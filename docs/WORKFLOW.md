@@ -144,5 +144,8 @@ other AWS delivery. Framework maintenance and the scorer do not access AWS.
 The doctor selects the next prompt. Fresh templates require current official AWS Core before initialization. Initialized projects skip that prerequisite during normal resume; missing or stale AWS Core evidence later pauses only the affected material AWS step. Correct only the reported blocker, then resume the derived prompt.
 
 Maintainers can run the optional, credential-free-to-validate
-[model role-play review](EVALUATION.md) before a release. Live model access is
-never part of ordinary CI.
+[model role-play review](EVALUATION.md) before a release. Its schema-4 manifest
+binds external transcript, scorecard, and adjudication files to the exact
+commit and prompt contract. A passing scorer result proves only exported
+evidence integrity and score consistency; it never claims release readiness.
+Live model access is never part of ordinary CI.
