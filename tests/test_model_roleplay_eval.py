@@ -304,6 +304,42 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
         self.assertFalse(passed)
         self.assertTrue(any("cannot be auto-converted" in error for error in result["errors"]))
 
+    def test_manifest_containment_handles_a_resolved_parent_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            real_parent = base / "real"
+            real_root = real_parent / "bundle"
+            real_root.mkdir(parents=True)
+            alias_parent = base / "alias"
+            try:
+                alias_parent.symlink_to(real_parent, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symlinks unavailable: {exc}")
+
+            lexical_root = alias_parent / "bundle"
+            manifest = lexical_root / "evaluation-manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+            errors: list[str] = []
+            resolved_root = model_roleplay_eval._bundle_root(lexical_root, errors)
+            self.assertIsNotNone(resolved_root, errors)
+            self.assertEqual(
+                model_roleplay_eval._manifest_path(
+                    manifest,
+                    lexical_root,
+                    resolved_root,
+                ),
+                manifest.resolve(),
+            )
+
+            linked_manifest = lexical_root / "linked-manifest.json"
+            linked_manifest.symlink_to(manifest)
+            with self.assertRaisesRegex(ValueError, "must not traverse a symlink"):
+                model_roleplay_eval._manifest_path(
+                    linked_manifest,
+                    lexical_root,
+                    resolved_root,
+                )
+
     def test_cli_requires_a_contained_manifest_and_pinned_revisions(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

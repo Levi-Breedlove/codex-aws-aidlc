@@ -507,24 +507,36 @@ def score_payload(
     return result, not errors
 
 
-def _manifest_path(path: Path, bundle_root: Path) -> Path:
+def _manifest_path(
+    path: Path,
+    lexical_root: Path,
+    resolved_root: Path,
+) -> Path:
     candidate = path if path.is_absolute() else Path.cwd() / path
+    root = lexical_root if lexical_root.is_absolute() else Path.cwd() / lexical_root
+    candidate = candidate.absolute()
+    root = root.absolute()
     try:
-        relative = candidate.absolute().relative_to(bundle_root)
+        relative = candidate.relative_to(root)
     except ValueError as exc:
         raise ValueError(
             "evaluation manifest must remain inside the evidence bundle"
         ) from exc
-    current = bundle_root
+    current = root
     try:
         for part in relative.parts:
             current = current / part
             if current.is_symlink():
                 raise ValueError("evaluation manifest must not traverse a symlink")
         resolved = current.resolve(strict=True)
-        resolved.relative_to(bundle_root)
     except OSError as exc:
         raise ValueError("evaluation manifest does not exist") from exc
+    try:
+        resolved.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError(
+            "evaluation manifest must remain inside the evidence bundle"
+        ) from exc
     if not resolved.is_file():
         raise ValueError("evaluation manifest must be a regular file")
     return resolved
@@ -556,7 +568,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if resolved_root is None:
             raise ValueError(errors[0])
-        manifest = _manifest_path(args.input, resolved_root)
+        manifest = _manifest_path(args.input, args.bundle_root, resolved_root)
         payload = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(json.dumps(_base_result([str(exc)]), indent=2, sort_keys=True))
