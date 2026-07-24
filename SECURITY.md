@@ -37,10 +37,20 @@ only when an owner manually copies it to `.codex/hooks.json` and accepts the
 native Codex trust prompt after review.
 
 The handler does not read transcripts, log prompts or tool inputs, persist
-trust or secrets, inspect credentials, or access AWS. It never auto-allows an
-approval request. Its denials and continuation checks are defense in depth. Doctor-projected write and external authority remain derived views of existing receipts; they grant nothing. A hook allow is never Gate A, Gate B, GitHub, AWS, or teardown authority. Review all
-active hook sources in `/hooks` because Codex can load matching hooks from more
-than one configuration layer.
+trust or secrets, inspect credentials, or access AWS. It consumes the doctor's
+normalized `external_authority.request_match` projection and never parses raw
+receipts independently. Structured AWS requests are checked only against
+observable exact fields. A multi-step account script requires exact reviewed
+bytes or a contained immutable artifact with the current approved digest;
+opaque or unbound scripts are denied rather than inferred from prose.
+
+The handler never auto-allows an approval request. Its denials and continuation
+checks are defense in depth. Doctor-projected write and external authority are
+derived views of existing records; they grant nothing. Lack of a hook denial is
+not Gate A, Gate B, GitHub, AWS, or teardown authority and does not replace
+native owner approval, the Codex sandbox, IAM, or observed AWS evidence. Review
+all active hook sources in `/hooks` because Codex can run matching hooks from
+more than one configuration layer.
 
 ## Setup controls
 

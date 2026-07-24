@@ -17,7 +17,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "^(Bash|apply_patch|mcp__.*)$",
+        "matcher": "^(Bash|apply_patch|use_aws|aws___.*|mcp__.*)$",
         "hooks": [
           {
             "type": "command",
@@ -31,7 +31,7 @@
     ],
     "PermissionRequest": [
       {
-        "matcher": "^(Bash|apply_patch|mcp__.*)$",
+        "matcher": "^(Bash|apply_patch|use_aws|aws___.*|mcp__.*)$",
         "hooks": [
           {
             "type": "command",
