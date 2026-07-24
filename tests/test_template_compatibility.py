@@ -68,6 +68,20 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn(expected, dependency)
         self.assertIn("Initialized projects skip the prerequisite gate", combined)
 
+    def test_maintenance_governance_separates_read_edit_and_publish_authority(self) -> None:
+        skill = (
+            REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
+        ).read_text(encoding="utf-8")
+        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(
+            encoding="utf-8"
+        )
+        for mode in ("AUDIT", "PLAN", "IMPLEMENT", "PUBLISH"):
+            self.assertIn(f"`{mode}`", skill)
+            self.assertIn(f"`{mode}`", workflow)
+        self.assertIn("Missing implementation scope stops", workflow)
+        self.assertIn("publication never", workflow)
+        self.assertNotIn("Delegate to `$fastlane`", skill)
+
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
         plan = model_roleplay_eval.plan_payload()
         self.assertEqual(len(plan["scenarios"]), 13)

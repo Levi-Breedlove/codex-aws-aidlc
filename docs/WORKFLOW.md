@@ -56,6 +56,16 @@ Gate B also records a risk-derived Harness Profile. It selects the smallest
 exact checks justified by the approved technology, risk, data, identity,
 exposure, recovery, and AWS lane; it never imposes a universal scanner.
 
+## Framework maintenance
+
+Fastlane framework work uses `maintain-fastlane`, never the adopter lifecycle.
+It has four modes: `AUDIT` and `PLAN` are read-only; `IMPLEMENT` permits only
+local edits inside a recorded baseline, outcome, non-goals, file allowlist,
+acceptance criteria, and change budget; and `PUBLISH` requires separate exact
+authority for each Git or release action. Missing implementation scope stops
+before editing. Unrelated findings remain report-only, and publication never
+follows merely from permission to edit.
+
 
 ## AWS Core throughout Fastlane
 

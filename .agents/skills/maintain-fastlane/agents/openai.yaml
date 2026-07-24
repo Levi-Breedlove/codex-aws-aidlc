@@ -1,6 +1,6 @@
 interface:
   display_name: "Maintain Fastlane"
   short_description: "Safely maintain the Fastlane framework"
-  default_prompt: "Use $maintain-fastlane to make the scoped framework change without starting an application lifecycle."
+  default_prompt: "Use $maintain-fastlane in AUDIT, PLAN, IMPLEMENT, or PUBLISH mode for scoped framework work without starting an application lifecycle."
 policy:
   allow_implicit_invocation: true

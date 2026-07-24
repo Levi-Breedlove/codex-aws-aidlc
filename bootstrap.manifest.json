@@ -23,8 +23,8 @@
     ".agents/skills/fastlane/references/owner-responses.md": "688d219ba8ca382869728760e2fa133c1b8761035c59745783927d0945bd9f34",
     ".agents/skills/launch-fastlane/SKILL.md": "73b0378bf1b74bba25ed33dfa067fe87340e109ca419230b245f3b2fea21fa5a",
     ".agents/skills/launch-fastlane/agents/openai.yaml": "62084196ff3e2f9fc533a4f0f77831b0264ebe3b9723efa1f84b5e9b46d52b02",
-    ".agents/skills/maintain-fastlane/SKILL.md": "a2d8add8acf88884194d9aa51149c48dd450805ec648d7f4afad6b09cd125186",
-    ".agents/skills/maintain-fastlane/agents/openai.yaml": "a020bbacf8fcfee0b9df8abe9927f7099c8bdc7961b4dda47088cd8f7dffa940",
+    ".agents/skills/maintain-fastlane/SKILL.md": "5ac33cd88b3f8fe03cfa22f5a18d9714d1082fee32e69ddc360ea8d47e44ae1f",
+    ".agents/skills/maintain-fastlane/agents/openai.yaml": "eabb8159ed9e1368b947bc1f75458d3cb7523e069def7ccdb5e1ab74f144b822",
     ".agents/skills/operate-fastlane-aws/SKILL.md": "6e82b94ffd596630e315316923d2cb58e942d5487ca05e59c959a60c903e6b0f",
     ".agents/skills/operate-fastlane-aws/agents/openai.yaml": "a22467c64e3dd4c74785d9f13189da90b2374c5f7c048b6d0681ddf9d3a0fe4f",
     ".agents/skills/plan-fastlane/SKILL.md": "05e50fcccfb00705e8162e5288b593c03503bdbf9bd2ce261df94d16628d8e62",
@@ -53,7 +53,7 @@
     "docs/HOOKS.md": "99361ed4a206a38281b61c68266e182b7d2c3384dbef39d0cc307650e92ba0ba",
     "docs/SETUP.md": "919f93e619ee111a12b67b7d7f9f2dca8c37c126488755b2765da5089c431b12",
     "docs/TROUBLESHOOTING.md": "4549428b5a1af8d326e2b8cae71624a6354ed4c6045940cb081402df42856205",
-    "docs/WORKFLOW.md": "0489584012d76b16615de3eb58113ded2698e10b9556df9065cd94b250079d56",
+    "docs/WORKFLOW.md": "456f504620df4fa09315da4d8787ebbad5f8c62acd822f5d2c75833d33e130f6",
     "docs/adr/0000-template.md": "82c8e4f1333b6d16776897eb8abc7e6ee8656b9ce3c90fc9f2f68f59c82afe86",
     "docs/project/BUGFIX.md": "d6bf2c93f720b16ce138a73d6f86a51393ece915526c4d5c969dd72d2919a424",
     "docs/project/PRD.md": "c72a0f9090e76973447edc92fff04a8f33bc07826077eda4257a31b7fe47e3ef",
@@ -84,10 +84,10 @@
     "tests/test_markdown_integrity.py": "b5a851436056c44490e7fec12fbf5198e825a29598937c99ccce9852885d4a4d",
     "tests/test_model_roleplay_eval.py": "a788ca5741b824b9a387e855d7a24a2313b481f37d5401ab798bdcebc2fcb66f",
     "tests/test_package_release.py": "9179da9511431d64f7fc3d94ba840dd8015bea6e4f039ff6b4c3f11b96490b74",
-    "tests/test_prompt_contracts.py": "953578f483d92c5e1705d8ad1f74ceb870893e277636f2d9813d2287572b683c",
+    "tests/test_prompt_contracts.py": "5b5f5f5323d0706d59cfc99c121e2ab5ed31b992ab3984592173e7278d94db9e",
     "tests/test_setup_assistant.py": "06a43f9fffe71c66be4010351ae6159198cc82e043c6efda2de6d86a7048824f",
     "tests/test_task_waves.py": "dfbc169756ca5f983ad6abb6caf884e38e580b2eb84d2adce6c31ba57b375221",
-    "tests/test_template_compatibility.py": "7b0ce91c30960dd312b3122472d13c962fa56540e26c2b61be0a9cbbe1771c79"
+    "tests/test_template_compatibility.py": "ca9f3482803fb7c14830ca4866d3f09b97d5cce0147f019847eb54fae2fb11d8"
   },
   "required_files": [
     ".agents/skills/build-fastlane/SKILL.md",

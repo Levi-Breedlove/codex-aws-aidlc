@@ -977,6 +977,34 @@ class PromptPackContractTests(unittest.TestCase):
             REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
         ).read_text(encoding="utf-8")
         self.assertIn("never adopter application planning", maintain)
+        for mode in ("AUDIT", "PLAN", "IMPLEMENT", "PUBLISH"):
+            self.assertIn(f"`{mode}`", maintain)
+        self.assertIn("default to `AUDIT` or", maintain)
+        self.assertIn("require explicit `PUBLISH` authority", maintain)
+        self.assertIn("baseline branch and exact commit", maintain)
+        self.assertIn("exact file allowlist", maintain)
+        self.assertIn("observable acceptance criteria", maintain)
+        self.assertIn("maximum changed files", maintain)
+        self.assertIn("Unrelated discoveries are report-only", maintain)
+        self.assertIn("Stop before widening", maintain)
+        for route in ("BOOT", "INTAKE", "DESIGN", "BUILD"):
+            self.assertIn(route, maintain)
+
+    def test_maintenance_modes_do_not_delegate_to_application_lifecycle(self) -> None:
+        maintain = (
+            REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
+        ).read_text(encoding="utf-8")
+        config = (
+            REPOSITORY_ROOT
+            / ".agents/skills/maintain-fastlane/agents/openai.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("never starts", maintain)
+        self.assertNotIn("Delegate to `$fastlane`", maintain)
+        self.assertNotIn("init template", maintain)
+        self.assertNotIn("APPROVE REQUIREMENTS GATE A", maintain)
+        self.assertNotIn("APPROVE PRD AND CONSTRUCTION GATE B", maintain)
+        self.assertIn("AUDIT, PLAN, IMPLEMENT, or PUBLISH", config)
+        self.assertIn("without starting an application lifecycle", config)
 
     def test_task_cards_are_human_first_with_collapsed_exact_metadata(self) -> None:
         self.assertIn("## How to read a task card", self.tasks)
