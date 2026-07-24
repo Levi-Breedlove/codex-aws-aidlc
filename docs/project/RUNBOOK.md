@@ -288,6 +288,27 @@ command. At the next checkpoint:
 `PARTIAL` or `UNKNOWN` state is a mandatory stop unless the current authorization
 explicitly covers the reconciled corrective or rollback action.
 
+## AWS execution lanes
+
+Use `STRUCTURED_API` for one attributable AWS API operation whose service,
+operation, parameters, Region/profile when exposed, and target resource can be
+compared with the doctor's current `external_authority.request_match` object.
+Missing or ambiguous observable fields stop mutation.
+
+Use `REVIEWED_SCRIPT` only for a legitimate multi-step, cross-service,
+paginated, retrying, parallel, conditional, or verification workflow. Before
+execution, record one current `AWS-EXEC-*` row in `VERIFY.md` that binds the
+exact authority and either the exact script SHA-256 or an immutable reviewed
+artifact SHA-256. Hash observable script bytes at execution and compare them;
+for an artifact, verify the contained regular file and its digest. An opaque or
+unbound script is not exact Fastlane verification and cannot mutate or tear
+down AWS resources.
+
+Both lanes remain subject to normal Codex owner approval, IAM, the exact
+deployment or teardown boundary, and AWS-30/AWS-50 evidence reconciliation.
+An execution contract grants no authority, and deployment authority never
+authorizes teardown.
+
 ## 6. Deployment
 
 Record the exact reviewed artifact:

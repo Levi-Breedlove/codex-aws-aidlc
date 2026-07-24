@@ -1941,6 +1941,121 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(authority["rollback_boundary"], "rollback fastlane-stack")
         self.assertEqual(authority["expiration"], "2099-01-01T00:00:00Z")
 
+        ctx = doctor.Context(Path("."))
+        ctx.texts[doctor.VERIFY_FILE] = "".join(lines)
+        request_match = doctor.derive_request_match(ctx, authority)
+        self.assertEqual(request_match["schema_version"], 1)
+        self.assertEqual(request_match["authority_kind"], "AWS_DEPLOYMENT")
+        self.assertEqual(request_match["account"], "111122223333")
+        self.assertEqual(request_match["region"], "us-west-2")
+        self.assertEqual(request_match["resources"], ["fastlane-stack"])
+        self.assertEqual(
+            request_match["operations"],
+            [
+                "cloudformation:CreateChangeSet",
+                "cloudformation:ExecuteChangeSet",
+            ],
+        )
+        self.assertEqual(
+            request_match["cost_ceiling"],
+            {"currency": "USD", "amount": "20.00"},
+        )
+        self.assertEqual(request_match["allowed_execution_lanes"], ["STRUCTURED_API"])
+        self.assertIsNone(request_match["reviewed_script"])
+
+    def test_reviewed_script_contract_is_exact_current_and_fail_closed(self) -> None:
+        verify_template = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(
+            encoding="utf-8"
+        )
+        authority = {
+            "kind": "AWS_DEPLOYMENT",
+            "validity": "CURRENT",
+            "authorization_id": "AWS-AUTH-0001",
+            "receipt_digest": "sha256:" + "c" * 64,
+            "account": "111122223333",
+            "region": "us-west-2",
+            "environment": "development",
+            "role_or_profile": "fastlane-deployment-role",
+            "resources": ["fastlane-stack"],
+            "operations": [
+                "cloudformation:CreateChangeSet",
+                "cloudformation:ExecuteChangeSet",
+            ],
+            "artifact_plan_binding": {
+                "artifact": "sha256:" + "a" * 64,
+                "plan": "TYPE: CLOUDFORMATION_CHANGE_SET; IDENTIFIER: canary; "
+                "DIGEST: sha256:" + "b" * 64,
+            },
+            "cost_ceiling": "USD: 20.00",
+            "rollback_boundary": "rollback fastlane-stack",
+            "expiration": "2099-01-01T00:00:00Z",
+        }
+        row = (
+            "| AWS-EXEC-0001 | AWS_DEPLOYMENT | AWS-AUTH-0001 | sha256:"
+            + "c" * 64
+            + " | sha256:"
+            + "d" * 64
+            + " | NONE | cloudformation:CreateChangeSet | fastlane-stack | "
+            "111122223333 | us-west-2 | development | fastlane-deployment-role | "
+            "sha256:"
+            + "a" * 64
+            + " | TYPE: CLOUDFORMATION_CHANGE_SET; IDENTIFIER: canary; DIGEST: sha256:"
+            + "b" * 64
+            + " | USD: 20.00 | rollback fastlane-stack | 2099-01-01T00:00:00Z | "
+            "EV-0601 | CURRENT |"
+        )
+
+        def with_rows(*rows: str) -> str:
+            lines = verify_template.splitlines()
+            heading = lines.index("## Reviewed AWS execution contracts")
+            data_index = next(
+                index
+                for index in range(heading + 1, len(lines))
+                if lines[index].startswith("| TODO | TODO |")
+            )
+            lines[data_index : data_index + 1] = list(rows)
+            return "\n".join(lines) + "\n"
+
+        ctx = doctor.Context(Path("."))
+        ctx.texts[doctor.VERIFY_FILE] = with_rows(row)
+        request_match = doctor.derive_request_match(ctx, authority)
+        self.assertEqual(
+            request_match["allowed_execution_lanes"],
+            ["STRUCTURED_API", "REVIEWED_SCRIPT"],
+        )
+        reviewed = request_match["reviewed_script"]
+        self.assertEqual(reviewed["execution_id"], "AWS-EXEC-0001")
+        self.assertEqual(reviewed["content_binding"]["kind"], "SCRIPT_SHA256")
+        self.assertEqual(reviewed["evidence_destination"], "EV-0601")
+        self.assertEqual(ctx.diagnostics, [])
+
+        invalid_rows = {
+            "mismatched authority": row.replace(
+                "AWS-AUTH-0001 | sha256:", "AWS-AUTH-9999 | sha256:", 1
+            ),
+            "expired": row.replace(
+                "2099-01-01T00:00:00Z | EV-0601",
+                "2000-01-01T00:00:00Z | EV-0601",
+            ),
+            "unbound": row.replace("| sha256:" + "d" * 64 + " | NONE |", "| NONE | NONE |"),
+        }
+        for label, invalid_row in invalid_rows.items():
+            with self.subTest(label=label):
+                invalid_ctx = doctor.Context(Path("."))
+                invalid_ctx.texts[doctor.VERIFY_FILE] = with_rows(invalid_row)
+                invalid_match = doctor.derive_request_match(invalid_ctx, authority)
+                self.assertEqual(invalid_match["allowed_execution_lanes"], ["STRUCTURED_API"])
+                self.assertIsNone(invalid_match["reviewed_script"])
+                self.assertTrue(
+                    any(item.code == "AWS_EXECUTION_CONTRACT_INVALID" for item in invalid_ctx.diagnostics)
+                )
+
+        duplicate_ctx = doctor.Context(Path("."))
+        duplicate_ctx.texts[doctor.VERIFY_FILE] = with_rows(row, row)
+        duplicate_match = doctor.derive_request_match(duplicate_ctx, authority)
+        self.assertEqual(duplicate_match["allowed_execution_lanes"], ["STRUCTURED_API"])
+        self.assertIsNone(duplicate_match["reviewed_script"])
+
     def test_gate_b_binds_live_design_contract_hash_and_required_scope_ids(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
@@ -3714,9 +3829,26 @@ class BootstrapDoctorTests(unittest.TestCase):
             valid_mutation_report["external_authority"]["cost_ceiling"],
             "USD: 20.00",
         )
+        request_match = valid_mutation_report["external_authority"]["request_match"]
+        self.assertEqual(request_match["schema_version"], 1)
+        self.assertEqual(request_match["authority_kind"], "FAST_DEV_GATE_B")
+        self.assertEqual(request_match["account"], "123456789012")
+        self.assertEqual(request_match["region"], "us-west-2")
+        self.assertEqual(
+            request_match["cost_ceiling"],
+            {"currency": "USD", "amount": "20.00"},
+        )
+        self.assertNotIn("ACCOUNT:", request_match["account"])
+        self.assertNotIn("REGION:", request_match["region"])
+        self.assertEqual(request_match["allowed_execution_lanes"], ["STRUCTURED_API"])
+        self.assertIsNone(request_match["reviewed_script"])
         self.assertEqual(
             explicit_gate_report["external_authority"]["kind"],
             "AWS_ACTION_RECEIPT_REQUIRED",
+        )
+        self.assertEqual(
+            explicit_gate_report["external_authority"]["request_match"]["validity"],
+            "BLOCKED",
         )
 
     def test_cost_posture_and_mutation_ceiling_are_canonical_and_bounded(self) -> None:

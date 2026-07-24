@@ -713,6 +713,19 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertRegex(self.prd, r"not a separate audit or\s+gate")
         self.assertLessEqual(len(self.root_readme.splitlines()), 90)
 
+    def test_aws_execution_lanes_are_derived_and_do_not_create_authority(self) -> None:
+        for document in (self.verify, self.runbook, self.prompts):
+            self.assertIn("STRUCTURED_API", document)
+            self.assertIn("REVIEWED_SCRIPT", document)
+            self.assertIn("AWS-EXEC-*", document)
+        self.assertIn("request_match", self.runbook)
+        self.assertIn("does not grant authority", self.verify)
+        self.assertIn("grants nothing", self.prompts)
+        self.assertIn("Natural-language descriptions do\nnot prove", self.verify)
+        self.assertIn("Deployment and teardown remain separate", self.prompts)
+        self.assertIn("<!-- bootstrap:aws-deployment-receipt:start -->", self.verify)
+        self.assertIn("<!-- bootstrap:aws-teardown-receipt:start -->", self.verify)
+
     def test_profiles_are_overlays_not_additional_gates(self) -> None:
         for document in (self.prompts, self.prd, self.agents):
             self.assertIn("`quick-mvp`", document)

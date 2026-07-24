@@ -271,6 +271,29 @@ An AWS submission is not proof of completion. After a deployment, rollback, or
 teardown attempt, use read-only evidence to record succeeded, failed, partial,
 or unknown state before continuing.
 
+## Reviewed AWS execution contracts
+
+Use `STRUCTURED_API` for a discrete attributable AWS operation; it needs no
+execution-contract row. Use `REVIEWED_SCRIPT` and `AWS-EXEC-*` only when AWS
+Core requires a multi-step `run_script` workflow. This table does not grant authority.
+A `CURRENT` row must bind to the
+exact current Gate B or deployment/teardown authority and to exactly one
+observable script digest or immutable reviewed artifact digest. Structured
+single-API calls do not require an execution-contract row.
+
+| Execution ID | Authority kind | Authorization ID | Receipt digest | Script SHA-256 | Immutable artifact SHA-256 | Expected operations | Resources | Account | Region | Environment | Role or profile | Artifact digest | Plan binding | Cost ceiling | Rollback boundary | Valid until | Evidence destination | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
+
+Allowed binding kinds are represented by the populated digest column:
+`Script SHA-256` binds exact UTF-8 script bytes; `Immutable artifact SHA-256`
+binds a separately reviewed immutable script artifact. Put `NONE` in the other
+digest column. `Expected operations` and `Resources` must be non-empty subsets
+of the current authority. `Valid until` cannot exceed the authority expiry.
+Any stale, duplicate, expired, mismatched, or unbound row is diagnostic only
+and cannot enable reviewed-script execution. Natural-language descriptions do
+not prove script contents.
+
 ## Action authorization provenance
 
 This table proves which exact owner message was checked before an external

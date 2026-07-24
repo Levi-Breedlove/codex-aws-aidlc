@@ -7016,6 +7016,234 @@ def derive_external_authority(
         "rollback_boundary": envelope.get("AWS rollback boundary", "NONE"),
         "expiration": expiration.isoformat(),
     }
+
+
+AWS_EXECUTION_CONTRACT_HEADERS = (
+    "Execution ID",
+    "Authority kind",
+    "Authorization ID",
+    "Receipt digest",
+    "Script SHA-256",
+    "Immutable artifact SHA-256",
+    "Expected operations",
+    "Resources",
+    "Account",
+    "Region",
+    "Environment",
+    "Role or profile",
+    "Artifact digest",
+    "Plan binding",
+    "Cost ceiling",
+    "Rollback boundary",
+    "Valid until",
+    "Evidence destination",
+    "Status",
+)
+
+
+def _machine_value(value: Any, *labels: str) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = clean_cell(value)
+    if cleaned == "NONE" or unresolved(cleaned) or cleaned.startswith("NOT_APPLICABLE"):
+        return None
+    for label in labels:
+        prefix = label + ":"
+        if cleaned.startswith(prefix):
+            candidate = clean_cell(cleaned[len(prefix) :])
+            return candidate if explicit_value(candidate) else None
+    return cleaned if explicit_value(cleaned) else None
+
+
+def _machine_list(values: Any, label: str) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    result: list[str] = []
+    for value in values:
+        normalized = _machine_value(value, label)
+        if normalized is not None and normalized not in result:
+            result.append(normalized)
+    return result
+
+
+def _machine_cost(value: Any) -> dict[str, str] | None:
+    normalized = _machine_value(value)
+    if normalized is None:
+        return None
+    match = re.fullmatch(r"(?P<currency>[A-Z]{3}):\s*(?P<amount>\d+(?:\.\d{1,2})?)", normalized)
+    if match is None:
+        return None
+    try:
+        amount = Decimal(match.group("amount"))
+    except InvalidOperation:
+        return None
+    if amount <= 0:
+        return None
+    return {"currency": match.group("currency"), "amount": f"{amount:.2f}"}
+
+
+def _execution_contract_rows(verify_text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    expected = list(AWS_EXECUTION_CONTRACT_HEADERS)
+    for table in markdown_tables(verify_text):
+        if not table or table[0] != expected:
+            continue
+        for cells in table[2:]:
+            if len(cells) == len(expected):
+                rows.append(dict(zip(expected, cells)))
+    return rows
+
+
+def _iso_datetime(value: str) -> datetime | None:
+    cleaned = clean_cell(value)
+    normalized = cleaned[:-1] + "+00:00" if cleaned.endswith("Z") else cleaned
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed
+
+
+def _reviewed_script_contract(
+    ctx: Context, request_match: dict[str, Any]
+) -> dict[str, Any] | None:
+    rows = [
+        row
+        for row in _execution_contract_rows(ctx.texts.get(VERIFY_FILE, ""))
+        if re.fullmatch(r"AWS-EXEC-\d{4,}", clean_cell(row["Execution ID"]))
+    ]
+    if not rows:
+        return None
+    ids = [clean_cell(row["Execution ID"]) for row in rows]
+    if len(ids) != len(set(ids)):
+        ctx.warning(
+            "AWS_EXECUTION_CONTRACT_INVALID",
+            "Reviewed AWS execution contracts contain a duplicate AWS-EXEC ID",
+            VERIFY_FILE,
+        )
+        return None
+    authorization_id = request_match.get("authorization_id") or "NONE"
+    candidates = [
+        row for row in rows if clean_cell(row["Authorization ID"]) == authorization_id
+    ]
+    if len(candidates) != 1:
+        ctx.warning(
+            "AWS_EXECUTION_CONTRACT_INVALID",
+            f"Expected one current AWS-EXEC contract for {authorization_id}; found {len(candidates)}",
+            VERIFY_FILE,
+        )
+        return None
+    row = candidates[0]
+    execution_id = clean_cell(row["Execution ID"])
+    issues: list[str] = []
+
+    expected_scalars = {
+        "Authority kind": request_match.get("authority_kind") or "NONE",
+        "Receipt digest": request_match.get("receipt_digest") or "NONE",
+        "Account": request_match.get("account") or "NONE",
+        "Region": request_match.get("region") or "NONE",
+        "Environment": request_match.get("environment") or "NONE",
+        "Role or profile": request_match.get("role_or_profile") or "NONE",
+        "Artifact digest": request_match.get("artifact_digest") or "NONE",
+        "Plan binding": request_match.get("plan_binding") or "NONE",
+        "Rollback boundary": request_match.get("rollback_boundary") or "NONE",
+    }
+    cost = request_match.get("cost_ceiling")
+    expected_scalars["Cost ceiling"] = (
+        f"{cost['currency']}: {cost['amount']}" if isinstance(cost, dict) else "NONE"
+    )
+    for field_name, expected_value in expected_scalars.items():
+        if clean_cell(row[field_name]) != expected_value:
+            issues.append(f"{field_name} does not match current authority")
+
+    operations = _split_authority_values(row["Expected operations"])
+    resources = _split_authority_values(row["Resources"])
+    if not operations or not set(operations).issubset(set(request_match["operations"])):
+        issues.append("Expected operations exceed current authority")
+    if not resources or not set(resources).issubset(set(request_match["resources"])):
+        issues.append("Resources exceed current authority")
+
+    script_digest = clean_cell(row["Script SHA-256"])
+    artifact_digest = clean_cell(row["Immutable artifact SHA-256"])
+    digest_pattern = re.compile(r"sha256:[0-9a-f]{64}")
+    bindings = [
+        ("SCRIPT_SHA256", script_digest),
+        ("IMMUTABLE_ARTIFACT_SHA256", artifact_digest),
+    ]
+    valid_bindings = [item for item in bindings if digest_pattern.fullmatch(item[1])]
+    other_values = [value for _kind, value in bindings if value != "NONE"]
+    if len(valid_bindings) != 1 or len(other_values) != 1:
+        issues.append("exactly one reviewed script or immutable artifact digest is required")
+
+    valid_until = _iso_datetime(row["Valid until"])
+    authority_expiry = _iso_datetime(request_match.get("expires_at") or "")
+    if (
+        valid_until is None
+        or authority_expiry is None
+        or valid_until <= datetime.now(timezone.utc)
+        or valid_until > authority_expiry
+    ):
+        issues.append("Valid until is expired or exceeds current authority")
+    evidence_destination = clean_cell(row["Evidence destination"])
+    if re.fullmatch(r"EV-[0-9]{4,}", evidence_destination) is None:
+        issues.append("Evidence destination must be one stable EV ID")
+    if clean_cell(row["Status"]) != "CURRENT":
+        issues.append("Status must be CURRENT")
+
+    if issues:
+        ctx.warning(
+            "AWS_EXECUTION_CONTRACT_INVALID",
+            f"{execution_id}: " + "; ".join(issues),
+            VERIFY_FILE,
+        )
+        return None
+    binding_kind, binding_digest = valid_bindings[0]
+    return {
+        "execution_id": execution_id,
+        "content_binding": {"kind": binding_kind, "sha256": binding_digest},
+        "expected_operations": operations,
+        "resources": resources,
+        "valid_until": clean_cell(row["Valid until"]),
+        "evidence_destination": evidence_destination,
+    }
+
+
+def derive_request_match(ctx: Context, authority: dict[str, Any]) -> dict[str, Any]:
+    raw_validity = clean_cell(str(authority.get("validity", "NONE")))
+    validity = raw_validity if raw_validity in {"CURRENT", "NONE", "STALE", "BLOCKED"} else "BLOCKED"
+    binding = authority.get("artifact_plan_binding")
+    binding = binding if isinstance(binding, dict) else {}
+    request_match: dict[str, Any] = {
+        "schema_version": 1,
+        "validity": validity,
+        "authority_kind": _machine_value(authority.get("kind")),
+        "authorization_id": _machine_value(authority.get("authorization_id")),
+        "receipt_digest": _machine_value(authority.get("receipt_digest")),
+        "account": _machine_value(authority.get("account"), "ACCOUNT"),
+        "region": _machine_value(authority.get("region"), "REGION"),
+        "environment": _machine_value(authority.get("environment"), "ENVIRONMENT"),
+        "role_or_profile": _machine_value(authority.get("role_or_profile"), "ROLE"),
+        "resources": _machine_list(authority.get("resources"), "RESOURCES"),
+        "operations": _machine_list(authority.get("operations"), "OPERATIONS"),
+        "artifact_digest": _machine_value(binding.get("artifact"), "EXACT_DIGEST"),
+        "plan_binding": _machine_value(binding.get("plan"), "STACK"),
+        "cost_ceiling": _machine_cost(authority.get("cost_ceiling")),
+        "rollback_boundary": _machine_value(authority.get("rollback_boundary"), "ROLLBACK"),
+        "expires_at": _machine_value(authority.get("expiration")),
+        "allowed_execution_lanes": [],
+        "reviewed_script": None,
+    }
+    if validity != "CURRENT":
+        return request_match
+    request_match["allowed_execution_lanes"] = ["STRUCTURED_API"]
+    reviewed_script = _reviewed_script_contract(ctx, request_match)
+    if reviewed_script is not None:
+        request_match["allowed_execution_lanes"].append("REVIEWED_SCRIPT")
+        request_match["reviewed_script"] = reviewed_script
+    return request_match
+
 def build_report(
     ctx: Context,
     lifecycle_state: str,
@@ -7092,6 +7320,9 @@ def build_report(
     )
     external_authority = derive_external_authority(
         ctx, envelope, lane, construction_authorization
+    )
+    external_authority["request_match"] = derive_request_match(
+        ctx, external_authority
     )
     diagnostic_codes = [item.code for item in ctx.diagnostics]
     interaction = derive_interaction(
