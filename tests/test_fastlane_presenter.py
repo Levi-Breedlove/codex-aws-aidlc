@@ -84,6 +84,26 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("Install Codex", rendered)
         self.assertIn("Install uv", rendered)
 
+    def test_unconfigured_template_owner_update_routes_to_prerequisites(self) -> None:
+        rendered = presenter.render_owner_update(
+            report(
+                owner_stage="DEFINE",
+                response_mode="BLOCKER",
+                state="BLOCKED",
+                route_reason_code="UNCONFIGURED_TEMPLATE",
+                owner_action_required=True,
+                owner_action_kind="COMPLETE_PREREQUISITE_CHECKLIST",
+                automatic_continuation_allowed=False,
+            )
+        )
+
+        self.assertTrue(rendered.startswith("FASTLANE \u00b7 DEFINE"))
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("This template has not been initialized.", rendered)
+        self.assertIn("Complete the prerequisite checklist", rendered)
+        self.assertIn("verify prerequisites before asking project questions", rendered)
+        self.assertNotIn("Resolve the listed validation failure", rendered)
+
     def test_delivery_progress_uses_doctor_task_fields(self) -> None:
         current = report(
             owner_stage="DELIVER",

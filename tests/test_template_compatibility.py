@@ -46,6 +46,18 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn("Missing implementation scope stops", workflow)
         self.assertIn("publication never", workflow)
         self.assertNotIn("Delegate to `$fastlane`", skill)
+        self.assertIn("pull requests targeting only that preview branch", workflow)
+        self.assertIn("direct push to `fast-lane-maint` requires explicit emergency", workflow)
+        self.assertIn("Force pushes and deletion", workflow)
+        self.assertIn("separate repository-setting action", workflow)
+        for check in (
+            "safety-tests (3.11)",
+            "safety-tests (3.12)",
+            "safety-tests (3.13)",
+            "windows-smoke",
+            "macos-setup-smoke",
+        ):
+            self.assertIn(f"`{check}`", workflow)
 
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
         plan = model_roleplay_eval.plan_payload()

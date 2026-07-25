@@ -224,7 +224,12 @@ class FastlaneHookTests(unittest.TestCase):
 
     def test_unconfigured_template_session_start_routes_to_prerequisites(self) -> None:
         observed = fastlane_hook.run_doctor(self.root)
-        self.assertEqual(observed["interaction"]["owner_stage"], "DELIVER")
+        self.assertEqual(observed["classification"], "UNCONFIGURED_TEMPLATE")
+        self.assertEqual(observed["interaction"]["owner_stage"], "DEFINE")
+        self.assertEqual(
+            observed["interaction"]["owner_action_kind"],
+            "COMPLETE_PREREQUISITE_CHECKLIST",
+        )
         result = fastlane_hook.handle_event(
             "session-start",
             payload("SessionStart", self.root),

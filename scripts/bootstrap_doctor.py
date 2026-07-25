@@ -6640,6 +6640,12 @@ def derive_interaction(
 ) -> dict[str, Any]:
     """Derive stable owner interaction metadata without conversational prose."""
 
+    aws_evidence_failure = any(code.startswith("AWS_CORE_") for code in diagnostic_codes)
+    design_evidence_failure = any(
+        code in {"AWS_CORE_EVIDENCE_REQUIRED", "AWS_CORE_EVIDENCE_STRUCTURE"}
+        for code in diagnostic_codes
+    )
+
     if lifecycle_state in {
         "INTAKE_REQUIRED",
         "REQUIREMENTS_ANALYSIS",
@@ -6649,10 +6655,11 @@ def derive_interaction(
         owner_stage = "DEFINE"
     elif lifecycle_state in {"DESIGN_REQUIRED", "DESIGN_STALE", "WAITING_GATE_B"}:
         owner_stage = "DESIGN"
+    elif design_evidence_failure:
+        owner_stage = "DESIGN"
     else:
         owner_stage = "DELIVER"
 
-    aws_evidence_failure = any(code.startswith("AWS_CORE_") for code in diagnostic_codes)
     if has_errors or lifecycle_state == "BLOCKED":
         response_mode = "BLOCKER"
         state = "BLOCKED"
@@ -6727,6 +6734,28 @@ def derive_interaction(
         "aws_core": {
             "materiality": "MATERIAL" if material else "NOT_MATERIAL",
             "evidence_status": evidence_status,
+        },
+    }
+
+
+def derive_unconfigured_template_interaction(
+    diagnostic_codes: list[str],
+) -> dict[str, Any]:
+    """Return honest setup-first metadata for an untouched adopter template."""
+
+    return {
+        "owner_stage": "DEFINE",
+        "response_mode": "BLOCKER",
+        "state": "BLOCKED",
+        "route_reason_code": "UNCONFIGURED_TEMPLATE",
+        "owner_action_required": True,
+        "owner_action_kind": "COMPLETE_PREREQUISITE_CHECKLIST",
+        "blocking_ids": sorted(set(diagnostic_codes)),
+        "automatic_continuation_allowed": False,
+        "formal_receipt_required": False,
+        "aws_core": {
+            "materiality": "NOT_MATERIAL",
+            "evidence_status": "NOT_REQUIRED",
         },
     }
 
@@ -7276,7 +7305,10 @@ def build_report(
         )
     if ctx.template_source:
         classification = "TEMPLATE_SOURCE"
-    elif setup.get("status") == "UNCONFIGURED_TEMPLATE":
+    elif setup.get("status") in {
+        "UNCONFIGURED_TEMPLATE",
+        "{{SETUP_STATUS}}",
+    }:
         classification = "UNCONFIGURED_TEMPLATE"
     elif project.get("mode") == "brownfield":
         classification = "ACTIVE_BROWNFIELD"
@@ -7333,6 +7365,10 @@ def build_report(
         design_aws_core_ready=design_aws_core_ready,
         aws_execution_planning_ready=aws_execution_planning_ready,
     )
+    if classification == "UNCONFIGURED_TEMPLATE" or (
+        classification == "TEMPLATE_SOURCE" and ctx.has_errors
+    ):
+        interaction = derive_unconfigured_template_interaction(diagnostic_codes)
     return {
         "schema_version": 2,
         "bootstrap_version": manifest.get(

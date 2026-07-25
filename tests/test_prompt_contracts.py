@@ -1002,6 +1002,19 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("Stop before widening", maintain)
         for route in ("BOOT", "INTAKE", "DESIGN", "BUILD"):
             self.assertIn(route, maintain)
+        self.assertIn("short-lived maintenance branch", maintain)
+        self.assertIn("targeting only\n   `fast-lane-maint`", maintain)
+        for check in (
+            "safety-tests (3.11)",
+            "safety-tests (3.12)",
+            "safety-tests (3.13)",
+            "windows-smoke",
+            "macos-setup-smoke",
+        ):
+            self.assertIn(f"`{check}`", maintain)
+        self.assertIn("explicit emergency publication", maintain)
+        self.assertIn("Never force-push or delete", maintain)
+        self.assertIn("separate repository-setting action", maintain)
 
     def test_maintenance_modes_do_not_delegate_to_application_lifecycle(self) -> None:
         maintain = (

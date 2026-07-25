@@ -1028,6 +1028,39 @@ class BootstrapDoctorTests(unittest.TestCase):
         return known_green
 
     @source_template_only
+    def test_ordinary_doctor_routes_untouched_template_to_prerequisites(self) -> None:
+        report = doctor.inspect_project(PROJECT_ROOT)
+
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertEqual(report["classification"], "UNCONFIGURED_TEMPLATE")
+        self.assertEqual(
+            report["gates"], {"gate_a": "BLOCKED", "gate_b": "BLOCKED"}
+        )
+        self.assertEqual(report["authorizations"]["construction"], "NONE")
+        self.assertEqual(report["authorizations"]["aws"], "NONE")
+        self.assertEqual(
+            report["interaction"],
+            {
+                "owner_stage": "DEFINE",
+                "response_mode": "BLOCKER",
+                "state": "BLOCKED",
+                "route_reason_code": "UNCONFIGURED_TEMPLATE",
+                "owner_action_required": True,
+                "owner_action_kind": "COMPLETE_PREREQUISITE_CHECKLIST",
+                "blocking_ids": sorted(
+                    {item["code"] for item in report["diagnostics"]}
+                ),
+                "automatic_continuation_allowed": False,
+                "formal_receipt_required": False,
+                "aws_core": {
+                    "materiality": "NOT_MATERIAL",
+                    "evidence_status": "NOT_REQUIRED",
+                },
+            },
+        )
+
+    @source_template_only
     def test_template_source_is_coherent_and_routes_to_intake(self) -> None:
         report = doctor.inspect_project(PROJECT_ROOT, template_source=True)
 
