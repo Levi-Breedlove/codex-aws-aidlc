@@ -356,11 +356,13 @@ class PromptPackContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         for heading in (
+            "### Adaptive coverage plan",
             "### Architecture drivers",
             "### Whole-system candidates",
             "### Selected architecture",
             "### Architecture traceability",
             "### Material AWS evidence",
+            "### Change impact record",
         ):
             self.assertIn(heading, self.prd)
         for stable_id in ("DRV-*", "CAND-*", "ARCH-*", "AWS-EV-*"):
@@ -375,7 +377,18 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("challenger prose cannot replace those calls", design_reference)
         self.assertIn("name the selected `ARCH-*` as the", design)
         self.assertIn("include the selected `ARCH-*`", design)
-        self.assertIn("full architecture+technology+property digest", self.prd)
+        self.assertIn("full design-contract digest", self.prd)
+        self.assertIn("Adaptive Coverage Plan", design)
+        self.assertIn("Adaptive Coverage Plan", design_reference)
+        self.assertIn("Change impact record", design)
+        self.assertIn("Change impact record", design_reference)
+        for field in (
+            "Security impact",
+            "Reliability impact",
+            "Operational burden",
+            "Migration path",
+        ):
+            self.assertIn(field, self.prd)
         self.assertIn("grandfathered until the next design-controlled change", self.prd)
         for finding in (
             "unsupported AWS claim",

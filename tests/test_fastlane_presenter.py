@@ -60,6 +60,47 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("Need from you: Nothing.", rendered)
         self.assertIn("compare complete architecture candidates", rendered)
 
+
+    def test_coverage_plan_is_rendered_without_internal_method_terms(self) -> None:
+        expected = {
+            "SELECT": "compare complete architecture candidates",
+            "AMEND": "reconsider only architecture decisions affected",
+            "PRESERVE": "existing architecture remains valid",
+        }
+        for disposition, phrase in expected.items():
+            with self.subTest(disposition=disposition):
+                current = report(
+                    owner_stage="DESIGN",
+                    state="WORKING",
+                    route_reason_code="DESIGN_REQUIRED",
+                    owner_action_required=False,
+                    owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+                    automatic_continuation_allowed=True,
+                )
+                current["coverage_plan"] = {
+                    "status": "READY",
+                    "architecture_disposition": disposition,
+                }
+                rendered = presenter.render_owner_update(current)
+                self.assertIn(phrase, rendered)
+                for internal_term in (
+                    "Adaptive Coverage Plan",
+                    "SELECT",
+                    "AMEND",
+                    "PRESERVE",
+                    "EARS",
+                    "Harness",
+                    "context_plan",
+                ):
+                    self.assertNotIn(internal_term, rendered)
+
+        invalid = report(owner_stage="DESIGN", route_reason_code="DESIGN_REQUIRED")
+        invalid["coverage_plan"] = {
+            "status": "READY",
+            "architecture_disposition": "UNKNOWN",
+        }
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(invalid)
     def test_formal_receipt_cannot_use_routine_presenter(self) -> None:
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(

@@ -187,6 +187,7 @@ def approve_gate_a(text: str) -> str:
             field,
             value,
         )
+    text = complete_coverage_plan(text)
     return set_receipt(
         text,
         "gate-a",
@@ -603,7 +604,47 @@ def put_contract_table(
     return text[:table_start] + table.rstrip() + "\n" + text[table_end:]
 
 
+def complete_coverage_plan(
+    text: str,
+    *,
+    work_kind: str = "NEW_BUILD",
+    disposition: str = "SELECT",
+) -> str:
+    document = doctor.table_after_heading(text, "## Document status")
+    requirements_revision = document["Current requirements revision"]
+    delivery_profile = document["Delivery profile"]
+    if delivery_profile not in doctor.DELIVERY_PROFILES:
+        text = set_table_value(
+            text,
+            "## Document status",
+            "## 1. Workload profile",
+            "Delivery profile",
+            "`quick-mvp`",
+        )
+        document = doctor.table_after_heading(text, "## Document status")
+        delivery_profile = "quick-mvp"
+    basis_ids = ", ".join(
+        [requirements_revision, *sorted(doctor.authoritative_requirement_ids(text))]
+    )
+    coverage_table = "\n".join(
+        [
+            "| Work kind | Delivery profile | Architecture disposition | Required sections | Omitted sections and reasons | Basis IDs |",
+            "|---|---|---|---|---|---|",
+            f"| {work_kind} | {delivery_profile} | {disposition} | "
+            + ", ".join(doctor.COVERAGE_DOMAINS)
+            + f" | NONE | {basis_ids} |",
+        ]
+    )
+    return put_contract_table(
+        text,
+        doctor.COVERAGE_PLAN_HEADING,
+        coverage_table,
+        "## 1. Workload profile",
+    )
+
+
 def complete_design_contract(text: str) -> str:
+    text = complete_coverage_plan(text)
     requirement_ids = sorted(doctor.authoritative_requirement_ids(text))
     requirement_list = ", ".join(requirement_ids)
     driver_table = "\n".join(
@@ -625,9 +666,9 @@ def complete_design_contract(text: str) -> str:
     text = put_contract_table(text, doctor.ARCHITECTURE_CANDIDATE_HEADING, candidate_table, doctor.ARCHITECTURE_SELECTION_HEADING)
     selection_table = "\n".join(
         [
-            "| Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Cost effect | Breakpoints | Revisit triggers | Validation |",
-            "|---|---|---|---|---|---|---|---|---|---|---|",
-            f"| ARCH-0001 | CAND-0001 | {requirement_list}, DRV-0001 | Meets every hard constraint with the smallest managed surface | CAND-0002 | Managed-service limits | Validate quotas and alarms before deployment | Pay per request with no intentional idle compute | Reassess at sustained utilization where containers are cheaper | Reassess on quota, residency, or latency changes | Requirement trace and integration tests |",
+            "| Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Security impact | Reliability impact | Operational burden | Cost effect | Breakpoints | Migration path | Revisit triggers | Validation |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+            f"| ARCH-0001 | CAND-0001 | {requirement_list}, DRV-0001 | Meets every hard constraint with the smallest managed surface | CAND-0002 | Managed-service limits | Validate quotas and alarms before deployment | Retains server-side authorization and least-privilege controls | Managed services bound failure domains with tested recovery | No continuously provisioned compute to operate | Pay per request with no intentional idle compute | Reassess at sustained utilization where containers are cheaper | Use versioned APIs and reversible IaC for any later migration | Reassess on quota, residency, or latency changes | Requirement trace and integration tests |",
         ]
     )
     text = put_contract_table(text, doctor.ARCHITECTURE_SELECTION_HEADING, selection_table, doctor.ARCHITECTURE_TRACEABILITY_HEADING)
@@ -654,6 +695,18 @@ def complete_design_contract(text: str) -> str:
             "| AWS-EV-0001 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001 | AWS managed serverless services support bounded pay-per-use execution patterns | retrieve_skill | https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html | 2026-07-17 |",
             "| AWS-EV-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0004 | AWS documentation defines current serverless security and operational guidance | search_documentation | https://docs.aws.amazon.com/lambda/latest/dg/security.html | 2026-07-17 |",
         ]
+    )
+    change_impact_table = "\n".join(
+        [
+            "| Change ID | Changed basis IDs | Affected IDs | Preserved IDs | Required revalidation |",
+            "|---|---|---|---|---|",
+        ]
+    )
+    text = put_contract_table(
+        text,
+        doctor.CHANGE_IMPACT_HEADING,
+        change_impact_table,
+        "## 14. Architecture overview",
     )
     text = put_contract_table(text, doctor.MATERIAL_AWS_EVIDENCE_HEADING, evidence_table, "## 14. Architecture overview")
     technology_rows = (
@@ -1078,7 +1131,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["authorizations"],
             {"construction": "NONE", "aws": "NONE"},
         )
-        self.assertEqual(report["design_contract"]["schema_version"], 3)
+        self.assertEqual(report["design_contract"]["schema_version"], 4)
         self.assertIn(
             report["design_contract"]["status"],
             {"UNINITIALIZED", "BLOCKED"},
@@ -1685,6 +1738,208 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(no_property_contract.property_execution, ())
 
+    def test_adaptive_coverage_select_amend_preserve_and_fail_closed(self) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        selected = complete_coverage_plan(template)
+        contract, issues = doctor.derive_coverage_contract(
+            selected,
+            "REQ-0001",
+            "quick-mvp",
+            "low",
+            "documentation-only",
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(contract.architecture_disposition, "SELECT")
+        self.assertEqual(contract.required_sections, doctor.COVERAGE_DOMAINS)
+
+        requirement_ids = sorted(doctor.authoritative_requirement_ids(selected))
+        basis_ids = ", ".join(["REQ-0001", *requirement_ids])
+        preserved_sections = [
+            item
+            for item in doctor.COVERAGE_DOMAINS
+            if item not in {"ARCHITECTURE_COMPARISON", "AWS_EVIDENCE"}
+        ]
+        preserve_table = "\n".join(
+            [
+                "| Work kind | Delivery profile | Architecture disposition | Required sections | Omitted sections and reasons | Basis IDs |",
+                "|---|---|---|---|---|---|",
+                "| BUGFIX | quick-mvp | PRESERVE | "
+                + ", ".join(preserved_sections)
+                + " | ARCHITECTURE_COMPARISON: ARCH-0001 remains unchanged; "
+                "AWS_EVIDENCE: documentation-only repository fix uses REPOSITORY_BASELINE | "
+                + basis_ids
+                + " |",
+            ]
+        )
+        preserved = put_contract_table(
+            selected,
+            doctor.COVERAGE_PLAN_HEADING,
+            preserve_table,
+            "## 1. Workload profile",
+        )
+        preserve_contract, preserve_issues = doctor.derive_coverage_contract(
+            preserved,
+            "REQ-0001",
+            "quick-mvp",
+            "low",
+            "documentation-only",
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(preserve_issues, [])
+        self.assertEqual(preserve_contract.architecture_disposition, "PRESERVE")
+
+        amended = complete_coverage_plan(
+            template, work_kind="FEATURE", disposition="AMEND"
+        )
+        amend_contract, amend_issues = doctor.derive_coverage_contract(
+            amended,
+            "REQ-0001",
+            "quick-mvp",
+            "low",
+            "documentation-only",
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(amend_issues, [])
+        self.assertEqual(amend_contract.architecture_disposition, "AMEND")
+
+        unsafe_table = preserve_table.replace(
+            "SECURITY_PRIVACY, ", "", 1
+        ).replace(
+            "ARCHITECTURE_COMPARISON:",
+            "SECURITY_PRIVACY: SEC-001 is still material; ARCHITECTURE_COMPARISON:",
+            1,
+        )
+        unsafe = put_contract_table(
+            selected,
+            doctor.COVERAGE_PLAN_HEADING,
+            unsafe_table,
+            "## 1. Workload profile",
+        )
+        blocked, blocked_issues = doctor.derive_coverage_contract(
+            unsafe,
+            "REQ-0001",
+            "quick-mvp",
+            "low",
+            "documentation-only",
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertTrue(
+            any("SECURITY_PRIVACY" in issue for issue in blocked_issues),
+            blocked_issues,
+        )
+
+    def test_change_impact_is_design_bound_and_falls_back_to_full_revalidation(self) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        amended = complete_design_contract(template)
+        amended = complete_coverage_plan(
+            amended, work_kind="FEATURE", disposition="AMEND"
+        )
+        impact_table = "\n".join(
+            [
+                "| Change ID | Changed basis IDs | Affected IDs | Preserved IDs | Required revalidation |",
+                "|---|---|---|---|---|",
+                "| CHANGE-0001 | FR-001 | ARCH-0001 | TECH-0001 | ARCH-0001 |",
+            ]
+        )
+        amended = put_contract_table(
+            amended,
+            doctor.CHANGE_IMPACT_HEADING,
+            impact_table,
+            "## 14. Architecture overview",
+        )
+        contract, issues = doctor.derive_design_contract(
+            amended, "DES-0001", required=True
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(contract.change_impact.status, "READY")
+        self.assertIn("GATE_A", contract.change_impact.stale_targets)
+        original_digest = contract.canonical_sha256
+
+        full_table = impact_table.replace(
+            "| ARCH-0001 | TECH-0001 | ARCH-0001 |",
+            "| ARCH-0001 | TECH-0001 | FULL_REVALIDATION |",
+            1,
+        )
+        uncertain = put_contract_table(
+            amended,
+            doctor.CHANGE_IMPACT_HEADING,
+            full_table,
+            "## 14. Architecture overview",
+        )
+        full_contract, full_issues = doctor.derive_design_contract(
+            uncertain, "DES-0001", required=True
+        )
+        self.assertEqual(full_issues, [])
+        self.assertEqual(
+            set(full_contract.change_impact.stale_targets),
+            {"AWS_AUTHORITY", "GATE_A", "GATE_B", "TASKS"},
+        )
+        self.assertNotEqual(original_digest, full_contract.canonical_sha256)
+
+        preserved = complete_coverage_plan(
+            amended, work_kind="BUGFIX", disposition="PRESERVE"
+        )
+        invalid_preserve, invalid_issues = doctor.derive_design_contract(
+            preserved, "DES-0001", required=True
+        )
+        self.assertEqual(invalid_preserve.status, "BLOCKED")
+        self.assertTrue(
+            any("PRESERVE cannot change architecture-controlled IDs" in issue for issue in invalid_issues),
+            invalid_issues,
+        )
+
+    def test_approved_schema_two_architecture_is_grandfathered_until_design_change(self) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(template)
+        requirement_list = ", ".join(sorted(doctor.authoritative_requirement_ids(complete)))
+        legacy_selection = "\n".join(
+            [
+                "| Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Cost effect | Breakpoints | Revisit triggers | Validation |",
+                "|---|---|---|---|---|---|---|---|---|---|---|",
+                f"| ARCH-0001 | CAND-0001 | {requirement_list}, DRV-0001 | Meets every hard constraint | CAND-0002 | Managed-service limits | Validate quotas and alarms | Pay per request | Reassess at sustained utilization | Reassess on quota changes | Requirement trace and integration tests |",
+            ]
+        )
+        legacy = put_contract_table(
+            complete,
+            doctor.ARCHITECTURE_SELECTION_HEADING,
+            legacy_selection,
+            doctor.ARCHITECTURE_TRACEABILITY_HEADING,
+        ).replace(
+            "| Gate B derived status | `BLOCKED` |",
+            "| Gate B derived status | `APPROVED_FOR_CONSTRUCTION` |",
+            1,
+        )
+
+        grandfathered, issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "READY")
+        self.assertEqual(grandfathered.architecture.schema_version, 2)
+        self.assertFalse(grandfathered.architecture.grandfathered_v1)
+
+        invalidated, invalidated_issues = doctor.derive_design_contract(
+            legacy.replace("Managed-service limits", "Changed risk", 1),
+            "DES-0002",
+            required=True,
+            grandfather_approved_v1=False,
+        )
+        self.assertEqual(invalidated.status, "BLOCKED")
+        self.assertTrue(
+            any("Selected architecture" in issue for issue in invalidated_issues),
+            invalidated_issues,
+        )
+
+
     def test_architecture_contract_is_traceable_fail_closed_and_digest_bound(self) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(template)
@@ -1696,7 +1951,9 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 3)
+        self.assertEqual(ready.schema_version, 4)
+        self.assertEqual(ready.architecture.schema_version, 3)
+        self.assertEqual(ready.change_impact.status, "READY")
         self.assertEqual(ready.architecture.status, "READY")
         self.assertFalse(ready.architecture.grandfathered_v1)
         self.assertEqual(
@@ -1863,7 +2120,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertTrue(ready_report["ok"], ready_report["diagnostics"])
             self.assertEqual(ready_report["status"], "RESUME")
             self.assertEqual(ready_report["next_prompt"], "TASK-10")
-            self.assertEqual(contract["schema_version"], 3)
+            self.assertEqual(contract["schema_version"], 4)
+            self.assertEqual(ready_report["coverage_plan"]["status"], "READY")
+            self.assertEqual(contract["change_impact"]["status"], "READY")
             self.assertEqual(contract["status"], "READY")
             self.assertEqual(contract["design_revision"], "DES-0001")
             self.assertTrue(ready_report["write_authority"]["valid"])

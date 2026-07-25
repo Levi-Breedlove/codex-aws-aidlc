@@ -52,6 +52,14 @@ TDD, Mikado, STRIDE, LINDDUN, ATAM, and ADR are conditional techniques, not
 lifecycle stages or approval gates. Their outputs stay in the existing PRD,
 task, decision, test, and evidence authorities.
 
+At Gate A, Fastlane derives one internal coverage record from the work kind,
+approved requirements, risk, and repository facts. New builds receive a full
+architecture comparison. A bounded change may reconsider only affected design
+decisions or retain the current architecture after proving that its technology,
+trust, data, recovery, Region, and validation boundaries did not change. Every
+omitted domain needs a current basis; uncertain impact uses full revalidation.
+This changes work depth, not safety, owner questions, or the two-gate lifecycle.
+
 Gate B also records a risk-derived Harness Profile. It selects the smallest
 exact checks justified by the approved technology, risk, data, identity,
 exposure, recovery, and AWS lane; it never imposes a universal scanner.
