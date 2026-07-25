@@ -4,6 +4,14 @@ These reviews are opt-in and run outside ordinary credential-free CI. They
 validate exported evidence contracts; neither scorer invokes a model, accesses
 AWS, reads credentials, or proves facts that were not actually observed.
 
+## Deterministic workflow corpus
+
+`tests/test_product_journeys.py` is the credential-free Golden Project Corpus.
+It exercises extracted-template setup, resume, both gates, AWS Core evidence
+routing, bounded delivery, side questions, deployment/teardown separation, and
+failure recovery through the real scripts. It is the mandatory deterministic
+workflow baseline; model role plays and adopter pilots supplement it.
+
 ## Model role-play evaluation
 
 Print the scenarios and anchored `1`, `3`, and `5` rubrics for all nine criteria:
@@ -58,6 +66,23 @@ They mean exported evidence integrity and score consistency only. They do not
 independently prove that a live model produced the transcript, determine
 release readiness, or authorize publication. Ordinary CI tests only the
 schema, bundle validator, and claim boundary.
+
+The scorer derives owner turns, assistant turns, stops, automatic continuations,
+and repeated owner actions from each bound transcript. It reports timing or token
+totals only when every turn in that transcript contains the corresponding metric.
+A repeated owner action fails the evidence contract; missing timing or token data
+is simply omitted rather than invented.
+
+## Maintainer adopter-pilot metrics
+
+Before a release-readiness claim, maintainers may run synthetic or personal-project
+pilots and retain only non-sensitive aggregate process metrics: prerequisite retries,
+clarification rounds before Gate A, requirement revisions, Gate A-to-Gate B time,
+architecture candidates, stale-gate events, autonomous task completions, validation
+retries, and owner actions after Gate B. Ask whether the owner understood the next
+action, both gates, AWS-access state, and the recommendation basis. Do not retain full
+transcripts by default; tracked files may contain only a non-personal reference and
+digest. Pilot metrics are evidence, never a gate or publication authority.
 
 ### Schema 3 migration
 

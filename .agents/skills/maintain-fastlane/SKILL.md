@@ -49,8 +49,11 @@ change budget.
    preserve unrelated work.
 3. Keep lifecycle, receipts, authorization, and package boundaries
    deterministic; skills guide while scripts validate exact state.
-4. For `IMPLEMENT`, make the smallest coherent change and direct regression
-   tests inside the scope contract. Unrelated discoveries are report-only.
+4. Before `IMPLEMENT` or `PUBLISH`, validate the ephemeral scope contract with
+   `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`.
+   The preflight is read-only; keep the contract outside tracked product state.
+   Then make the smallest coherent change and direct regression tests inside the
+   validated scope. Unrelated discoveries are report-only.
 5. For bounded framework or brownfield refactoring, use the Mikado Method:
    attempt the smallest target change; identify a blocking prerequisite;
    preserve or revert unsafe exploratory edits; implement only the in-scope

@@ -59,6 +59,20 @@ class TemplateCompatibilityTests(unittest.TestCase):
         ):
             self.assertIn(f"`{check}`", workflow)
 
+    def test_maintenance_preflight_is_read_only_and_routed_only_to_maintenance(self) -> None:
+        skill = (REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md").read_text(encoding="utf-8")
+        script = (REPOSITORY_ROOT / "scripts/maintenance_preflight.py").read_text(encoding="utf-8")
+        self.assertIn("maintenance_preflight.py", skill)
+        self.assertIn("Validate a Fastlane maintenance scope contract read-only", script)
+        for forbidden in ("boto3", "openai", "AWS_ACCESS_KEY", "codex login", "git push"):
+            self.assertNotIn(forbidden, script)
+
+    def test_deterministic_workflow_corpus_is_the_mandatory_baseline(self) -> None:
+        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(encoding="utf-8")
+        self.assertIn("Golden Project Corpus", evaluation)
+        self.assertIn("tests/test_product_journeys.py", evaluation)
+        self.assertRegex(evaluation, r"mandatory deterministic\s+workflow baseline")
+
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
         plan = model_roleplay_eval.plan_payload()
         self.assertEqual(len(plan["scenarios"]), 13)

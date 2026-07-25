@@ -1894,6 +1894,51 @@ class BootstrapDoctorTests(unittest.TestCase):
             invalid_issues,
         )
 
+    def test_context_plan_is_route_bounded_ephemeral_and_complete(self) -> None:
+        tasks = doctor.TaskSummary(
+            statuses={"TASK-0001": "IN_PROGRESS", "TASK-0002": "READY"},
+            active=["TASK-0001"],
+            ready=["TASK-0002"],
+        )
+        coverage = doctor.CoverageContract(
+            status="READY",
+            basis_ids=("REQ-0001", "FR-001"),
+        )
+        expected_reference = {
+            "DEFINE": "references/define.md",
+            "DESIGN": "references/design.md",
+            "DELIVER": "references/deliver.md",
+        }
+        for stage, reference in expected_reference.items():
+            with self.subTest(stage=stage):
+                plan = doctor.derive_context_plan(
+                    {
+                        "owner_stage": stage,
+                        "route_reason_code": "DESIGN_REQUIRED",
+                        "blocking_ids": ["CURRENT_BLOCKER"],
+                    },
+                    tasks,
+                    coverage,
+                )
+                self.assertEqual(plan["maximum_initial_bytes"], 12_000)
+                self.assertTrue(any(reference in item for item in plan["source_slices"]))
+                self.assertIn("CURRENT_BLOCKER", plan["active_ids"])
+                self.assertEqual(len(plan["source_slices"]), len(set(plan["source_slices"])))
+
+        aws_plan = doctor.derive_context_plan(
+            {
+                "owner_stage": "DELIVER",
+                "route_reason_code": "AWS_PREFLIGHT_REQUIRED",
+                "blocking_ids": [],
+            },
+            tasks,
+            coverage,
+        )
+        self.assertTrue(
+            any("Action authorization provenance" in item for item in aws_plan["source_slices"])
+        )
+        self.assertEqual(aws_plan["active_ids"], ["TASK-0001"])
+
     def test_approved_schema_two_architecture_is_grandfathered_until_design_change(self) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(template)

@@ -90,6 +90,16 @@ BINDING_KEYS = {
     "aws_account_accessed",
 }
 TRANSCRIPT_KEYS = BINDING_KEYS | {"turns"}
+TURN_KEYS = {
+    "role",
+    "text",
+    "owner_action_id",
+    "automatic_continuation",
+    "stop",
+    "duration_ms",
+    "token_count",
+}
+OWNER_ACTION_ID = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 SCORECARD_KEYS = BINDING_KEYS | {
     "transcript_sha256",
     "rater_id",
@@ -137,6 +147,15 @@ def plan_payload() -> dict[str, Any]:
             "credentials_inspected": False,
             "aws_account_accessed": False,
             "release_readiness_claimed_by_scorer": False,
+            "transcript_metrics": [
+                "owner_turns",
+                "assistant_turns",
+                "stops",
+                "automatic_continuations",
+                "repeated_actions",
+                "duration_ms_when_complete",
+                "token_count_when_complete",
+            ],
         },
     }
 
@@ -286,6 +305,79 @@ def _binding_errors(
             errors.append(f"{label}.{key} does not match the run binding")
 
 
+def _turn_metrics(
+    value: object,
+    label: str,
+    errors: list[str],
+) -> dict[str, int] | None:
+    if not isinstance(value, list) or not value:
+        errors.append(f"{label} must be a non-empty list")
+        return None
+    metrics = {
+        "owner_turns": 0,
+        "assistant_turns": 0,
+        "stops": 0,
+        "automatic_continuations": 0,
+        "repeated_actions": 0,
+    }
+    action_ids: set[str] = set()
+    durations: list[int] = []
+    tokens: list[int] = []
+    for index, turn in enumerate(value):
+        turn_label = f"{label}[{index}]"
+        if not isinstance(turn, dict):
+            errors.append(f"{turn_label} must be an object")
+            continue
+        unknown = sorted(set(turn) - TURN_KEYS)
+        if unknown:
+            errors.append(f"{turn_label} has unknown fields: {', '.join(unknown)}")
+        role = turn.get("role")
+        if role == "owner":
+            metrics["owner_turns"] += 1
+        elif role in {"codex", "assistant"}:
+            metrics["assistant_turns"] += 1
+        else:
+            errors.append(f"{turn_label}.role must be owner, codex, or assistant")
+        text = turn.get("text")
+        if not isinstance(text, str) or not text.strip():
+            errors.append(f"{turn_label}.text must be non-empty text")
+        action_id = turn.get("owner_action_id")
+        if action_id is not None:
+            if role not in {"codex", "assistant"}:
+                errors.append(f"{turn_label}.owner_action_id belongs only on an assistant turn")
+            elif not isinstance(action_id, str) or OWNER_ACTION_ID.fullmatch(action_id) is None:
+                errors.append(f"{turn_label}.owner_action_id must be one stable uppercase ID")
+            elif action_id in action_ids:
+                metrics["repeated_actions"] += 1
+            else:
+                action_ids.add(action_id)
+        for field, target in (("duration_ms", durations), ("token_count", tokens)):
+            metric = turn.get(field)
+            if metric is not None:
+                if not isinstance(metric, int) or isinstance(metric, bool) or metric < 0:
+                    errors.append(f"{turn_label}.{field} must be a non-negative integer")
+                else:
+                    target.append(metric)
+        for field, key in (
+            ("stop", "stops"),
+            ("automatic_continuation", "automatic_continuations"),
+        ):
+            flag = turn.get(field)
+            if flag is not None and not isinstance(flag, bool):
+                errors.append(f"{turn_label}.{field} must be boolean")
+            elif flag is True:
+                if role not in {"codex", "assistant"}:
+                    errors.append(f"{turn_label}.{field} belongs only on an assistant turn")
+                metrics[key] += 1
+    if metrics["owner_turns"] < 1 or metrics["assistant_turns"] < 1:
+        errors.append(f"{label} must contain both owner and assistant turns")
+    if len(durations) == len(value):
+        metrics["duration_ms"] = sum(durations)
+    if len(tokens) == len(value):
+        metrics["token_count"] = sum(tokens)
+    return metrics
+
+
 def _base_result(errors: list[str], mode: str = "UNKNOWN") -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
@@ -341,6 +433,7 @@ def score_payload(
     seen_paths: set[str] = set()
     seen_digests: set[str] = set()
     artifact_count = 0
+    workflow_runs: list[dict[str, Any]] = []
     for index, run_value in enumerate(runs):
         label = f"runs[{index}]"
         run = _exact_object(run_value, RUN_KEYS, label, errors)
@@ -382,9 +475,23 @@ def score_payload(
             record = _exact_object(transcript, TRANSCRIPT_KEYS, f"{label}.transcript artifact", errors)
             if record is not None:
                 _binding_errors(record, run, "MODEL_TRANSCRIPT", f"{label}.transcript artifact", errors)
-                turns = record.get("turns")
-                if not isinstance(turns, list) or not turns:
-                    errors.append(f"{label}.transcript artifact.turns must be a non-empty list")
+                metrics = _turn_metrics(
+                    record.get("turns"),
+                    f"{label}.transcript artifact.turns",
+                    errors,
+                )
+                if metrics is not None:
+                    workflow_runs.append(
+                        {
+                            "scenario_id": scenario,
+                            "iteration": iteration,
+                            **metrics,
+                        }
+                    )
+                    if metrics["repeated_actions"]:
+                        errors.append(
+                            f"{label}.transcript repeats an owner action"
+                        )
 
         scorecard_refs = run.get("scorecards")
         minimum_raters = 2 if mode == "RELEASE" else 1
@@ -490,6 +597,28 @@ def score_payload(
         if mode == "DEVELOPMENT" and not errors
         else "FAIL"
     )
+    workflow_metrics: dict[str, Any] = {
+        "owner_turns": sum(item["owner_turns"] for item in workflow_runs),
+        "assistant_turns": sum(item["assistant_turns"] for item in workflow_runs),
+        "stops": sum(item["stops"] for item in workflow_runs),
+        "automatic_continuations": sum(
+            item["automatic_continuations"] for item in workflow_runs
+        ),
+        "repeated_actions": sum(item["repeated_actions"] for item in workflow_runs),
+        "runs": workflow_runs,
+    }
+    timed_runs = [item for item in workflow_runs if "duration_ms" in item]
+    token_runs = [item for item in workflow_runs if "token_count" in item]
+    if timed_runs:
+        workflow_metrics["timing"] = {
+            "observed_runs": len(timed_runs),
+            "total_duration_ms": sum(item["duration_ms"] for item in timed_runs),
+        }
+    if token_runs:
+        workflow_metrics["tokens"] = {
+            "observed_runs": len(token_runs),
+            "total_token_count": sum(item["token_count"] for item in token_runs),
+        }
     result = {
         "schema_version": SCHEMA_VERSION,
         "evaluation_mode": mode,
@@ -502,6 +631,7 @@ def score_payload(
             key: len(value) for key, value in sorted(iterations.items())
         },
         "criterion_averages": averages,
+        "workflow_metrics": workflow_metrics,
         "errors": errors,
     }
     return result, not errors
