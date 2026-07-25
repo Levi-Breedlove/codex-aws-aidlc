@@ -60,9 +60,31 @@ change budget.
    focused tests, the full suite, manifest and deterministic package checks,
    and `git diff --check` before any authorized publication.
 
-`PUBLISH` must revalidate the exact branch tip and commit immediately before
-mutation. Never switch, reset, merge, force-push, delete, or release outside
-the exact owner authorization.
+## Canonical preview publication
+
+For the canonical `fast-lane-maint` preview branch, `PUBLISH` defaults to a
+PR-gated flow:
+
+1. create a short-lived maintenance branch from the exact current preview tip;
+2. push only that short-lived branch and open a pull request targeting only
+   `fast-lane-maint`;
+3. require the pull request branch to be current with the preview tip; and
+4. merge only after all of these exact checks pass:
+   - `safety-tests (3.11)`;
+   - `safety-tests (3.12)`;
+   - `safety-tests (3.13)`;
+   - `windows-smoke`; and
+   - `macos-setup-smoke`.
+
+A direct push to `fast-lane-maint` requires explicit emergency publication
+authorization naming that branch and push. Never force-push or delete the
+canonical preview branch. Configuring or changing its GitHub branch rule is a
+separate repository-setting action and is not implied by source publication.
+`main` remains outside this preview flow unless the owner separately names it.
+
+Every `PUBLISH` operation must revalidate the exact source and target branch
+tips and commits immediately before mutation. Never switch, reset, merge,
+force-push, delete, or release outside the exact owner authorization.
 
 Never install software, change Codex/plugin state, inspect credentials, access
 an AWS account, approve a gate, or publish beyond the owner's exact scope.

@@ -72,6 +72,22 @@ def ready_evidence(**updates: object) -> dict[str, object]:
 
 
 class ConversationContractTests(unittest.TestCase):
+    def test_raw_doctor_and_presenter_keep_untouched_template_in_setup(self) -> None:
+        report = doctor.inspect_project(REPOSITORY_ROOT)
+        rendered = presenter.render_owner_update(report)
+
+        self.assertEqual(report["classification"], "UNCONFIGURED_TEMPLATE")
+        self.assertEqual(report["interaction"]["owner_stage"], "DEFINE")
+        self.assertEqual(
+            report["interaction"]["owner_action_kind"],
+            "COMPLETE_PREREQUISITE_CHECKLIST",
+        )
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("send `init template` again", rendered)
+        self.assertNotIn("DELIVER", rendered)
+        self.assertEqual(report["aws_access"], "NOT_USED")
+        self.assertEqual(report["authorizations"]["aws"], "NONE")
+
     def test_missing_prerequisites_return_one_complete_action_then_ready_welcome(self) -> None:
         blocked = setup.reduce_prerequisites(
             ready_evidence(
@@ -135,6 +151,23 @@ class ConversationContractTests(unittest.TestCase):
         self.assertEqual(report["aws_access"], "NOT_USED")
         self.assertEqual(report["aws_authorization"], "NONE")
         self.assertFalse(report["user_state_persisted_in_repository"])
+
+    def test_missing_design_evidence_stays_in_design_with_one_aws_core_action(self) -> None:
+        interaction = doctor.derive_interaction(
+            "BLOCKED",
+            "STOP",
+            has_errors=True,
+            diagnostic_codes=["AWS_CORE_EVIDENCE_REQUIRED"],
+            design_aws_core_ready=False,
+            aws_execution_planning_ready=False,
+        )
+        rendered = presenter.render_owner_update({"interaction": interaction})
+        self.assertEqual(interaction["owner_stage"], "DESIGN")
+        self.assertEqual(interaction["owner_action_kind"], "ENABLE_AWS_CORE")
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("Enable official AWS Core", rendered)
+        self.assertFalse(interaction["automatic_continuation_allowed"])
+        self.assertFalse(interaction["formal_receipt_required"])
 
     def test_golden_define_design_deliver_route_has_only_two_product_stops(self) -> None:
         sequence = (

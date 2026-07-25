@@ -15,6 +15,7 @@ class PresentationError(RuntimeError):
 
 
 STATUS_TEXT = {
+    "UNCONFIGURED_TEMPLATE": "This template has not been initialized.",
     "INTAKE_REQUIRED": "Ready to define the project.",
     "REQUIREMENTS_ANALYSIS": "Requirements are ready for analysis.",
     "REQUIREMENTS_STALE": "Approved requirements need review after a change.",
@@ -32,6 +33,9 @@ STATUS_TEXT = {
 }
 
 ACTION_TEXT = {
+    "COMPLETE_PREREQUISITE_CHECKLIST": (
+        "Complete the prerequisite checklist, then send `init template` again."
+    ),
     "ANSWER_OPEN_DECISIONS": "Answer the next one to three project questions.",
     "APPROVE_GATE_A": "Review and decide the Gate A requirements receipt.",
     "ENABLE_AWS_CORE": "Enable official AWS Core, then continue the affected AWS step.",
@@ -42,6 +46,9 @@ ACTION_TEXT = {
 }
 
 NEXT_TEXT = {
+    "UNCONFIGURED_TEMPLATE": (
+        "Codex will verify prerequisites before asking project questions."
+    ),
     "INTAKE_REQUIRED": "Codex will record your answers and continue guided definition.",
     "REQUIREMENTS_ANALYSIS": "Codex will analyze the complete requirement set.",
     "REQUIREMENTS_STALE": "Codex will reconcile the changed requirement basis.",
