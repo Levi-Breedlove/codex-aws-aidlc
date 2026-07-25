@@ -73,6 +73,9 @@ acceptance criteria, and change budget; and `PUBLISH` requires separate exact
 authority for each Git or release action. Missing implementation scope stops
 before editing. Unrelated findings remain report-only, and publication never
 follows merely from permission to edit.
+Use `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`
+to verify the exact baseline, allowlist, change budget, and distinct publication
+authority before maintenance work. The contract is ephemeral and untracked.
 
 The canonical `fast-lane-maint` preview uses short-lived maintenance branches
 and pull requests targeting only that preview branch. The PR branch must be
@@ -139,6 +142,17 @@ mutation requires a separate current record naming:
 
 Tools, credentials, sandbox permission, prior access, or AWS Core availability
 never replace this authorization.
+
+## Fast-path expectations
+
+A ready Quick MVP with a complete brief needs at most one clarification round
+before Gate A. Setup questions occur once. Gate A continues into Design in the
+same run; Design reaches pending Gate B without an owner pause unless a material
+owner decision exists; Gate B continues into task generation in the same run.
+Resume never repeats completed setup, and every blocked response has one owner
+action. Routine owner responses do not expose internal methodology, Harness, or
+context-management terms. These expectations add no gate and never override a
+material decision, validation failure, or authority boundary.
 
 ## Optional hook guardrails
 

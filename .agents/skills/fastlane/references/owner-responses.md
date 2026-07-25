@@ -16,3 +16,19 @@
 - A pre-Gate-A AWS example must say:
   `Illustrative architecture candidate — not selected or approved.`
 - Use `explain-fastlane` only for an explicit explanation request.
+
+## Material decision card
+
+Before an exact Gate A, Gate B, AWS deployment, or teardown receipt, give one
+short decision card with exactly these labels:
+
+- `Decision:` what the owner is deciding now;
+- `Recommendation:` Codex's evidence-backed recommendation;
+- `Why:` the material requirement and evidence basis;
+- `Tradeoff:` the principal benefit and cost or limitation;
+- `Reply:` the exact copyable response; and
+- `After that:` the work Fastlane will continue automatically.
+
+The card summarizes but never replaces or alters the exact formal receipt.
+Do not add it to routine status, side-question restoration, or an internal
+checkpoint. Keep methodology and context-management terms out of the card.

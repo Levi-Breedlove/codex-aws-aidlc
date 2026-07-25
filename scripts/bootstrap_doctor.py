@@ -7323,6 +7323,87 @@ def derive_unconfigured_template_interaction(
     }
 
 
+CONTEXT_MAXIMUM_INITIAL_BYTES = 12_000
+
+
+def derive_context_plan(
+    interaction: Mapping[str, Any],
+    tasks: TaskSummary,
+    coverage: CoverageContract,
+) -> dict[str, Any]:
+    """Select an ephemeral, route-bounded canonical context packet."""
+
+    stage = interaction.get("owner_stage")
+    reason = interaction.get("route_reason_code")
+    if stage == "DEFINE":
+        source_slices = [
+            ".agents/skills/fastlane/references/define.md",
+            f"{PRD_FILE}#Document status",
+            f"{PRD_FILE}#Part I — Requirements",
+        ]
+        on_demand_slices = [
+            f"{PRD_FILE}#Part II — Requirements Analysis and Gate A",
+            f"{BUGFIX_FILE}#Active defect contract",
+        ]
+    elif stage == "DESIGN":
+        source_slices = [
+            ".agents/skills/fastlane/references/design.md",
+            f"{PRD_FILE}#Adaptive coverage plan",
+            f"{PRD_FILE}#Architecture drivers",
+            f"{PRD_FILE}#Whole-system candidates",
+            f"{PRD_FILE}#Selected architecture",
+            f"{VERIFY_FILE}#AWS Core evidence",
+        ]
+        on_demand_slices = [
+            f"{PRD_FILE}#Architecture traceability",
+            f"{PRD_FILE}#Change impact record",
+            f"{PRD_FILE}#Gate B Harness Profile",
+            f"{PRD_FILE}#Construction envelope",
+        ]
+    elif stage == "DELIVER":
+        source_slices = [
+            ".agents/skills/fastlane/references/deliver.md",
+            f"{TASKS_FILE}#Active execution snapshot",
+        ]
+        on_demand_slices = [
+            f"{PRD_FILE}#Construction envelope",
+            f"{VERIFY_FILE}#Task completion evidence",
+            f"{VERIFY_FILE}#Construction and release readiness checks",
+            f"{RUNBOOK_FILE}#Active operational boundary",
+        ]
+    else:
+        raise ValueError("context plan requires a known owner stage")
+
+    active_ids: list[str] = []
+    if stage == "DELIVER":
+        active_ids.extend(tasks.active)
+        if not active_ids and tasks.ready:
+            active_ids.append(tasks.ready[0])
+    else:
+        active_ids.extend(coverage.basis_ids)
+    blockers = interaction.get("blocking_ids")
+    if isinstance(blockers, list):
+        active_ids.extend(item for item in blockers if isinstance(item, str))
+    active_ids = sorted(set(active_ids))
+
+    if stage == "DELIVER" and active_ids:
+        source_slices.append(f"{TASKS_FILE}#" + active_ids[0])
+    if isinstance(reason, str) and reason.startswith("AWS_"):
+        source_slices.extend(
+            [
+                f"{VERIFY_FILE}#Action authorization provenance",
+                f"{RUNBOOK_FILE}#Conditional AWS action receipts",
+            ]
+        )
+
+    return {
+        "source_slices": source_slices,
+        "active_ids": active_ids,
+        "on_demand_slices": on_demand_slices,
+        "maximum_initial_bytes": CONTEXT_MAXIMUM_INITIAL_BYTES,
+    }
+
+
 def _split_authority_values(value: str) -> list[str]:
     """Return conservative exact values from a comma- or semicolon-list."""
 
@@ -7935,6 +8016,7 @@ def build_report(
         classification == "TEMPLATE_SOURCE" and ctx.has_errors
     ):
         interaction = derive_unconfigured_template_interaction(diagnostic_codes)
+    context_plan = derive_context_plan(interaction, tasks, coverage_contract)
     return {
         "schema_version": 2,
         "bootstrap_version": manifest.get(
@@ -7947,6 +8029,7 @@ def build_report(
         "resume_safe": not ctx.has_errors,
         "next_prompt": next_prompt,
         "interaction": interaction,
+        "context_plan": context_plan,
         "project": {
             "name": project.get("name"),
             "region": project.get("region"),

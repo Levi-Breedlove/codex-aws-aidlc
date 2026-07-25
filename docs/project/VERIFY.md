@@ -46,6 +46,21 @@ or AWS authority. All external actions remain conditional on the current AUTH.
 authorized task-level local criteria pass while a required live check remains
 `PENDING_AWS`; the release remains not ready until that evidence is observed.
 
+### Evidence levels
+
+| Level | Meaning | Minimum attributable basis |
+|---|---|---|
+| `E0_PROPOSED` | Recommendation or planned control only | Current PRD or task ID |
+| `E1_SOURCE_VERIFIED` | Current official source supports the material claim | Current AWS Core or authoritative source evidence ID |
+| `E2_LOCALLY_VALIDATED` | Exact local code, test, policy, IaC, or package check passed | Command, artifact/revision, and evidence ID |
+| `E3_AWS_READ_OBSERVED` | Authorized read-only AWS observation confirms the target state | Account/Region scope and AWS evidence ID |
+| `E4_DEPLOYED_OBSERVED` | Authorized deployment and smoke evidence confirms deployed behavior | Deployment authority, artifact/plan, and evidence ID |
+| `E5_RECOVERY_OBSERVED` | Rollback, restore, or teardown behavior was exercised | Recovery/teardown authority and evidence ID |
+
+Report the highest level actually observed for each material claim, with its evidence
+IDs and limits. Levels are not approval, are not automatically cumulative across
+different claims, and never turn a design recommendation into deployed proof.
+
 ## Evidence rules
 
 - Documentation is not implementation evidence, and implementation is not test
@@ -234,8 +249,11 @@ evidence-based readiness check performed within the active authorization.
 |---|---|---|
 | Requirements identity | Gate A remains current for the active REQ revision | `NOT_STARTED` |
 | Construction identity | Gate B remains current for matching REQ/DES/AUTH IDs | `NOT_STARTED` |
+| Architecture | Selected architecture, alternatives, impacts, and traceability remain current | `NOT_STARTED` |
 | AWS design grounding | Current DESIGN-10 has fresh successful official AWS Core `retrieve_skill` and `search_documentation` evidence | `NOT_STARTED` |
 | Task graph | Dependencies validate, waivers are explicit, and required tasks are complete | `NOT_STARTED` |
+| Harness | Every required Harness row has current attributable PASS evidence | `NOT_STARTED` |
+| Local evidence | Required local evidence is current, attributable, and at least `E2_LOCALLY_VALIDATED` | `NOT_STARTED` |
 | Build | Formatting, linting, typing, tests, and packaging pass | `NOT_STARTED` |
 | Infrastructure | IaC, policy, and brownfield drift checks pass | `NOT_STARTED` |
 | IaC delivery contract | Every applicable TECH-selected IaC, policy, plan, SBOM, and image check has current attributable evidence | `NOT_STARTED` |
@@ -244,6 +262,11 @@ evidence-based readiness check performed within the active authorization.
 | Performance | Required targets pass for the identified artifact and environment | `NOT_STARTED` |
 | Deployment | Required live deployment and smoke evidence is `VERIFIED` or explicitly not applicable | `NOT_STARTED` |
 | Operations | Monitoring, restore, rollback, and authorized cleanup procedures are usable | `NOT_STARTED` |
+| Runbook | Deployment, rollback, recovery, and teardown procedures are explicit | `NOT_STARTED` |
+| AWS authority | Not required until an AWS action; when present it must be exact and current | `NOT_STARTED` |
+| Teardown | Not yet observed, observed under separate authority, or explicitly not applicable | `NOT_STARTED` |
+| Package | Manifest and deterministic package checks pass for the current commit | `NOT_STARTED` |
+| Model/user pilot | Optional non-sensitive evidence reference and digest, or `NOT_APPLICABLE` with reason | `NOT_STARTED` |
 | Cost | Observed and forecast cost remains inside the approved ceiling | `NOT_STARTED` |
 | AWS execution grounding | Current AWS-10 has fresh successful official AWS Core operational and deployment evidence before any AWS execution plan | `NOT_STARTED` |
 

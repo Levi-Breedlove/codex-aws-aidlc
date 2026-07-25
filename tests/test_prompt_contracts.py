@@ -1377,6 +1377,30 @@ class PromptPackContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("never repeats a formal Gate A, Gate B, or AWS receipt", owner_reference)
 
+    def test_context_speed_decision_and_evidence_contracts_are_canonical(self) -> None:
+        coordinator = (PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_text(encoding="utf-8")
+        owner = (PROJECT_ROOT / ".agents/skills/fastlane/references/owner-responses.md").read_text(encoding="utf-8")
+        workflow = (PROJECT_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
+        verify = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(encoding="utf-8")
+        self.assertIn("maximum_initial_bytes", coordinator)
+        self.assertIn("Never silently truncate a row", coordinator)
+        for label in ("Decision:", "Recommendation:", "Why:", "Tradeoff:", "Reply:", "After that:"):
+            self.assertIn(f"`{label}`", owner)
+        self.assertIn("at most one clarification round", workflow)
+        self.assertIn("Gate A continues into Design in the", workflow)
+        self.assertIn("Gate B continues into task generation", workflow)
+        for level in (
+            "E0_PROPOSED",
+            "E1_SOURCE_VERIFIED",
+            "E2_LOCALLY_VALIDATED",
+            "E3_AWS_READ_OBSERVED",
+            "E4_DEPLOYED_OBSERVED",
+            "E5_RECOVERY_OBSERVED",
+        ):
+            self.assertIn(level, verify)
+        for area in ("Architecture", "Harness", "Local evidence", "Runbook", "AWS authority", "Teardown", "Package", "Model/user pilot"):
+            self.assertRegex(verify, rf"\| {re.escape(area)} \|")
+
     def test_normative_requirements_use_one_ears_and_acceptance_schema(self) -> None:
         header = (
             "| ID | Requirement | EARS form | Acceptance criteria | "

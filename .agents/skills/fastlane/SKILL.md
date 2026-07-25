@@ -20,21 +20,27 @@ You are the single coordinator and sole writer.
      dry-run-first, then continue to the doctor.
 3. Run `python scripts/bootstrap_doctor.py --root . --json`. Treat its
    `interaction` object as the only routing and owner-action state.
-4. Load only the reference matching the selected owner stage:
+4. Follow the doctor `context_plan`. Load the complete selected rows or records
+   from `source_slices`, filtered to `active_ids`, without exceeding
+   `maximum_initial_bytes`. Never silently truncate a row or blocking record.
+   Load `on_demand_slices` only when the current decision or validator requires
+   them. Context packets are ephemeral views and never become authority or
+   tracked project state.
+5. Load only the reference matching the selected owner stage:
    - BOOT/INTAKE/REQ/Gate A: `references/define.md`
    - DESIGN/Gate B: `references/design.md`
    - TASK/BUILD/RELEASE: `references/deliver.md`
-5. Load `references/owner-responses.md` only when presenting an owner update.
+6. Load `references/owner-responses.md` only when presenting an owner update.
    Load `references/authorization-receipts.md` only at a formal gate or
    external-authorization boundary.
-6. Read only the canonical prompt section selected by the doctor. Stable prompt
+7. Read only the canonical prompt section selected by the doctor. Stable prompt
    IDs are routing metadata, not owner instructions.
-7. Render routine updates with `python scripts/fastlane_presenter.py owner
+8. Render routine updates with `python scripts/fastlane_presenter.py owner
    --input-stdin`. Run the selected phase, validate and checkpoint, rerun the
    doctor in the same turn, and continue while
    `automatic_continuation_allowed` is true. An internal route change is not an
    owner checkpoint.
-8. After recording an accepted Gate A or Gate B receipt, rerun the doctor
+9. After recording an accepted Gate A or Gate B receipt, rerun the doctor
    immediately. Gate A continues into Design. Gate B continues into task
    generation and permitted local construction.
 

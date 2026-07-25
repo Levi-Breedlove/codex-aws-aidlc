@@ -165,6 +165,89 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
         self.assertEqual(result["claim_scope"], model_roleplay_eval.CLAIM_SCOPE)
         self.assertFalse(result["release_readiness_claimed"])
 
+    def test_workflow_metrics_are_transcript_derived_and_optional(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = self.safe_payload(root, "DEVELOPMENT")
+            run = payload["runs"][0]
+            transcript = rewrite_artifact(
+                root,
+                run["transcript"],
+                lambda artifact: artifact.__setitem__(
+                    "turns",
+                    [
+                        {
+                            "role": "owner",
+                            "text": "Synthetic brief.",
+                            "duration_ms": 100,
+                            "token_count": 10,
+                        },
+                        {
+                            "role": "codex",
+                            "text": "One bounded question.",
+                            "owner_action_id": "ANSWER_OPEN_DECISIONS",
+                            "duration_ms": 200,
+                            "token_count": 20,
+                        },
+                        {
+                            "role": "owner",
+                            "text": "Synthetic answer.",
+                            "duration_ms": 50,
+                            "token_count": 5,
+                        },
+                        {
+                            "role": "codex",
+                            "text": "Continuing automatically.",
+                            "automatic_continuation": True,
+                            "duration_ms": 150,
+                            "token_count": 15,
+                        },
+                    ],
+                ),
+            )
+            for reference in run["scorecards"]:
+                rewrite_artifact(
+                    root,
+                    reference,
+                    lambda artifact: artifact.__setitem__(
+                        "transcript_sha256", run["transcript"]["sha256"]
+                    ),
+                )
+            result, passed = self.score(payload, root)
+        self.assertTrue(passed, result["errors"])
+        first = result["workflow_metrics"]["runs"][0]
+        self.assertEqual(first["owner_turns"], 2)
+        self.assertEqual(first["assistant_turns"], 2)
+        self.assertEqual(first["automatic_continuations"], 1)
+        self.assertEqual(first["duration_ms"], 500)
+        self.assertEqual(first["token_count"], 50)
+        self.assertIn("timing", result["workflow_metrics"])
+        self.assertIn("tokens", result["workflow_metrics"])
+        self.assertNotIn("duration_ms", result["workflow_metrics"]["runs"][1])
+
+    def test_repeated_owner_action_fails_closed(self) -> None:
+        errors: list[str] = []
+        metrics = model_roleplay_eval._turn_metrics(
+            [
+                {"role": "owner", "text": "Start."},
+                {
+                    "role": "codex",
+                    "text": "Answer this.",
+                    "owner_action_id": "ANSWER_OPEN_DECISIONS",
+                },
+                {"role": "owner", "text": "Answered."},
+                {
+                    "role": "codex",
+                    "text": "Answer it again.",
+                    "owner_action_id": "ANSWER_OPEN_DECISIONS",
+                },
+            ],
+            "turns",
+            errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(metrics["repeated_actions"], 1)
+
     def test_release_requires_independent_bound_scorecard_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
