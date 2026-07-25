@@ -161,6 +161,32 @@ def _delivery_next(report: Mapping[str, Any], reason: str) -> str | None:
     return None
 
 
+def _coverage_next(report: Mapping[str, Any], reason: str) -> str | None:
+    if reason not in {"DESIGN_REQUIRED", "DESIGN_STALE"}:
+        return None
+    value = report.get("coverage_plan")
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise PresentationError("invalid deterministic coverage plan")
+    if value.get("status") != "READY":
+        return None
+    disposition = value.get("architecture_disposition")
+    if disposition == "SELECT":
+        return "Codex will compare complete architecture candidates."
+    if disposition == "AMEND":
+        return (
+            "Codex will reconsider only architecture decisions affected by "
+            "this change."
+        )
+    if disposition == "PRESERVE":
+        return (
+            "Codex will verify that the existing architecture remains valid "
+            "for this bounded change."
+        )
+    raise PresentationError("invalid deterministic architecture disposition")
+
+
 def render_owner_update(
     report: Mapping[str, Any],
     *,
@@ -186,7 +212,9 @@ def render_owner_update(
         raise PresentationError("owner action requirement conflicts with action kind")
 
     status_text = _delivery_status(report, reason) or STATUS_TEXT[reason]
-    next_text = _delivery_next(report, reason) or NEXT_TEXT[reason]
+    next_text = (
+        _delivery_next(report, reason) or _coverage_next(report, reason) or NEXT_TEXT[reason]
+    )
     lines = [
         f"FASTLANE · {stage}",
         "",

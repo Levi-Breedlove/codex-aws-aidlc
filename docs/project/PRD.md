@@ -88,6 +88,26 @@ If the recorded risk is `high` or `critical`, select `high-risk`. Every profile
 keeps the same identity, IAM, data, testing, evidence, cost, and change-approval
 requirements, and none adds a routine owner gate beyond Gate A and Gate B.
 
+### Adaptive coverage plan
+
+Codex derives this internal plan from approved scope, risk, and repository facts;
+it is not a new owner question or gate. `Work kind` is exactly `NEW_BUILD`,
+`FEATURE`, `BUGFIX`, `REFACTOR`, `MIGRATION`, `INFRASTRUCTURE`, or
+`SECURITY_FIX`. `Architecture disposition` is `SELECT`, `AMEND`, or
+`PRESERVE`. New builds use `SELECT`. Every canonical coverage domain is
+either required or omitted with a concrete requirement ID or
+`REPOSITORY_BASELINE` reason. Quick MVP changes depth, never safety. Uncertain
+impact or high/critical risk falls back to full coverage.
+
+| Work kind | Delivery profile | Architecture disposition | Required sections | Omitted sections and reasons | Basis IDs |
+|---|---|---|---|---|---|
+| TODO | TODO | TODO | TODO | TODO | TODO |
+
+An existing initialized project without this table uses full coverage until its
+next requirements-controlled change. Current official AWS Core evidence remains
+required whenever an AWS fact is material.
+
+
 ## 1. Workload profile
 
 | Field | Value |
@@ -651,9 +671,9 @@ Select exactly one eligible candidate. The selection is an
 `Rejected alternatives` may be `NO_VIABLE_ALTERNATIVE`; otherwise enumerate
 every nonselected `CAND-*` in table order.
 
-| Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Cost effect | Breakpoints | Revisit triggers | Validation |
-|---|---|---|---|---|---|---|---|---|---|---|
-| ARCH-0001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Security impact | Reliability impact | Operational burden | Cost effect | Breakpoints | Migration path | Revisit triggers | Validation |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ARCH-0001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
 ### Architecture traceability
 
@@ -676,6 +696,19 @@ tool transcripts or prove invocation by itself.
 |---|---|---|---|---|---|
 | AWS-EV-0001 | TODO | TODO | `retrieve_skill` | TODO | TODO |
 | AWS-EV-0002 | TODO | TODO | `search_documentation` | TODO | TODO |
+
+### Change impact record
+
+Use this record for `AMEND` and `PRESERVE`. It maps the changed basis to
+affected and provably preserved IDs; it does not override revision monotonicity
+or stale-gate rules. Use `FULL_REVALIDATION` whenever impact cannot be proven.
+After required reapproval, prior task or evidence results are reusable only
+when their exact basis IDs and bound digests remain current.
+
+| Change ID | Changed basis IDs | Affected IDs | Preserved IDs | Required revalidation |
+|---|---|---|---|---|
+| CHANGE-0001 | TODO | TODO | TODO | TODO |
+
 
 A material change to an architecture driver, candidate eligibility, selected
 architecture, traceability row, material AWS evidence, technology selection,
@@ -1271,14 +1304,14 @@ makes Gate B non-runnable. `Architecture/components` on the readiness card is
 exactly that selected `ARCH-*`.
 `Design contract SHA-256` must exactly equal the doctor's current derived hash
 of the Architecture driver, Candidate, Selection, Traceability, Material AWS
-evidence, Technology decision, Property applicability, Property definition,
-and Property execution tables in that order. The baseline must resolve in the
-current local Git repository. Prefix lists are literal argv prefixes separated
-by semicolons, not shell fragments, command substitutions, or wildcards. Gate B
-therefore binds the full architecture+technology+property digest. An existing
-valid v1 Gate B whose design contract predates these architecture tables is
-grandfathered until the next design-controlled change; that change requires all
-architecture tables and a new Gate B approval.
+evidence, Harness, Change impact, Technology decision, Property applicability,
+Property definition, and Property execution tables in that order. The baseline
+must resolve in the current local Git repository. Prefix lists are literal argv
+prefixes separated by semicolons, not shell fragments, command substitutions,
+or wildcards. Gate B therefore binds the full design-contract digest. An
+existing valid v1 Gate B whose design contract predates these architecture
+tables is grandfathered until the next design-controlled change; that change
+requires every current design table and a new Gate B approval.
 Paths
 and external targets must be repository-relative or exact named targets and
 remain inside the approved scope.

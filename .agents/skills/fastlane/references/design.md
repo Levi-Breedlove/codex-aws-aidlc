@@ -7,18 +7,26 @@ Use for DESIGN-10 and Gate B.
 - Use official current AWS Core directly for material current AWS facts and
   record attributable documentation evidence. Generic connectors, memory, or
   challenger prose cannot replace those calls.
+- Follow the current Adaptive Coverage Plan: `SELECT` compares complete
+  architectures, `AMEND` reconsiders every materially affected driver and
+  alternative, and `PRESERVE` is valid only when architecture, technology,
+  trust, data, recovery, Region, and Harness boundaries are proven unchanged.
 - Derive `DRV-*` records from approved requirements. Compare credible
   whole-system `CAND-*` designs against hard constraints first, then
   preferences. Evaluate a secure managed-serverless baseline for greenfield
   work unless a hard constraint makes it ineligible; never add a straw option
   or use arbitrary numerical scoring.
 - Select one eligible `ARCH-*` as an agent recommendation. Record every
-  rejected candidate, risk, mitigation, cost effect, scaling breakpoint,
-  revisit trigger, and validation method. Use `NO_VIABLE_ALTERNATIVE` only when
+  rejected candidate, risk, mitigation, security and reliability impact,
+  operational burden, cost effect, scaling breakpoint, migration path, revisit
+  trigger, and validation method. Use `NO_VIABLE_ALTERNATIVE` only when
   exactly one candidate satisfies the hard constraints.
 - Map every approved requirement to the selected `ARCH-*`, concrete
   `COMP/API/DATA/CTRL` IDs, applicable property/test IDs, and `AWS-EV-*` IDs.
   Keep detailed live AWS Core invocation evidence in `docs/project/VERIFY.md`.
+- Complete the Change impact record for `AMEND` or `PRESERVE`. Bind changed,
+  affected, and preserved IDs; use `FULL_REVALIDATION` when impact is
+  uncertain. It never overrides revision monotonicity or stale-gate rules.
 - Complete the Gate B Harness Profile from the selected `TECH-*` register,
   delivery profile, effective risk, data classification, identity boundary,
   public exposure, recovery target, and AWS lane. Give each `HARNESS-*` row one
@@ -46,5 +54,5 @@ Use for DESIGN-10 and Gate B.
   shared basis, and remains the sole writer.
 - Require a current Gate A, complete readiness card, canonical construction
   envelope digest, selected architecture, complete traceability, current
-  material AWS evidence, complete Harness Profile, and exact owner Gate B
-  receipt.
+  material AWS evidence, complete Harness Profile and change impact, and exact
+  owner Gate B receipt.

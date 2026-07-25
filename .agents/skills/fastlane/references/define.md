@@ -21,6 +21,10 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
 - Add `QAS-*` rows only for material performance, availability, reliability,
   recovery, scalability, security-response, or operational-response concerns;
   otherwise record `NOT_APPLICABLE — <concrete reason>`.
+- Derive one internal Adaptive Coverage Plan before Gate A. Infer the work kind
+  and `SELECT`/`AMEND`/`PRESERVE` disposition without adding an owner question.
+  Every omission needs a current requirement or repository basis; uncertain
+  impact uses full coverage. Quick MVP changes depth, never safety.
 - Use STRIDE only when material security trust boundaries require systematic
   analysis. Use LINDDUN only when materially privacy-sensitive data requires
   systematic analysis. Record resulting requirements, controls, tests, and

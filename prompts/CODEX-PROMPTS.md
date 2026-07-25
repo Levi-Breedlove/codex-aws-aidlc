@@ -822,6 +822,9 @@ asks for an explanation.
 
 Create or increment a requirements revision such as REQ-0001. Give every
 requirement, non-goal, assumption, and material open question a stable ID.
+Derive the internal Adaptive Coverage Plan from the work kind, delivery profile,
+risk, requirements, and repository facts. Do not ask a new routine question.
+Every omission needs a current basis; uncertain impact uses full coverage.
 Record in docs/project/PRD.md:
 - problem, actors, outcome, scope, and non-goals;
 - measurable functional and non-functional requirements;
@@ -992,12 +995,10 @@ live `aws-core@agent-toolkit-for-aws`, and visibly call both
 `retrieve_skill` and `search_documentation` for material service-fit, Region,
 IAM, encryption, reliability, observability, quota, security, and cost facts.
 BOOT-00/plugin metadata, cache, generic connectors, and memory are insufficient.
-After completing the proposed design and attributable AWS Core evidence, invoke
-the read-only `fastlane-architecture-challenger` only for high-risk,
-hard-to-reverse, shared-infrastructure, isolation, recovery, or explicitly
-requested review. It may challenge the finished proposal; it cannot select the
-architecture, replace live AWS Core calls, write the PRD, or approve Gate B.
-The coordinator remains the only writer.
+After completing the proposed design, invoke `fastlane-architecture-challenger`
+for high-risk, hard-to-reverse, shared, isolation, recovery, or owner request.
+It cannot select, replace AWS Core evidence, write, or approve. Codex is the
+only writer.
 
 Fill the two `DESIGN-10` rows in docs/project/VERIFY.md with live inputs,
 outputs, official references, actor `CODEX_LIVE_TOOL_CALL`, observed semantic
@@ -1007,25 +1008,26 @@ accessed` both `NO`. Use `DES-0001; TECH: TECH-0001, TECH-0002` or
 binding. The observed AWS Core version is metadata, never a pin. Missing,
 failed, stale, or unattributed rows block Gate B.
 
-Before Gate B, load `.agents/skills/fastlane/references/design.md` and:
-- complete every `DRV-*`, whole-system `CAND-*`, selected `ARCH-*`, traceability,
-  and `AWS-EV-*` row. Apply hard constraints before preferences;
-  select only an eligible candidate;
-- evaluate the managed-serverless baseline for greenfield work unless a hard
-  constraint makes it ineligible. Cover identity, authorization, isolation,
-  interfaces, data/uploads, IAM, encryption, secrets, networking, failures,
-  retries, concurrency, observability, recovery, cost, rollback, teardown, and
-  verification. Keep Well-Architected review conversational;
-- complete every in-scope `TECH-*` row. Only `EXACT` accepts opaque versions;
-  Active `PROPERTY_TESTING` uses `EXACT`, `COMPATIBLE_MAJOR`, or numeric
-  `MINIMUM`;
-- classify every measurable Gate A requirement exactly once for PBT and give each
-  applicable `PROP-*` an exact command, bounded cases/time, replay format, and
-  VERIFY destination. The replay format must explicitly declare a seed or
-  exact-command method. Use one local command without shell-control
-  chaining and no placeholder property definitions or execution rows; and
-- complete the Gate B Harness Profile and cite its required `HARNESS-*` IDs; and
-- resolve brownfield compatibility, migration, and protected behavior.
+Before Gate B, load `.agents/skills/fastlane/references/design.md`, follow
+the Adaptive Coverage Plan, and complete every required existing PRD
+record. `SELECT` compares complete candidates; `AMEND` revalidates materially
+affected drivers and alternatives; `PRESERVE` requires proof that architecture,
+technology, trust, data, recovery, Region, and Harness boundaries are unchanged.
+- For SELECT, evaluate a secure managed-serverless baseline. Complete `DRV-*`,
+  `CAND-*`, selected `ARCH-*`, traceability, and `AWS-EV-*`. Apply hard constraints before preferences
+  and select only an eligible candidate.
+- Record rejected alternatives, risks, mitigations, security/reliability impact,
+  operational burden, cost, breakpoints, migration path, revisit triggers, and
+  validation. Cover all required whole-system domains and keep review conversational.
+- Complete in-scope `TECH-*` rows. Only `EXACT` accepts opaque versions.
+  Active `PROPERTY_TESTING` uses `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
+- classify every measurable Gate A requirement exactly once. Each applicable
+  `PROP-*` gets one bounded command without shell-control
+  chaining; its replay format must explicitly declare a
+  seed or deterministic reproduction and VERIFY destination.
+- Complete the Gate B Harness Profile and Change impact record. Use
+  `FULL_REVALIDATION` when impact is uncertain; resolve brownfield compatibility,
+  migration, and protected behavior.
 
 Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as their
 shared basis, and not append by default. Route material
@@ -1061,8 +1063,9 @@ authorized commit>; <deterministic rule>`, and
 Use every exact envelope row and grammar in docs/project/PRD.md. Require a local Git
 repository and resolvable baseline commit before readiness. Compute and record
 the derived Design contract SHA-256 over Architecture driver, Candidate,
-Selection, Traceability, Material AWS evidence, Technology decision, Property
-applicability, Property definition, and Property execution tables. Copy it into
+Selection, Traceability, Material AWS evidence, Harness, Change impact,
+Technology decision, Property applicability, Property definition, and Property
+execution tables. Copy it into
 the envelope and include the selected `ARCH-*`, every current `TECH-*`, and every
 applicable `PROP-*` in authorized `SCOPE_IDS`. Then compute
 the canonical complete-envelope SHA-256 after the final table edit and copy the
