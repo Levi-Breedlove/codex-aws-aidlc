@@ -217,7 +217,7 @@ class ProductJourneyTests(unittest.TestCase):
                 answer="Official AWS Core evidence is needed only for this material design step.",
             )
             self.assertIn("Project state changed: No.", side_answer)
-            self.assertIn("Pending owner action: Enable official AWS Core", side_answer)
+            self.assertIn("Pending next action: Enable official AWS Core", side_answer)
 
             verify_path.write_text(current_evidence, encoding="utf-8")
             recovered = doctor.inspect_project(deliver_project)
@@ -239,6 +239,42 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(construction["interaction"]["owner_stage"], "DELIVER")
             self.assertTrue(
                 construction["interaction"]["automatic_continuation_allowed"]
+            )
+
+            tasks_path = deliver_project / "docs/project/TASKS.md"
+            valid_tasks = tasks_path.read_text(encoding="utf-8")
+            malformed_tasks = valid_tasks.replace(
+                "- Status: `READY`", "- Status: `BROKEN`", 1
+            )
+            self.assertNotEqual(malformed_tasks, valid_tasks)
+            tasks_path.write_text(malformed_tasks, encoding="utf-8")
+
+            generated_defect = doctor.inspect_project(deliver_project)
+            self.assertFalse(generated_defect["ok"])
+            defect_item = next(
+                item
+                for item in generated_defect["remediation"]["items"]
+                if item["diagnostic_code"] == "TASK_GRAPH_INVALID"
+            )
+            self.assertEqual(defect_item["responsible_party"], "CODEX")
+            self.assertEqual(defect_item["category"], "AGENT_CORRECTION")
+            self.assertTrue(defect_item["automatic_correction_allowed"])
+            self.assertEqual(
+                generated_defect["remediation"]["next_action"]["action_kind"],
+                "CORRECT_AND_REVALIDATE",
+            )
+            self.assertFalse(
+                generated_defect["interaction"]["owner_action_required"]
+            )
+            repair_update = presenter.render_owner_update(generated_defect)
+            self.assertIn("Need from you: Nothing.", repair_update)
+            self.assertIn("Codex will correct", repair_update)
+
+            tasks_path.write_text(valid_tasks, encoding="utf-8")
+            after_repair = doctor.inspect_project(deliver_project)
+            self.assertTrue(after_repair["ok"], after_repair["diagnostics"])
+            self.assertTrue(
+                after_repair["interaction"]["automatic_continuation_allowed"]
             )
 
     def test_hook_preserves_documentation_and_distinct_aws_authority_lanes(self) -> None:

@@ -428,17 +428,33 @@ Next: <automatic next work>
 Audit: <only consequential evidence; omit otherwise>
 ~~~
 
-A routine update contains exactly one `Need from you` action. Include one
-copyable reply when input is required. Omit `Audit` when it adds no decision
-value. Never expose prompt IDs as owner instructions, or include internal
-hashes, file counts, repetitive `NONE` values, implementation narration, or
-the exhaustive AWS authority fields. `Need from you: Nothing` permits
-automatic continuation.
+A routine update identifies exactly one next action. `Need from you` names an
+owner action only for a genuine decision, setup step, approval, authorization,
+protected-boundary decision, or human safety review; otherwise it is `Nothing`.
+Include one copyable reply only when owner input is required. Omit `Audit` when
+it adds no decision value. Never expose prompt IDs as owner instructions, or
+include internal hashes, file counts, repetitive `NONE` values, implementation
+narration, or exhaustive AWS authority fields.
+
+The doctor's additive `remediation` object classifies each error with a stable
+`DGN-*` ID, responsible party, category, and automatic-correction decision,
+then derives one `next_action`. Any `MANUAL_SAFETY_REVIEW` item blocks automatic
+correction. Unknown codes fail closed to `HUMAN_REVIEWER`. Safe Codex and owner
+items may coexist: correct only independent Codex-owned defects first, preserve
+owner-controlled requirements, architecture, technologies, gates, receipts,
+and authority, then validate and rerun the doctor. Never infer that manifest
+drift followed an authorized maintenance change; only a passing scoped
+`maintain-fastlane` preflight permits regeneration.
+
+`Need from you: Nothing` plus `CORRECT_AND_REVALIDATE` means Codex corrects the
+reported in-scope defect inside the current write boundary and attempt budget,
+reruns validation, and continues. `REVIEW_SAFETY_BLOCKER` is reserved for a
+genuine human safety review.
 
 For a side question, answer directly, rerun the doctor, and pass the unchanged
 report plus the answer to `python scripts/fastlane_presenter.py side-question
---input-stdin`. State whether project state changed and restore the current
-owner action. Do not repeat a formal Gate A, Gate B, or AWS receipt merely
+--input-stdin`. State whether project state changed and restore the current next
+action. Do not repeat a formal Gate A, Gate B, or AWS receipt merely
 because a question was asked. A side question never creates an internal
 checkpoint or changes lifecycle state unless the owner separately requested a
 project change.

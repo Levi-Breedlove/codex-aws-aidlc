@@ -61,6 +61,62 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("compare complete architecture candidates", rendered)
 
 
+    def test_agent_correction_needs_nothing_and_continues(self) -> None:
+        current = report(
+            owner_stage="DELIVER",
+            response_mode="OWNER_UPDATE",
+            state="WORKING",
+            route_reason_code="BLOCKED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+        )
+        current["remediation"] = {
+            "items": [
+                {
+                    "diagnostic_id": "DGN-0001",
+                    "diagnostic_code": "TASK_GRAPH_INVALID",
+                    "path": "docs/project/TASKS.md",
+                    "responsible_party": "CODEX",
+                    "category": "AGENT_CORRECTION",
+                    "automatic_correction_allowed": True,
+                }
+            ],
+            "next_action": {
+                "responsible_party": "CODEX",
+                "action_kind": "CORRECT_AND_REVALIDATE",
+                "automatic_continuation_allowed": True,
+            },
+        }
+
+        rendered = presenter.render_owner_update(current)
+        self.assertIn("Status: Fastlane found an in-scope validation defect.", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn(
+            "Next: Codex will correct the reported in-scope failure and rerun validation.",
+            rendered,
+        )
+        self.assertNotIn("Resolve the listed validation failure", rendered)
+
+    def test_human_safety_review_is_one_genuine_action(self) -> None:
+        current = report(
+            response_mode="BLOCKER",
+            state="BLOCKED",
+            route_reason_code="BLOCKED",
+            owner_action_kind="REVIEW_SAFETY_BLOCKER",
+        )
+        current["remediation"] = {
+            "items": [],
+            "next_action": {
+                "responsible_party": "HUMAN_REVIEWER",
+                "action_kind": "REVIEW_SAFETY_BLOCKER",
+                "automatic_continuation_allowed": False,
+            },
+        }
+        rendered = presenter.render_owner_update(current)
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("Review the reported safety blocker", rendered)
+
     def test_coverage_plan_is_rendered_without_internal_method_terms(self) -> None:
         expected = {
             "SELECT": "compare complete architecture candidates",
@@ -212,7 +268,7 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertTrue(rendered.startswith("CloudFront is optional"))
         self.assertIn("Project state changed: No.", rendered)
         self.assertIn(
-            "Pending owner action: Review and decide the Gate A requirements receipt.",
+            "Pending next action: Review and decide the Gate A requirements receipt.",
             rendered,
         )
         self.assertNotIn("APPROVE REQUIREMENTS GATE A", rendered)
@@ -230,7 +286,7 @@ class FastlanePresenterTests(unittest.TestCase):
             working,
             answer="No architecture decision changed.",
         )
-        self.assertIn("Pending owner action: Nothing.", rendered)
+        self.assertIn("Pending next action: Nothing.", rendered)
         self.assertIn("Next: Codex will compare complete architecture candidates.", rendered)
 
     def test_public_cli_reads_one_json_object_from_stdin(self) -> None:

@@ -149,10 +149,24 @@ A ready Quick MVP with a complete brief needs at most one clarification round
 before Gate A. Setup questions occur once. Gate A continues into Design in the
 same run; Design reaches pending Gate B without an owner pause unless a material
 owner decision exists; Gate B continues into task generation in the same run.
-Resume never repeats completed setup, and every blocked response has one owner
-action. Routine owner responses do not expose internal methodology, Harness, or
-context-management terms. These expectations add no gate and never override a
-material decision, validation failure, or authority boundary.
+Resume never repeats completed setup. Every paused or blocked response identifies
+one next action; it asks the owner only for a genuine decision, setup step,
+approval, authorization, protected-boundary decision, or human safety review.
+Routine responses do not expose internal methodology, Harness, or context terms.
+These expectations add no gate and never override an authority boundary.
+
+The doctor classifies validation diagnostics individually. A safe Codex-owned
+defect continues through correction and revalidation inside the current write
+boundary and attempt budget. Manual-safety findings stop all automatic repair.
+When safe Codex and owner findings coexist, Codex may repair only independent
+agent-owned defects before rerunning the doctor and presenting the remaining
+owner action. Unknown diagnostics fail closed to human review.
+
+During framework maintenance, a stale manifest is regenerated only after the
+read-only `maintain-fastlane` preflight proves every changed source is inside the
+recorded allowlist. The application coordinator never infers that provenance.
+Unexplained control-hash drift, unsafe paths, malformed manifest structure, and
+protected-file changes always require human safety review.
 
 ## Optional hook guardrails
 
@@ -177,7 +191,11 @@ stage, gate, or routine owner action.
 
 ## Resume behavior
 
-The doctor selects the next prompt. Fresh templates require current official AWS Core before initialization. Initialized projects skip that prerequisite during normal resume; missing or stale AWS Core evidence later pauses only the affected material AWS step. Correct only the reported blocker, then resume the derived prompt.
+The doctor selects the next prompt. Fresh templates require current official
+AWS Core before initialization. Initialized projects skip that prerequisite
+during normal resume; missing or stale AWS Core evidence later pauses only the
+affected material AWS step. Follow the derived remediation action, rerun the
+doctor, and resume the selected route.
 
 Maintainers can run the optional, credential-free-to-validate
 [model role-play review](EVALUATION.md) before a release. Its schema-4 manifest

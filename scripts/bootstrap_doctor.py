@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Mapping
 
 
 STATE_FILE = "bootstrap.yaml"
@@ -463,8 +463,14 @@ class Diagnostic:
     path: str | None = None
     severity: str = "ERROR"
 
-    def to_dict(self) -> dict[str, str]:
-        result = {"code": self.code, "severity": self.severity, "message": self.message}
+    def to_dict(self, diagnostic_id: str | None = None) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "code": self.code,
+            "severity": self.severity,
+            "message": self.message,
+        }
+        if diagnostic_id is not None:
+            result["diagnostic_id"] = diagnostic_id
         if self.path is not None:
             result["path"] = self.path
         return result
@@ -496,6 +502,8 @@ class TaskSummary:
     ready: list[str] = field(default_factory=list)
     active: list[str] = field(default_factory=list)
     write_sets: dict[str, list[str]] = field(default_factory=dict)
+    attempts_used: dict[str, int] = field(default_factory=dict)
+    attempt_budgets: dict[str, int] = field(default_factory=dict)
 
     @property
     def total(self) -> int:
@@ -6892,6 +6900,8 @@ def validate_tasks(
     summary.statuses = {task.task_id: task.status for task in tasks}
     summary.active = sorted(task.task_id for task in tasks if task.status == "IN_PROGRESS")
     summary.ready = sorted(ready)
+    summary.attempts_used = {task.task_id: task.attempts_used for task in tasks}
+    summary.attempt_budgets = {task.task_id: task.attempt_budget for task in tasks}
     for task in tasks:
         try:
             summary.write_sets[task.task_id] = parse_task_write_set(
@@ -7192,6 +7202,275 @@ def inspect_git_baseline(root: Path) -> str:
     return commit if re.fullmatch(r"[0-9a-fA-F]{40,64}", commit) else "PENDING"
 
 
+DEFINE_AGENT_DIAGNOSTICS = frozenset(
+    {
+        "ADAPTIVE_COVERAGE_INVALID",
+        "GATE_A_LIFECYCLE_TRANSITION",
+        "GATE_A_READINESS_CARD",
+        "GATE_A_RECOMMENDATION",
+    }
+)
+DESIGN_AGENT_DIAGNOSTICS = frozenset(
+    {
+        "AWS_LANE_BOUNDARY",
+        "DESIGN_CONTRACT_INVALID",
+        "GATE_B_DESIGN_CONTRACT_HASH",
+        "GATE_B_ENVELOPE",
+        "GATE_B_ENVELOPE_HASH",
+        "GATE_B_GAP",
+        "GATE_B_LIFECYCLE_TRANSITION",
+        "GATE_B_PROJECT_DRIFT",
+        "GATE_B_READINESS_CARD",
+        "GATE_B_RECOMMENDATION",
+        "GATE_B_REVISION_MISMATCH",
+    }
+)
+DELIVER_AGENT_DIAGNOSTICS = frozenset(
+    {
+        "ACTIVE_TASK_CONFLICT",
+        "AUTONOMY_OUTSIDE_AUTH",
+        "STATE_TASK_DRIFT",
+        "TASK_ATTEMPT_BOUNDARY",
+        "TASK_AWS_BOUNDARY",
+        "TASK_BASELINE_DRIFT",
+        "TASK_COMMAND_BOUNDARY",
+        "TASK_EXCLUDED_WRITE",
+        "TASK_EXTERNAL_STATE_BOUNDARY",
+        "TASK_GITHUB_BOUNDARY",
+        "TASK_GRAPH_INVALID",
+        "TASK_ID_OUTSIDE_AUTH",
+        "TASK_LIMIT_EXCEEDED",
+        "TASK_OUTSIDE_TASK_BOUNDARY",
+        "TASK_OUTSIDE_WRITE_BOUNDARY",
+        "TASK_PLAN_STATE",
+        "TASK_PROPERTY_COVERAGE",
+        "TASK_SNAPSHOT",
+        "WORKER_LIMIT_EXCEEDED",
+    }
+)
+OWNER_DECISION_DIAGNOSTICS = frozenset(
+    {
+        "BROWNFIELD_PRD_BASELINE",
+        "BROWNFIELD_PRD_PRESERVATION",
+        "BROWNFIELD_STATE",
+        "GATE_A_ASSUMPTIONS",
+        "GATE_A_BLOCKER",
+        "GATE_A_COST_POSTURE",
+        "PLACEHOLDER_UNRESOLVED",
+        "PROJECT_COST_POSTURE",
+        "PROJECT_IDENTITY",
+        "PROJECT_RISK_PROFILE",
+        "PROJECT_SELECTION_REQUIRED",
+        "REQUIREMENT_METHOD_MIGRATION_REQUIRED",
+    }
+)
+OWNER_SETUP_DIAGNOSTICS = frozenset(
+    {
+        "AWS_CORE_EVIDENCE_REQUIRED",
+        "AWS_CORE_EVIDENCE_STRUCTURE",
+    }
+)
+OWNER_AUTHORIZATION_DIAGNOSTICS = frozenset(
+    {
+        "GATE_A_COST_AUTHORIZATION",
+        "GATE_A_HUMAN_APPROVER",
+        "GATE_A_OWNER_RECORD",
+        "GATE_A_RECEIPT_MISMATCH",
+        "GATE_B_HUMAN_APPROVER",
+        "GATE_B_OWNER_RECORD",
+        "GATE_B_RECEIPT_MISMATCH",
+        "GATE_B_WITHOUT_GATE_A",
+    }
+)
+UNCONFIGURED_SETUP_DIAGNOSTICS = frozenset(
+    {
+        "PLACEHOLDER_UNRESOLVED",
+        "PROJECT_COST_POSTURE",
+        "STATE_SETUP",
+    }
+)
+
+
+def _owner_stage_from_gates(gate_a: str, gate_b: str) -> str:
+    if gate_a != "APPROVED_FOR_DESIGN":
+        return "DEFINE"
+    if gate_b != "APPROVED_FOR_CONSTRUCTION":
+        return "DESIGN"
+    return "DELIVER"
+
+
+def _agent_correction_is_safe(
+    diagnostic: Diagnostic,
+    owner_stage: str,
+    gate_b: str,
+    envelope: Mapping[str, str],
+    tasks: TaskSummary,
+) -> bool:
+    """Return whether one generated defect is repairable inside current boundaries."""
+
+    relative = validate_relative_path(diagnostic.path)
+    if relative is None:
+        return False
+    if owner_stage == "DEFINE":
+        return (
+            diagnostic.code in DEFINE_AGENT_DIAGNOSTICS
+            and relative == PRD_FILE
+        )
+    if owner_stage == "DESIGN":
+        return (
+            diagnostic.code in DESIGN_AGENT_DIAGNOSTICS
+            and relative == PRD_FILE
+            and gate_b != "APPROVED_FOR_CONSTRUCTION"
+        )
+    if diagnostic.code not in DELIVER_AGENT_DIAGNOSTICS:
+        return False
+    if gate_b != "APPROVED_FOR_CONSTRUCTION":
+        return False
+    try:
+        allowed = parse_envelope_paths(
+            envelope.get("Allowed repository write set", ""),
+            "Allowed repository write set",
+            allow_none=False,
+        )
+        excluded = parse_envelope_paths(
+            envelope.get("Excluded or owner-only write set", ""),
+            "Excluded or owner-only write set",
+            allow_none=True,
+        )
+        protected = parse_envelope_paths(
+            envelope.get("Protected dirty paths", ""),
+            "Protected dirty paths",
+            allow_none=True,
+        )
+    except ValueError:
+        return False
+    if any(path_boundaries_overlap(relative, item) for item in excluded + protected):
+        return False
+    if relative in COORDINATOR_LEDGER_PATHS:
+        return True
+    if len(tasks.active) != 1:
+        return False
+    active_task = tasks.active[0]
+    if tasks.attempts_used.get(active_task, 0) >= tasks.attempt_budgets.get(
+        active_task, 0
+    ):
+        return False
+    return any(path_boundary_contains(item, relative) for item in allowed) and any(
+        path_boundary_contains(item, relative)
+        for item in tasks.write_sets.get(active_task, [])
+    )
+
+
+def _owner_authorization_action(items: list[dict[str, Any]]) -> str:
+    codes = {str(item.get("diagnostic_code", "")) for item in items}
+    if any(code.startswith("GATE_A_") for code in codes):
+        return "APPROVE_GATE_A"
+    if any(code.startswith("GATE_B_") for code in codes):
+        return "APPROVE_GATE_B"
+    return "AUTHORIZE_AWS_OPERATION"
+
+
+def derive_remediation(
+    ctx: Context,
+    *,
+    classification: str,
+    gate_a: str,
+    gate_b: str,
+    envelope: Mapping[str, str],
+    tasks: TaskSummary,
+) -> dict[str, Any]:
+    """Classify each error, then derive one deterministic next action."""
+
+    owner_stage = _owner_stage_from_gates(gate_a, gate_b)
+    items: list[dict[str, Any]] = []
+    for index, diagnostic in enumerate(ctx.diagnostics, start=1):
+        if diagnostic.severity != "ERROR":
+            continue
+        responsible_party = "HUMAN_REVIEWER"
+        category = "MANUAL_SAFETY_REVIEW"
+        automatic = False
+        if (
+            classification == "UNCONFIGURED_TEMPLATE"
+            and diagnostic.code in UNCONFIGURED_SETUP_DIAGNOSTICS
+        ):
+            responsible_party = "OWNER"
+            category = "OWNER_SETUP"
+        elif diagnostic.code in OWNER_SETUP_DIAGNOSTICS:
+            responsible_party = "OWNER"
+            category = "OWNER_SETUP"
+        elif diagnostic.code in OWNER_DECISION_DIAGNOSTICS:
+            responsible_party = "OWNER"
+            category = "OWNER_DECISION"
+        elif diagnostic.code in OWNER_AUTHORIZATION_DIAGNOSTICS:
+            responsible_party = "OWNER"
+            category = "OWNER_AUTHORIZATION"
+        elif _agent_correction_is_safe(
+            diagnostic, owner_stage, gate_b, envelope, tasks
+        ):
+            responsible_party = "CODEX"
+            category = "AGENT_CORRECTION"
+            automatic = True
+        items.append(
+            {
+                "diagnostic_id": f"DGN-{index:04d}",
+                "diagnostic_code": diagnostic.code,
+                "path": diagnostic.path,
+                "responsible_party": responsible_party,
+                "category": category,
+                "automatic_correction_allowed": automatic,
+            }
+        )
+
+    manual = [item for item in items if item["category"] == "MANUAL_SAFETY_REVIEW"]
+    codex = [item for item in items if item["category"] == "AGENT_CORRECTION"]
+    owner_decisions = [item for item in items if item["category"] == "OWNER_DECISION"]
+    owner_setup = [item for item in items if item["category"] == "OWNER_SETUP"]
+    owner_authorization = [
+        item for item in items if item["category"] == "OWNER_AUTHORIZATION"
+    ]
+    if manual:
+        next_action = {
+            "responsible_party": "HUMAN_REVIEWER",
+            "action_kind": "REVIEW_SAFETY_BLOCKER",
+            "automatic_continuation_allowed": False,
+        }
+    elif codex:
+        next_action = {
+            "responsible_party": "CODEX",
+            "action_kind": "CORRECT_AND_REVALIDATE",
+            "automatic_continuation_allowed": True,
+        }
+    elif owner_decisions:
+        next_action = {
+            "responsible_party": "OWNER",
+            "action_kind": "ANSWER_OPEN_DECISIONS",
+            "automatic_continuation_allowed": False,
+        }
+    elif owner_setup:
+        next_action = {
+            "responsible_party": "OWNER",
+            "action_kind": (
+                "COMPLETE_PREREQUISITE_CHECKLIST"
+                if classification == "UNCONFIGURED_TEMPLATE"
+                else "ENABLE_AWS_CORE"
+            ),
+            "automatic_continuation_allowed": False,
+        }
+    elif owner_authorization:
+        next_action = {
+            "responsible_party": "OWNER",
+            "action_kind": _owner_authorization_action(owner_authorization),
+            "automatic_continuation_allowed": False,
+        }
+    else:
+        next_action = {
+            "responsible_party": "CODEX",
+            "action_kind": "CONTINUE_CURRENT_ROUTE",
+            "automatic_continuation_allowed": True,
+        }
+    return {"items": items, "next_action": next_action}
+
+
 def derive_interaction(
     lifecycle_state: str,
     next_prompt: str,
@@ -7200,6 +7479,8 @@ def derive_interaction(
     diagnostic_codes: list[str],
     design_aws_core_ready: bool,
     aws_execution_planning_ready: bool,
+    remediation: Mapping[str, Any] | None = None,
+    owner_stage_hint: str | None = None,
 ) -> dict[str, Any]:
     """Derive stable owner interaction metadata without conversational prose."""
 
@@ -7222,12 +7503,39 @@ def derive_interaction(
         owner_stage = "DESIGN"
     else:
         owner_stage = "DELIVER"
+    if not design_evidence_failure and owner_stage_hint in {"DEFINE", "DESIGN", "DELIVER"}:
+        owner_stage = owner_stage_hint
 
     if has_errors or lifecycle_state == "BLOCKED":
-        response_mode = "BLOCKER"
-        state = "BLOCKED"
-        action_kind = "ENABLE_AWS_CORE" if aws_evidence_failure else "FIX_VALIDATION_FAILURE"
-        automatic = False
+        next_action = remediation.get("next_action") if remediation else None
+        remediation_action = (
+            str(next_action.get("action_kind", ""))
+            if isinstance(next_action, Mapping)
+            else ""
+        )
+        if remediation_action == "CORRECT_AND_REVALIDATE":
+            response_mode = "OWNER_UPDATE"
+            state = "WORKING"
+            action_kind = "NONE_CONTINUE_AUTOMATICALLY"
+            automatic = True
+        elif remediation_action in {
+            "ANSWER_OPEN_DECISIONS",
+            "APPROVE_GATE_A",
+            "APPROVE_GATE_B",
+            "AUTHORIZE_AWS_OPERATION",
+            "COMPLETE_PREREQUISITE_CHECKLIST",
+            "ENABLE_AWS_CORE",
+            "REVIEW_SAFETY_BLOCKER",
+        }:
+            response_mode = "BLOCKER"
+            state = "BLOCKED"
+            action_kind = remediation_action
+            automatic = False
+        else:
+            response_mode = "BLOCKER"
+            state = "BLOCKED"
+            action_kind = "ENABLE_AWS_CORE" if aws_evidence_failure else "FIX_VALIDATION_FAILURE"
+            automatic = False
         formal_receipt = False
     elif lifecycle_state == "WAITING_GATE_A":
         response_mode = "GATE_A"
@@ -7284,6 +7592,18 @@ def derive_interaction(
             "BLOCKED" if has_errors else "REQUIRED"
         )
 
+    blocking_ids: list[str] = []
+    if state == "BLOCKED" and remediation:
+        remediation_items = remediation.get("items")
+        if isinstance(remediation_items, list):
+            blocking_ids = [
+                str(item["diagnostic_id"])
+                for item in remediation_items
+                if isinstance(item, Mapping) and "diagnostic_id" in item
+            ]
+    if state == "BLOCKED" and not blocking_ids:
+        blocking_ids = sorted(set(diagnostic_codes))
+
     return {
         "owner_stage": owner_stage,
         "response_mode": response_mode,
@@ -7291,7 +7611,7 @@ def derive_interaction(
         "route_reason_code": lifecycle_state,
         "owner_action_required": action_kind != "NONE_CONTINUE_AUTOMATICALLY",
         "owner_action_kind": action_kind,
-        "blocking_ids": sorted(set(diagnostic_codes)) if state == "BLOCKED" else [],
+        "blocking_ids": blocking_ids,
         "automatic_continuation_allowed": automatic,
         "formal_receipt_required": formal_receipt,
         "aws_core": {
@@ -8004,6 +8324,14 @@ def build_report(
         ctx, external_authority
     )
     diagnostic_codes = [item.code for item in ctx.diagnostics]
+    remediation = derive_remediation(
+        ctx,
+        classification=classification,
+        gate_a=gate_a,
+        gate_b=gate_b,
+        envelope=envelope,
+        tasks=tasks,
+    )
     interaction = derive_interaction(
         lifecycle_state,
         next_prompt,
@@ -8011,9 +8339,13 @@ def build_report(
         diagnostic_codes=diagnostic_codes,
         design_aws_core_ready=design_aws_core_ready,
         aws_execution_planning_ready=aws_execution_planning_ready,
+        remediation=remediation,
+        owner_stage_hint=_owner_stage_from_gates(gate_a, gate_b),
     )
-    if classification == "UNCONFIGURED_TEMPLATE" or (
-        classification == "TEMPLATE_SOURCE" and ctx.has_errors
+    if (
+        classification == "UNCONFIGURED_TEMPLATE"
+        and remediation["next_action"]["action_kind"]
+        == "COMPLETE_PREREQUISITE_CHECKLIST"
     ):
         interaction = derive_unconfigured_template_interaction(diagnostic_codes)
     context_plan = derive_context_plan(interaction, tasks, coverage_contract)
@@ -8029,6 +8361,7 @@ def build_report(
         "resume_safe": not ctx.has_errors,
         "next_prompt": next_prompt,
         "interaction": interaction,
+        "remediation": remediation,
         "context_plan": context_plan,
         "project": {
             "name": project.get("name"),
@@ -8073,7 +8406,10 @@ def build_report(
             "active_ids": tasks.active,
             "blocked_ids": tasks.blocked,
         },
-        "diagnostics": [item.to_dict() for item in ctx.diagnostics],
+        "diagnostics": [
+            item.to_dict(f"DGN-{index:04d}")
+            for index, item in enumerate(ctx.diagnostics, start=1)
+        ],
     }
 
 
