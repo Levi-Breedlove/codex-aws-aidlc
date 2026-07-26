@@ -235,7 +235,115 @@ class ConversationContractTests(unittest.TestCase):
             answer="The project remains in Design; no approved artifact changed.",
         )
         self.assertIn("Project state changed: No.", side)
-        self.assertIn("Pending owner action: Nothing.", side)
+        self.assertIn("Pending next action: Nothing.", side)
+
+    def test_mixed_diagnostics_repair_safe_codex_items_first(self) -> None:
+        ctx = doctor.Context(root=REPOSITORY_ROOT)
+        ctx.error(
+            "TASK_GRAPH_INVALID",
+            "Generated task status is invalid",
+            "docs/project/TASKS.md",
+        )
+        ctx.error(
+            "PROJECT_SELECTION_REQUIRED",
+            "A product decision is unresolved",
+            "docs/project/PRD.md",
+        )
+        tasks = doctor.TaskSummary(
+            plan_revision="PLAN-0001",
+            plan_state="CURRENT",
+        )
+        envelope = {
+            "Allowed repository write set": "PATHS: app/**; tests/**",
+            "Excluded or owner-only write set": "NONE",
+            "Protected dirty paths": "NONE",
+        }
+
+        remediation = doctor.derive_remediation(
+            ctx,
+            classification="ACTIVE_GREENFIELD",
+            gate_a="APPROVED_FOR_DESIGN",
+            gate_b="APPROVED_FOR_CONSTRUCTION",
+            envelope=envelope,
+            tasks=tasks,
+        )
+
+        self.assertEqual(
+            [item["diagnostic_id"] for item in remediation["items"]],
+            ["DGN-0001", "DGN-0002"],
+        )
+        self.assertEqual(
+            remediation["items"][0],
+            {
+                "diagnostic_id": "DGN-0001",
+                "diagnostic_code": "TASK_GRAPH_INVALID",
+                "path": "docs/project/TASKS.md",
+                "responsible_party": "CODEX",
+                "category": "AGENT_CORRECTION",
+                "automatic_correction_allowed": True,
+            },
+        )
+        self.assertEqual(
+            remediation["items"][1]["responsible_party"], "OWNER"
+        )
+        self.assertEqual(
+            remediation["next_action"],
+            {
+                "responsible_party": "CODEX",
+                "action_kind": "CORRECT_AND_REVALIDATE",
+                "automatic_continuation_allowed": True,
+            },
+        )
+        routed = doctor.derive_interaction(
+            "BLOCKED",
+            "STOP",
+            has_errors=True,
+            diagnostic_codes=["TASK_GRAPH_INVALID", "PROJECT_SELECTION_REQUIRED"],
+            design_aws_core_ready=True,
+            aws_execution_planning_ready=False,
+            remediation=remediation,
+            owner_stage_hint="DELIVER",
+        )
+        self.assertFalse(routed["owner_action_required"])
+        self.assertEqual(
+            routed["owner_action_kind"], "NONE_CONTINUE_AUTOMATICALLY"
+        )
+        self.assertTrue(routed["automatic_continuation_allowed"])
+
+    def test_unknown_and_protected_diagnostics_require_human_review(self) -> None:
+        envelope = {
+            "Allowed repository write set": "PATHS: app/**; tests/**",
+            "Excluded or owner-only write set": "NONE",
+            "Protected dirty paths": "PATHS: docs/project/TASKS.md",
+        }
+        tasks = doctor.TaskSummary(plan_revision="PLAN-0001", plan_state="CURRENT")
+        for code in ("TASK_GRAPH_INVALID", "UNKNOWN_DIAGNOSTIC"):
+            with self.subTest(code=code):
+                ctx = doctor.Context(root=REPOSITORY_ROOT)
+                ctx.error(code, "Review required", "docs/project/TASKS.md")
+                remediation = doctor.derive_remediation(
+                    ctx,
+                    classification="ACTIVE_GREENFIELD",
+                    gate_a="APPROVED_FOR_DESIGN",
+                    gate_b="APPROVED_FOR_CONSTRUCTION",
+                    envelope=envelope,
+                    tasks=tasks,
+                )
+                self.assertEqual(
+                    remediation["items"][0]["responsible_party"],
+                    "HUMAN_REVIEWER",
+                )
+                self.assertEqual(
+                    remediation["items"][0]["category"],
+                    "MANUAL_SAFETY_REVIEW",
+                )
+                self.assertFalse(
+                    remediation["items"][0]["automatic_correction_allowed"]
+                )
+                self.assertEqual(
+                    remediation["next_action"]["action_kind"],
+                    "REVIEW_SAFETY_BLOCKER",
+                )
 
 
 

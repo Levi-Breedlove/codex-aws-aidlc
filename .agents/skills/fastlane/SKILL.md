@@ -19,7 +19,7 @@ You are the single coordinator and sole writer.
      for project name, preferred Region, and optional budget. Initialize
      dry-run-first, then continue to the doctor.
 3. Run `python scripts/bootstrap_doctor.py --root . --json`. Treat its
-   `interaction` object as the only routing and owner-action state.
+   `interaction` and `remediation` objects as the only routing and next-action state.
 4. Follow the doctor `context_plan`. Load the complete selected rows or records
    from `source_slices`, filtered to `active_ids`, without exceeding
    `maximum_initial_bytes`. Never silently truncate a row or blocking record.
@@ -40,6 +40,14 @@ You are the single coordinator and sole writer.
    doctor in the same turn, and continue while
    `automatic_continuation_allowed` is true. An internal route change is not an
    owner checkpoint.
+   When remediation assigns safe `AGENT_CORRECTION` items to Codex, correct
+   only those items inside the current write boundary and attempt budget,
+   rerun validation, and rerun the doctor before any owner-facing pause. Never
+   rewrite owner requirements, approved architecture or technology, gates,
+   receipts, authority, protected paths, or external state during automatic
+   correction. A manual-safety item blocks automatic correction; when safe
+   Codex and owner items coexist, repair only independent Codex items first,
+   then rerun the doctor to derive the remaining next action.
 9. After recording an accepted Gate A or Gate B receipt, rerun the doctor
    immediately. Gate A continues into Design. Gate B continues into task
    generation and permitted local construction.
@@ -47,11 +55,12 @@ You are the single coordinator and sole writer.
 For a side question, answer directly without changing project state unless the
 owner requested a change. Rerun the doctor, then use
 `scripts/fastlane_presenter.py side-question --input-stdin` to restore the
-pending action. Route an explicit teaching request to `explain-fastlane`.
+pending next action. Route an explicit teaching request to `explain-fastlane`.
 
-Stop only for an owner decision or gate, stale/conflicting scope, failed
-validation, missing material evidence, an exhausted boundary, or missing
-external authority. Gate A approval continues to design; Gate B approval
+Stop only for an owner decision or gate, human safety review, stale/conflicting
+scope, missing material evidence, an exhausted correction or write boundary,
+or missing external authority. Safely agent-correctable validation failures
+continue automatically. Gate A approval continues to design; Gate B approval
 continues to task generation and permitted local construction.
 
 Optional requirements and architecture challengers are read-only critics at

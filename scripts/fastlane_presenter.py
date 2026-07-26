@@ -42,6 +42,7 @@ ACTION_TEXT = {
     "APPROVE_GATE_B": "Review and decide the Gate B design and construction receipt.",
     "AUTHORIZE_AWS_OPERATION": "Review the exact AWS authority receipt before any AWS action.",
     "FIX_VALIDATION_FAILURE": "Resolve the listed validation failure, then continue Fastlane.",
+    "REVIEW_SAFETY_BLOCKER": "Review the reported safety blocker before Fastlane changes anything.",
     "NONE_CONTINUE_AUTOMATICALLY": "Nothing.",
 }
 
@@ -77,6 +78,42 @@ def _interaction(report: Mapping[str, Any]) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise PresentationError("doctor report is missing interaction state")
     return value
+
+
+def _remediation_text(report: Mapping[str, Any]) -> tuple[str | None, str | None]:
+    value = report.get("remediation")
+    if value is None:
+        return None, None
+    if not isinstance(value, Mapping):
+        raise PresentationError("doctor report has invalid remediation state")
+    next_action = value.get("next_action")
+    if not isinstance(next_action, Mapping):
+        raise PresentationError("doctor report has invalid remediation next action")
+    action_kind = str(next_action.get("action_kind", ""))
+    party = str(next_action.get("responsible_party", ""))
+    automatic = next_action.get("automatic_continuation_allowed") is True
+    if action_kind == "CORRECT_AND_REVALIDATE":
+        if party != "CODEX" or not automatic:
+            raise PresentationError("unsafe automatic remediation state")
+        return (
+            "Fastlane found an in-scope validation defect.",
+            "Codex will correct the reported in-scope failure and rerun validation.",
+        )
+    if action_kind == "REVIEW_SAFETY_BLOCKER":
+        if party != "HUMAN_REVIEWER" or automatic:
+            raise PresentationError("unsafe manual remediation state")
+        return None, None
+    if action_kind not in {
+        "ANSWER_OPEN_DECISIONS",
+        "APPROVE_GATE_A",
+        "APPROVE_GATE_B",
+        "AUTHORIZE_AWS_OPERATION",
+        "COMPLETE_PREREQUISITE_CHECKLIST",
+        "CONTINUE_CURRENT_ROUTE",
+        "ENABLE_AWS_CORE",
+    }:
+        raise PresentationError("unknown remediation next action")
+    return None, None
 
 
 def _task_details(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -211,9 +248,11 @@ def render_owner_update(
     if required == (action_kind == "NONE_CONTINUE_AUTOMATICALLY"):
         raise PresentationError("owner action requirement conflicts with action kind")
 
-    status_text = _delivery_status(report, reason) or STATUS_TEXT[reason]
+    remediation_status, remediation_next = _remediation_text(report)
+    status_text = remediation_status or _delivery_status(report, reason) or STATUS_TEXT[reason]
     next_text = (
-        _delivery_next(report, reason) or _coverage_next(report, reason) or NEXT_TEXT[reason]
+        remediation_next or _delivery_next(report, reason)
+        or _coverage_next(report, reason) or NEXT_TEXT[reason]
     )
     lines = [
         f"FASTLANE · {stage}",
@@ -243,6 +282,7 @@ def render_side_question_response(
     if not cleaned_answer:
         raise PresentationError("side-question answer must not be empty")
     interaction = _interaction(report)
+    _remediation_status, remediation_next = _remediation_text(report)
     action_kind = str(interaction.get("owner_action_kind", ""))
     if action_kind not in ACTION_TEXT:
         raise PresentationError("unknown owner action kind")
@@ -253,13 +293,13 @@ def render_side_question_response(
         cleaned_answer,
         "",
         "Project state changed: " + ("Yes." if project_state_changed else "No."),
-        f"Pending owner action: {ACTION_TEXT[action_kind]}",
+        f"Pending next action: {ACTION_TEXT[action_kind]}",
     ]
     if not required:
         reason = str(interaction.get("route_reason_code", ""))
         if reason not in NEXT_TEXT:
             raise PresentationError("unknown route reason code")
-        lines.append(f"Next: {NEXT_TEXT[reason]}")
+        lines.append(f"Next: {remediation_next or NEXT_TEXT[reason]}")
     return "\n".join(lines)
 
 
