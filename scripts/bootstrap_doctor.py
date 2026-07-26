@@ -21,6 +21,19 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
+try:
+    from fastlane_context import (
+        SliceRequest,
+        SourceSpan,
+        resolve_context_packet,
+    )
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.fastlane_context import (
+        SliceRequest,
+        SourceSpan,
+        resolve_context_packet,
+    )
+
 
 STATE_FILE = "bootstrap.yaml"
 MANIFEST_FILE = "bootstrap.manifest.json"
@@ -2466,24 +2479,57 @@ def _parse_contract_table_lines(
     )
 
 
-def _heading_section_lines(
+def _heading_section_offsets(
     text: str, heading: str
-) -> tuple[list[str], list[str]] | None:
+) -> tuple[int, int, int] | None:
+    """Return heading start, body start, and section end using canonical rules."""
+
     structural = without_fenced_code(text)
     matches = list(
-        re.finditer(rf"^{re.escape(heading)}[ \t]*$", structural, re.MULTILINE)
+        re.finditer(rf"^{re.escape(heading)}[ \t]*\r?$", structural, re.MULTILINE)
     )
     if not matches:
         return None
     if len(matches) != 1:
         raise ValueError(f"Expected exactly one heading {heading!r}; found {len(matches)}")
     level = len(heading) - len(heading.lstrip("#"))
-    start = matches[0].end()
     following = re.search(
-        rf"^#{{1,{level}}}[ \t]+", structural[start:], re.MULTILINE
+        rf"^#{{1,{level}}}[ \t]+", structural[matches[0].end() :], re.MULTILINE
     )
-    end = start + following.start() if following else len(text)
-    return text[start:end].splitlines(), structural[start:end].splitlines()
+    end = matches[0].end() + following.start() if following else len(text)
+    return matches[0].start(), matches[0].end(), end
+
+
+def _heading_section_lines(
+    text: str, heading: str
+) -> tuple[list[str], list[str]] | None:
+    offsets = _heading_section_offsets(text, heading)
+    if offsets is None:
+        return None
+    _, body_start, end = offsets
+    structural = without_fenced_code(text)
+    return text[body_start:end].splitlines(), structural[body_start:end].splitlines()
+
+
+def _heading_title_span(text: str, title: str) -> SourceSpan:
+    """Resolve one visible Markdown heading title without inspecting fences."""
+
+    structural = without_fenced_code(text)
+    matches = list(
+        re.finditer(
+            rf"^(?P<marks>#{{1,6}})[ \t]+(?:\d+(?:\.\d+)*\.?[ \t]+)?{re.escape(title)}[ \t]*\r?$",
+            structural,
+            re.MULTILINE,
+        )
+    )
+    if len(matches) != 1:
+        raise ValueError(f"expected exactly one heading title {title!r}; found {len(matches)}")
+    level = len(matches[0].group("marks"))
+    following = re.search(
+        rf"^#{{1,{level}}}[ \t]+", structural[matches[0].end() :], re.MULTILINE
+    )
+    end = matches[0].end() + following.start() if following else len(text)
+    return SourceSpan(matches[0].start(), end)
 
 
 def contract_table_after_heading(
@@ -7646,10 +7692,126 @@ def derive_unconfigured_template_interaction(
 CONTEXT_MAXIMUM_INITIAL_BYTES = 12_000
 
 
+def _context_selector_span(request: SliceRequest, text: str) -> SourceSpan:
+    """Resolve one selector through the doctor's canonical Markdown helpers."""
+
+    if request.selector_kind == "WHOLE_FILE":
+        if not text:
+            raise ValueError("whole-file source is empty")
+        return SourceSpan(0, len(text))
+    if request.selector_kind == "HEADING":
+        return _heading_title_span(text, request.selector)
+    if request.selector_kind == "TASK_ID":
+        matches = [
+            task for task in inspect_task_blocks(text) if task.task_id == request.selector
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"expected exactly one task {request.selector!r}; found {len(matches)}"
+            )
+        start = text.find(matches[0].block)
+        if start < 0:
+            raise ValueError(f"task {request.selector!r} has no canonical source range")
+        return SourceSpan(start, start + len(matches[0].block))
+    if request.selector_kind == "RECORD_ID":
+        structural_lines = without_fenced_code(text).splitlines(keepends=True)
+        source_lines = text.splitlines(keepends=True)
+        token = re.compile(rf"(?<![A-Z0-9-]){re.escape(request.selector)}(?![A-Z0-9-])")
+        matches: list[SourceSpan] = []
+        offset = 0
+        for source_line, structural_line in zip(source_lines, structural_lines):
+            cells = (
+                split_markdown_table_row(source_line.rstrip("\r\n"))
+                if structural_line.strip().startswith("|")
+                else None
+            )
+            if cells is not None and any(token.search(clean_cell(cell)) for cell in cells):
+                matches.append(SourceSpan(offset, offset + len(source_line)))
+            offset += len(source_line)
+        if len(matches) != 1:
+            raise ValueError(
+                f"expected exactly one table record {request.selector!r}; found {len(matches)}"
+            )
+        return matches[0]
+    raise ValueError(f"unsupported selector kind {request.selector_kind!r}")
+
+
+def _context_request(
+    value: str,
+    active_ids: list[str],
+    *,
+    initial: bool,
+) -> SliceRequest:
+    path, marker, selector = value.partition("#")
+    if not marker:
+        selector_kind = "WHOLE_FILE"
+        selector = path
+        priority = 0
+        reason = "Current phase procedure"
+    elif TASK_ID.fullmatch(selector):
+        selector_kind = "TASK_ID"
+        priority = 2
+        reason = "Active task and dependencies"
+    else:
+        selector_kind = "HEADING"
+        if path == TASKS_FILE:
+            priority = 2
+            reason = "Active task and dependencies"
+        elif path == PRD_FILE:
+            priority = 3
+            reason = "Controlling PRD record"
+        else:
+            priority = 4
+            reason = "Consequential evidence or authority"
+    required_selectors = {
+        "Document status",
+        "Active execution snapshot",
+        "AWS Core evidence",
+        "Action authorization provenance",
+        "Conditional AWS action receipts",
+    }
+    required = initial and (
+        selector_kind in {"WHOLE_FILE", "TASK_ID"} or selector in required_selectors
+    )
+    return SliceRequest(
+        path=path,
+        selector_kind=selector_kind,
+        selector=selector,
+        priority=priority if initial else 5,
+        reason=reason if initial else "On-demand canonical source",
+        required=required,
+        active_ids=tuple(active_ids),
+    )
+
+
+def _resolve_context_metadata(
+    source_slices: list[str],
+    on_demand_slices: list[str],
+    active_ids: list[str],
+    source_texts: Mapping[str, str],
+) -> tuple[dict[str, object], list[dict[str, str]]]:
+    initial_requests = [
+        _context_request(value, active_ids, initial=True) for value in source_slices
+    ]
+    on_demand_requests = [
+        _context_request(value, active_ids, initial=False)
+        for value in on_demand_slices
+    ]
+    return resolve_context_packet(
+        initial_requests,
+        on_demand_requests,
+        source_texts,
+        _context_selector_span,
+        maximum_initial_source_bytes=CONTEXT_MAXIMUM_INITIAL_BYTES,
+    )
+
+
 def derive_context_plan(
     interaction: Mapping[str, Any],
     tasks: TaskSummary,
     coverage: CoverageContract,
+    *,
+    source_texts: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Select an ephemeral, route-bounded canonical context packet."""
 
@@ -7663,7 +7825,7 @@ def derive_context_plan(
         ]
         on_demand_slices = [
             f"{PRD_FILE}#Part II — Requirements Analysis and Gate A",
-            f"{BUGFIX_FILE}#Active defect contract",
+            BUGFIX_FILE,
         ]
     elif stage == "DESIGN":
         source_slices = [
@@ -7716,12 +7878,22 @@ def derive_context_plan(
             ]
         )
 
-    return {
+    plan: dict[str, Any] = {
         "source_slices": source_slices,
         "active_ids": active_ids,
         "on_demand_slices": on_demand_slices,
         "maximum_initial_bytes": CONTEXT_MAXIMUM_INITIAL_BYTES,
     }
+    if source_texts is not None:
+        metadata, issues = _resolve_context_metadata(
+            source_slices,
+            on_demand_slices,
+            active_ids,
+            source_texts,
+        )
+        plan.update(metadata)
+        plan["_resolution_issues"] = issues
+    return plan
 
 
 def _split_authority_values(value: str) -> list[str]:
@@ -8348,7 +8520,62 @@ def build_report(
         == "COMPLETE_PREREQUISITE_CHECKLIST"
     ):
         interaction = derive_unconfigured_template_interaction(diagnostic_codes)
-    context_plan = derive_context_plan(interaction, tasks, coverage_contract)
+    context_plan = derive_context_plan(
+        interaction,
+        tasks,
+        coverage_contract,
+        source_texts=ctx.texts,
+    )
+    context_issues = context_plan.pop("_resolution_issues", [])
+    if context_issues:
+        for issue in context_issues:
+            issue_path = str(issue.get("path", ""))
+            ctx.error(
+                "CONTEXT_SOURCE_INVALID",
+                str(issue.get("reason", "context source could not be resolved")),
+                issue_path if issue_path != "NONE" else None,
+            )
+        lifecycle_state, next_prompt = "BLOCKED", "STOP"
+        status = "BLOCKED"
+        construction_authorization = "NONE"
+        aws_authorization = "NONE"
+        write_authority = derive_write_authority(ctx, envelope, tasks, "NONE")
+        external_authority = derive_external_authority(ctx, envelope, lane, "NONE")
+        external_authority["request_match"] = derive_request_match(
+            ctx, external_authority
+        )
+        diagnostic_codes = [item.code for item in ctx.diagnostics]
+        remediation = derive_remediation(
+            ctx,
+            classification=classification,
+            gate_a=gate_a,
+            gate_b=gate_b,
+            envelope=envelope,
+            tasks=tasks,
+        )
+        interaction = derive_interaction(
+            lifecycle_state,
+            next_prompt,
+            has_errors=True,
+            diagnostic_codes=diagnostic_codes,
+            design_aws_core_ready=design_aws_core_ready,
+            aws_execution_planning_ready=aws_execution_planning_ready,
+            remediation=remediation,
+            owner_stage_hint=_owner_stage_from_gates(gate_a, gate_b),
+        )
+        if (
+            classification == "UNCONFIGURED_TEMPLATE"
+            and remediation["next_action"]["action_kind"]
+            == "COMPLETE_PREREQUISITE_CHECKLIST"
+        ):
+            interaction = derive_unconfigured_template_interaction(diagnostic_codes)
+        context_plan = derive_context_plan(
+            interaction,
+            tasks,
+            coverage_contract,
+            source_texts=ctx.texts,
+        )
+        context_plan.pop("_resolution_issues", None)
     return {
         "schema_version": 2,
         "bootstrap_version": manifest.get(

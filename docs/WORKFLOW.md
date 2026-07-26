@@ -143,6 +143,20 @@ mutation requires a separate current record naming:
 Tools, credentials, sandbox permission, prior access, or AWS Core availability
 never replace this authorization.
 
+## Measured context packets
+
+The doctor resolves its compatibility selectors into exact, one-based inclusive
+source ranges. It normalizes selected repository text to LF, ends it with one
+LF, hashes those UTF-8 bytes, and reports the actual initial source-byte total
+against the 12,000-byte source budget. This measures selected repository
+content, not prompts, tool schemas, conversation history, tokens, or total model
+context.
+
+Lower-priority material moves on demand. One complete required record may exceed
+the remaining budget and is reported honestly without creating an owner action;
+records are never truncated. Missing, ambiguous, or overlapping required source
+fails closed through normal remediation. Packets are ephemeral and untracked.
+
 ## Fast-path expectations
 
 A ready Quick MVP with a complete brief needs at most one clarification round
