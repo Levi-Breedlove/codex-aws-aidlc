@@ -1547,6 +1547,23 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("without adding task metadata", deliver_reference)
         design_words = " ".join(design_reference.split())
         self.assertIn("do not impose a universal scanner", design_words)
+        for concern in (
+            "syntax/build",
+            "type checking when supported",
+            "formatting or canonicalization",
+            "linting",
+            "secret scanning",
+            "dependency/SCA",
+            "container scanning when containers apply",
+            "IaC/policy validation",
+            "license checks when material",
+        ):
+            self.assertIn(concern, design_words)
+        self.assertIn("`REQUIRED` with an exact command", design_reference)
+        self.assertIn("`CONDITIONAL — <trigger>` with an exact", design_reference)
+        self.assertIn("`NOT_APPLICABLE — <technology/risk reason>`", design_reference)
+        self.assertIn("Do not add a second Harness table", design_reference)
+        self.assertIn("Semantic Anchors remain optional internal vocabulary", design_reference)
         self.assertNotIn("## HARNESS-10", self.prompts)
 
     def test_method_contracts_leave_all_exact_authorization_receipts_intact(self) -> None:

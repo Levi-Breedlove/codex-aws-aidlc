@@ -7,6 +7,11 @@ Use for DESIGN-10 and Gate B.
 - Use official current AWS Core directly for material current AWS facts and
   record attributable documentation evidence. Generic connectors, memory, or
   challenger prose cannot replace those calls.
+- Codex selects and coordinates the proposed product architecture. AWS Core
+  supplies current AWS knowledge, decision guidance, procedures, and execution
+  tools. Fastlane governs state, gates, authority, and evidence. The owner
+  authorizes; IAM enforces; observed evidence proves what occurred. AWS Core
+  never chooses the product architecture or grants authority.
 - Follow the current Adaptive Coverage Plan: `SELECT` compares complete
   architectures, `AMEND` reconsiders every materially affected driver and
   alternative, and `PRESERVE` is valid only when architecture, technology,
@@ -35,6 +40,18 @@ Use for DESIGN-10 and Gate B.
   `NOT_APPLICABLE — <concrete reason>`; a triggered conditional row is
   required. Select the smallest checks that address the approved risks and do
   not impose a universal scanner.
+- Account for this internal applicability checklist in that existing Harness
+  Profile: syntax/build; type checking when supported; formatting or
+  canonicalization; linting; secret scanning; dependency/SCA; container
+  scanning when containers apply; IaC/policy validation when infrastructure or
+  policies apply; and license checks when material. Map each concern to
+  `REQUIRED` with an exact command, `CONDITIONAL — <trigger>` with an exact
+  trigger and command, or `NOT_APPLICABLE — <technology/risk reason>`.
+  Do not add a second Harness table, universal tool package, setup dependency,
+  Gate B field, lifecycle state, or owner question.
+- Semantic Anchors remain optional internal vocabulary, not a Fastlane
+  dependency or public methodology. Fastlane's local contracts and
+  deterministic validators remain authoritative.
 - Use ATAM only for a high-risk design with materially competing quality
   attributes. Use a Nygard-style ADR only for a consequential,
   hard-to-reverse decision. Record their conclusions in the existing driver,

@@ -90,7 +90,16 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertNotIn(retired_doc, inventory)
         self.assertNotIn(retired_script, inventory)
         evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(encoding="utf-8")
-        self.assertIn("AWS Core selects the smallest disposable", evaluation)
+        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
+        self.assertIn("Codex selects the smallest disposable", evaluation)
+        self.assertIn("using current AWS Core guidance", evaluation)
+        self.assertNotIn("AWS Core selects the smallest disposable", evaluation)
+        self.assertIn("Codex selects the smallest disposable", workflow)
+        self.assertIn(
+            "AWS Core does not choose the product architecture or grant authority",
+            workflow,
+        )
+        self.assertIn("The owner authorizes; IAM enforces; observed evidence proves", workflow)
         self.assertIn("introduces no scorer, lifecycle stage, gate, or routine", evaluation)
         self.assertIn("AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50", evaluation)
 
