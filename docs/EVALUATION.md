@@ -1,8 +1,8 @@
 # Optional Fastlane Evaluations
 
-These reviews are opt-in and run outside ordinary credential-free CI. They
-validate exported evidence contracts; neither scorer invokes a model, accesses
-AWS, reads credentials, or proves facts that were not actually observed.
+These reviews are opt-in and run outside ordinary credential-free CI. The
+scorer validates exported evidence contracts; it does not invoke a model,
+access AWS, read credentials, or prove facts that were not actually observed.
 
 ## Deterministic workflow corpus
 
@@ -92,19 +92,22 @@ Do not auto-convert them. Re-export each transcript, scorecard, and required
 adjudication as a schema-4 evidence bundle, calculate the actual file digests,
 and rerun the scorer with the exact tested commit and prompt-contract digest.
 
-## Disposable AWS canary evidence
+## AWS Core field qualification
 
-The three field canaries are defined in [AWS-CANARY.md](AWS-CANARY.md). Planning
-and verification remain local:
+Field qualification is a maintainer-only release activity. Require it before
+the first claim of real AWS deployment readiness and repeat it after material
+changes to AWS execution authority, exact receipts, AWS Core execution lanes,
+optional hooks, rollback, teardown, or evidence reconciliation.
 
-```text
-python scripts/aws_canary_eval.py plan --json
-python scripts/aws_canary_eval.py score --input <results.json> --bundle-root <evidence-bundle> --json
-```
+AWS Core selects the smallest disposable non-production scenario that exercises
+the changed execution path using current AWS guidance. Codex performs and
+evaluates the scenario. Fastlane governs it through the existing Gate A, Gate B,
+AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 contracts. Exercise every execution
+lane claimed as supported, including `STRUCTURED_API` and `REVIEWED_SCRIPT` when
+applicable.
 
-The verifier requires a contained, non-symlink evidence bundle whose manifest
-binds Gate A, Gate B, AWS-20, teardown authority, CloudTrail export, IaC plan or
-change set, smoke tests, rollback, teardown, and billing reports by SHA-256.
-`CANARY_EVIDENCE_CONTRACT_PASS` proves only exported evidence integrity and
-internal consistency, not AWS truth. A real canary still requires exact
-owner-authorized deployment and separate teardown authority.
+Keep the complete evidence bundle outside the reusable template. Tracked files
+may contain only non-secret references and digests. Reasoning and procedure
+selection alone are not operational evidence. Field qualification is not part
+of customer setup and introduces no scorer, lifecycle stage, gate, or routine
+owner action.
