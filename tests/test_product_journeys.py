@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import subprocess
@@ -24,6 +25,7 @@ from tests import test_task_waves as task_fixtures
 
 import bootstrap_doctor as doctor
 import fastlane_presenter as presenter
+import fastlane_context as context_runtime
 import package_release
 import setup_assistant as setup
 import task_waves
@@ -92,6 +94,27 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(untouched["gates"]["gate_a"], "BLOCKED")
             self.assertEqual(untouched["gates"]["gate_b"], "BLOCKED")
             self.assertEqual(untouched["authorizations"]["aws"], "NONE")
+            packet = untouched["context_plan"]
+            self.assertEqual(packet["maximum_initial_source_bytes"], 12_000)
+            self.assertEqual(
+                packet["actual_initial_source_bytes"],
+                sum(item["source_bytes"] for item in packet["resolved_initial_slices"]),
+            )
+            self.assertIn(
+                packet["budget_status"],
+                {"WITHIN_LIMIT", "OVERSIZED_REQUIRED_RECORD"},
+            )
+            for item in packet["resolved_initial_slices"]:
+                source = (project / item["path"]).read_text(encoding="utf-8")
+                selected = "\n".join(
+                    source.splitlines()[item["start_line"] - 1 : item["end_line"]]
+                )
+                canonical = context_runtime.canonical_source_bytes(selected)
+                self.assertEqual(item["source_bytes"], len(canonical))
+                self.assertEqual(
+                    item["canonical_sha256"],
+                    "sha256:" + hashlib.sha256(canonical).hexdigest(),
+                )
             owner_update = presenter.render_owner_update(untouched)
             self.assertIn("This template has not been initialized.", owner_update)
             self.assertEqual(owner_update.count("Need from you:"), 1)
@@ -138,6 +161,9 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(first_resume["classification"], "ACTIVE_GREENFIELD")
             self.assertEqual(first_resume["next_prompt"], "INTAKE-10")
             self.assertEqual(first_resume["interaction"], second_resume["interaction"])
+            self.assertEqual(
+                first_resume["context_plan"], second_resume["context_plan"]
+            )
             resumed = presenter.render_owner_update(first_resume)
             for setup_text in (
                 "Welcome to AWS Codex Fastlane",
@@ -156,6 +182,8 @@ class ProductJourneyTests(unittest.TestCase):
                 "native_hook_review_attested",
                 "credentials_inspected",
                 "aws_account_accessed",
+                "resolved_initial_slices",
+                "actual_initial_source_bytes",
             ):
                 self.assertNotIn(forbidden, state_text)
 

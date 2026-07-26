@@ -1939,6 +1939,23 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(aws_plan["active_ids"], ["TASK-0001"])
 
+        report = doctor.inspect_project(PROJECT_ROOT, template_source=True)
+        resolved = report["context_plan"]
+        self.assertEqual(resolved["maximum_initial_bytes"], 12_000)
+        self.assertEqual(resolved["maximum_initial_source_bytes"], 12_000)
+        self.assertEqual(resolved["budget_status"], "WITHIN_LIMIT")
+        self.assertEqual(
+            resolved["actual_initial_source_bytes"],
+            sum(item["source_bytes"] for item in resolved["resolved_initial_slices"]),
+        )
+        self.assertLessEqual(resolved["actual_initial_source_bytes"], 12_000)
+        self.assertEqual(resolved["overflow_records"], [])
+        self.assertTrue(resolved["resolved_initial_slices"])
+        for item in resolved["resolved_initial_slices"]:
+            self.assertRegex(item["canonical_sha256"], r"^sha256:[0-9a-f]{64}$")
+            self.assertGreaterEqual(item["start_line"], 1)
+            self.assertGreaterEqual(item["end_line"], item["start_line"])
+
     def test_approved_schema_two_architecture_is_grandfathered_until_design_change(self) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(template)

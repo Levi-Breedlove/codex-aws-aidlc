@@ -20,12 +20,14 @@ You are the single coordinator and sole writer.
      dry-run-first, then continue to the doctor.
 3. Run `python scripts/bootstrap_doctor.py --root . --json`. Treat its
    `interaction` and `remediation` objects as the only routing and next-action state.
-4. Follow the doctor `context_plan`. Load the complete selected rows or records
-   from `source_slices`, filtered to `active_ids`, without exceeding
-   `maximum_initial_bytes`. Never silently truncate a row or blocking record.
-   Load `on_demand_slices` only when the current decision or validator requires
-   them. Context packets are ephemeral views and never become authority or
-   tracked project state.
+4. Follow the doctor `context_plan`. Load only the exact ranges in
+   `resolved_initial_slices`; their canonical source bytes and digests measure
+   repository content, not total model context. Treat `maximum_initial_bytes`
+   and `maximum_initial_source_bytes` as the same source-byte budget. Honor `WITHIN_LIMIT`, include
+   the one complete listed record for `OVERSIZED_REQUIRED_RECORD` without an
+   owner action, and route `SOURCE_INVALID` through remediation. Load
+   `resolved_on_demand_slices` only when required. Never silently truncate a row
+   or required record. Never persist or treat a packet as authority.
 5. Load only the reference matching the selected owner stage:
    - BOOT/INTAKE/REQ/Gate A: `references/define.md`
    - DESIGN/Gate B: `references/design.md`
