@@ -99,9 +99,9 @@ the first claim of real AWS deployment readiness and repeat it after material
 changes to AWS execution authority, exact receipts, AWS Core execution lanes,
 optional hooks, rollback, teardown, or evidence reconciliation.
 
-AWS Core selects the smallest disposable non-production scenario that exercises
-the changed execution path using current AWS guidance. Codex performs and
-evaluates the scenario. Fastlane governs it through the existing Gate A, Gate B,
+Codex selects the smallest disposable non-production scenario that exercises
+the changed execution path using current AWS Core guidance, then performs and
+evaluates it. Fastlane governs it through the existing Gate A, Gate B,
 AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 contracts. Exercise every execution
 lane claimed as supported, including `STRUCTURED_API` and `REVIEWED_SCRIPT` when
 applicable.

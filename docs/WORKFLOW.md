@@ -198,10 +198,13 @@ authoritative.
 
 Before claiming real AWS deployment readiness, maintainers follow the
 [AWS Core field-qualification policy](EVALUATION.md#aws-core-field-qualification).
-AWS Core selects the smallest disposable scenario, Codex performs and evaluates
-it, and Fastlane applies its existing gates, AWS authority, rollback, teardown,
-and evidence contracts. This adds no customer setup step, scorer, lifecycle
-stage, gate, or routine owner action.
+Codex selects the smallest disposable scenario using current AWS Core guidance,
+then performs and evaluates it. AWS Core supplies current AWS knowledge,
+decision guidance, procedures, and execution tools; Fastlane applies its
+existing state, gates, authority, rollback, teardown, and evidence contracts.
+The owner authorizes; IAM enforces; observed evidence proves what occurred.
+AWS Core does not choose the product architecture or grant authority. This adds
+no customer setup step, scorer, lifecycle stage, gate, or routine owner action.
 
 ## Resume behavior
 
