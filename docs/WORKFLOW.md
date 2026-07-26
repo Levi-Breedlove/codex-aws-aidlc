@@ -166,13 +166,14 @@ Hooks never approve a gate or external action. The Fastlane receipts,
 construction envelope, AWS authorization, sandbox, and owner approvals remain
 authoritative.
 
-## Optional AWS field canaries
+## Maintainer field qualification
 
-The [disposable AWS canary contract](AWS-CANARY.md) defines three representative
-field reviews and a standard-library scorer. It is optional, never runs in
-ordinary CI, and does not add a lifecycle phase or gate. A real run follows the
-same Gate A, Gate B, AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 controls as any
-other AWS delivery. Framework maintenance and the scorer do not access AWS.
+Before claiming real AWS deployment readiness, maintainers follow the
+[AWS Core field-qualification policy](EVALUATION.md#aws-core-field-qualification).
+AWS Core selects the smallest disposable scenario, Codex performs and evaluates
+it, and Fastlane applies its existing gates, AWS authority, rollback, teardown,
+and evidence contracts. This adds no customer setup step, scorer, lifecycle
+stage, gate, or routine owner action.
 
 ## Resume behavior
 

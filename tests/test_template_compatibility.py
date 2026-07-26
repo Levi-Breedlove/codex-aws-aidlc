@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -72,6 +73,26 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn("Golden Project Corpus", evaluation)
         self.assertIn("tests/test_product_journeys.py", evaluation)
         self.assertRegex(evaluation, r"mandatory deterministic\s+workflow baseline")
+
+    def test_field_qualification_replaces_fixed_canary_subsystem(self) -> None:
+        retired_doc = "AWS-" + "CANARY"
+        retired_script = "aws_" + "canary_eval"
+        for relative in (
+            "docs/" + retired_doc + ".md",
+            "scripts/" + retired_script + ".py",
+            "tests/test_" + retired_script + ".py",
+        ):
+            self.assertFalse((REPOSITORY_ROOT / relative).exists())
+        manifest = json.loads(
+            (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
+        )
+        inventory = json.dumps(manifest, sort_keys=True)
+        self.assertNotIn(retired_doc, inventory)
+        self.assertNotIn(retired_script, inventory)
+        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(encoding="utf-8")
+        self.assertIn("AWS Core selects the smallest disposable", evaluation)
+        self.assertIn("introduces no scorer, lifecycle stage, gate, or routine", evaluation)
+        self.assertIn("AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50", evaluation)
 
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
         plan = model_roleplay_eval.plan_payload()

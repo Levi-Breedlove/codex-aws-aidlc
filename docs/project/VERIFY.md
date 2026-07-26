@@ -405,26 +405,6 @@ record every known blind spot rather than claiming global absence.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | EV-0301 | `AWS-40` / `AWS-50` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
 
-## Disposable AWS canary evidence
-
-Use this section only for an explicitly authorized field run from
-`docs/AWS-CANARY.md`. The untracked machine-readable result remains the
-complete canary record; this ledger stores its durable non-secret reference
-and the consequential bindings. A scorer pass does not replace the underlying
-Gate A, Gate B, AWS-20, AWS-30, AWS-40, or AWS-50 evidence.
-
-| Evidence ID | Canary ID | Run reference | Account / Region / environment | Artifact and plan binding | Deployed resource boundary | Cost ceiling / observed cost | AWS Core evidence | CloudTrail reference | Controlled failure / rollback | Teardown / residuals / billing follow-up | Result reference | Status |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EV-0501 | `synchronous-managed-serverless` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
-| EV-0502 | `asynchronous-event-driven` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
-| EV-0503 | `container-based` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
-
-Record `VERIFIED` only after the observed run passes
-`python scripts/aws_canary_eval.py score --input <results.json> --json` and
-every cited underlying evidence item is current. Do not paste credentials,
-secret values, raw CloudTrail events, private client state, or broad account
-inventory into this file.
-
 ## Known gaps and accepted risks
 
 | ID | Risk or gap | Severity | Owner | Review date | Rationale and authority |

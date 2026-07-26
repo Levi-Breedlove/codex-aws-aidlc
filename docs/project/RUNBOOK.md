@@ -560,32 +560,3 @@ expiry, changed resources, billable residuals, and whether the observed operatio
 state is `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`. GitHub status
 or comment updates are written only when AUTH permits those exact operations;
 otherwise record `PENDING_SYNC` locally.
-
-## 16. Disposable AWS canary procedure
-
-The optional [AWS canary contract](../AWS-CANARY.md) exercises Fastlane in a
-disposable non-production AWS boundary. It is not part of ordinary framework
-maintenance, CI, or an adopter's required lifecycle. The three representative
-canaries cover synchronous managed serverless, asynchronous event-driven, and
-container-based delivery without preselecting those architectures for a real
-project.
-
-Before a live canary, complete the normal PRD and evidence path through Gate B,
-record current official AWS Core documentation evidence, validate IaC locally,
-and complete AWS-10. Use the canonical deployment receipt in this runbook for
-AWS-20. After the controlled failure, rollback, and AWS-30 evidence, perform a
-read-only teardown review and use the separate canonical teardown receipt for
-AWS-50. Reconcile residual resources and delayed billing after teardown.
-
-Print or score the machine contract without AWS access:
-
-```text
-python scripts/aws_canary_eval.py plan --json
-python scripts/aws_canary_eval.py score --input <results.json> --json
-```
-
-The scorer validates evidence shape only. It does not create authority, call
-AWS, prove the referenced observations, or permit a rerun. Stop on a missing
-or stale receipt, identity or Region mismatch, unbound artifact or plan,
-unexpected resource, failed rollback, over-ceiling observed cost, incomplete
-teardown, or unresolved billing dimension.
