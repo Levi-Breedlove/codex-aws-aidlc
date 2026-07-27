@@ -156,6 +156,39 @@ class SetupAssistantTests(unittest.TestCase):
         for forbidden in ("install", "marketplace", "plugin", "aws configure"):
             self.assertNotIn(forbidden, serialized.casefold())
 
+    def test_codex_readiness_uses_capabilities_not_semantic_version(self) -> None:
+        current = FakeEnvironment()
+        current.outputs[("codex", "--version")] = (0, "codex-cli current")
+        try:
+            observed = setup.inspect_local_prerequisites(
+                REPOSITORY_ROOT,
+                which=current.which,
+                runner=current.runner,
+                system="Linux",
+                release="6.8.0-generic",
+            )
+        finally:
+            current.close()
+        self.assertTrue(observed["codex_cli_available"])
+        self.assertTrue(observed["codex_cli_supported"])
+        self.assertTrue(observed["codex_login_status_supported"])
+        self.assertTrue(observed["codex_login_ready"])
+
+        unsupported = FakeEnvironment()
+        unsupported.outputs[("codex", "--version")] = (1, "unsupported")
+        try:
+            failed = setup.inspect_local_prerequisites(
+                REPOSITORY_ROOT,
+                which=unsupported.which,
+                runner=unsupported.runner,
+                system="Linux",
+                release="6.8.0-generic",
+            )
+        finally:
+            unsupported.close()
+        self.assertTrue(failed["codex_cli_available"])
+        self.assertFalse(failed["codex_cli_supported"])
+
     def test_windows_prefers_supported_python3_when_python_is_old(self) -> None:
         environment = FakeEnvironment()
         try:
@@ -236,6 +269,20 @@ class SetupAssistantTests(unittest.TestCase):
         self.assertGreaterEqual(len(report["checklist"]), 5)
         rendered = setup.render_setup_response(report)
         self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("Owner-run install:", rendered)
+        self.assertIn("Verify:", rendered)
+        self.assertIn("Official guide:", rendered)
+        for step in report["checklist"]:
+            self.assertEqual(
+                step["commands"],
+                [
+                    *step["install_commands"],
+                    *step["action_commands"],
+                    *step["verification_commands"],
+                ],
+            )
+            self.assertTrue(step["verification_commands"])
+            self.assertTrue(step["install_commands"] or step.get("guide"))
         for phrase in (
             "Codex CLI",
             "Git",
@@ -272,6 +319,33 @@ class SetupAssistantTests(unittest.TestCase):
         for label in ("Project name:", "Preferred AWS Region:", "Development budget:"):
             self.assertEqual(greeting.count(label), 1)
         self.assertIn("did not inspect AWS credentials or access an AWS account", greeting)
+
+    def test_final_onboarding_docs_and_instruction_headroom(self) -> None:
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        setup_doc = (REPOSITORY_ROOT / "docs/SETUP.md").read_text(encoding="utf-8")
+        combined = readme + "\n" + setup_doc
+        self.assertIn("one consolidated checklist", combined)
+        self.assertNotIn("one copyable checklist", combined)
+        self.assertIn("signed-in interactive Codex CLI", combined)
+        self.assertIn("Fastlane requires the official AWS Core plugin", readme)
+        self.assertIn("runtime skills", setup_doc)
+        self.assertIn("does not copy AWS skills into the\nrepository", readme)
+        self.assertIn("does not require separately installed AWS skills", setup_doc)
+        self.assertIn("Other Agent Toolkit plugins are optional", setup_doc)
+        self.assertIn("Ordinary requirements and\ndesign need no AWS credentials or AWS account", readme)
+        self.assertIn("Deployment and teardown retain separate exact Fastlane authority", setup_doc)
+        self.assertLessEqual(len(readme.splitlines()), 90)
+        self.assertLessEqual(len((REPOSITORY_ROOT / "AGENTS.md").read_bytes()), 7_200)
+
+        prompts = (REPOSITORY_ROOT / "prompts/CODEX-PROMPTS.md").read_text(
+            encoding="utf-8"
+        )
+        design_start = prompts.index("## DESIGN-10")
+        design_end = prompts.index("## DESIGN-20", design_start)
+        self.assertLessEqual(
+            len(prompts[design_start:design_end].encode("utf-8")),
+            7_200,
+        )
 
     def test_official_source_and_linked_runtime_discovery_are_required(self) -> None:
         def observed(**updates: object) -> dict[str, object]:

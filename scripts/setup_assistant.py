@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check Fastlane prerequisites and render instruction-only owner guidance.
 
-The checker runs only bounded version and login-status probes. It never installs
+The checker runs only bounded capability, version, and login-status probes. It never installs
 software, changes Codex plugin state, approves hooks, reads credentials, or
 accesses an AWS account. Codex-session capability observations may be supplied
 through the allowlisted, ephemeral stdin interface.
@@ -320,7 +320,7 @@ def inspect_local_prerequisites(
     is_wsl = system_name == "LINUX" and "microsoft" in release_name
     is_wsl2 = is_wsl and "wsl2" in release_name
 
-    codex_available, codex_ok, codex_output = _probe(
+    codex_available, codex_ok, _ = _probe(
         "codex", ["--version"], checked_root, which=which, runner=runner
     )
     login_available, login_ok, _ = _probe(
@@ -359,7 +359,7 @@ def inspect_local_prerequisites(
     return {
         "repository_ready": True,
         "codex_cli_available": codex_available,
-        "codex_cli_supported": codex_available and codex_ok and _version_at_least(codex_output, (0, 1)),
+        "codex_cli_supported": codex_available and codex_ok,
         "codex_login_status_supported": login_available,
         "codex_login_ready": login_available and login_ok,
         "git_available": git_available and git_ok,
@@ -378,12 +378,42 @@ def inspect_local_prerequisites(
     }
 
 
+def _checklist_step(
+    label: str,
+    *,
+    install: Sequence[str] = (),
+    action: Sequence[str] = (),
+    verify: Sequence[str] = (),
+    guide: str | None = None,
+    instruction: str | None = None,
+) -> dict[str, Any]:
+    """Return a compatible checklist row with explicit owner and verification work."""
+
+    result: dict[str, Any] = {
+        "label": label,
+        "commands": [*install, *action, *verify],
+        "install_commands": list(install),
+        "action_commands": list(action),
+        "verification_commands": list(verify),
+    }
+    if guide:
+        result["guide"] = guide
+    if instruction:
+        result["instruction"] = instruction
+    return result
+
+
 def _codex_step(platform_family: str) -> dict[str, Any]:
     if platform_family == "WINDOWS":
-        commands = ["irm https://chatgpt.com/codex/install.ps1 | iex", "codex --version"]
+        install = ["irm https://chatgpt.com/codex/install.ps1 | iex"]
     else:
-        commands = ["curl -fsSL https://chatgpt.com/codex/install.sh | sh", "codex --version"]
-    return {"label": "Install or update Codex CLI", "commands": commands, "guide": CODEX_GUIDE}
+        install = ["curl -fsSL https://chatgpt.com/codex/install.sh | sh"]
+    return _checklist_step(
+        "Install or update interactive Codex CLI",
+        install=install,
+        verify=["codex --version"],
+        guide=CODEX_GUIDE,
+    )
 
 
 def _uv_step(evidence: Mapping[str, Any]) -> dict[str, Any]:
@@ -398,20 +428,26 @@ def _uv_step(evidence: Mapping[str, Any]) -> dict[str, Any]:
         install = "brew install uv"
     else:
         install = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-    return {"label": "Install Astral uv", "commands": [install, "uvx --version"], "guide": UV_GUIDE}
+    return _checklist_step(
+        "Install Astral uv",
+        install=[install],
+        verify=["uvx --version"],
+        guide=UV_GUIDE,
+    )
 
 
 def _aws_core_step() -> dict[str, Any]:
-    return {
-        "label": "Enable official AWS Core",
-        "commands": [MARKETPLACE_COMMAND],
-        "guide": AWS_PLUGIN_GUIDE,
-        "instruction": (
+    return _checklist_step(
+        "Enable official AWS Core",
+        install=[MARKETPLACE_COMMAND],
+        verify=["init template"],
+        guide=AWS_PLUGIN_GUIDE,
+        instruction=(
             "Open `/plugins`, select AWS Core under Agent Toolkit for AWS, restart Codex, "
             "then send `init template`. Codex will search the runtime AWS skill catalog "
             "and retrieve one returned skill without AWS credentials."
         ),
-    }
+    )
 
 
 def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str, Any]]]:
@@ -423,39 +459,63 @@ def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str
         missing.append(
             (
                 "LOGIN",
-                {
-                    "label": "Sign in to Codex CLI",
-                    "commands": ["codex login", "codex login status"],
-                    "guide": CODEX_GUIDE,
-                },
+                _checklist_step(
+                    "Sign in to Codex CLI",
+                    action=["codex login"],
+                    verify=["codex login status"],
+                    guide=CODEX_GUIDE,
+                ),
             )
         )
     if not evidence.get("git_available"):
-        missing.append(("LOCAL", {"label": "Install Git", "commands": ["git --version"], "guide": GIT_GUIDE}))
-    if not evidence.get("python_available") or not evidence.get("python_version_supported"):
         missing.append(
-            ("LOCAL", {"label": "Install Python 3.11 or newer", "commands": ["python3 --version", "python --version"], "guide": PYTHON_GUIDE})
+            (
+                "LOCAL",
+                _checklist_step(
+                    "Install Git",
+                    verify=["git --version"],
+                    guide=GIT_GUIDE,
+                ),
+            )
+        )
+    if not evidence.get("python_available") or not evidence.get("python_version_supported"):
+        python_checks = (
+            ["py -3 --version", "python --version"]
+            if family == "WINDOWS"
+            else ["python3 --version", "python --version"]
+        )
+        missing.append(
+            (
+                "LOCAL",
+                _checklist_step(
+                    "Install Python 3.11 or newer",
+                    verify=python_checks,
+                    guide=PYTHON_GUIDE,
+                ),
+            )
         )
     if not evidence.get("platform_supported"):
         missing.append(
             (
                 "SANDBOX",
-                {
-                    "label": "Use WSL2 instead of WSL1",
-                    "commands": ["wsl --set-version <distribution> 2"],
-                    "guide": CODEX_GUIDE,
-                },
+                _checklist_step(
+                    "Use WSL2 instead of WSL1",
+                    action=["wsl --set-version <distribution> 2"],
+                    verify=["wsl -l -v"],
+                    guide=CODEX_GUIDE,
+                ),
             )
         )
     elif evidence.get("bubblewrap_required") and not evidence.get("bubblewrap_available"):
         missing.append(
             (
                 "SANDBOX",
-                {
-                    "label": "Install the Linux Codex sandbox prerequisite",
-                    "commands": ["sudo apt update", "sudo apt install bubblewrap", "command -v bwrap", "bwrap --version"],
-                    "guide": CODEX_GUIDE,
-                },
+                _checklist_step(
+                    "Install the Linux Codex sandbox prerequisite",
+                    install=["sudo apt update", "sudo apt install bubblewrap"],
+                    verify=["command -v bwrap", "bwrap --version"],
+                    guide=CODEX_GUIDE,
+                ),
             )
         )
     if not evidence.get("uvx_available"):
@@ -474,12 +534,12 @@ def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str
         missing.append(
             (
                 "TRUST",
-                {
-                    "label": "Review the official AWS Core hook in Codex",
-                    "commands": [],
-                    "guide": AWS_PLUGIN_GUIDE,
-                    "instruction": "Open `/hooks`, verify the source is official AWS Core, and personally accept or reject Codex's native trust prompt.",
-                },
+                _checklist_step(
+                    "Review the official AWS Core hook in Codex",
+                    action=["Open /hooks and review the native trust prompt"],
+                    guide=AWS_PLUGIN_GUIDE,
+                    instruction="Verify the source is official AWS Core, then personally accept or reject Codex's native trust prompt.",
+                ),
             )
         )
     else:

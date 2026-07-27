@@ -975,34 +975,30 @@ receipt last after a concise readiness summary.
 
 ## DESIGN-10 — Technical PRD and Construction Envelope
 
-**Preconditions:** docs/project/PRD.md contains a valid Gate A receipt for the current
-requirements revision.
+**Preconditions:** Current Gate A receipt for the requirements revision.
 
-**Authoritative inputs:** All applicable AGENTS.md; complete docs/project/PRD.md and
-docs/project/VERIFY.md; brownfield code, tests, IaC, config, schemas, and relevant
-history; current official AWS Core capability, primary AWS documentation, and
-read-only AWS advisor findings.
+**Authoritative inputs:** Applicable AGENTS.md; PRD and VERIFY; relevant
+brownfield code, tests, IaC, configuration, schemas, and history; current
+official AWS Core and primary AWS documentation; read-only advisor findings.
 
-**Permitted writes:** docs/project/PRD.md Parts III/IV, envelope, and Document status DES/AUTH/design/Gate B fields; a
-narrow ADR for a hard-to-reverse decision; docs/project/VERIFY.md DESIGN-10 evidence;
-docs/project/TASKS.md snapshot identity/boundaries; matching `bootstrap.yaml` mirror.
-Write one coordinator checkpoint; do not generate a task graph. Before marking
-a CURRENT plan STALE, reconcile active tasks and commit/archive its ledger.
+**Permitted writes:** PRD Parts III/IV, envelope, and DES/AUTH/Gate B status;
+one necessary ADR; VERIFY DESIGN-10 evidence; TASKS snapshot boundaries; and
+the matching bootstrap.yaml mirror. Write one coordinator checkpoint. Do not
+generate tasks; reconcile active work before staling a current plan.
 
 **GitHub mode:** READ_ONLY only when authorized and needed for design facts.
 
 **AWS mode:** DOCS_ONLY by default; authenticated READ_ONLY only when explicitly
-authorized and necessary to validate an existing brownfield environment.
+authorized for an existing brownfield environment.
 
-**Required authorization:** Design writes only. No implementation, GitHub writes, or AWS
-mutation.
+**Required authorization:** Design writes only; no implementation, GitHub
+writes, or AWS mutation.
 
 **Stop conditions:** Missing/invalid Gate A; requirements/design conflict;
-incomplete or stale architecture selection/traceability; unresolved TECH
-selection or property execution contract; unavailable or
-wrong-source AWS Core; missing, failed, cached, generic, or stale DESIGN-10
-`retrieve_skill` or `search_documentation` evidence; or an unverified material
-AWS claim.
+incomplete or stale architecture/traceability; unresolved TECH or property
+contract; wrong-source or unavailable AWS Core; missing, failed, or stale
+DESIGN-10 `search_documentation`/`retrieve_skill` evidence; or an unverified
+material AWS claim.
 
 **Receipt:** Routine status with REQ, DES, and proposed AUTH IDs.
 
@@ -1012,50 +1008,50 @@ AWS claim.
 [DESIGN-10]
 Complete a build-ready technical PRD for the accepted requirements.
 
-Create/increment DES and proposed AUTH IDs. Confirm official
+Create/increment DES and proposed AUTH IDs. Confirm
 `aws-core@agent-toolkit-for-aws`. For each material AWS question, identify
-basis IDs and call `search_documentation` to discover runtime skills. Review
-returned descriptions, select the smallest covering set, call `retrieve_skill`
-with the exact returned identifiers, then follow their procedures and official
-references.
+basis IDs, call `search_documentation`, review returned descriptions, select
+the smallest relevant set, and call `retrieve_skill` with exact returned
+identifiers. Follow the retrieved procedure and current official references.
 
-Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md: search before
-retrieve; shared basis, identity, version, actor, result set, privacy, time,
-and binding. Selected and returned IDs match search results.
-Use `DES-0001; TECH: TECH-0001, TECH-0002` or `DES-0001; TECH: NONE — no technology/toolchain impact` for the Design trace; every `AWS-EV-*` cites its
-chain. The observed AWS Core version is metadata, never a pin. Persist no raw
-skill content or transcripts. BOOT/plugin metadata, installed skills, cache,
-connectors, and memory are insufficient. After completing the proposed design, use
-`fastlane-architecture-challenger` only for its conditional triggers; it cannot
-select, write, approve, or replace evidence. Codex is the only writer.
+Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md: search precedes
+retrieve; basis, identity, version, actor, results, privacy, time, and binding
+match; selected/returned IDs occur in search results. Use
+`DES-0001; TECH: TECH-0001, TECH-0002` or
+`DES-0001; TECH: NONE — no technology/toolchain impact`. Every
+`AWS-EV-*` cites its chain; observed AWS Core version is metadata, never a pin.
+Persist no raw skill content or transcripts. Installed skills, BOOT
+metadata, cache, connectors, and memory are insufficient. Codex is the only writer and selects the design.
 
-Before Gate B, load `.agents/skills/fastlane/references/design.md`, follow
-the Adaptive Coverage Plan, and complete every required existing PRD
-record. `SELECT` compares complete candidates; `AMEND` revalidates materially
-affected drivers and alternatives; `PRESERVE` requires proof that architecture,
-technology, trust, data, recovery, Region, and Harness boundaries are unchanged.
+After completing the proposed design, use
+`fastlane-architecture-challenger` only for its conditional triggers. It
+cannot select, write, approve, authorize, or replace evidence.
+
+Load the Design reference, follow the Adaptive Coverage Plan, and complete
+every required existing PRD record. `SELECT` compares complete candidates;
+`AMEND` revalidates affected drivers and alternatives; `PRESERVE` proves
+architecture, technology, trust, data, recovery, Region, and Harness
+boundaries unchanged.
+
 - For SELECT, evaluate a secure managed-serverless baseline. Complete `DRV-*`,
-  `CAND-*`, selected `ARCH-*`, traceability, and `AWS-EV-*`. Apply hard constraints before preferences
-  and select only an eligible candidate.
-- Record rejected alternatives, risks, mitigations, security/reliability impact,
-  operational burden, cost, breakpoints, migration path, revisit triggers, and
-  validation. Cover all required whole-system domains and keep review conversational.
-- Complete in-scope `TECH-*` rows. Only `EXACT` accepts opaque versions.
-  Active `PROPERTY_TESTING` uses `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
+  `CAND-*`, selected `ARCH-*`, traceability, and `AWS-EV-*`; apply
+  hard constraints before preferences and select only an eligible candidate.
+- Record rejected alternatives, risks/mitigations, Security impact,
+  Reliability impact, Operational burden, cost/breakpoints, Migration path,
+  revisit triggers, and validation for all required whole-system domains.
+- Complete in-scope `TECH-*`. Only `EXACT` accepts opaque versions; Active `PROPERTY_TESTING` uses
+  `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
 - classify every measurable Gate A requirement exactly once. Each applicable
-  `PROP-*` gets one bounded command without shell-control
-  chaining; its replay format must explicitly declare a
-  seed or deterministic reproduction and VERIFY destination.
-- Complete the Gate B Harness Profile and Change impact record. Use
-  `FULL_REVALIDATION` when impact is uncertain; resolve brownfield compatibility,
+  `PROP-*` has one bounded local command without shell-control
+  chaining; its replay format must explicitly declare a seed or deterministic reproduction and VERIFY target.
+- Complete the Gate B Harness Profile and Change impact record. Uncertain
+  impact uses `FULL_REVALIDATION`; resolve brownfield compatibility,
   migration, and protected behavior.
 
-Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as their
-shared basis, and not append by default. Route material
-Part I flow changes through REQ-10. Preserve least-privilege IAM, encryption,
-protected secrets,
-input validation, safe failures, telemetry, low-usage cost, billing dimensions,
-scaling breakpoints, and measurable expansion or migration
+Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as the
+shared basis, and not append by default. Route material Part I flow changes through REQ-10. Preserve least-privilege IAM, encryption, secrets, validation,
+safe failures, telemetry, low-usage cost, billing dimensions, scaling
+breakpoints, and measurable expansion or migration
 triggers. Never weaken one of those required controls to lower cost.
 
 Fill the Gate B readiness card with these exact fields: Design basis IDs;
@@ -1063,50 +1059,40 @@ Architecture/components; Technology/toolchains/version policy; Interfaces/data
 flow; Identity/secrets; Failure/retry/concurrency; Deployment/operations;
 Validation/evidence; Rollback/recovery/teardown; Brownfield
 compatibility/migration; Outstanding gaps. Use explicit stable IDs.
-`NOT_APPLICABLE — <reason>` is allowed only when genuine; Outstanding gaps is
-`NONE` or stable gap IDs, and any gap keeps Gate B BLOCKED.
+`NOT_APPLICABLE — <reason>` is allowed only when genuine. Outstanding gaps is
+`NONE` or stable gap IDs; any gap keeps Gate B `BLOCKED`.
 
-Propose a complete construction envelope with the fields defined in this pack.
-GitHub writes default to branch/commit/push/pull-request only when explicitly
-listed. Merge and branch deletion default to not authorized. AWS defaults to
-DOCS_ONLY. A fast-dev AWS mutation envelope may be proposed only when every AWS
-mutation-boundary field is complete, the environment is non-production, the
-cost ceiling is a finite positive ISO-currency amount such as `USD: 20.00`, it
-does not exceed or change the currency of an owner Gate A hard cap, and
-rollback/teardown is proven feasible, artifact
-authority is an exact lowercase SHA-256 digest or deterministic authorized
-source rule, and the exact finite expiry remains in the future. Use
-`ENVIRONMENT: <exact>; CLASS: NON_PRODUCTION`, `EXACT_DIGEST: sha256:<64
-lowercase hex>` or `DERIVED_FROM_AUTHORIZED_SOURCE: SHA-256 from baseline <full
-authorized commit>; <deterministic rule>`, and
-`Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>`.
+Propose the complete construction envelope using every PRD row and grammar.
+GitHub writes include only explicitly listed operations; merge and branch
+deletion default unauthorized. AWS defaults DOCS_ONLY. A fast-dev mutation
+envelope requires non-production, exact resources/operations, a finite
+positive `USD: 20.00`-style ceiling that does not exceed or change currency of
+an owner hard cap, feasible rollback/teardown, artifact authority as an exact
+lowercase SHA-256 or deterministic authorized-source rule, and future expiry. Use
+`ENVIRONMENT: <exact>; CLASS: NON_PRODUCTION`,
+`EXACT_DIGEST: sha256:<64 lowercase hex>` or
+`DERIVED_FROM_AUTHORIZED_SOURCE: SHA-256 from baseline <full authorized commit>; <deterministic rule>`,
+and `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>`.
 
-Use every exact envelope row and grammar in docs/project/PRD.md. Require a local Git
-repository and resolvable baseline commit before readiness. Compute and record
-the derived Design contract SHA-256 over Architecture driver, Candidate,
-Selection, Traceability, Material AWS evidence, Harness, Change impact,
-Technology decision, Property applicability, Property definition, and Property
-execution tables. Copy it into
-the envelope and include the selected `ARCH-*`, every current `TECH-*`, and every
-applicable `PROP-*` in authorized `SCOPE_IDS`. Then compute
-the canonical complete-envelope SHA-256 after the final table edit and copy the
-same digest into the Gate B agent review and proposed owner receipt.
+Require a local Git repository and baseline commit. Compute the Design contract
+SHA-256 over Architecture driver, Candidate, Selection, Traceability, Material
+AWS evidence, Harness, Change impact, Technology, Property applicability,
+definition, and execution tables. Copy it into the envelope; include the selected `ARCH-*`, every current
+`TECH-*`, and every applicable `PROP-*` in
+`SCOPE_IDS`. Compute the final complete-envelope SHA-256 and copy it into
+the Gate B review and proposed receipt.
 
-If the PRD or envelope is incomplete, keep Gate B `BLOCKED`. When the design and
-envelope review recommendation is `READY_FOR_CONSTRUCTION_APPROVAL`, atomically
-set both the Document status and detailed owner Gate B state to
-`PENDING_OWNER_APPROVAL`; copy the exact REQ/DES/AUTH IDs, Gate B state, maximum
-workers, baseline, and protected dirty paths into docs/project/TASKS.md's Active execution
-snapshot; and mirror lifecycle state in bootstrap.yaml. Keep any old task plan
-STALE and non-runnable until the new Gate B is approved and TASK-10 replaces it.
-Reset
-the Gate B owner decision to `PENDING`, clear any prior approver, provenance,
-authorized-ID, and receipt fields, and render the current proposed receipt with
-an approver placeholder; never carry an old receipt into a new design or AUTH.
-Do not implement, generate tasks, approve the design, or perform GitHub/AWS
-writes. Return the routine status.
+Incomplete design/envelope keeps Gate B `BLOCKED`. Only after the recommendation
+is `READY_FOR_CONSTRUCTION_APPROVAL`, atomically set the
+Document status DES/AUTH/design/Gate B fields and owner Gate B state to
+`PENDING_OWNER_APPROVAL`; copy current REQ/DES/AUTH, Gate B state, and authorized maximum
+workers, baseline, and protected dirty paths into docs/project/TASKS.md's Active
+execution snapshot and bootstrap.yaml. Keep old tasks stale until approved and TASK-10
+replaces them. Reset the owner decision to `PENDING`, clear old approval
+provenance/receipts, never carry an old receipt into a new design or AUTH, and
+render the current proposed receipt. Do not implement,
+generate tasks, approve, or perform GitHub/AWS writes. Return routine status.
 ~~~
-
 ## DESIGN-20 — PRD and Construction Gate B
 
 **Preconditions:** Complete, internally consistent PRD; current Gate A;
