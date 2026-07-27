@@ -304,7 +304,7 @@ def render_side_question_response(
 
 
 def render_prerequisite_update(report: Mapping[str, Any]) -> str:
-    """Render one prerequisite action with one complete owner checklist."""
+    """Render one prerequisite action with one consolidated owner checklist."""
 
     state = str(report.get("state", ""))
     if state == "PREREQUISITES_READY":
@@ -328,10 +328,33 @@ def render_prerequisite_update(report: Mapping[str, Any]) -> str:
     for index, step in enumerate(steps, start=1):
         label = str(step.get("label", "Required step"))
         lines.append(f"{index}. {label}")
-        commands = step.get("commands", [])
-        if isinstance(commands, Sequence) and not isinstance(commands, (str, bytes)):
-            for command in commands:
-                lines.append(f"   `{command}`")
+        grouped = any(
+            key in step
+            for key in (
+                "install_commands",
+                "action_commands",
+                "verification_commands",
+            )
+        )
+        if grouped:
+            for heading, key in (
+                ("Owner-run install", "install_commands"),
+                ("Owner action", "action_commands"),
+                ("Verify", "verification_commands"),
+            ):
+                commands = step.get(key, [])
+                if isinstance(commands, Sequence) and not isinstance(
+                    commands, (str, bytes)
+                ):
+                    for command in commands:
+                        lines.append(f"   {heading}: `{command}`")
+        else:
+            commands = step.get("commands", [])
+            if isinstance(commands, Sequence) and not isinstance(
+                commands, (str, bytes)
+            ):
+                for command in commands:
+                    lines.append(f"   `{command}`")
         guide = step.get("guide")
         if guide:
             lines.append(f"   Official guide: {guide}")

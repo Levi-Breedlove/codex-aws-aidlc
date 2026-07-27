@@ -4,7 +4,8 @@ AWS Codex Fastlane is a reusable project template that turns an AWS idea into
 approved requirements, an AWS-informed technical PRD, an organized task plan,
 and a safely bounded build.
 
-Requires the Codex CLI, Git, and Python 3.11 or newer. AWS credentials are
+Requires the Codex CLI, Git, and Python 3.11 or newer. The signed-in
+interactive Codex CLI is Fastlane's supported onboarding surface. AWS credentials are
 needed only for an explicitly authorized deployment or other approved AWS
 operation.
 
@@ -19,7 +20,7 @@ operation.
    ```
 
 3. Fastlane checks Codex login, Git, Python, platform sandbox tools, `uvx`, and
-   official AWS Core. If anything is missing, complete its one copyable
+   official AWS Core. If anything is missing, complete one consolidated
    checklist and send `init template` again.
 4. When prerequisites pass, answer three short setup questions:
    - project name;
@@ -45,16 +46,21 @@ them during construction, and records reproducible seeds and counterexamples.
 
 AWS changes require a separate exact authorization naming the account, Region,
 environment, resources, operations, cost ceiling, rollback plan, and expiry.
+Teardown uses a distinct exact authorization.
 
 ## AWS Core
 
-Fastlane is built to use official AWS Core from the
-[AWS Agent Toolkit](https://github.com/aws/agent-toolkit-for-aws) for current
-AWS guidance. Fresh initialization verifies the current official
-`aws-core@agent-toolkit-for-aws`. It does not pin a plugin version or commit. Initialized projects do not rerun setup, while material AWS phases
-still require current attributable evidence.
-Codex's own `/plugins` and `/hooks` screens manage installation and trust.
-AWS Core advises; it cannot approve either gate or authorize an AWS change.
+Fastlane requires the official AWS Core plugin from the
+[AWS Agent Toolkit](https://github.com/aws/agent-toolkit-for-aws) once. Fresh
+initialization verifies `aws-core@agent-toolkit-for-aws` from
+`aws/agent-toolkit-for-aws`; it does not pin a plugin version or commit.
+During AWS work, Codex searches for and retrieves only the runtime skills
+relevant to the current decision. Fastlane does not copy AWS skills into the
+repository or require separate skill installation. Ordinary requirements and
+design need no AWS credentials or AWS account. Initialized projects skip setup,
+while material AWS phases require fresh attributable evidence.
+Codex's `/plugins` and `/hooks` screens manage installation and trust.
+AWS Core advises; it cannot approve a gate or authorize an AWS change.
 
 ## Project files
 
