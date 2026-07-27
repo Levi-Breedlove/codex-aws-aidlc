@@ -290,10 +290,14 @@ explicitly covers the reconciled corrective or rollback action.
 
 ## AWS execution lanes
 
-Use `STRUCTURED_API` for one attributable AWS API operation whose service,
-operation, parameters, Region/profile when exposed, and target resource can be
-compared with the doctor's current `external_authority.request_match` object.
-Missing or ambiguous observable fields stop mutation.
+AWS Core selects a currently supported account-operation tool. Fastlane maps
+its observable request shape into an execution lane; a tool name is neither a
+product dependency nor authority.
+
+Use `STRUCTURED_API` for one attributable operation whose service, operation,
+parameters, Region/profile when exposed, and target resource can be compared
+with the doctor's current `external_authority.request_match` object. Missing or
+ambiguous observable fields stop mutation.
 
 Use `REVIEWED_SCRIPT` only for a legitimate multi-step, cross-service,
 paginated, retrying, parallel, conditional, or verification workflow. Before
@@ -303,6 +307,11 @@ artifact SHA-256. Hash observable script bytes at execution and compare them;
 for an artifact, verify the contained regular file and its digest. An opaque or
 unbound script is not exact Fastlane verification and cannot mutate or tear
 down AWS resources.
+
+Poll a long-running AWS task only when its exact task identifier is bound in
+the current derived authority. A presigned URL must bind its S3 object,
+upload/download operation, positive expiration, and observable profile to that
+authority. Tool availability grants nothing.
 
 Both lanes remain subject to normal Codex owner approval, IAM, the exact
 deployment or teardown boundary, and AWS-30/AWS-50 evidence reconciliation.

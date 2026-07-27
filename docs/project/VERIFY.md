@@ -294,13 +294,15 @@ or unknown state before continuing.
 
 ## Reviewed AWS execution contracts
 
-Use `STRUCTURED_API` for a discrete attributable AWS operation; it needs no
-execution-contract row. Use `REVIEWED_SCRIPT` and `AWS-EXEC-*` only when AWS
-Core requires a multi-step `run_script` workflow. This table does not grant authority.
-A `CURRENT` row must bind to the
-exact current Gate B or deployment/teardown authority and to exactly one
-observable script digest or immutable reviewed artifact digest. Structured
-single-API calls do not require an execution-contract row.
+AWS Core selects a currently supported account-operation tool. Use
+`STRUCTURED_API` when one attributable operation exposes exact service,
+operation, parameters, context, and resources; it needs no execution-contract
+row. Use `REVIEWED_SCRIPT` and `AWS-EXEC-*` only for a multi-step workflow
+whose exact script or immutable artifact is observable.
+This table does not grant authority. A `CURRENT` row must bind to the exact current Gate B or
+deployment/teardown authority and to exactly one observable script digest or
+immutable reviewed artifact digest. Structured single-operation requests do
+not require an execution-contract row.
 
 | Execution ID | Authority kind | Authorization ID | Receipt digest | Script SHA-256 | Immutable artifact SHA-256 | Expected operations | Resources | Account | Region | Environment | Role or profile | Artifact digest | Plan binding | Cost ceiling | Rollback boundary | Valid until | Evidence destination | Status |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

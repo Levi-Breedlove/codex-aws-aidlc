@@ -40,19 +40,26 @@ mutations must match current exact AWS-20 authority, and teardown must match a
 distinct teardown receipt. The handler consumes only the doctor's derived,
 normalized `external_authority.request_match`; it never reparses a receipt.
 
-The example recognizes official local names such as `aws___call_aws` and
-`aws___run_script`, plus ordinary `mcp__server__tool` names. A structured API
-request is compared using observable service, operation, parameters, Region or
-profile, resources, artifact, and plan fields. A reviewed script must expose
-the exact approved script bytes or a contained, regular, non-symlink artifact
-whose SHA-256 matches its current `AWS-EXEC-*` contract. Opaque, unbound, stale,
-wrong-kind, and teardown-conflicting account scripts are denied. A description
-never proves script content.
+The example matches generic `aws___*` and `mcp__server__tool` families.
+Fastlane classifies an AWS request by observable capability, not by advertising
+one account-operation tool name. A discrete `STRUCTURED_API`
+request must expose service, operation, parameters, context, and resources that
+fit current authority. A `REVIEWED_SCRIPT` workflow must expose the exact
+approved script bytes or a contained,
+regular, non-symlink artifact whose SHA-256 matches its current `AWS-EXEC-*`
+contract. Opaque, unbound, stale, wrong-kind, and teardown-conflicting account
+scripts are denied. A description never proves script content.
+
+Task polling requires an exact task identifier already present in the doctor's
+derived authority; otherwise the optional adapter denies it. Presigned URL
+requests must expose the S3 object, upload/download direction, positive
+expiration, and matching profile when present. Their operation, resource, and
+expiration must remain inside current authority.
 
 File writes must remain inside the repository, current Gate B write roots,
 exclusions and protected paths, and the active task write set. The handler
 examines attributable tool fields and recognizable shell, PowerShell, MCP, and
-`run_script` inputs. It does not silently rewrite commands.
+local-function inputs. It does not silently rewrite commands.
 
 ## Native event boundary
 

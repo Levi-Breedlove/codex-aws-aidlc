@@ -193,6 +193,8 @@ class FastlaneHookTests(unittest.TestCase):
             self.assertIn("use_aws", matcher)
             self.assertIn("aws___.*", matcher)
             self.assertIn("mcp__.*", matcher)
+            self.assertNotIn("call_aws", matcher)
+            self.assertNotIn("run_script", matcher)
 
     def test_valid_and_malformed_event_payloads(self) -> None:
         parsed = fastlane_hook.read_event(
@@ -248,6 +250,7 @@ class FastlaneHookTests(unittest.TestCase):
             "aws___read_documentation",
             "mcp__aws-core__retrieve_skill",
             "mcp__aws-core__search_documentation",
+            "mcp__codex_apps__aws_documentation_aws___get_regi_f8690b05bd48",
         ):
             result = fastlane_hook.handle_event(
                 "pre-tool-use",
@@ -263,6 +266,187 @@ class FastlaneHookTests(unittest.TestCase):
             )
             self.assertIsNone(result)
 
+        deceptive = fastlane_hook.handle_event(
+            "pre-tool-use",
+            payload(
+                "PreToolUse",
+                self.root,
+                tool_name="aws___recommend_delete_stack",
+                tool_input={},
+            ),
+            root=self.root,
+            doctor_report=report(),
+            envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+        )
+        self.assertIn(
+            "external authority is absent",
+            deceptive["hookSpecificOutput"]["permissionDecisionReason"],
+        )
+
+    def test_account_tools_are_classified_by_capability_not_product_name(self) -> None:
+        external = authority(
+            "FAST_DEV_GATE_B", ["cloudformation:CreateStack"]
+        )
+        for tool_name in (
+            "aws___invoke_operation",
+            "mcp__aws-core__invoke_operation",
+            "aws___call_aws",
+        ):
+            with self.subTest(tool_name=tool_name):
+                self.assertIsNone(
+                    fastlane_hook.handle_event(
+                        "pre-tool-use",
+                        payload(
+                            "PreToolUse",
+                            self.root,
+                            tool_name=tool_name,
+                            tool_input=aws_request("CreateStack"),
+                        ),
+                        root=self.root,
+                        doctor_report=report(
+                            aws="AUTH-0001", external_authority=external
+                        ),
+                        envelope={
+                            "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                            "GitHub boundary": "NONE",
+                        },
+                    )
+                )
+
+        unrelated = fastlane_hook.handle_event(
+            "pre-tool-use",
+            payload(
+                "PreToolUse",
+                self.root,
+                tool_name="mcp__calendar__invoke_operation",
+                tool_input=aws_request("CreateStack"),
+            ),
+            root=self.root,
+            doctor_report=report(),
+            envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+        )
+        self.assertIsNone(unrelated)
+
+    def test_presigned_urls_require_exact_direction_resource_and_expiration(self) -> None:
+        resource = "arn:aws:s3:::fastlane-bucket/releases/app.zip"
+        download = authority(
+            "AWS_READ_ONLY",
+            ["s3:GetObject"],
+            resources=[resource],
+        )
+        request = {
+            "bucket": "fastlane-bucket",
+            "key": "releases/app.zip",
+            "direction": "download",
+            "expires_in": 300,
+            "region": "us-west-2",
+            "aws_profile": "fastlane-role",
+        }
+        self.assertIsNone(
+            fastlane_hook.handle_event(
+                "pre-tool-use",
+                payload(
+                    "PreToolUse",
+                    self.root,
+                    tool_name="aws___get_presigned_url",
+                    tool_input=request,
+                ),
+                root=self.root,
+                doctor_report=report(
+                    aws="AUTH-0001", external_authority=download
+                ),
+                envelope={
+                    "AWS boundary": "READ_ONLY",
+                    "GitHub boundary": "NONE",
+                },
+            )
+        )
+
+        mismatches = (
+            ({**request, "direction": "upload"}, "mutation authority"),
+            ({**request, "key": "releases/other.zip"}, "resource target"),
+            ({key: value for key, value in request.items() if key != "expires_in"}, "positive expiration"),
+            ({**request, "expires_in": 10**12}, "expiration exceeds"),
+        )
+        for tool_input, reason in mismatches:
+            with self.subTest(reason=reason):
+                denied = fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    payload(
+                        "PreToolUse",
+                        self.root,
+                        tool_name="mcp__aws-core__get_presigned_url",
+                        tool_input=tool_input,
+                    ),
+                    root=self.root,
+                    doctor_report=report(
+                        aws="AUTH-0001", external_authority=download
+                    ),
+                    envelope={
+                        "AWS boundary": "READ_ONLY",
+                        "GitHub boundary": "NONE",
+                    },
+                )
+                self.assertIn(
+                    reason,
+                    denied["hookSpecificOutput"]["permissionDecisionReason"],
+                )
+
+    def test_task_polling_requires_a_doctor_derived_task_binding(self) -> None:
+        current = authority(
+            "AWS_DEPLOYMENT", ["cloudformation:CreateStack"],
+            authorization_id="AWS-AUTH-0001",
+        )
+        for tool_input, reason in (
+            ({"aws_profile": "fastlane-role"}, "exact task identifier"),
+            (
+                {"task_id": "task-123", "aws_profile": "fastlane-role"},
+                "not bound in current doctor-derived authority",
+            ),
+        ):
+            with self.subTest(reason=reason):
+                denied = fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    payload(
+                        "PreToolUse",
+                        self.root,
+                        tool_name="aws___get_tasks",
+                        tool_input=tool_input,
+                    ),
+                    root=self.root,
+                    doctor_report=report(
+                        aws="AWS-AUTH-0001", external_authority=current
+                    ),
+                    envelope={
+                        "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                        "GitHub boundary": "NONE",
+                    },
+                )
+                self.assertIn(
+                    reason,
+                    denied["hookSpecificOutput"]["permissionDecisionReason"],
+                )
+
+    def test_product_execution_guidance_is_tool_name_independent(self) -> None:
+        documents = (
+            REPOSITORY_ROOT / "docs" / "HOOKS.md",
+            REPOSITORY_ROOT / "docs" / "project" / "RUNBOOK.md",
+            REPOSITORY_ROOT / "docs" / "project" / "VERIFY.md",
+            REPOSITORY_ROOT / "prompts" / "CODEX-PROMPTS.md",
+        )
+        for path in documents:
+            with self.subTest(path=path):
+                content = path.read_text(encoding="utf-8")
+                self.assertNotIn("call_aws", content)
+                self.assertNotIn("run_script", content)
+                self.assertIn("STRUCTURED_API", content)
+                self.assertIn("REVIEWED_SCRIPT", content)
+        self.assertIn(
+            "AWS Core selects a currently supported account-operation tool",
+            (REPOSITORY_ROOT / "docs" / "project" / "RUNBOOK.md").read_text(
+                encoding="utf-8"
+            ),
+        )
     def test_read_only_gh_api_is_not_misclassified_as_publication(self) -> None:
         read_result = fastlane_hook.handle_event(
             "pre-tool-use",
