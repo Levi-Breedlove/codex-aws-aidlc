@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -52,6 +53,22 @@ SETUP_STATES = (
 MAX_EVIDENCE_BYTES = 1_000_000
 MAX_OUTPUT_BYTES = 16_384
 CAPABILITY_RESULTS = {"PASS", "FAIL", "UNAVAILABLE"}
+RUNTIME_DISCOVERY_FIELD = "aws_core_runtime_discovery"
+RUNTIME_DISCOVERY_KEYS = frozenset(
+    {
+        "search_status",
+        "search_query",
+        "search_observed_at",
+        "discovered_skill_identifiers",
+        "selected_skill_identifier",
+        "retrieve_status",
+        "retrieved_skill_identifier",
+        "retrieve_observed_at",
+        "credentials_inspected",
+        "aws_account_accessed",
+    }
+)
+CANONICAL_SKILL_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")
 
 BOOLEAN_EVIDENCE_FIELDS = frozenset(
     {
@@ -78,7 +95,10 @@ STRING_EVIDENCE_FIELDS = frozenset(
 )
 STRING_LIST_EVIDENCE_FIELDS = frozenset({"search_documentation_references"})
 SESSION_EVIDENCE_FIELDS = frozenset(
-    BOOLEAN_EVIDENCE_FIELDS | STRING_EVIDENCE_FIELDS | STRING_LIST_EVIDENCE_FIELDS
+    BOOLEAN_EVIDENCE_FIELDS
+    | STRING_EVIDENCE_FIELDS
+    | STRING_LIST_EVIDENCE_FIELDS
+    | {RUNTIME_DISCOVERY_FIELD}
 )
 
 Which = Callable[[str], str | None]
@@ -96,6 +116,73 @@ def _safe_text(value: str, label: str, *, maximum: int = 500) -> str:
     if re.search(r"(?:secret|token|password|access[_-]?key)\s*[:=]", cleaned, re.I):
         raise SetupError(f"stdin evidence field {label!r} may contain secret material")
     return cleaned
+
+
+def _parse_runtime_discovery(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != RUNTIME_DISCOVERY_KEYS:
+        raise SetupError(
+            "aws_core_runtime_discovery must contain the exact runtime discovery fields"
+        )
+    result: dict[str, Any] = {}
+    for key, item in value.items():
+        if key in {"credentials_inspected", "aws_account_accessed"}:
+            if not isinstance(item, bool):
+                raise SetupError(f"stdin evidence field {key!r} must be boolean")
+            result[key] = item
+        elif key == "discovered_skill_identifiers":
+            if not isinstance(item, list) or not all(isinstance(entry, str) for entry in item):
+                raise SetupError(f"stdin evidence field {key!r} must be a string list")
+            identifiers = [_safe_text(entry, key) for entry in item]
+            if len(identifiers) != len(set(identifiers)):
+                raise SetupError("discovered_skill_identifiers must not contain duplicates")
+            if any(CANONICAL_SKILL_IDENTIFIER.fullmatch(entry) is None for entry in identifiers):
+                raise SetupError("discovered_skill_identifiers must contain canonical identifiers")
+            result[key] = identifiers
+        else:
+            if not isinstance(item, str):
+                raise SetupError(f"stdin evidence field {key!r} must be a string")
+            result[key] = _safe_text(item, key)
+    for key in ("search_status", "retrieve_status"):
+        if result[key] not in CAPABILITY_RESULTS:
+            raise SetupError(f"stdin evidence field {key!r} must be PASS, FAIL, or UNAVAILABLE")
+    for key in ("selected_skill_identifier", "retrieved_skill_identifier"):
+        if CANONICAL_SKILL_IDENTIFIER.fullmatch(result[key]) is None:
+            raise SetupError(f"stdin evidence field {key!r} must be a canonical identifier")
+    return result
+
+
+def _observed_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        observed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return observed if observed.tzinfo is not None else None
+
+
+def _runtime_discovery_ready(evidence: Mapping[str, Any]) -> bool:
+    discovery = evidence.get(RUNTIME_DISCOVERY_FIELD)
+    if not isinstance(discovery, Mapping):
+        return False
+    discovered = discovery.get("discovered_skill_identifiers")
+    selected = discovery.get("selected_skill_identifier")
+    searched_at = _observed_datetime(discovery.get("search_observed_at"))
+    retrieved_at = _observed_datetime(discovery.get("retrieve_observed_at"))
+    return bool(
+        discovery.get("search_status") == "PASS"
+        and discovery.get("search_query") == "AWS skills"
+        and isinstance(discovered, list)
+        and discovered
+        and selected in discovered
+        and discovery.get("retrieve_status") == "PASS"
+        and discovery.get("retrieved_skill_identifier") == selected
+        and searched_at is not None
+        and retrieved_at is not None
+        and searched_at <= retrieved_at
+        and discovery.get("credentials_inspected") is False
+        and discovery.get("aws_account_accessed") is False
+    )
 
 
 def read_session_evidence(stream: Any) -> dict[str, Any]:
@@ -118,7 +205,9 @@ def read_session_evidence(stream: Any) -> dict[str, Any]:
 
     result: dict[str, Any] = {}
     for key, value in parsed.items():
-        if key in BOOLEAN_EVIDENCE_FIELDS:
+        if key == RUNTIME_DISCOVERY_FIELD:
+            result[key] = _parse_runtime_discovery(value)
+        elif key in BOOLEAN_EVIDENCE_FIELDS:
             if not isinstance(value, bool):
                 raise SetupError(f"stdin evidence field {key!r} must be boolean")
             result[key] = value
@@ -319,8 +408,8 @@ def _aws_core_step() -> dict[str, Any]:
         "guide": AWS_PLUGIN_GUIDE,
         "instruction": (
             "Open `/plugins`, select AWS Core under Agent Toolkit for AWS, restart Codex, "
-            "then send `init template`. Codex will verify `retrieve_skill` and "
-            "`search_documentation` without AWS credentials."
+            "then send `init template`. Codex will search the runtime AWS skill catalog "
+            "and retrieve one returned skill without AWS credentials."
         ),
     }
 
@@ -394,20 +483,11 @@ def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str
             )
         )
     else:
-        retrieve_ready = (
-            evidence.get("retrieve_skill_result") == "PASS"
-            and bool(evidence.get("retrieve_skill_identifier"))
-        )
-        search_ready = (
-            evidence.get("search_documentation_result") == "PASS"
-            and bool(evidence.get("search_documentation_query"))
-            and bool(evidence.get("search_documentation_references"))
-        )
         no_account_access = (
             evidence.get("credentials_inspected") is False
             and evidence.get("aws_account_accessed") is False
         )
-        if not (retrieve_ready and search_ready and no_account_access):
+        if not (_runtime_discovery_ready(evidence) and no_account_access):
             missing.append(("AWS_CORE", _aws_core_step()))
     return missing
 
@@ -444,6 +524,7 @@ def reduce_prerequisites(evidence: Mapping[str, Any]) -> dict[str, Any]:
         "owner_action_required": True,
         "checklist": [step for _, step in missing],
         "aws_core_status": "AVAILABLE" if state == "PREREQUISITES_READY" else "REQUIRED",
+        "aws_core_runtime_discovery": "CURRENT" if state == "PREREQUISITES_READY" else "REQUIRED",
         "aws_credentials": "NOT_INSPECTED",
         "aws_access": "NOT_USED",
         "aws_authorization": "NONE",

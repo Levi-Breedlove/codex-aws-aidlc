@@ -57,13 +57,18 @@ def ready_evidence(**updates: object) -> dict[str, object]:
         "observed_plugin_identity": setup.OFFICIAL_AWS_CORE_IDENTITY,
         "native_hook_review_required": False,
         "native_hook_review_attested": False,
-        "retrieve_skill_result": "PASS",
-        "retrieve_skill_identifier": "aws-serverless",
-        "search_documentation_result": "PASS",
-        "search_documentation_query": "AWS serverless security guidance",
-        "search_documentation_references": [
-            "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"
-        ],
+        "aws_core_runtime_discovery": {
+            "search_status": "PASS",
+            "search_query": "AWS skills",
+            "search_observed_at": "2026-07-26T12:00:00Z",
+            "discovered_skill_identifiers": ["aws-serverless", "aws-iam"],
+            "selected_skill_identifier": "aws-serverless",
+            "retrieve_status": "PASS",
+            "retrieved_skill_identifier": "aws-serverless",
+            "retrieve_observed_at": "2026-07-26T12:00:01Z",
+            "credentials_inspected": False,
+            "aws_account_accessed": False,
+        },
         "credentials_inspected": False,
         "aws_account_accessed": False,
     }

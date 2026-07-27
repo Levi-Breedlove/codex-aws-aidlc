@@ -690,12 +690,13 @@ test IDs when applicable; otherwise use `NONE - <concrete reason>`.
 This table maps design decisions to current official AWS facts. The detailed,
 attributable `retrieve_skill` and `search_documentation` call evidence remains
 authoritative in `docs/project/VERIFY.md`; this PRD table does not duplicate
-tool transcripts or prove invocation by itself.
+tool transcripts or prove invocation by itself. Every material claim cites the
+current `AWS-DISC-*` chain that informed it.
 
-| Evidence ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |
-|---|---|---|---|---|---|
-| AWS-EV-0001 | TODO | TODO | `retrieve_skill` | TODO | TODO |
-| AWS-EV-0002 | TODO | TODO | `search_documentation` | TODO | TODO |
+| Evidence ID | Discovery ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |
+|---|---|---|---|---|---|---|
+| AWS-EV-0001 | AWS-DISC-0001 | TODO | TODO | `retrieve_skill` | TODO | TODO |
+| AWS-EV-0002 | AWS-DISC-0001 | TODO | TODO | `search_documentation` | TODO | TODO |
 
 ### Change impact record
 

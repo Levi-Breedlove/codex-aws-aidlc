@@ -89,45 +89,43 @@ evidence-ID formats.
 
 ## AWS Core evidence
 
-This ledger proves observed use of the official
-`aws-core@agent-toolkit-for-aws` plugin; installation metadata, generic AWS
-connectors, cached content, prior conversation, and prose claims are not proof.
-DESIGN-10 and AWS-10 each require fresh successful observations of both
-`retrieve_skill` and `search_documentation`, with one independently
-attributed result row for each capability. Fresh prerequisite capability
-observations are ephemeral and are never written to this project ledger.
-Missing, stale, wrong-source, or unattributed DESIGN-10 evidence blocks Gate B
-readiness; the same condition at AWS-10 blocks AWS execution planning.
+This ledger proves current runtime skill discovery through official
+`aws-core@agent-toolkit-for-aws`; installation metadata, bundled or local
+skills, generic connectors, cache, prior conversation, and prose are not proof.
+DESIGN-10 and AWS-10 each require at least one current `AWS-DISC-*` chain:
+`search_documentation` records returned canonical skill identifiers, then
+`retrieve_skill` records the selected and returned matching identifier.
+Multiple chains are allowed only for materially different AWS domains.
+Fresh prerequisite capability
+observations are ephemeral and never enter this ledger.
 
-Every completed row must come from observed live calls through
-`aws-core@agent-toolkit-for-aws` and source `aws/agent-toolkit-for-aws`. Every
-passing row uses observation actor `CODEX_LIVE_TOOL_CALL`, records the observed
-current semantic plugin version as observation metadata rather than a pin,
-and records `Credentials inspected` and `AWS account accessed` as exactly
-`NO`. Both rows for a phase use the same observed version.
+Both rows in a chain use the same phase, Discovery ID, Basis IDs, official
+source `aws/agent-toolkit-for-aws`, invoked identity, observed semantic plugin
+version, actor `CODEX_LIVE_TOOL_CALL`, discovered identifier set, advisory
+Design binding, privacy declarations, and current evidence binding. Retrieval
+must not precede search. The selected identifier must be in the search results,
+and the returned identifier must equal it. Every material `AWS-EV-*` row in
+the PRD cites the `AWS-DISC-*` chain that informed it.
 
-Each phase records the requested and returned skill identifiers or
-documentation query and returned official AWS references, as applicable.
-For DESIGN-10, bind advisory findings to the current design and any influenced
+`Basis IDs` are comma-space-separated current stable IDs and include the
+current `DES-*`. For DESIGN-10, bind findings to the design and influenced
 technology rows using `DES-0001; TECH: TECH-0001, TECH-0002` or
 `DES-0001; TECH: NONE — no technology/toolchain impact`. This trace never
 selects a technology, approves Gate B, or authorizes AWS.
 
-Do not record credentials, local plugin/cache paths, usernames, session
-identifiers, hook-trust state or trust-database data, secrets, or private
-machine information. Every passing row also records an ISO 8601 observation
-time and a current binding: the current DES revision for DESIGN-10 or the
-Active evidence scope artifact for AWS-10. DESIGN-10 uses `DES-0001; TECH:
-TECH-0001, TECH-0002` (or the defined no-impact form). AWS-10 uses `ARTIFACT:
-sha256:<64 lowercase hex>; DES: DES-0001; TECH: TECH-0001, TECH-0002` (or
-`TECH: NONE — no technology/toolchain impact`).
+Do not record raw skill instructions, tool transcripts, credentials, local
+paths, usernames, session identifiers, hook-trust state, secrets, or machine
+information. Every passing row records an ISO 8601 time and current binding:
+the current DES revision for DESIGN-10 or the Active evidence scope artifact
+for AWS-10. AWS-10 uses `ARTIFACT: sha256:<64 lowercase hex>; DES: DES-0001;
+TECH: TECH-0001, TECH-0002` or the defined no-impact form.
 
-| Phase | Plugin source | Invoked plugin identity | Observed plugin version | Capability | Observation actor | Requested skill | Returned skill identifier | Documentation query | Source references | Advisory Design binding | Credentials inspected | AWS account accessed | Observed at | Evidence binding | Observed status |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `DESIGN-10` | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
-| `DESIGN-10` | TODO | TODO | TODO | `search_documentation` | TODO | — | — | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
-| `AWS-10` | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
-| `AWS-10` | TODO | TODO | TODO | `search_documentation` | TODO | — | — | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| Phase | Discovery ID | Basis IDs | Plugin source | Invoked plugin identity | Observed plugin version | Capability | Observation actor | Requested skill | Returned skill identifier | Documentation query | Discovered skill identifiers | Source references | Advisory Design binding | Credentials inspected | AWS account accessed | Observed at | Evidence binding | Observed status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `DESIGN-10` | `AWS-DISC-0001` | TODO | TODO | TODO | TODO | `search_documentation` | TODO | — | — | `AWS skills for the current design question` | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `DESIGN-10` | `AWS-DISC-0001` | TODO | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | TODO | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `AWS-10` | `AWS-DISC-0002` | TODO | TODO | TODO | TODO | `search_documentation` | TODO | — | — | `AWS skills for the current operational question` | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `AWS-10` | `AWS-DISC-0002` | TODO | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | TODO | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
 
 ## IaC validation evidence
 
