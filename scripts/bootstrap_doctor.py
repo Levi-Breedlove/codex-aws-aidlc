@@ -208,8 +208,17 @@ ARCHITECTURE_TRACEABILITY_HEADERS = (
     "Evidence IDs",
 )
 MATERIAL_AWS_EVIDENCE_HEADING = "### Material AWS evidence"
+MATERIAL_AWS_EVIDENCE_HEADERS_V1 = (
+    "Evidence ID",
+    "Design IDs",
+    "Material claim",
+    "AWS Core capability",
+    "Official reference",
+    "Observed date",
+)
 MATERIAL_AWS_EVIDENCE_HEADERS = (
     "Evidence ID",
+    "Discovery ID",
     "Design IDs",
     "Material claim",
     "AWS Core capability",
@@ -222,6 +231,7 @@ ARCHITECTURE_ID = re.compile(r"ARCH-\d{4,}")
 ARCHITECTURE_DESIGN_ID = re.compile(r"(?:ARCH|COMP|API|DATA|CTRL)-\d{3,}")
 ARCHITECTURE_TEST_ID = re.compile(r"(?:PROP|EX|TEST)-\d{3,}")
 AWS_MATERIAL_EVIDENCE_ID = re.compile(r"AWS-EV-\d{4,}")
+AWS_DISCOVERY_ID = re.compile(r"AWS-DISC-\d{4,}")
 ARCHITECTURE_DRIVER_CLASSES = {"HARD_CONSTRAINT", "PREFERENCE", "REVISIT_TRIGGER"}
 ARCHITECTURE_ELIGIBILITY = {"ELIGIBLE", "INELIGIBLE"}
 AWS_DOCUMENTATION_CAPABILITIES = {"retrieve_skill", "search_documentation"}
@@ -772,6 +782,7 @@ class ArchitectureTrace:
 @dataclass(frozen=True)
 class MaterialAwsEvidence:
     evidence_id: str
+    discovery_id: str
     design_ids: str
     material_claim: str
     capability: str
@@ -781,6 +792,7 @@ class MaterialAwsEvidence:
     def to_dict(self) -> dict[str, str]:
         return {
             "evidence_id": self.evidence_id,
+            "discovery_id": self.discovery_id,
             "design_ids": self.design_ids,
             "material_claim": self.material_claim,
             "capability": self.capability,
@@ -1093,6 +1105,8 @@ GATE_B_READINESS_FIELDS = {
 }
 AWS_CORE_EVIDENCE_HEADERS = (
     "Phase",
+    "Discovery ID",
+    "Basis IDs",
     "Plugin source",
     "Invoked plugin identity",
     "Observed plugin version",
@@ -1101,6 +1115,7 @@ AWS_CORE_EVIDENCE_HEADERS = (
     "Requested skill",
     "Returned skill identifier",
     "Documentation query",
+    "Discovered skill identifiers",
     "Source references",
     "Advisory Design binding",
     "Credentials inspected",
@@ -1109,8 +1124,12 @@ AWS_CORE_EVIDENCE_HEADERS = (
     "Evidence binding",
     "Observed status",
 )
+AWS_CORE_EVIDENCE_HEADERS_V1 = tuple(
+    header for header in AWS_CORE_EVIDENCE_HEADERS
+    if header not in {"Discovery ID", "Basis IDs", "Discovered skill identifiers"}
+)
 AWS_CORE_EVIDENCE_PHASES = ("DESIGN-10", "AWS-10")
-AWS_CORE_REQUIRED_CAPABILITIES = ("retrieve_skill", "search_documentation")
+AWS_CORE_REQUIRED_CAPABILITIES = ("search_documentation", "retrieve_skill")
 AWS_CORE_OFFICIAL_SOURCE = "aws/agent-toolkit-for-aws"
 AWS_CORE_OFFICIAL_IDENTITY = "aws-core@agent-toolkit-for-aws"
 AWS_CORE_OBSERVATION_ACTOR = "CODEX_LIVE_TOOL_CALL"
@@ -1197,6 +1216,8 @@ class PropertyTestEvidenceRow:
 @dataclass(frozen=True)
 class AwsCoreEvidenceRow:
     phase: str
+    discovery_id: str
+    basis_ids: str
     plugin_source: str
     invoked_plugin_identity: str
     observed_plugin_version: str
@@ -1205,6 +1226,7 @@ class AwsCoreEvidenceRow:
     requested_skill: str
     returned_skill_identifier: str
     documentation_query: str
+    discovered_skill_identifiers: str
     source_references: str
     advisory_design_binding: str
     credentials_inspected: str
@@ -1357,8 +1379,10 @@ def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]
 
 def parse_aws_core_evidence(
     text: str,
-) -> dict[tuple[str, str], AwsCoreEvidenceRow]:
-    """Parse one attributable AWS Core evidence row per phase and capability."""
+    *,
+    allow_legacy: bool = False,
+) -> dict[tuple[str, str, str], AwsCoreEvidenceRow]:
+    """Parse linked runtime skill-discovery evidence chains."""
 
     structural = without_fenced_code(text)
     headings = list(re.finditer(r"^## AWS Core evidence[ \t]*$", structural, re.MULTILINE))
@@ -1367,22 +1391,35 @@ def parse_aws_core_evidence(
     following = re.search(r"^##\s+", structural[headings[0].end() :], re.MULTILINE)
     end = headings[0].end() + following.start() if following else len(structural)
     lines = structural[headings[0].end() : end].splitlines()
+
+    headers = AWS_CORE_EVIDENCE_HEADERS
     header_indexes = [
         index
         for index, line in enumerate(lines)
-        if split_markdown_table_row(line) == list(AWS_CORE_EVIDENCE_HEADERS)
+        if split_markdown_table_row(line) == list(headers)
     ]
+    legacy = False
+    if len(header_indexes) != 1 and allow_legacy:
+        headers = AWS_CORE_EVIDENCE_HEADERS_V1
+        header_indexes = [
+            index
+            for index, line in enumerate(lines)
+            if split_markdown_table_row(line) == list(headers)
+        ]
+        legacy = len(header_indexes) == 1
     if len(header_indexes) != 1:
         raise ValueError("VERIFY.md requires one exact AWS Core evidence table")
     header = header_indexes[0]
     separator = split_markdown_table_row(lines[header + 1]) if header + 1 < len(lines) else None
     if (
         separator is None
-        or len(separator) != len(AWS_CORE_EVIDENCE_HEADERS)
+        or len(separator) != len(headers)
         or any(re.fullmatch(r":?-{3,}:?", cell) is None for cell in separator)
     ):
         raise ValueError("VERIFY.md AWS Core evidence separator is invalid")
-    rows: dict[tuple[str, str], AwsCoreEvidenceRow] = {}
+
+    rows: dict[tuple[str, str, str], AwsCoreEvidenceRow] = {}
+    discovery_phases: dict[str, str] = {}
     for line in lines[header + 2 :]:
         if not line.strip():
             if rows:
@@ -1393,45 +1430,69 @@ def parse_aws_core_evidence(
             if rows:
                 break
             raise ValueError("VERIFY.md AWS Core evidence row is missing")
-        if len(cells) != len(AWS_CORE_EVIDENCE_HEADERS):
+        if len(cells) != len(headers):
             raise ValueError(
-                "VERIFY.md AWS Core evidence row must have "
-                f"{len(AWS_CORE_EVIDENCE_HEADERS)} cells"
+                f"VERIFY.md AWS Core evidence row must have {len(headers)} cells"
             )
-        row = AwsCoreEvidenceRow(*(clean_cell(cell) for cell in cells))
+        cleaned = tuple(clean_cell(cell) for cell in cells)
+        if legacy:
+            row = AwsCoreEvidenceRow(
+                cleaned[0],
+                "",
+                "",
+                *cleaned[1:9],
+                "",
+                *cleaned[9:],
+            )
+        else:
+            row = AwsCoreEvidenceRow(*cleaned)
         if row.phase not in AWS_CORE_EVIDENCE_PHASES:
             raise ValueError(f"VERIFY.md AWS Core evidence has unknown phase {row.phase!r}")
-        normalized_capability = row.capability.replace("`", "").strip()
-        if normalized_capability not in AWS_CORE_REQUIRED_CAPABILITIES:
+        capability = row.capability.replace("`", "").strip()
+        if capability not in AWS_CORE_REQUIRED_CAPABILITIES:
             raise ValueError(
-                f"{row.phase} AWS Core evidence has unknown capability "
-                f"{normalized_capability!r}"
+                f"{row.phase} AWS Core evidence has unknown capability {capability!r}"
             )
-        key = (row.phase, normalized_capability)
+        if not legacy and AWS_DISCOVERY_ID.fullmatch(row.discovery_id) is None:
+            raise ValueError(
+                f"{row.phase} AWS Core evidence has invalid Discovery ID {row.discovery_id!r}"
+            )
+        owner = discovery_phases.setdefault(row.discovery_id, row.phase)
+        if row.discovery_id and owner != row.phase:
+            raise ValueError(
+                f"{row.discovery_id} AWS Core discovery ID is reused across phases"
+            )
+        key = (row.phase, row.discovery_id, capability)
         if key in rows:
             raise ValueError(
-                "VERIFY.md AWS Core evidence duplicates "
-                f"{row.phase} {normalized_capability}"
+                f"VERIFY.md AWS Core evidence duplicates {row.phase} "
+                f"{row.discovery_id or 'legacy'} {capability}"
             )
         if row.observed_status not in AWS_CORE_EVIDENCE_STATUSES:
             raise ValueError(
-                f"{row.phase} {normalized_capability} AWS Core evidence has invalid status"
+                f"{row.phase} {capability} AWS Core evidence has invalid status"
             )
         rows[key] = row
-    expected = {
-        (phase, capability)
-        for phase in AWS_CORE_EVIDENCE_PHASES
-        for capability in AWS_CORE_REQUIRED_CAPABILITIES
-    }
-    missing = sorted(expected - set(rows))
+
+    missing: list[str] = []
+    for phase in AWS_CORE_EVIDENCE_PHASES:
+        discovery_ids = sorted(
+            {discovery_id for row_phase, discovery_id, _ in rows if row_phase == phase}
+        )
+        if not discovery_ids:
+            missing.append(f"{phase} discovery chain")
+            continue
+        for discovery_id in discovery_ids:
+            for capability in AWS_CORE_REQUIRED_CAPABILITIES:
+                if (phase, discovery_id, capability) not in rows:
+                    missing.append(
+                        f"{phase} {discovery_id or 'legacy'} {capability}"
+                    )
     if missing:
-        labels = [f"{phase} {capability}" for phase, capability in missing]
         raise ValueError(
-            "VERIFY.md AWS Core evidence is missing phase/capability rows: "
-            + ", ".join(labels)
+            "VERIFY.md AWS Core evidence is missing linked rows: " + ", ".join(missing)
         )
     return rows
-
 
 def validate_advisory_design_binding(
     value: str,
@@ -1490,7 +1551,7 @@ def validate_advisory_design_binding(
             )
 
 
-def aws_core_phase_evidence_issues(
+def _unlinked_aws_core_phase_evidence_issues(
     rows: dict[tuple[str, str], AwsCoreEvidenceRow],
     phase: str,
     *,
@@ -1609,14 +1670,129 @@ def aws_core_phase_evidence_issues(
     return issues
 
 
-def require_aws_core_phase_evidence(
-    ctx: Context,
-    rows: dict[tuple[str, str], AwsCoreEvidenceRow],
+def aws_core_phase_evidence_issues(
+    rows: dict[tuple[str, str, str], AwsCoreEvidenceRow],
     phase: str,
     *,
     expected_binding: str | None = None,
     expected_design_revision: str | None = None,
     approved_tech_ids: set[str] | None = None,
+    allow_legacy_discovery: bool = False,
+) -> list[str]:
+    """Validate ordered, source-attributed runtime skill-discovery chains."""
+
+    discovery_ids = sorted(
+        {discovery_id for row_phase, discovery_id, _ in rows if row_phase == phase}
+    )
+    if not discovery_ids:
+        return [f"{phase} requires at least one AWS-DISC discovery chain"]
+    if "" in discovery_ids:
+        if not allow_legacy_discovery or len(discovery_ids) != 1:
+            return [f"{phase} legacy AWS Core evidence requires discovery migration"]
+        legacy = {
+            (phase, capability): rows[(phase, "", capability)]
+            for capability in AWS_CORE_REQUIRED_CAPABILITIES
+            if (phase, "", capability) in rows
+        }
+        return _unlinked_aws_core_phase_evidence_issues(
+            legacy,
+            phase,
+            expected_binding=expected_binding,
+            expected_design_revision=expected_design_revision,
+            approved_tech_ids=approved_tech_ids,
+        )
+
+    issues: list[str] = []
+    for discovery_id in discovery_ids:
+        chain = {
+            (phase, capability): rows[(phase, discovery_id, capability)]
+            for capability in AWS_CORE_REQUIRED_CAPABILITIES
+            if (phase, discovery_id, capability) in rows
+        }
+        issues.extend(
+            _unlinked_aws_core_phase_evidence_issues(
+                chain,
+                phase,
+                expected_binding=expected_binding,
+                expected_design_revision=expected_design_revision,
+                approved_tech_ids=approved_tech_ids,
+            )
+        )
+        search = chain.get((phase, "search_documentation"))
+        retrieve = chain.get((phase, "retrieve_skill"))
+        if search is None or retrieve is None:
+            issues.append(f"{phase} {discovery_id} requires linked search and retrieve rows")
+            continue
+
+        try:
+            basis_ids = _canonical_id_list(
+                search.basis_ids,
+                STABLE_CONTRACT_ID,
+                f"{phase} {discovery_id} Basis IDs",
+            )
+        except ValueError as exc:
+            issues.append(str(exc))
+            basis_ids = []
+        if expected_design_revision and expected_design_revision not in basis_ids:
+            issues.append(
+                f"{phase} {discovery_id} Basis IDs must include {expected_design_revision}"
+            )
+
+        try:
+            discovered = _canonical_id_list(
+                search.discovered_skill_identifiers,
+                AWS_CORE_CANONICAL_SKILL_IDENTIFIER_PATTERN,
+                f"{phase} {discovery_id} Discovered skill identifiers",
+            )
+        except ValueError as exc:
+            issues.append(str(exc))
+            discovered = []
+
+        shared = (
+            "basis_ids",
+            "plugin_source",
+            "invoked_plugin_identity",
+            "observed_plugin_version",
+            "observation_actor",
+            "discovered_skill_identifiers",
+            "advisory_design_binding",
+            "credentials_inspected",
+            "aws_account_accessed",
+            "evidence_binding",
+        )
+        for field_name in shared:
+            if getattr(search, field_name) != getattr(retrieve, field_name):
+                issues.append(
+                    f"{phase} {discovery_id} rows must share {field_name}"
+                )
+        if retrieve.requested_skill != retrieve.returned_skill_identifier:
+            issues.append(
+                f"{phase} {discovery_id} retrieved identifier must equal the selected identifier"
+            )
+        if retrieve.returned_skill_identifier not in discovered:
+            issues.append(
+                f"{phase} {discovery_id} retrieved identifier was not returned by search"
+            )
+
+        if explicit_timestamp(search.observed_at) and explicit_timestamp(retrieve.observed_at):
+            searched_at = datetime.fromisoformat(search.observed_at.replace("Z", "+00:00"))
+            retrieved_at = datetime.fromisoformat(retrieve.observed_at.replace("Z", "+00:00"))
+            if retrieved_at < searched_at:
+                issues.append(
+                    f"{phase} {discovery_id} retrieve timestamp precedes search"
+                )
+    return issues
+
+
+def require_aws_core_phase_evidence(
+    ctx: Context,
+    rows: dict[tuple[str, str, str], AwsCoreEvidenceRow],
+    phase: str,
+    *,
+    expected_binding: str | None = None,
+    expected_design_revision: str | None = None,
+    approved_tech_ids: set[str] | None = None,
+    allow_legacy_discovery: bool = False,
 ) -> None:
     """Block a phase boundary unless both official AWS Core calls are evidenced."""
 
@@ -1626,6 +1802,7 @@ def require_aws_core_phase_evidence(
         expected_binding=expected_binding,
         expected_design_revision=expected_design_revision,
         approved_tech_ids=approved_tech_ids,
+        allow_legacy_discovery=allow_legacy_discovery,
     ):
         ctx.error("AWS_CORE_EVIDENCE_REQUIRED", issue, VERIFY_FILE)
 
@@ -3724,6 +3901,7 @@ def _derive_architecture_contract(
     tables: dict[str, ContractTable | None] = {}
     parse_issues: list[str] = []
     selection_schema_version = 3
+    evidence_schema_version = 2
     for key, heading, headers in specifications:
         try:
             tables[key] = contract_table_after_heading(text, heading, headers)
@@ -3734,6 +3912,15 @@ def _derive_architecture_contract(
                         text, heading, ARCHITECTURE_SELECTION_HEADERS_V2
                     )
                     selection_schema_version = 2
+                    continue
+                except ValueError as legacy_exc:
+                    current_exc = legacy_exc
+            if key == "evidence" and grandfather_approved_v1:
+                try:
+                    tables[key] = contract_table_after_heading(
+                        text, heading, MATERIAL_AWS_EVIDENCE_HEADERS_V1
+                    )
+                    evidence_schema_version = 1
                     continue
                 except ValueError as legacy_exc:
                     current_exc = legacy_exc
@@ -4023,8 +4210,16 @@ def _derive_architecture_contract(
         if not evidence_table.rows:
             issues.append("Material AWS evidence has no stored rows")
         for row in evidence_table.rows:
-            item = MaterialAwsEvidence(*row)
+            item = (
+                MaterialAwsEvidence(*row)
+                if evidence_schema_version == 2
+                else MaterialAwsEvidence(row[0], "", *row[1:])
+            )
             evidence.append(item)
+            if evidence_schema_version == 2 and AWS_DISCOVERY_ID.fullmatch(item.discovery_id) is None:
+                issues.append(
+                    f"{item.evidence_id}: invalid Discovery ID {item.discovery_id!r}"
+                )
             if AWS_MATERIAL_EVIDENCE_ID.fullmatch(item.evidence_id) is None:
                 issues.append(f"Invalid material AWS evidence ID {item.evidence_id!r}")
             elif item.evidence_id in seen_evidence_ids:
@@ -4126,7 +4321,11 @@ def _derive_architecture_contract(
         canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
     return (
         ArchitectureContract(
-            schema_version=selection_schema_version,
+            schema_version=(
+                selection_schema_version
+                if grandfather_approved_v1 and selection_schema_version < 3
+                else (4 if evidence_schema_version == 2 else selection_schema_version)
+            ),
             status="READY" if not issues else "BLOCKED",
             drivers=tuple(drivers),
             candidates=tuple(candidates),
@@ -7127,11 +7326,18 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         design_contract,
         coverage_contract,
     ) = validate_prd(ctx, state)
-    aws_core_rows: dict[tuple[str, str], AwsCoreEvidenceRow] = {}
+    allow_legacy_design_discovery = bool(
+        prd_fields.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
+        and design_contract.architecture.schema_version < 4
+    )
+    aws_core_rows: dict[tuple[str, str, str], AwsCoreEvidenceRow] = {}
     verify_text = ctx.texts.get(VERIFY_FILE) or safe_read_text(ctx, VERIFY_FILE)
     if verify_text is not None:
         try:
-            aws_core_rows = parse_aws_core_evidence(verify_text)
+            aws_core_rows = parse_aws_core_evidence(
+                verify_text,
+                allow_legacy=allow_legacy_design_discovery,
+            )
         except ValueError as exc:
             ctx.error("AWS_CORE_EVIDENCE_STRUCTURE", str(exc), VERIFY_FILE)
     tasks = validate_tasks(ctx, state, prd_fields, envelope, design_contract)
@@ -7155,7 +7361,23 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         expected_binding=prd_fields.get("design_revision"),
         expected_design_revision=prd_fields.get("design_revision"),
         approved_tech_ids=approved_tech_ids,
+        allow_legacy_discovery=allow_legacy_design_discovery,
     )
+    material_discovery_issues: list[str] = []
+    if not allow_legacy_design_discovery:
+        design_discovery_ids = {
+            discovery_id
+            for row_phase, discovery_id, _capability in aws_core_rows
+            if row_phase == "DESIGN-10"
+        }
+        for evidence in design_contract.architecture.aws_evidence:
+            if evidence.discovery_id not in design_discovery_ids:
+                issue = (
+                    f"{evidence.evidence_id} must cite a current DESIGN-10 "
+                    f"AWS-DISC chain"
+                )
+                material_discovery_issues.append(issue)
+                design_aws_core_issues.append(issue)
     design_aws_core_ready = not design_aws_core_issues
     if gate_b_agent_ready or gate_b in {
         "PENDING_OWNER_APPROVAL",
@@ -7168,7 +7390,10 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
             expected_binding=prd_fields.get("design_revision"),
             expected_design_revision=prd_fields.get("design_revision"),
             approved_tech_ids=approved_tech_ids,
+            allow_legacy_discovery=allow_legacy_design_discovery,
         )
+        for issue in material_discovery_issues:
+            ctx.error("AWS_CORE_EVIDENCE_REQUIRED", issue, PRD_FILE)
     lifecycle_state, next_prompt = derive_route(
         gate_a,
         gate_b,
@@ -7205,8 +7430,8 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         if not aws_execution_planning_ready:
             ctx.warning(
                 "AWS_CORE_AWS10_EVIDENCE_REQUIRED",
-                "AWS-10 must record fresh source-attributed retrieve_skill and "
-                "search_documentation evidence bound to the current artifact before "
+                "AWS-10 must record a fresh linked search_documentation then "
+                "retrieve_skill discovery chain bound to the current artifact before "
                 "AWS execution planning: " + "; ".join(aws_10_issues),
                 VERIFY_FILE,
             )

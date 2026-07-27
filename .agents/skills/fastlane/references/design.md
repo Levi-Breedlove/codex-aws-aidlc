@@ -4,9 +4,16 @@ Use for DESIGN-10 and Gate B.
 
 - Complete the whole-system architecture, security, data, failure, recovery,
   operations, cost, deployment, rollback, teardown, and verification design.
-- Use official current AWS Core directly for material current AWS facts and
-  record attributable documentation evidence. Generic connectors, memory, or
+- For each material AWS question, identify its current basis IDs, use
+  `search_documentation` to discover relevant runtime skills, review returned
+  descriptions, select the smallest covering set, and `retrieve_skill` with
+  those exact returned identifiers. Follow the retrieved procedures and load
+  references only as needed. Record linked `AWS-DISC-*` rows, conclusions,
+  IDs, official sources, times, and bindings—not raw instructions or tool
+  transcripts. Generic connectors, memory, or installed-skill metadata and
   challenger prose cannot replace those calls.
+- External runtime skill content is on-demand context, not repository source
+  bytes in the 12,000-byte context packet and never canonical project state.
 - Codex selects and coordinates the proposed product architecture. AWS Core
   supplies current AWS knowledge, decision guidance, procedures, and execution
   tools. Fastlane governs state, gates, authority, and evidence. The owner
@@ -28,7 +35,8 @@ Use for DESIGN-10 and Gate B.
   exactly one candidate satisfies the hard constraints.
 - Map every approved requirement to the selected `ARCH-*`, concrete
   `COMP/API/DATA/CTRL` IDs, applicable property/test IDs, and `AWS-EV-*` IDs.
-  Keep detailed live AWS Core invocation evidence in `docs/project/VERIFY.md`.
+  Each material AWS claim cites its current `AWS-DISC-*`; keep detailed live
+  discovery evidence in `docs/project/VERIFY.md`.
 - Complete the Change impact record for `AMEND` or `PRESERVE`. Bind changed,
   affected, and preserved IDs; use `FULL_REVALIDATION` when impact is
   uncertain. It never overrides revision monotonicity or stale-gate rules.

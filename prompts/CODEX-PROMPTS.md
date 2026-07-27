@@ -596,11 +596,14 @@ previous local blocker.
 
    python scripts/setup_assistant.py prerequisites --root <repository root> --evidence-stdin --json
 
-   Do not claim AWS Core readiness from memory, generic documentation tools,
-   installation metadata, or prose. Both `retrieve_skill` and
-   `search_documentation` must be attributable to
-   `aws-core@agent-toolkit-for-aws` from `aws/agent-toolkit-for-aws`, and must
-   confirm no credential inspection or AWS account access.
+   Search the runtime catalog first with `search_documentation` query `AWS
+   skills`, select one canonical identifier from its results, then call
+   `retrieve_skill` with that exact identifier. Pass the linked, timestamped
+   observations through the nested `aws_core_runtime_discovery` field. Both
+   calls must be attributable to `aws-core@agent-toolkit-for-aws` from
+   `aws/agent-toolkit-for-aws` and confirm no credential inspection or account
+   access. Installation metadata, bundled/local skills, memory, and prose are
+   insufficient; a documentation URL is not required merely to prove discovery.
 
    When blocked, render the returned checklist as one owner action and stop.
    Never execute its installation commands, change plugin state, approve native
@@ -1006,23 +1009,22 @@ AWS claim.
 [DESIGN-10]
 Complete a build-ready technical PRD for the accepted requirements.
 
-Create/increment DES and proposed AUTH IDs. Run the dependency checker, confirm
-live `aws-core@agent-toolkit-for-aws`, and visibly call both
-`retrieve_skill` and `search_documentation` for material service-fit, Region,
-IAM, encryption, reliability, observability, quota, security, and cost facts.
-BOOT-00/plugin metadata, cache, generic connectors, and memory are insufficient.
-After completing the proposed design, invoke `fastlane-architecture-challenger`
-for high-risk, hard-to-reverse, shared, isolation, recovery, or owner request.
-It cannot select, replace AWS Core evidence, write, or approve. Codex is the
-only writer.
+Create/increment DES and proposed AUTH IDs. Confirm official
+`aws-core@agent-toolkit-for-aws`. For each material AWS question, identify
+basis IDs and call `search_documentation` to discover runtime skills. Review
+returned descriptions, select the smallest covering set, call `retrieve_skill`
+with the exact returned identifiers, then follow their procedures and official
+references.
 
-Fill the two `DESIGN-10` rows in docs/project/VERIFY.md with live inputs,
-outputs, official references, actor `CODEX_LIVE_TOOL_CALL`, observed semantic
-version, ISO 8601 time, PASS/FAIL, and `Credentials inspected` and `AWS account
-accessed` both `NO`. Use `DES-0001; TECH: TECH-0001, TECH-0002` or
-`DES-0001; TECH: NONE — no technology/toolchain impact` for the advisory Design
-binding. The observed AWS Core version is metadata, never a pin. Missing,
-failed, stale, or unattributed rows block Gate B.
+Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md: search before
+retrieve; shared basis, identity, version, actor, result set, privacy, time,
+and binding. Selected and returned IDs match search results.
+Use `DES-0001; TECH: TECH-0001, TECH-0002` or `DES-0001; TECH: NONE — no technology/toolchain impact` for the Design trace; every `AWS-EV-*` cites its
+chain. The observed AWS Core version is metadata, never a pin. Persist no raw
+skill content or transcripts. BOOT/plugin metadata, installed skills, cache,
+connectors, and memory are insufficient. After completing the proposed design, use
+`fastlane-architecture-challenger` only for its conditional triggers; it cannot
+select, write, approve, or replace evidence. Codex is the only writer.
 
 Before Gate B, load `.agents/skills/fastlane/references/design.md`, follow
 the Adaptive Coverage Plan, and complete every required existing PRD
@@ -1722,29 +1724,24 @@ change set; cost/rollback uncertainty; or any mutation.
 
 ~~~text
 [AWS-10]
-Perform a read-only AWS deployment preflight. First confirm
-`aws-core@agent-toolkit-for-aws`, then visibly make fresh `retrieve_skill` and
-`search_documentation` calls for the current operational, deployment, IAM,
-service, Region, quota, security, reliability, and cost decisions. BOOT-00 or
-DESIGN-10 evidence, a generic connector, plugin metadata, cached content, and
-model memory are insufficient for AWS-10.
+Perform a read-only AWS deployment preflight. Confirm current official AWS
+Core, then create fresh artifact-bound `AWS-DISC-*` chains for the material
+operational, deployment, IAM, service, Region, quota, security, reliability,
+rollback, teardown, and cost questions. Search first, select the smallest
+relevant returned skill set, retrieve those exact identifiers, and follow the
+procedures and current official references. BOOT-00 or DESIGN-10 evidence,
+installed-skill metadata, cache, connectors, and memory are insufficient.
 
-Fill the two `AWS-10` capability rows under `## AWS Core evidence` in
-docs/project/VERIFY.md. Record each live observation's observation actor,
-official source and invoked identity, observed current semantic plugin version,
-capability input/output, advisory Design binding when relevant, ISO 8601
-observation time, current immutable-artifact binding, PASS/FAIL,
-`Credentials inspected` =
-`NO`, and `AWS account accessed` = `NO`. The actor is
-`CODEX_LIVE_TOOL_CALL` and the `search_documentation` row records returned
-official AWS references. Missing, failed, stale, unattributed, or wrong-binding
-evidence keeps the doctor's AWS execution-planning state `BLOCKED` and blocks
-any AWS execution proposal. Do not record credentials, local plugin paths,
-usernames, trust data, or private machine information.
-
-Bind both AWS-10 rows to `ARTIFACT: sha256:<64 lowercase hex>; DES: DES-nnnn;
-TECH: TECH-nnnn, TECH-nnnn` or the defined no-technology-impact form. Reusing
-DESIGN-10 evidence does not satisfy this artifact-bound phase.
+Record linked rows under `## AWS Core evidence` with one shared Discovery ID,
+basis IDs, official source and identity, observed semantic version, actor
+`CODEX_LIVE_TOOL_CALL`, discovered identifiers, privacy declarations, Design
+trace, ISO 8601 times, PASS/FAIL, and current immutable-artifact binding.
+Search must precede retrieval; selected and returned identifiers must match and
+appear in search results. Bind each chain to `ARTIFACT: sha256:<64 lowercase
+hex>; DES: DES-nnnn; TECH: TECH-nnnn, TECH-nnnn` or the defined no-impact
+form. Missing, stale, mismatched, unattributed, or wrong-binding evidence
+blocks AWS execution planning. Do not persist raw skill content, transcripts,
+credentials, local paths, usernames, trust data, or machine information.
 
 Confirm without exposing secrets:
 - caller identity, allowlisted profile/role, account, Region, and environment;

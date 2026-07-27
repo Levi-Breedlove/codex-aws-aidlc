@@ -430,6 +430,9 @@ def record_aws_core_evidence(
     status: str = "PASS",
     *,
     binding: str | None = None,
+    discovery_id: str | None = None,
+    basis_ids: str = "DES-0001",
+    discovered_skill_identifiers: str = "aws-architecture, aws-iam",
     actor: str = "CODEX_LIVE_TOOL_CALL",
     plugin_version: str = "1.2.0",
     advisory_design_binding: str = "DES-0001; TECH: NONE — no technology/toolchain impact",
@@ -439,6 +442,11 @@ def record_aws_core_evidence(
             "DESIGN-10": "DES-0001",
             "AWS-10": "sha256:" + "a" * 64,
         }[phase]
+    if discovery_id is None:
+        discovery_id = {
+            "DESIGN-10": "AWS-DISC-0001",
+            "AWS-10": "AWS-DISC-0002",
+        }[phase]
     for capability in doctor.AWS_CORE_REQUIRED_CAPABILITIES:
         text = record_aws_core_capability_evidence(
             text,
@@ -446,6 +454,9 @@ def record_aws_core_evidence(
             capability,
             status,
             binding=binding,
+            discovery_id=discovery_id,
+            basis_ids=basis_ids,
+            discovered_skill_identifiers=discovered_skill_identifiers,
             actor=actor,
             plugin_version=plugin_version,
             advisory_design_binding=advisory_design_binding,
@@ -460,6 +471,9 @@ def record_aws_core_capability_evidence(
     status: str = "PASS",
     *,
     binding: str,
+    discovery_id: str | None = None,
+    basis_ids: str = "DES-0001",
+    discovered_skill_identifiers: str = "aws-architecture, aws-iam",
     actor: str = "CODEX_LIVE_TOOL_CALL",
     plugin_source: str = "aws/agent-toolkit-for-aws",
     invoked_identity: str = "aws-core@agent-toolkit-for-aws",
@@ -472,29 +486,37 @@ def record_aws_core_capability_evidence(
     credentials_inspected: str = "NO",
     aws_account_accessed: str = "NO",
 ) -> str:
+    if discovery_id is None:
+        discovery_id = {
+            "DESIGN-10": "AWS-DISC-0001",
+            "AWS-10": "AWS-DISC-0002",
+        }[phase]
     if capability == "retrieve_skill":
         requested_skill = requested_skill or "aws-architecture"
         returned_skill_identifier = returned_skill_identifier or requested_skill
         documentation_query = "—"
         source_references = "—"
+        observed_at = "2026-07-20T12:00:01Z"
     else:
         requested_skill = "—"
         returned_skill_identifier = "—"
-        documentation_query = documentation_query or "Current AWS service and IAM guidance"
+        documentation_query = documentation_query or "AWS skills for current guidance"
         source_references = source_references or (
             "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"
         )
+        observed_at = "2026-07-20T12:00:00Z"
     replacement = (
-        f"| `{phase}` | `{plugin_source}` | `{invoked_identity}` | "
-        f"`{plugin_version}` | `{capability}` | `{actor}` | "
+        f"| `{phase}` | `{discovery_id}` | `{basis_ids}` | `{plugin_source}` | "
+        f"`{invoked_identity}` | `{plugin_version}` | `{capability}` | `{actor}` | "
         f"`{requested_skill}` | `{returned_skill_identifier}` | "
-        f"`{documentation_query}` | `{source_references}` | "
-        f"`{advisory_design_binding}` | `{credentials_inspected}` | "
-        f"`{aws_account_accessed}` | `2026-07-20T12:00:00Z` | "
+        f"`{documentation_query}` | `{discovered_skill_identifiers}` | "
+        f"`{source_references}` | `{advisory_design_binding}` | "
+        f"`{credentials_inspected}` | `{aws_account_accessed}` | `{observed_at}` | "
         f"`{binding}` | `{status}` |"
     )
     updated, count = re.subn(
-        rf"^\| `{re.escape(phase)}` \|.*\| `{re.escape(capability)}` \|.*$",
+        rf"^\| `{re.escape(phase)}` \| `{re.escape(discovery_id)}` \|.*"
+        rf"\| `{re.escape(capability)}` \|.*$",
         replacement,
         text,
         count=1,
@@ -502,7 +524,7 @@ def record_aws_core_capability_evidence(
     )
     if count != 1:
         raise AssertionError(
-            f"Missing AWS Core evidence row for {phase} {capability}"
+            f"Missing AWS Core evidence row for {phase} {discovery_id} {capability}"
         )
     return updated
 
@@ -690,10 +712,10 @@ def complete_design_contract(text: str) -> str:
     text = put_contract_table(text, doctor.ARCHITECTURE_TRACEABILITY_HEADING, trace_table, doctor.MATERIAL_AWS_EVIDENCE_HEADING)
     evidence_table = "\n".join(
         [
-            "| Evidence ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |",
-            "|---|---|---|---|---|---|",
-            "| AWS-EV-0001 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001 | AWS managed serverless services support bounded pay-per-use execution patterns | retrieve_skill | https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html | 2026-07-17 |",
-            "| AWS-EV-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0004 | AWS documentation defines current serverless security and operational guidance | search_documentation | https://docs.aws.amazon.com/lambda/latest/dg/security.html | 2026-07-17 |",
+            "| Evidence ID | Discovery ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |",
+            "|---|---|---|---|---|---|---|",
+            "| AWS-EV-0001 | AWS-DISC-0001 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001 | AWS managed serverless services support bounded pay-per-use execution patterns | retrieve_skill | https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html | 2026-07-17 |",
+            "| AWS-EV-0002 | AWS-DISC-0001 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0004 | AWS documentation defines current serverless security and operational guidance | search_documentation | https://docs.aws.amazon.com/lambda/latest/dg/security.html | 2026-07-17 |",
         ]
     )
     change_impact_table = "\n".join(
@@ -2014,7 +2036,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
         self.assertEqual(ready.schema_version, 4)
-        self.assertEqual(ready.architecture.schema_version, 3)
+        self.assertEqual(ready.architecture.schema_version, 4)
         self.assertEqual(ready.change_impact.status, "READY")
         self.assertEqual(ready.architecture.status, "READY")
         self.assertFalse(ready.architecture.grandfathered_v1)
@@ -3919,13 +3941,125 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
 
+    def test_aws_core_runtime_discovery_chains_are_linked_and_ordered(self) -> None:
+        verify_text = (REPOSITORY_ROOT / "docs/project/VERIFY.md").read_text(
+            encoding="utf-8"
+        )
+        passed = record_aws_core_evidence(verify_text, "DESIGN-10")
+        design_rows = re.findall(
+            r"(?m)^\| `DESIGN-10` \| `AWS-DISC-0001` \|.*$", passed
+        )
+        self.assertEqual(len(design_rows), 2)
+        second_rows = "\n".join(
+            row.replace("AWS-DISC-0001", "AWS-DISC-0003").replace(
+                "aws-architecture", "aws-databases"
+            )
+            for row in design_rows
+        )
+        first_aws_10 = re.search(r"(?m)^\| `AWS-10` \|", passed)
+        self.assertIsNotNone(first_aws_10)
+        multiple = (
+            passed[: first_aws_10.start()]
+            + second_rows
+            + "\n"
+            + passed[first_aws_10.start() :]
+        )
+        multiple_rows = doctor.parse_aws_core_evidence(multiple)
+        self.assertEqual(
+            {
+                discovery_id
+                for phase, discovery_id, _capability in multiple_rows
+                if phase == "DESIGN-10"
+            },
+            {"AWS-DISC-0001", "AWS-DISC-0003"},
+        )
+        self.assertEqual(
+            doctor.aws_core_phase_evidence_issues(
+                multiple_rows,
+                "DESIGN-10",
+                expected_binding="DES-0001",
+                expected_design_revision="DES-0001",
+            ),
+            [],
+        )
+
+        mismatched = record_aws_core_capability_evidence(
+            passed,
+            "DESIGN-10",
+            "retrieve_skill",
+            binding="DES-0001",
+            returned_skill_identifier="aws-databases",
+        )
+        mismatch_issues = doctor.aws_core_phase_evidence_issues(
+            doctor.parse_aws_core_evidence(mismatched),
+            "DESIGN-10",
+            expected_binding="DES-0001",
+            expected_design_revision="DES-0001",
+        )
+        self.assertTrue(
+            any("was not returned by search" in issue for issue in mismatch_issues),
+            mismatch_issues,
+        )
+
+        retrieve_first = passed.replace(
+            "`2026-07-20T12:00:01Z`",
+            "`2026-07-20T11:59:59Z`",
+            1,
+        )
+        chronology_issues = doctor.aws_core_phase_evidence_issues(
+            doctor.parse_aws_core_evidence(retrieve_first),
+            "DESIGN-10",
+            expected_binding="DES-0001",
+            expected_design_revision="DES-0001",
+        )
+        self.assertTrue(
+            any("retrieve timestamp precedes search" in issue for issue in chronology_issues),
+            chronology_issues,
+        )
+
+        duplicate = passed.replace(design_rows[0], design_rows[0] + "\n" + design_rows[0], 1)
+        with self.assertRaisesRegex(ValueError, "duplicates DESIGN-10"):
+            doctor.parse_aws_core_evidence(duplicate)
+
+        reused = passed.replace("`AWS-DISC-0002`", "`AWS-DISC-0001`")
+        with self.assertRaisesRegex(ValueError, "reused across phases"):
+            doctor.parse_aws_core_evidence(reused)
+
+        wrong_phase = passed.replace("`DESIGN-10`", "`BOOT-00`", 1)
+        with self.assertRaisesRegex(ValueError, "unknown phase"):
+            doctor.parse_aws_core_evidence(wrong_phase)
+
+    def test_material_aws_claim_requires_current_discovery_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            text = prd_path.read_text(encoding="utf-8").replace(
+                "| AWS-EV-0001 | AWS-DISC-0001 |",
+                "| AWS-EV-0001 | AWS-DISC-9999 |",
+                1,
+            )
+            prd_path.write_text(text, encoding="utf-8")
+
+            report = doctor.inspect_project(project)
+
+        self.assertIn("AWS_CORE_EVIDENCE_REQUIRED", codes(report))
+        self.assertTrue(
+            any(
+                "AWS-EV-0001 must cite a current DESIGN-10 AWS-DISC chain"
+                in item["message"]
+                for item in report["diagnostics"]
+            ),
+            report["diagnostics"],
+        )
+
     def test_aws_core_evidence_is_limited_to_design_and_aws_preflight(self) -> None:
         verify_text = (REPOSITORY_ROOT / "docs/project/VERIFY.md").read_text(
             encoding="utf-8"
         )
         rows = doctor.parse_aws_core_evidence(verify_text)
         self.assertEqual(
-            {phase for phase, _capability in rows},
+            {phase for phase, _discovery, _capability in rows},
             {"DESIGN-10", "AWS-10"},
         )
         self.assertNotIn("BOOT-00", doctor.AWS_CORE_EVIDENCE_PHASES)

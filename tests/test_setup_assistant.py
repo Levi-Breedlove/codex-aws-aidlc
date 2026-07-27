@@ -34,13 +34,18 @@ def official_session_evidence(**updates: object) -> dict[str, object]:
         "observed_plugin_identity": setup.OFFICIAL_AWS_CORE_IDENTITY,
         "native_hook_review_required": False,
         "native_hook_review_attested": False,
-        "retrieve_skill_result": "PASS",
-        "retrieve_skill_identifier": "aws-serverless",
-        "search_documentation_result": "PASS",
-        "search_documentation_query": "AWS Lambda security best practices",
-        "search_documentation_references": [
-            "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"
-        ],
+        "aws_core_runtime_discovery": {
+            "search_status": "PASS",
+            "search_query": "AWS skills",
+            "search_observed_at": "2026-07-26T12:00:00Z",
+            "discovered_skill_identifiers": ["aws-serverless", "aws-iam"],
+            "selected_skill_identifier": "aws-serverless",
+            "retrieve_status": "PASS",
+            "retrieved_skill_identifier": "aws-serverless",
+            "retrieve_observed_at": "2026-07-26T12:00:01Z",
+            "credentials_inspected": False,
+            "aws_account_accessed": False,
+        },
         "credentials_inspected": False,
         "aws_account_accessed": False,
     }
@@ -268,27 +273,59 @@ class SetupAssistantTests(unittest.TestCase):
             self.assertEqual(greeting.count(label), 1)
         self.assertIn("did not inspect AWS credentials or access an AWS account", greeting)
 
-    def test_official_source_and_both_capabilities_are_required(self) -> None:
-        for updates in (
-            {"observed_plugin_identity": "aws-core@unknown"},
-            {"retrieve_skill_result": "FAIL"},
-            {"retrieve_skill_identifier": ""},
-            {"search_documentation_result": "UNAVAILABLE"},
-            {"search_documentation_references": []},
-            {"credentials_inspected": True},
-            {"aws_account_accessed": True},
-        ):
-            with self.subTest(updates=updates):
-                report = setup.reduce_prerequisites(local_ready(**updates))
-                self.assertEqual(report["state"], "AWS_CORE_REQUIRED")
+    def test_official_source_and_linked_runtime_discovery_are_required(self) -> None:
+        def observed(**updates: object) -> dict[str, object]:
+            evidence = local_ready()
+            discovery = dict(evidence[setup.RUNTIME_DISCOVERY_FIELD])
+            discovery.update(updates)
+            evidence[setup.RUNTIME_DISCOVERY_FIELD] = discovery
+            return evidence
+
+        no_runtime = local_ready()
+        no_runtime.pop(setup.RUNTIME_DISCOVERY_FIELD)
+        blocked = (
+            local_ready(observed_plugin_identity="aws-agents@agent-toolkit-for-aws"),
+            observed(search_status="FAIL"),
+            observed(discovered_skill_identifiers=[]),
+            observed(selected_skill_identifier="aws-databases"),
+            observed(retrieved_skill_identifier="aws-iam"),
+            observed(
+                search_observed_at="2026-07-26T12:00:02Z",
+                retrieve_observed_at="2026-07-26T12:00:01Z",
+            ),
+            observed(credentials_inspected=True),
+            observed(aws_account_accessed=True),
+            local_ready(credentials_inspected=True),
+            local_ready(aws_account_accessed=True),
+            no_runtime,
+        )
+        for evidence in blocked:
+            with self.subTest(evidence=evidence):
+                self.assertEqual(
+                    setup.reduce_prerequisites(evidence)["state"],
+                    "AWS_CORE_REQUIRED",
+                )
+
         ready = setup.reduce_prerequisites(local_ready())
         self.assertEqual(ready["aws_core_status"], "AVAILABLE")
+        self.assertEqual(ready["aws_core_runtime_discovery"], "CURRENT")
         self.assertNotIn("plugin_version", json.dumps(ready))
         self.assertNotIn("plugin_commit", json.dumps(ready))
+        self.assertNotIn("aws-serverless", json.dumps(ready))
 
     def test_evidence_stdin_is_strict_ephemeral_and_non_secret(self) -> None:
-        parsed = setup.read_session_evidence(io.StringIO(json.dumps(official_session_evidence())))
-        self.assertEqual(parsed["retrieve_skill_result"], "PASS")
+        parsed = setup.read_session_evidence(
+            io.StringIO(json.dumps(official_session_evidence()))
+        )
+        self.assertEqual(
+            parsed[setup.RUNTIME_DISCOVERY_FIELD]["retrieve_status"],
+            "PASS",
+        )
+        invalid_discovery = official_session_evidence()
+        invalid_discovery[setup.RUNTIME_DISCOVERY_FIELD] = {
+            **invalid_discovery[setup.RUNTIME_DISCOVERY_FIELD],
+            "retrieved_skill_identifier": "token=secret",
+        }
         for payload in (
             '{"hook_trust_database": true}',
             '{"AWS_SECRET_ACCESS_KEY": "secret"}',
@@ -296,6 +333,7 @@ class SetupAssistantTests(unittest.TestCase):
             '{"retrieve_skill_result": "MAYBE"}',
             '{"retrieve_skill_identifier": "token=secret"}',
             '{"search_documentation_references": ["https://example.com/not-aws"]}',
+            json.dumps(invalid_discovery),
             "[]",
             "",
         ):
