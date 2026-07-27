@@ -1,13 +1,36 @@
 # AWS Codex Fastlane
 
-AWS Codex Fastlane is a reusable project template that turns an AWS idea into
-approved requirements, an AWS-informed technical PRD, an organized task plan,
-and a safely bounded build.
+**Turn an AWS idea into a build you understand, approve, and can trust.**
 
-Requires the Codex CLI, Git, and Python 3.11 or newer. The signed-in
-interactive Codex CLI is Fastlane's supported onboarding surface. AWS credentials are
-needed only for an explicitly authorized deployment or other approved AWS
-operation.
+Fastlane gives Codex a disciplined way to design and build your AWS application.
+You explain the outcome in plain language. Codex turns it into clear requirements,
+consults current AWS guidance, recommends a complete design, and builds it after you approve the plan.
+
+Think of Fastlane as the cockpit:
+
+- **You set the destination:** the outcome, constraints, budget, and approvals.
+- **Codex pilots:** it plans, recommends, writes, tests, and keeps work moving.
+- **AWS Core advises:** it supplies current AWS knowledge and procedures.
+- **Fastlane governs:** it records decisions, enforces boundaries, and proves results.
+
+Fastlane prefers secure pay-per-use
+serverless options when they fit and seeks the lowest practical total cost without
+weakening required safeguards. It never jumps directly to production: two checkpoints
+keep you in control, and it asks before anything changes in AWS.
+
+## What to expect
+
+1. Describe what you want to accomplish in your own words.
+2. Codex asks short, plain-language questions and recommends sensible defaults.
+3. At Gate A, you confirm that Fastlane understands the right problem.
+4. Codex consults AWS Core, compares credible designs, and recommends one.
+5. At Gate B, you approve the complete plan and its construction limits.
+6. Codex creates an organized task plan, builds, tests, and records evidence.
+7. If you want to deploy, Fastlane presents the exact AWS action for approval.
+
+Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
+
+You do not need an architecture. You can always answer, "I'm not sure—recommend one."
 
 ## Start
 
@@ -19,72 +42,49 @@ operation.
    init template
    ```
 
-3. Fastlane checks Codex login, Git, Python, platform sandbox tools, `uvx`, and
-   official AWS Core. If anything is missing, complete one consolidated
-   checklist and send `init template` again.
-4. When prerequisites pass, answer three short setup questions:
-   - project name;
-   - preferred AWS Region; and
-   - development budget or "minimize cost; no hard cap."
+3. Prerequisite baseline: Requires the Codex CLI, Git, and Python 3.11 or newer.
+   Fastlane also checks platform sandbox support, `uvx`, and official AWS Core.
+   If something is missing, complete the one consolidated checklist and retry.
+4. Answer three short setup questions: project name, preferred AWS Region, and
+   development budget—or ask Fastlane to minimize cost with no hard cap.
 
-Codex then configures the template and begins guided intake.
-Setup does not inspect AWS credentials or access an AWS account. Detailed
-platform commands are in [SETUP.md](docs/SETUP.md).
+Setup does not inspect AWS credentials or access an AWS account. Platform
+instructions are in [SETUP.md](docs/SETUP.md).
 
-## What to expect
+## What Fastlane creates
 
-Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
-
-Codex asks short, plain-language questions, prefers secure pay-per-use
-serverless options when they fit, seeks the lowest practical total cost without
-weakening required safeguards, and records evidence.
-You can always answer, "I'm not sure—recommend one."
-
-When an approved requirement expresses a testable invariant, Codex records a
-`PROP-*` specification, generates framework-appropriate property tests, runs
-them during construction, and records reproducible seeds and counterexamples.
-
-AWS changes require a separate exact authorization naming the account, Region,
-environment, resources, operations, cost ceiling, rollback plan, and expiry.
-Teardown uses a distinct exact authorization.
+- `docs/project/PRD.md`: what will be built, the recommended design, and both
+  approvals.
+- `docs/project/TASKS.md`: the dependency-aware work plan and current progress.
+- `docs/project/VERIFY.md`: observed evidence, including reproducible seeds and counterexamples.
+- `docs/project/RUNBOOK.md`: deployment, rollback, recovery, and teardown steps.
 
 ## AWS Core
 
-Fastlane requires the official AWS Core plugin from the
-[AWS Agent Toolkit](https://github.com/aws/agent-toolkit-for-aws) once. Fresh
-initialization verifies `aws-core@agent-toolkit-for-aws` from
-`aws/agent-toolkit-for-aws`; it does not pin a plugin version or commit.
-During AWS work, Codex searches for and retrieves only the runtime skills
-relevant to the current decision. Fastlane does not copy AWS skills into the
+Fastlane requires the official AWS Core plugin `aws-core@agent-toolkit-for-aws` from the
+[AWS Agent Toolkit](https://github.com/aws/agent-toolkit-for-aws). It does not pin a plugin version or commit. During AWS work,
+Codex discovers and loads only the runtime skills relevant to the current decision.
+Fastlane does not copy AWS skills into the
 repository or require separate skill installation. Ordinary requirements and
-design need no AWS credentials or AWS account. Initialized projects skip setup,
-while material AWS phases require fresh attributable evidence.
-Codex's `/plugins` and `/hooks` screens manage installation and trust.
-AWS Core advises; it cannot approve a gate or authorize an AWS change.
+design need no AWS credentials or AWS account.
+
+Codex chooses the architecture. AWS Core supplies current expertise; it cannot approve or authorize.
 
 ## Project files
 
-```text
-.
-├── AGENTS.md                  Always-on Codex rules
-├── docs/project/PRD.md        Requirements, design, Gate A, and Gate B
-├── docs/project/TASKS.md      Dependency graph and execution state
-├── docs/project/VERIFY.md     Observed evidence
-├── docs/project/RUNBOOK.md    Deploy, rollback, recovery, and teardown
-├── bootstrap.yaml             Derived lifecycle state
-├── .agents/skills/            Fastlane workflows
-├── .codex/agents/             Optional read-only challengers
-├── prompts/CODEX-PROMPTS.md   Exact lifecycle contracts
-└── scripts/                   Doctor, task runtime, and packaging tools
-```
+- `AGENTS.md` contains the always-on operating rules.
+- `.agents/skills/` contains workflows; `.codex/agents/` contains optional read-only challengers.
+- `prompts/CODEX-PROMPTS.md` contains exact lifecycle and receipt contracts.
+- `bootstrap.yaml` mirrors lifecycle state; `scripts/` validates and packages it.
 
 ## Safety
 
-Setup, login, plugin, hook-trust, credential, and machine state stay outside
-the repository. Tool availability never authorizes AWS access.
+Tool availability never grants authority. AWS changes require a separate
+exact authorization naming the account, Region, environment, resources, operations,
+cost ceiling, rollback plan, and expiry. Teardown requires a distinct approval.
+Setup, login, plugin, trust, credential, and machine state stay outside the repo.
 
 ## Agent reference
 
-Detailed references: [setup](docs/SETUP.md) ·
-[workflow](docs/WORKFLOW.md) · [security](SECURITY.md) ·
-[agent rules](AGENTS.md).
+Detailed references: [setup](docs/SETUP.md) · [workflow](docs/WORKFLOW.md) ·
+[security](SECURITY.md) · [agent rules](AGENTS.md).
