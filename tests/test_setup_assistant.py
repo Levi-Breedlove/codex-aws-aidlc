@@ -476,5 +476,23 @@ class SetupAssistantTests(unittest.TestCase):
                 setup.canonical_root(root)
 
 
+    def test_ready_welcome_explains_fastlane_and_owner_boundaries_once(self) -> None:
+        greeting = setup.render_setup_response(
+            setup.reduce_prerequisites(local_ready())
+        )
+        compact = " ".join(greeting.split())
+        for phrase in (
+            "clear AWS application plan and a tested local build",
+            "You do not need to choose AWS services.",
+            "Gate A confirms what should be built",
+            "Gate B confirms the design and build boundaries",
+            "AWS account changes never happen automatically",
+            "Setup did not inspect AWS credentials or access an AWS account.",
+        ):
+            self.assertIn(phrase, compact)
+        for label in ("Project name:", "Preferred AWS Region:", "Development budget:"):
+            self.assertEqual(greeting.count(label), 1)
+        self.assertEqual(greeting.count("Welcome to AWS Codex Fastlane."), 1)
+
 if __name__ == "__main__":
     unittest.main()

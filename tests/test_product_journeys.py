@@ -521,5 +521,50 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn("EV-0001", verify_path.read_text(encoding="utf-8"))
 
 
+    def test_partial_high_risk_intake_remains_a_plain_owner_consultation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.extract_template(Path(directory), "partial-intake")
+            self.initialize(project)
+            prd_path = project / "docs/project/PRD.md"
+            text = prd_path.read_text(encoding="utf-8")
+            for label, value in (
+                ("Project mode", "`greenfield`"),
+                ("Delivery profile", "`high-risk`"),
+                ("Effective risk", "`high`"),
+            ):
+                text = doctor_fixtures.set_table_value(
+                    text,
+                    "## Document status",
+                    "## 1. Workload profile",
+                    label,
+                    value,
+                )
+            prd_path.write_text(text, encoding="utf-8")
+            state_path = project / "bootstrap.yaml"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["project"].update(
+                {
+                    "mode": "greenfield",
+                    "delivery_profile": "high-risk",
+                    "effective_risk": "high",
+                    "brownfield_baseline": "NOT_APPLICABLE",
+                }
+            )
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            report = doctor.inspect_project(project)
+            rendered = presenter.render_owner_update(report)
+
+        self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["next_prompt"], "INTAKE-10")
+        self.assertEqual(report["interaction"]["state"], "NEEDS_INPUT")
+        self.assertEqual(
+            report["interaction"]["owner_action_kind"], "ANSWER_OPEN_DECISIONS"
+        )
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("next one to three project questions", rendered)
+        self.assertNotIn("validation boundary", rendered)
+        self.assertNotIn("Welcome to AWS Codex Fastlane", rendered)
+
 if __name__ == "__main__":
     unittest.main()

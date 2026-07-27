@@ -10,6 +10,12 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
 - Initialized projects skip prerequisites and resume the derived stage. Never
   repeat completed setup questions.
 - Ask no more than three related, plain-language owner decisions per response.
+- Lead with the real-world consequence. Keep `RTO`, `RPO`, `p95`, concurrency,
+  metadata, and methodology labels in internal records unless the owner used
+  the term or explicitly asks for technical detail. Translate them using the
+  Owner responses reference, mark one recommendation with its main tradeoff,
+  and provide a short copyable reply. Permit `Accept all recommendations.`
+  when every presented default is complete and safe to accept together.
 - Separate owner facts, repository facts, recommendations, proposed
   assumptions, and unresolved decisions.
 - Give requirements and assumptions stable IDs and observable acceptance
@@ -33,7 +39,12 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   an owner cap exactly.
 - Quick MVP uses no challenger by default. Use the requirements challenger only
   for ambiguity, contradictions, sensitive data, identity, payments,
-  migrations, shared interfaces, high risk, or explicit owner request.
+  migrations, shared interfaces, high risk, or explicit owner request, and
+  only after the complete requirement draft exists with no open owner decision.
+  Attempt it once per requirements revision for at most 60 seconds. On failure,
+  timeout, or unavailability, record that independent review was unavailable in
+  the existing recommendation rationale, run the checklist as coordinator, and
+  continue without exposing reviewer orchestration or adding an owner action.
 - Use AWS Core only when a current AWS fact materially affects feasibility.
 - The coordinator writes analysis and the readiness card; only the owner may
   approve the exact Gate A receipt.

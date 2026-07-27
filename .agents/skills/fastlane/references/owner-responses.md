@@ -18,6 +18,26 @@
   `Illustrative architecture candidate — not selected or approved.`
 - Use `explain-fastlane` only for an explicit explanation request.
 
+## Plain-language decisions
+
+- Explain the real-world consequence before a technical name or abbreviation.
+  Keep precise engineering terms in canonical records, but do not require the
+  owner to know them.
+- Unless the owner already used the term or asks for technical detail, translate
+  `RTO` into how quickly service returns after an outage, `RPO` into how much
+  recent data might need recovery, `p95` into “at least 95 out of every 100
+  requests,” concurrency into people using the product at the same time, and
+  metadata into concrete examples such as hidden location and device details.
+- Present at most three numbered decisions. For each, mark one `Recommended`
+  choice, state its principal benefit or limitation, and offer no more than two
+  understandable alternatives.
+- End input requests with one short copyable reply. When every recommendation
+  is independently safe and complete, allow `Accept all recommendations.` and
+  clarify that it records planning decisions only, not AWS access or spending.
+- “Explain these questions” is a clarification, not learning mode. Explain each
+  pending choice directly, state `Project state changed: No.`, rerun the doctor,
+  and restore the same pending decision through the side-question presenter.
+
 ## Material decision card
 
 Before an exact Gate A, Gate B, AWS deployment, or teardown receipt, give one

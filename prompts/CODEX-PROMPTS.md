@@ -751,7 +751,12 @@ In each response:
    security, deployment, or success-measure mistake;
 4. give two or three understandable choices when helpful;
 5. always allow the answer “I'm not sure—recommend one”;
-6. recommend a default and explain its practical effect in one sentence.
+6. recommend a default and explain its practical effect in one sentence;
+7. lead with the real-world consequence and keep unexplained `RTO`, `RPO`,
+   `p95`, concurrency, metadata, EARS, QAS, and Harness terminology out of the
+   owner response unless the owner used it or asks for technical detail; and
+8. include one short copyable reply. Permit `Accept all recommendations.` only
+   when every presented default is independently safe and complete.
 
 Capture:
 - project mode: greenfield or brownfield;
@@ -822,7 +827,14 @@ coordinator challenges the complete requirement set. Quick MVP uses no
 subagent by default. Invoke the read-only
 `fastlane-requirements-challenger` only for ambiguity, contradictions,
 sensitive data, identity, payments, migrations, shared interfaces, high risk,
-or an explicit owner request. When AWS feasibility, Region, identity, data
+or an explicit owner request, and only after the complete draft exists with no
+open owner decision. Make one attempt per requirements revision and wait no
+more than 60 seconds. If it fails, stalls, or is unavailable, stop it, record
+`Independent requirements challenge: UNAVAILABLE — coordinator checklist completed`
+in the current Gate A Recommendation rationale, perform the checklist as the
+coordinator, rerun the doctor and deterministic presenter, and continue. Never
+expose reviewer timing or orchestration or turn its availability into an owner
+action. When AWS feasibility, Region, identity, data
 protection, recovery, or cost materially affects readiness, the coordinator
 uses official AWS Core directly with current primary AWS documentation. If AWS
 Core is unavailable, continue ordinary

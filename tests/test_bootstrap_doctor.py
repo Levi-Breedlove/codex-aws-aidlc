@@ -4990,5 +4990,117 @@ class BootstrapDoctorTests(unittest.TestCase):
                 )
 
 
+    def test_incomplete_intake_routes_as_open_decisions_not_corruption(self) -> None:
+        choices = {
+            "mode": ("Project mode", "`greenfield`", "greenfield"),
+            "delivery_profile": ("Delivery profile", "`high-risk`", "high-risk"),
+            "effective_risk": ("Effective risk", "`high`", "high"),
+            "aws_lane": ("AWS lane", "`explicit-gate`", "explicit-gate"),
+        }
+        for missing_key in choices:
+            with self.subTest(missing=missing_key), tempfile.TemporaryDirectory() as directory:
+                project = self.copy_project(Path(directory))
+                prd_path = project / "docs/project/PRD.md"
+                text = prd_path.read_text(encoding="utf-8")
+                state_path = project / "bootstrap.yaml"
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                state["project"]["brownfield_baseline"] = "NOT_APPLICABLE"
+                for key, (label, rendered, state_value) in choices.items():
+                    if key == missing_key:
+                        continue
+                    text = set_table_value(
+                        text,
+                        "## Document status",
+                        "## 1. Workload profile",
+                        label,
+                        rendered,
+                    )
+                    state["project"][key] = state_value
+                prd_path.write_text(text, encoding="utf-8")
+                state_path.write_text(json.dumps(state), encoding="utf-8")
+
+                report = doctor.inspect_project(project)
+
+                self.assertTrue(report["ok"], report["diagnostics"])
+                self.assertNotIn("PROJECT_VOCABULARY", codes(report))
+                self.assertNotIn("PROJECT_SELECTION_REQUIRED", codes(report))
+                self.assertNotIn("STATE_PRD_DRIFT", codes(report))
+                self.assertEqual(report["next_prompt"], "INTAKE-10")
+                self.assertEqual(report["status"], "READY")
+                self.assertEqual(report["interaction"]["response_mode"], "OWNER_UPDATE")
+                self.assertEqual(report["interaction"]["state"], "NEEDS_INPUT")
+                self.assertEqual(
+                    report["interaction"]["owner_action_kind"],
+                    "ANSWER_OPEN_DECISIONS",
+                )
+                self.assertEqual(
+                    report["interaction"]["route_reason_code"], "INTAKE_REQUIRED"
+                )
+
+    def test_malformed_multi_choice_intake_value_remains_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            prd_path = project / "docs/project/PRD.md"
+            text = set_table_value(
+                prd_path.read_text(encoding="utf-8"),
+                "## Document status",
+                "## 1. Workload profile",
+                "Project mode",
+                "`greenfield` / `brownfield` / `sideways`",
+            )
+            prd_path.write_text(text, encoding="utf-8")
+
+            report = doctor.inspect_project(project)
+
+        self.assertFalse(report["ok"])
+        self.assertIn("PROJECT_VOCABULARY", codes(report))
+        self.assertNotIn("PROJECT_SELECTION_REQUIRED", codes(report))
+        self.assertEqual(
+            report["remediation"]["next_action"]["action_kind"],
+            "REVIEW_SAFETY_BLOCKER",
+        )
+
+    def test_unsupported_intake_value_remains_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            prd_path = project / "docs/project/PRD.md"
+            text = prd_path.read_text(encoding="utf-8")
+            values = {
+                "Project mode": "`sideways`",
+                "Delivery profile": "`high-risk`",
+                "Effective risk": "`high`",
+                "AWS lane": "`explicit-gate`",
+            }
+            for label, value in values.items():
+                text = set_table_value(
+                    text,
+                    "## Document status",
+                    "## 1. Workload profile",
+                    label,
+                    value,
+                )
+            prd_path.write_text(text, encoding="utf-8")
+            state_path = project / "bootstrap.yaml"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["project"].update(
+                {
+                    "delivery_profile": "high-risk",
+                    "effective_risk": "high",
+                    "aws_lane": "explicit-gate",
+                    "brownfield_baseline": "NOT_APPLICABLE",
+                }
+            )
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            report = doctor.inspect_project(project)
+
+        self.assertFalse(report["ok"])
+        self.assertIn("PROJECT_VOCABULARY", codes(report))
+        self.assertNotIn("PROJECT_SELECTION_REQUIRED", codes(report))
+        self.assertEqual(
+            report["remediation"]["next_action"]["action_kind"],
+            "REVIEW_SAFETY_BLOCKER",
+        )
+
 if __name__ == "__main__":
     unittest.main()

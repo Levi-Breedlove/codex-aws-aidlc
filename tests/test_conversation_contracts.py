@@ -354,5 +354,61 @@ class ConversationContractTests(unittest.TestCase):
 
 
 
+    def test_incomplete_intake_and_explanation_restore_one_plain_next_action(self) -> None:
+        ctx = doctor.Context(root=REPOSITORY_ROOT)
+        ctx.error(
+            "PROJECT_SELECTION_REQUIRED",
+            "Project intake choices remain open",
+            "docs/project/PRD.md",
+        )
+        remediation = doctor.derive_remediation(
+            ctx,
+            classification="ACTIVE_GREENFIELD",
+            gate_a="BLOCKED",
+            gate_b="BLOCKED",
+            envelope={},
+            tasks=doctor.TaskSummary(),
+        )
+        interaction = doctor.derive_interaction(
+            "BLOCKED",
+            "STOP",
+            has_errors=True,
+            diagnostic_codes=["PROJECT_SELECTION_REQUIRED"],
+            design_aws_core_ready=False,
+            aws_execution_planning_ready=False,
+            remediation=remediation,
+            owner_stage_hint="DEFINE",
+        )
+        self.assertEqual(interaction["response_mode"], "OWNER_UPDATE")
+        self.assertEqual(interaction["state"], "NEEDS_INPUT")
+        self.assertEqual(interaction["route_reason_code"], "INTAKE_REQUIRED")
+        self.assertEqual(interaction["owner_action_kind"], "ANSWER_OPEN_DECISIONS")
+        self.assertFalse(interaction["automatic_continuation_allowed"])
+        rendered = presenter.render_owner_update(
+            {"interaction": interaction, "remediation": remediation}
+        )
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertNotIn("validation boundary", rendered)
+
+        explanation = presenter.render_side_question_response(
+            {"interaction": interaction, "remediation": remediation},
+            answer=(
+                "The recovery choice means the service returns within 4 hours and "
+                "may need to recover up to the most recent hour of saved data. "
+                "The response target means at least 95 out of every 100 requests "
+                "finish within the stated time. Photo handling removes hidden "
+                "location and device details."
+            ),
+        )
+        for phrase in (
+            "returns within 4 hours",
+            "most recent hour",
+            "at least 95 out of every 100 requests",
+            "hidden location and device details",
+            "Project state changed: No.",
+            "Pending next action: Answer the next one to three project questions.",
+        ):
+            self.assertIn(phrase, explanation)
+
 if __name__ == "__main__":
     unittest.main()
