@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -36,16 +37,15 @@ AWS_DOCUMENTATION_MARKERS = (
     "list_regions",
     "get_regional_availability",
 )
-AWS_EXTERNAL_TOOL_MARKERS = (
+AWS_COMPATIBILITY_TOOL_MARKERS = (
     "call_aws",
-    "run_script",
     "use_aws",
     "execute_aws",
     "aws_api",
-    "get_presigned_url",
-    "get_tasks",
 )
 AWS_SCRIPT_TOOL_MARKERS = ("run_script",)
+AWS_PRESIGNED_TOOL_MARKERS = ("get_presigned_url",)
+AWS_TASK_TOOL_MARKERS = ("get_tasks",)
 AWS_MUTATION_COMMANDS = (
     "cdk deploy",
     "cdk destroy",
@@ -384,13 +384,123 @@ def _write_denial(
         ):
             return f"Fastlane blocked {relative} because it is outside {active_task}'s active write set."
     return None
+
+
+def _tool_capability_name(tool_name: str) -> str:
+    lowered = tool_name.casefold()
+    if "___" in lowered:
+        return lowered.rsplit("___", 1)[-1]
+    if lowered.startswith("mcp__"):
+        return lowered.rsplit("__", 1)[-1]
+    return lowered
+
+
 def _is_aws_documentation_tool(tool_name: str) -> bool:
     lowered = tool_name.casefold()
-    return any(marker in lowered for marker in AWS_DOCUMENTATION_MARKERS)
+    if _tool_capability_name(tool_name) in AWS_DOCUMENTATION_MARKERS:
+        return True
+    return lowered.startswith(
+        "mcp__codex_apps__aws_documentation_aws___"
+    )
 
 
 def _normalized_operation(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", value.casefold())
+
+
+def _is_aws_account_tool(tool_name: str) -> bool:
+    lowered = tool_name.casefold()
+    capability = _tool_capability_name(tool_name)
+    if capability in AWS_COMPATIBILITY_TOOL_MARKERS:
+        return True
+    if lowered.startswith("aws___"):
+        return True
+    if not lowered.startswith("mcp__"):
+        return False
+    return any(
+        part == "aws"
+        or part.startswith("aws-")
+        or part.startswith("aws_")
+        for part in lowered.split("__")[1:]
+    )
+
+
+def _string_values(value: object) -> list[str]:
+    candidates = value if isinstance(value, list) else [value]
+    return [
+        item.strip()
+        for item in candidates
+        if isinstance(item, str) and item.strip()
+    ]
+
+
+def _positive_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        parsed = int(value.strip())
+        return parsed if parsed > 0 else None
+    return None
+
+
+def _task_poll_request(tool_input: Mapping[str, Any]) -> dict[str, Any]:
+    task_ids: list[str] = []
+    for key in ("task_id", "task_ids", "id", "ids"):
+        task_ids.extend(_string_values(tool_input.get(key)))
+    return {
+        "lane": "TASK_POLL",
+        "task_ids": sorted(set(task_ids)),
+        "role_or_profile": _first_string(
+            tool_input, ("aws_profile", "profile", "role")
+        ),
+    }
+
+
+def _presigned_url_request(tool_input: Mapping[str, Any]) -> dict[str, Any]:
+    raw_direction = _first_string(
+        tool_input, ("direction", "operation", "action", "method")
+    ) or ""
+    direction = _normalized_operation(raw_direction)
+    if direction in {"download", "get", "getobject", "read", "s3getobject"}:
+        operation = "s3:GetObject"
+        kind = "READ"
+    elif direction in {"upload", "put", "putobject", "write", "s3putobject"}:
+        operation = "s3:PutObject"
+        kind = "MUTATE"
+    else:
+        operation = raw_direction
+        kind = "AMBIGUOUS"
+
+    bucket = _first_string(tool_input, ("bucket", "bucket_name"))
+    key = _first_string(tool_input, ("key", "object", "object_key"))
+    resources = (
+        [f"arn:aws:s3:::{bucket}/{key.lstrip('/')}"]
+        if bucket is not None and key is not None
+        else []
+    )
+    expires_in = None
+    for field in ("expires_in", "expires_in_seconds", "expiration", "ttl_seconds"):
+        expires_in = _positive_int(tool_input.get(field))
+        if expires_in is not None:
+            break
+    request: dict[str, Any] = {
+        "lane": "STRUCTURED_API",
+        "kind": kind,
+        "operation": operation,
+        "resources": resources,
+        "presigned_url": True,
+        "expires_in_seconds": expires_in,
+    }
+    for destination, keys in {
+        "region": ("region",),
+        "role_or_profile": ("aws_profile", "profile", "role"),
+    }.items():
+        observed = _first_string(tool_input, keys)
+        if observed is not None:
+            request[destination] = observed
+    return request
 
 
 def _aws_request_details(
@@ -400,8 +510,8 @@ def _aws_request_details(
 
     if _is_aws_documentation_tool(tool_name):
         return None
-    lowered_name = tool_name.casefold()
-    if any(marker in lowered_name for marker in AWS_SCRIPT_TOOL_MARKERS):
+    capability = _tool_capability_name(tool_name)
+    if capability in AWS_SCRIPT_TOOL_MARKERS:
         return {
             "lane": "REVIEWED_SCRIPT",
             "script": _script_source(tool_input),
@@ -412,9 +522,14 @@ def _aws_request_details(
                 tool_input, ("aws_profile", "profile", "role")
             ),
         }
+    if capability in AWS_TASK_TOOL_MARKERS:
+        return _task_poll_request(tool_input)
+    if capability in AWS_PRESIGNED_TOOL_MARKERS:
+        return _presigned_url_request(tool_input)
+
     command = _first_string(tool_input, ("command", "cli_command")) or ""
     lowered_command = command.casefold()
-    is_external_tool = any(marker in lowered_name for marker in AWS_EXTERNAL_TOOL_MARKERS)
+    is_external_tool = _is_aws_account_tool(tool_name)
     is_shell_aws = bool(
         re.search(r"(?:^|[;&|]\s*)(?:aws(?:\.exe)?|cdk|sam|terraform|serverless)\s+", lowered_command)
     ) or any(marker in lowered_command for marker in AWS_MUTATION_COMMANDS)
@@ -514,7 +629,6 @@ def _aws_request_details(
     if profile_match:
         details["role_or_profile"] = profile_match.group(1)
     return details
-
 
 def _value_allowed(value: str, allowed: Sequence[object]) -> bool:
     normalized = value.strip().casefold()
@@ -617,12 +731,64 @@ def _reviewed_script_denial(
     return None
 
 
+def _task_poll_denial(
+    request: Mapping[str, Any], match: Mapping[str, Any]
+) -> str | None:
+    task_ids = request.get("task_ids")
+    if not isinstance(task_ids, list) or not task_ids:
+        return "Fastlane blocked AWS task polling because an exact task identifier is not observable."
+    allowed = match.get("task_ids")
+    contract = match.get("reviewed_script")
+    if not isinstance(allowed, list) and isinstance(contract, Mapping):
+        allowed = contract.get("task_ids")
+    if not isinstance(allowed, list) or not allowed:
+        return "Fastlane blocked AWS task polling because the task is not bound in current doctor-derived authority."
+    if any(not _exact_value_allowed(str(task_id), allowed) for task_id in task_ids):
+        return "Fastlane blocked AWS task polling because a task identifier is outside current authority."
+    expected_profile = match.get("role_or_profile")
+    observed_profile = request.get("role_or_profile")
+    if observed_profile is not None and str(observed_profile) != str(expected_profile):
+        return "Fastlane blocked AWS task polling because its profile does not match current authority."
+    return None
+
+
+def _parse_utc_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _presigned_url_expiration_denial(
+    request: Mapping[str, Any], match: Mapping[str, Any]
+) -> str | None:
+    expires_in = request.get("expires_in_seconds")
+    if not isinstance(expires_in, int) or isinstance(expires_in, bool) or expires_in <= 0:
+        return "Fastlane blocked the presigned URL because its positive expiration is not observable."
+    authority_expiry = _parse_utc_datetime(match.get("expires_at"))
+    now = datetime.now(timezone.utc)
+    if authority_expiry is None or authority_expiry <= now:
+        return "Fastlane blocked the presigned URL because current authority is expired or malformed."
+    if expires_in > int((authority_expiry - now).total_seconds()):
+        return "Fastlane blocked the presigned URL because its expiration exceeds current authority."
+    return None
+
 def _aws_authority_denial(
     request: Mapping[str, Any], report: Mapping[str, Any], root: Path
 ) -> str | None:
     authority = _request_match(report)
     if authority is None or authority.get("validity") != "CURRENT":
         return "Fastlane blocked AWS account access because normalized current external authority is absent."
+    if request.get("lane") == "TASK_POLL":
+        return _task_poll_denial(request, authority)
     if request.get("lane") == "REVIEWED_SCRIPT":
         return _reviewed_script_denial(request, authority, root)
     lanes = authority.get("allowed_execution_lanes")
@@ -645,7 +811,7 @@ def _aws_authority_denial(
     if not isinstance(operations, list) or not _value_allowed(str(request.get("operation", "")), operations):
         return "Fastlane blocked the AWS request because its exact operation is outside the authorized operation list."
     requested_resources = request.get("resources")
-    if kind in {"MUTATE", "TEARDOWN"} and (
+    if (kind in {"MUTATE", "TEARDOWN"} or request.get("presigned_url") is True) and (
         not isinstance(requested_resources, list) or not requested_resources
     ):
         return "Fastlane blocked the AWS request because its exact resource target is not observable."
@@ -664,6 +830,8 @@ def _aws_authority_denial(
         expected = authority.get(authority_key)
         if observed is not None and (not isinstance(expected, str) or str(observed) != expected):
             return f"Fastlane blocked the AWS request because its {request_key} binding does not match current authority."
+    if request.get("presigned_url") is True:
+        return _presigned_url_expiration_denial(request, authority)
     return None
 
 

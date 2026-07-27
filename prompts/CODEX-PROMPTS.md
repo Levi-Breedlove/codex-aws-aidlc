@@ -343,16 +343,19 @@ Missing, stale, or conflicting values make the mutation BLOCKED. Read-only
 discovery must precede mutation. Prefer a read-only profile by default and the
 least-privileged write profile only for an authorized operation.
 
-AWS execution uses two lanes. `STRUCTURED_API` is a discrete attributable API
-call whose observable operation, context, parameters, and resources must fit
-the current doctor-derived authority. `REVIEWED_SCRIPT` is a legitimate
-multi-step AWS Core workflow bound by one current `AWS-EXEC-*` record in
-`docs/project/VERIFY.md` to the exact authority and one script or immutable
-artifact SHA-256. The record grants nothing. Stale, duplicate, expired,
-mismatched, opaque, or unbound scripts remain blocked; a description never
-proves script contents. Exact matches preserve normal owner approval and IAM.
-Deployment and teardown remain separate authorities and use their unchanged
-exact receipts.
+AWS Core selects a currently supported account-operation tool; never make a
+tool name a product dependency or infer a lane from prose. `STRUCTURED_API` is
+one attributable operation whose observable service, operation, context,
+parameters, and resources fit current doctor-derived authority.
+`REVIEWED_SCRIPT` is a legitimate multi-step workflow bound by one current
+`AWS-EXEC-*` record in `docs/project/VERIFY.md` to the exact authority and one
+script or immutable artifact SHA-256. The record grants nothing. Stale,
+duplicate, expired, mismatched, opaque, or unbound scripts remain blocked; a
+description never proves script contents. Task polling requires a task ID bound
+in derived authority. Presigned URLs require exact resource, direction,
+operation, and expiration fit. Exact matches preserve normal owner approval
+and IAM. Deployment and teardown remain separate authorities and use their
+unchanged exact receipts.
 
 Select IaC checks from the current TECH register: CloudFormation/SAM/CDK synth,
 lint, selected Guard/policy validation, and an authorized change set;
