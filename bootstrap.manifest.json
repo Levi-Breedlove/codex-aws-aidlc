@@ -87,7 +87,7 @@
     "tests/test_package_release.py": "9179da9511431d64f7fc3d94ba840dd8015bea6e4f039ff6b4c3f11b96490b74",
     "tests/test_product_journeys.py": "76928f4b6ae6febc2574bbb7e12e46595bacad28dc352572b380d21752b8e4b7",
     "tests/test_prompt_contracts.py": "fe6d62fbde19e3525c327d7e821d9ec43ee66188e75a448cc6b9d81647a62a29",
-    "tests/test_setup_assistant.py": "0502ac1bf8445b4786d174dbb2ca55a4ffc0317aaa9a1035befea0efa39df471",
+    "tests/test_setup_assistant.py": "4abb8cede4288835a18985e30d3cd9e644e68271b607bb92c491b088ddd939b4",
     "tests/test_task_waves.py": "dfbc169756ca5f983ad6abb6caf884e38e580b2eb84d2adce6c31ba57b375221",
     "tests/test_template_compatibility.py": "01926c31c31e9eacdc53b8801393adb9f7da3cfbeb9bc5423b821ad31d4e1494"
   },
