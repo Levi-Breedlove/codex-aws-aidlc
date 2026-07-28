@@ -28,11 +28,16 @@
 For guided intake, render only the current Engine-validated
 `INTAKE-CARD-*`. Use its stable reply keys, uppercase A/B/C decision choices,
 required-detail prompts, and exact copyable reply. Do not expose its internal
-IDs or digest. Factual questions remain short free text. If no recommendation
-is justified, say so rather than guessing. Rendering a card with
+IDs or digest. The copyable reply begins with the Engine-generated opaque
+`R-*` reply token; retain it unchanged so delayed replies cannot bind to a
+newer card. Describe it only as a reply token, never as an identifier or hash.
+Factual questions remain short free text. Recommend a choice
+only when current evidence justifies it; there is no universal default. If no
+recommendation is justified, render exactly
+`No recommendation—choose the option that matches your situation.` and use
+`1: <choose A, B, or C>` for that decision in the copyable reply. Rendering a card with
 `turn_boundary_required` ends the assistant turn; only a new owner message
 may resolve it.
-
 
 - Explain the real-world consequence before a technical name or abbreviation.
   Keep precise engineering terms in canonical records, but do not require the
@@ -42,12 +47,26 @@ may resolve it.
   recent data might need recovery, `p95` into “at least 95 out of every 100
   requests,” concurrency into people using the product at the same time, and
   metadata into concrete examples such as hidden location and device details.
-- Present at most three numbered decisions. For each, mark one `Recommended`
-  choice, state its principal benefit or limitation, and offer no more than two
-  understandable alternatives.
+- Present at most three numbered questions. For a decision, mark one
+  `Recommended` choice only when justified, state its principal benefit or
+  limitation, and offer no more than two understandable alternatives. Do not
+  label factual questions as decisions. Use `1 question remains before
+  requirements analysis.` when only one question is pending.
 - End input requests with one short copyable reply. When every recommendation
-  is independently safe and complete, allow `Accept all recommendations.` and
-  clarify that it records planning decisions only, not AWS access or spending.
+  is independently safe and complete, allow the current token-bound
+  `R-*; Accept all recommendations.` alternative and clarify that it records
+  planning decisions only, not AWS access or spending.
+- On a new message that may answer the pending card, parse before any project
+  write and use the parser's deterministic owner-safe status. If parsing fails,
+  say that nothing was recorded, state the specific invalid reply key or format,
+  preserve the unchanged questions, and show the valid reply form; do not
+  narrate internal IDs or hashes or echo secret-like input. If parsing succeeds
+  with only some answers, acknowledge only those answers and present the
+  still-pending questions using their original stable reply keys.
+- The `Accept all recommendations.` payload is available only after the current
+  reply token and only when every question is a decision with a complete
+  recommendation that requires no detail. A factual question, missing
+  recommendation, required detail, stale token, or altered phrase makes it unavailable.
 - “Explain these questions” is a clarification, not learning mode. Explain each
   pending choice directly, state `Project state changed: No.`, rerun the doctor,
   and restore the same pending decision through the side-question presenter.

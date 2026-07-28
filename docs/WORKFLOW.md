@@ -40,6 +40,37 @@ remains open until the detail is supplied. Recommendations and examples never
 become owner confirmation. Requirements stay provisional until the foundation
 and current card are complete.
 
+Fastlane does not assume that option A is a default. When evidence supports a
+recommendation, the card marks it and explains its main tradeoff. Otherwise it
+says `No recommendation—choose the option that matches your situation.` and
+shows a neutral reply such as `1: <choose A, B, or C>`.
+
+When the owner replies to a pending card, the Engine parses that message against
+the exact current card before writing project state. It accepts bounded
+whitespace, lowercase or uppercase A/B/C choices, semicolon or newline-separated
+answers, factual answers, and valid partial replies. It rejects unknown or
+duplicate keys, stale-card replies, placeholders, contradictory choices,
+missing required detail, unresolved sentinel values, secret-like assignments,
+and extra unparsed text. A rejected reply changes no project file and returns
+one owner-safe correction without echoing the input. A valid partial reply
+records only the supplied answers and leaves the other questions pending under
+their original stable reply keys.
+
+The `Accept all recommendations.` payload is safe only after the current reply
+token and when every question is a decision with a complete recommendation
+that needs no supporting detail. It is unavailable for factual questions or a
+partially recommended card. For the initial work-context question, normalized A/B/C choices map to
+`NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, and `REPAIR_OR_MIGRATION`.
+The normalized response register, card row, and all foundation facts derived
+from that question share one current-card provenance record. That record proves
+how Fastlane interpreted the message; it does not authenticate the owner's
+identity.
+
+For unapproved legacy intake, prior values remain unconfirmed context: Codex
+reopens the affected facts and asks the smallest current card rather than
+inventing historical owner-response provenance. An unchanged approved Gate A
+remains grandfathered until a requirements-controlled change.
+
 ## Lifecycle
 
 | Phase | Outcome | Owner decision |

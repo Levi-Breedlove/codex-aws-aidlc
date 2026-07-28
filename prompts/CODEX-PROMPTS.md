@@ -759,12 +759,15 @@ In each response:
    security, deployment, or success-measure mistake;
 4. give two or three understandable choices when helpful;
 5. always allow the answer “I'm not sure—recommend one”;
-6. recommend a default and explain its practical effect in one sentence;
+6. recommend a choice only when current evidence justifies it and explain its
+   practical effect in one sentence; otherwise state
+   `No recommendation—choose the option that matches your situation.`;
 7. lead with the real-world consequence and keep unexplained `RTO`, `RPO`,
    `p95`, concurrency, metadata, EARS, QAS, and Harness terminology out of the
    owner response unless the owner used it or asks for technical detail; and
-8. include one short copyable reply. Permit `Accept all recommendations.` only
-   when every presented default is independently safe and complete.
+8. include one short copyable reply. Permit the current token-bound
+   `R-*; Accept all recommendations.` alternative only when every presented
+   default is independently safe and complete.
 
 Before requirements analysis:
 - Keep repository mode (`GREENFIELD` or `BROWNFIELD`) separate from owner
@@ -776,16 +779,40 @@ Before requirements analysis:
 - Keep normative requirements provisional while any material foundation field
   or current card question is unresolved.
 - Store one current `INTAKE-CARD-*` in PRD intake provenance. Decision rows
-  use uppercase A/B/C, one practical effect and tradeoff per option, A as the
-  recommendation when one is justified, any required supporting detail, and
-  an exact reply. Factual rows use short free text and no invented choices.
+  use uppercase A/B/C, one practical effect and tradeoff per option, a
+  recommendation only when one is justified, any required supporting detail,
+  and an exact reply. When none is justified, show the exact no-recommendation
+  sentence above and use `1: <choose A, B, or C>` for that decision in the
+  copyable reply. Factual rows use short free text and no invented choices.
 - A selection is current only when it is bound to the current card and revision
   with normalized `OWNER_RESPONSE` provenance. A recommendation, assistant
   example, prior owner message, ambiguous shorthand, stale-card reply, or
   absent reply never confirms a choice.
-- `Accept all recommendations.` selects only complete A recommendations on
-  the current card. Do not offer it for factual questions or a recommendation
-  that still needs detail.
+- Before any project write for a possible card answer, run the deterministic
+  parser against the exact current card ID, revision, digest, reply token, and a
+  new `OWNER-MSG-*` ID. Failure is atomic: make zero writes, preserve the card,
+  and return its owner-safe correction without echoing secret-like input.
+  Partial success updates only returned reply keys; all others remain pending
+  on the same card under their original stable keys.
+- Accept bounded ASCII whitespace, lowercase or uppercase A/B/C input normalized
+  to uppercase, semicolon or newline separators, factual responses, valid
+  partial replies, and the exact safe accept-all phrase. Reject unknown or
+  duplicate reply keys, stale card identity or digest, placeholders,
+  unresolved sentinel values, secret-like assignments, contradictory choices,
+  missing required detail, unsupported whitespace, and unparsed extra content.
+- Unapproved legacy intake reopens facts from unconfirmed context, never synthesizes `OWNER-MSG-*` provenance, and grandfathers only unchanged approved Gate A.
+- The `Accept all recommendations.` payload selects only complete
+  recommendations when preceded by the exact current reply token, every
+  question is a decision, and no selected option needs detail. Do not offer or
+  accept it for factual questions, missing recommendations, required detail,
+  partial eligibility, an altered phrase, or a stale token/card.
+- Project each successful parsed answer into the normalized owner-response
+  register, the matching card row, and every foundation row named by that
+  question's basis IDs. All foundation facts derived from one question cite the
+  same parsed owner-response record. For the initial work-context question, map
+  `A` to `NEW_APPLICATION`, `B` to `EXISTING_APPLICATION_CHANGE`, and `C` to
+  `REPAIR_OR_MIGRATION`. This provenance proves deterministic interpretation
+  and current-card binding; it does not authenticate the owner's identity.
 - If the owner asks for advice or says `recommend one`, explain the options
   and practical tradeoff, state that project state did not change, and restore
   the unchanged card.
