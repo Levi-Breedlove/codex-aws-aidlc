@@ -3983,6 +3983,35 @@ class BootstrapDoctorTests(unittest.TestCase):
             [],
         )
 
+        observed = doctor.derive_aws_core_observed_usage(
+            multiple_rows,
+            "DESIGN-10",
+            issues=[],
+        )
+        self.assertEqual(observed["status"], "OBSERVED")
+        self.assertEqual(observed["phase"], "DESIGN-10")
+        self.assertEqual(
+            [chain["discovery_id"] for chain in observed["chains"]],
+            ["AWS-DISC-0001", "AWS-DISC-0003"],
+        )
+        self.assertEqual(
+            observed["chains"][0]["skill_identifier"], "aws-architecture"
+        )
+        self.assertEqual(
+            observed["chains"][0]["official_references"],
+            ["https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"],
+        )
+        self.assertIs(observed["chains"][0]["credentials_inspected"], False)
+        self.assertIs(observed["chains"][0]["aws_account_accessed"], False)
+        self.assertEqual(
+            doctor.derive_aws_core_observed_usage(
+                multiple_rows,
+                "DESIGN-10",
+                issues=["current chain is unavailable"],
+            ),
+            {"status": "UNOBSERVED", "phase": "DESIGN-10", "chains": []},
+        )
+
         mismatched = record_aws_core_capability_evidence(
             passed,
             "DESIGN-10",

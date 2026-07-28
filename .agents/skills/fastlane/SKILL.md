@@ -50,6 +50,10 @@ You are the single coordinator and sole writer.
    correction. A manual-safety item blocks automatic correction; when safe
    Codex and owner items coexist, repair only independent Codex items first,
    then rerun the doctor to derive the remaining next action.
+   Plugin installation or selecting `@AWS-Core` proves availability, not use.
+   Mention AWS Core in `Audit:` only when the current doctor report projects a
+   validated `search_documentation` then matching `retrieve_skill` chain; never
+   supply audit prose to the presenter.
 9. After recording an accepted Gate A or Gate B receipt, rerun the doctor
    immediately. Gate A continues into Design. Gate B continues into task
    generation and permitted local construction.

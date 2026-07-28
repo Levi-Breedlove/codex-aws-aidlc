@@ -378,7 +378,11 @@ compare hook hashes, request
 screenshots, run synthetic hook probes, or create a hook-trust receipt. For
 material decisions, require attributable live AWS Core `retrieve_skill` and
 `search_documentation` results rather than generic connectors, cached prose, or
-model memory.
+model memory. Installation or explicit `@AWS-Core` selection proves
+availability, not use. Only a validated search-then-matching-retrieve chain may
+produce concise owner audit attribution; unavailable or unobservable calls
+produce no claim. Persist no raw skill content, transcript, credentials,
+session identifiers, or machine details.
 
 BOOT-00 does not configure AWS credentials. When an explicitly invoked AWS
 operating prompt later needs account access, follow the current Agent Toolkit
