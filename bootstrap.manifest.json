@@ -23,7 +23,7 @@
     ".agents/skills/fastlane/references/owner-responses.md": "8767377535aa730a4a3183f0240fe00a936b99e7c5c0b45c274b0441f2aacf08",
     ".agents/skills/launch-fastlane/SKILL.md": "73b0378bf1b74bba25ed33dfa067fe87340e109ca419230b245f3b2fea21fa5a",
     ".agents/skills/launch-fastlane/agents/openai.yaml": "62084196ff3e2f9fc533a4f0f77831b0264ebe3b9723efa1f84b5e9b46d52b02",
-    ".agents/skills/maintain-fastlane/SKILL.md": "a568189f69957bea46d020dad4252f7c81730255c8714cfd0e05b4a26cab6748",
+    ".agents/skills/maintain-fastlane/SKILL.md": "89e48a3dc04df02b8391591513b29438dff47baaf3c787fd0618f9d790da19e1",
     ".agents/skills/maintain-fastlane/agents/openai.yaml": "eabb8159ed9e1368b947bc1f75458d3cb7523e069def7ccdb5e1ab74f144b822",
     ".agents/skills/operate-fastlane-aws/SKILL.md": "6e82b94ffd596630e315316923d2cb58e942d5487ca05e59c959a60c903e6b0f",
     ".agents/skills/operate-fastlane-aws/agents/openai.yaml": "a22467c64e3dd4c74785d9f13189da90b2374c5f7c048b6d0681ddf9d3a0fe4f",
@@ -43,7 +43,7 @@
     "AGENTS.md": "03c69fc43614339d65263dc040a0c9ca973ec7a0152982f4cfb61efdf93b4ed3",
     "LICENSE": "5293c851be403da449f4d6a2ba71702a8d81b29fa46bda45da2f627790b3cf68",
     "README.md": "604682d08b6267d832b8f731542257e65f4155c85af38bd21bd1487375844042",
-    "SECURITY.md": "20c2b1a28bde20c454bed98f4154b937855abd9712608978331a3f3eefa3c902",
+    "SECURITY.md": "6c9c4121d158aa62e89f6a54a14fd5ecf7923d31ead62bed736cc9e18e052de9",
     "app/AGENTS.md": "80c37e745419881501b2f8ec03e31de64306aff9186901719bc45a9ef55417be",
     "bootstrap.py": "46e3bb58f4318cdde23e664b5d70ce9a6d6915d5946c45b4474c7cddc14c02b2",
     "bootstrap.yaml": "b49ddfa03e4b1309760c29e5673cad682ab86a5c929758e4f690f275c634baeb",
@@ -52,7 +52,7 @@
     "docs/HOOKS.md": "47c36767a0b073e07b12eecaffc12973677d9d275a1a367072a7f8ef3753ca0b",
     "docs/SETUP.md": "7c84dd305b47d2c332394673d0bf7f386d35414de3d45fd280835fc318997111",
     "docs/TROUBLESHOOTING.md": "4549428b5a1af8d326e2b8cae71624a6354ed4c6045940cb081402df42856205",
-    "docs/WORKFLOW.md": "6b7159cd18033e022eeec6bbe231e283cab139da237f599a20dee3474b1ac669",
+    "docs/WORKFLOW.md": "134db5d94f1058f1fbd2c25c2eeeb18cce336d2699255da97b946b03e4003837",
     "docs/adr/0000-template.md": "82c8e4f1333b6d16776897eb8abc7e6ee8656b9ce3c90fc9f2f68f59c82afe86",
     "docs/project/BUGFIX.md": "d6bf2c93f720b16ce138a73d6f86a51393ece915526c4d5c969dd72d2919a424",
     "docs/project/PRD.md": "74beae0c5696af1e761e4486b6b584d99bf95e2381e08fdaebc086c836c35520",
@@ -89,7 +89,7 @@
     "tests/test_prompt_contracts.py": "7e4d6f8fd337752224a8a0b7c2a5da3870614fbfcb33141b3cddd435f19fef37",
     "tests/test_setup_assistant.py": "a2988ebb4dbd8e3a3b7400588269e133555a516f40528849126fae884b2d89fd",
     "tests/test_task_waves.py": "dfbc169756ca5f983ad6abb6caf884e38e580b2eb84d2adce6c31ba57b375221",
-    "tests/test_template_compatibility.py": "7720a97f43304d8b6f4d9bc6bce61b2ff6879bf84e4dfbbaf1ae70a6b371a064"
+    "tests/test_template_compatibility.py": "8c14190df30491022eed9747517043fc67fa8fdf3215a247602143d955b3eca3"
   },
   "required_files": [
     ".agents/skills/build-fastlane/SKILL.md",

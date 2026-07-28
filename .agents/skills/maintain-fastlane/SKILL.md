@@ -83,7 +83,7 @@ A direct push to `fast-lane-maint` requires explicit emergency publication
 authorization naming that branch and push. Never force-push or delete the
 live customer branch. Configuring or changing its GitHub branch rule is a
 separate repository-setting action and is not implied by source publication.
-Legacy `main` remains outside this customer flow unless separately authorized.
+The protected `Legacy` branch remains outside this customer flow unless separately authorized.
 
 Every `PUBLISH` operation must revalidate the exact source and target branch
 tips and commits immediately before mutation. Never switch, reset, merge,

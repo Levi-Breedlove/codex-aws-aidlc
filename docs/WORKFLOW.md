@@ -88,7 +88,7 @@ publication authorization; ordinary `PUBLISH` work uses the PR-gated flow.
 GitHub branch-rule configuration is a separate repository-setting action. The
 repository documents the required policy but does not treat source-edit,
 commit, push, or PR authority as permission to change that setting. Protected
-legacy `main` is not a customer publication target.
+legacy `Legacy` is not a customer publication target.
 
 
 ## AWS Core throughout Fastlane

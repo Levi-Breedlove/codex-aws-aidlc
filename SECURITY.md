@@ -2,7 +2,7 @@
 
 ## Supported state
 
-Fastlane 1.0 is maintained on the live default branch `fast-lane-maint`; protected `main` is the unchanged legacy line. A published release identifies the exact template revision it contains.
+Fastlane 1.0 is maintained on the live default branch `fast-lane-maint`; protected `Legacy` is the unchanged legacy line. A published release identifies the exact template revision it contains.
 
 ## Report a concern
 
