@@ -164,7 +164,27 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(
                 first_resume["context_plan"], second_resume["context_plan"]
             )
+            foundation = first_resume["intake_foundation"]
+            self.assertEqual(foundation["repository_mode"], "GREENFIELD")
+            self.assertIsNone(foundation["owner_work_context"])
+            self.assertEqual(foundation["status"], "FOUNDATION_REQUIRED")
+            self.assertTrue(first_resume["interaction"]["turn_boundary_required"])
+            self.assertEqual(foundation, second_resume["intake_foundation"])
+            card = foundation["pending_card"]
+            self.assertEqual(len(card["questions"]), 3)
+            self.assertFalse(card["accept_all_allowed"])
+            self.assertEqual(
+                card["exact_reply"],
+                "1A; 2: <your answer>; 3: <your answer>",
+            )
             resumed = presenter.render_owner_update(first_resume)
+            self.assertIn("1. What are you starting with?", resumed)
+            self.assertIn("A. A new application", resumed)
+            self.assertIn("B. A change to an existing application", resumed)
+            self.assertIn("C. A repair", resumed)
+            self.assertNotIn("Accept all recommendations.", resumed)
+            self.assertNotIn("INTAKE-CARD", resumed)
+            self.assertEqual(resumed.count("Need from you:"), 1)
             for setup_text in (
                 "Welcome to AWS Codex Fastlane",
                 "Project name:",
@@ -562,7 +582,17 @@ class ProductJourneyTests(unittest.TestCase):
             report["interaction"]["owner_action_kind"], "ANSWER_OPEN_DECISIONS"
         )
         self.assertEqual(rendered.count("Need from you:"), 1)
-        self.assertIn("next one to three project questions", rendered)
+        foundation = report["intake_foundation"]
+        self.assertEqual(foundation["repository_mode"], "GREENFIELD")
+        self.assertIsNone(foundation["owner_work_context"])
+        self.assertEqual(foundation["status"], "FOUNDATION_REQUIRED")
+        self.assertEqual(len(foundation["pending_card"]["questions"]), 3)
+        self.assertTrue(report["interaction"]["turn_boundary_required"])
+        self.assertIn("1. What are you starting with?", rendered)
+        self.assertIn("A. A new application", rendered)
+        self.assertIn("B. A change to an existing application", rendered)
+        self.assertIn("C. A repair", rendered)
+        self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)
         self.assertNotIn("Welcome to AWS Codex Fastlane", rendered)
 

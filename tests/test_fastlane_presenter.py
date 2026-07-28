@@ -34,6 +34,70 @@ def report(**updates: object) -> dict[str, object]:
     return {"interaction": interaction}
 
 
+
+def intake_foundation() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "status": "FOUNDATION_REQUIRED",
+        "repository_mode": "GREENFIELD",
+        "owner_work_context": None,
+        "basis_ids": [],
+        "missing_fields": ["OWNER_WORK_CONTEXT", "PRIMARY_USERS"],
+        "grandfathered_approved_gate_a": False,
+        "pending_card": {
+            "card_id": "INTAKE-CARD-0001",
+            "revision": 1,
+            "accept_all_allowed": False,
+            "exact_reply": "1A; 2: <your answer>; 3: <your answer>",
+            "canonical_sha256": "sha256:" + "a" * 64,
+            "questions": [
+                {
+                    "reply_key": "1",
+                    "question_id": "INTAKE-Q-0001",
+                    "kind": "DECISION",
+                    "basis_ids": ["INTAKE-0001"],
+                    "prompt": "What are you starting with?",
+                    "options": {
+                        "A": "A new application.",
+                        "B": "A change to an existing application.",
+                        "C": "A repair or migration.",
+                    },
+                    "recommended": None,
+                    "required_detail_for": ["B", "C"],
+                    "detail_prompt": "Name the existing application.",
+                    "selection": "PENDING",
+                    "selection_detail": None,
+                },
+                {
+                    "reply_key": "2",
+                    "question_id": "INTAKE-Q-0002",
+                    "kind": "FACT",
+                    "basis_ids": ["INTAKE-0002", "INTAKE-0003"],
+                    "prompt": "Who needs this, and what problem should it solve?",
+                    "options": {},
+                    "recommended": None,
+                    "required_detail_for": [],
+                    "detail_prompt": "Name the primary users and their problem.",
+                    "selection": "PENDING",
+                    "selection_detail": None,
+                },
+                {
+                    "reply_key": "3",
+                    "question_id": "INTAKE-Q-0003",
+                    "kind": "FACT",
+                    "basis_ids": ["INTAKE-0004", "INTAKE-0005"],
+                    "prompt": "What is the first useful result?",
+                    "options": {},
+                    "recommended": None,
+                    "required_detail_for": [],
+                    "detail_prompt": "Describe the first-release outcome.",
+                    "selection": "PENDING",
+                    "selection_detail": None,
+                },
+            ],
+        },
+    }
+
 class FastlanePresenterTests(unittest.TestCase):
     def test_owner_update_has_one_action_and_no_internal_prompt_id(self) -> None:
         rendered = presenter.render_owner_update(report())
@@ -406,6 +470,73 @@ class FastlanePresenterTests(unittest.TestCase):
             result.stderr,
         )
         self.assertNotIn("Audit:", result.stdout)
+
+    def test_grounded_intake_card_uses_uppercase_choices_and_exact_reply(self) -> None:
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = intake_foundation()
+
+        rendered = presenter.render_owner_update(
+            current, updated="I recorded the project brief you supplied."
+        )
+
+        self.assertTrue(rendered.startswith("FASTLANE \u00b7 DEFINE"))
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("1. What are you starting with?", rendered)
+        self.assertIn("A. A new application.", rendered)
+        self.assertIn("B. A change to an existing application.", rendered)
+        self.assertIn("C. A repair or migration.", rendered)
+        self.assertIn("If you choose B: Name the existing application.", rendered)
+        self.assertIn("Reply: Name the primary users and their problem.", rendered)
+        self.assertIn("1A; 2: <your answer>; 3: <your answer>", rendered)
+        self.assertNotIn("Accept all recommendations.", rendered)
+        self.assertNotIn("INTAKE-CARD", rendered)
+        self.assertNotIn("sha256:", rendered)
+
+    def test_accept_all_is_rendered_only_for_complete_recommendations(self) -> None:
+        foundation = intake_foundation()
+        card = foundation["pending_card"]
+        assert isinstance(card, dict)
+        question = card["questions"][0]
+        question["recommended"] = "A"
+        question["required_detail_for"] = []
+        question["detail_prompt"] = None
+        card["questions"] = [question]
+        card["accept_all_allowed"] = True
+        card["exact_reply"] = "1A"
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = foundation
+
+        rendered = presenter.render_owner_update(current)
+
+        self.assertEqual(rendered.count("Accept all recommendations."), 1)
+        self.assertIn("A. Recommended \u2014 A new application.", rendered)
+        self.assertIn("Copyable reply:\n1A", rendered)
+
+    def test_side_question_explains_without_resolving_or_replacing_card(self) -> None:
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = intake_foundation()
+
+        rendered = presenter.render_side_question_response(
+            current,
+            answer=(
+                "An existing-application change keeps the current product and alters "
+                "only the outcome you describe."
+            ),
+        )
+
+        self.assertIn("Project state changed: No.", rendered)
+        self.assertIn("The pending questions are unchanged:", rendered)
+        self.assertIn("1. What are you starting with?", rendered)
+        self.assertIn("A. A new application.", rendered)
+        self.assertIn("1A; 2: <your answer>; 3: <your answer>", rendered)
+
+    def test_owner_card_requires_a_final_turn_boundary(self) -> None:
+        current = report(turn_boundary_required=False)
+        current["intake_foundation"] = intake_foundation()
+
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+
 
     def test_unknown_or_conflicting_state_fails_closed(self) -> None:
         with self.assertRaises(presenter.PresentationError):

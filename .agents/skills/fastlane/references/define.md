@@ -9,6 +9,20 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   budget exactly once, then initialize dry-run-first.
 - Initialized projects skip prerequisites and resume the derived stage. Never
   repeat completed setup questions.
+- Keep repository mode separate from owner work context. A greenfield or empty
+  repository does not prove a new application. Ground `INTAKE-*` rows in the
+  owner's users, problem, observable outcome, first-release boundary, success
+  measure, and material data/operating boundaries before requirements are ready.
+- Store one current `INTAKE-CARD-*` in PRD intake provenance. Decisions use
+  uppercase A/B/C, at most three questions, a practical effect and tradeoff,
+  any required supporting detail, and one exact reply. Facts use short free
+  text rather than invented choices.
+- A recommendation, copyable example, prior message, ambiguous shorthand, or
+  absent reply is never owner confirmation. Resolve only the current card from
+  a new owner response, record normalized `OWNER_RESPONSE` provenance, then
+  rerun the Engine. The card is the final action when its turn boundary is set.
+- `Accept all recommendations.` applies only to the current card and only when
+  every question is a decision with a complete recommended option.
 - Ask no more than three related, plain-language owner decisions per response.
 - Lead with the real-world consequence. Keep `RTO`, `RPO`, `p95`, concurrency,
   metadata, and methodology labels in internal records unless the owner used

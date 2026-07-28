@@ -1636,6 +1636,7 @@ Approver: <name/handle>"""
 
     def test_consultations_are_consequence_first_plain_and_bounded(self) -> None:
         intake = self.prompt_section("INTAKE-10")
+        boot = self.prompt_section("BOOT-00")
         requirements = self.prompt_section("REQ-10")
         owner = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/owner-responses.md"
@@ -1651,6 +1652,9 @@ Approver: <name/handle>"""
         ).read_text(encoding="utf-8")
 
         owner_compact = " ".join(owner.split())
+        intake_compact = " ".join(intake.split())
+        boot_compact = " ".join(boot.split())
+        coordinator_compact = " ".join(coordinator.split())
         for phrase in (
             "real-world consequence",
             "at least 95 out of every 100 requests",
@@ -1685,6 +1689,35 @@ Approver: <name/handle>"""
         self.assertIn(
             "Never expose reviewer timing or orchestration",
             " ".join(requirements.split()),
+        )
+
+        for surface in (intake, define, owner):
+            compact = " ".join(surface.split())
+            self.assertIn("uppercase A/B/C", compact)
+            self.assertIn("exact", compact.lower())
+        for surface in (intake, define):
+            self.assertIn("current card", " ".join(surface.split()))
+        self.assertIn("current Engine-validated `INTAKE-CARD-*`", owner_compact)
+        self.assertIn("turn_boundary_required", intake)
+        self.assertIn("turn_boundary_required", owner)
+        self.assertIn("turn_boundary_required", coordinator)
+        self.assertIn("new inbound owner message", coordinator_compact)
+        self.assertIn("assistant example", intake_compact)
+        self.assertIn("absent reply never confirms a choice", intake_compact)
+        self.assertIn("OWNER_RESPONSE", intake)
+        self.assertIn("OWNER_RESPONSE", self.prd)
+        self.assertIn("INTAKE-CARD-*", self.prd)
+        self.assertIn("OWNER_WORK_CONTEXT", self.prd)
+        self.assertIn("EXISTING_APPLICATION_CHANGE", intake_compact)
+        self.assertIn("REPAIR_OR_MIGRATION", intake_compact)
+        self.assertIn("Empty code never proves a new application", intake_compact)
+        self.assertIn("exact `AWS skills` search/retrieve chain runs first", boot_compact)
+        self.assertIn("Do not run an", boot_compact)
+        self.assertIn("exploratory topic search before it", boot_compact)
+        self.assertIn("do not repeat it after valid setup", boot_compact)
+        self.assertLess(
+            boot_compact.index("`AWS skills` search/retrieve chain"),
+            boot_compact.index("Architecture-specific discovery begins"),
         )
 
 if __name__ == "__main__":

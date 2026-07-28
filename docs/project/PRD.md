@@ -147,8 +147,46 @@ source of truth.
 
 | Requirement or constraint ID | Basis | Source or evidence | Confidence | Owner confirmation |
 |---|---|---|---|---|
-| FR-001 | `OWNER_FACT` / `REPOSITORY_FACT` / `RECOMMENDATION` / `PROPOSED_ASSUMPTION` / `OPEN_QUESTION` | TODO | TODO | TODO |
+| FR-001 | `OWNER_FACT` / `REPOSITORY_FACT` / `AGENT_RECOMMENDATION` / `PROPOSED_ASSUMPTION` / `OPEN_QUESTION` | TODO | TODO | TODO |
 
+#### Intake foundation
+
+Repository mode describes the checked-out code: `GREENFIELD` or `BROWNFIELD`.
+Owner work context is separate and comes only from the owner:
+`NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, or `REPAIR_OR_MIGRATION`.
+An empty repository never proves that the owner is creating a new product.
+
+| Intake ID | Field | Value | Basis | Status |
+|---|---|---|---|---|
+| INTAKE-0001 | OWNER_WORK_CONTEXT | TODO | OPEN_QUESTION | OPEN |
+| INTAKE-0002 | PRIMARY_USERS | TODO | OPEN_QUESTION | OPEN |
+| INTAKE-0003 | OWNER_STATED_PROBLEM | TODO | OPEN_QUESTION | OPEN |
+| INTAKE-0004 | OBSERVABLE_OUTCOME | TODO | OPEN_QUESTION | OPEN |
+| INTAKE-0005 | FIRST_RELEASE_BOUNDARY | TODO | OPEN_QUESTION | OPEN |
+| INTAKE-0006 | SUCCESS_MEASURE | TODO | OPEN_QUESTION | OPEN |
+| INTAKE-0007 | MATERIAL_DATA_AND_OPERATING_BOUNDARIES | TODO | OPEN_QUESTION | OPEN |
+
+`CONFIRMED` rows require a concrete value and `OWNER_FACT` provenance.
+Repository facts, recommendations, assumptions, and open questions remain
+separate and cannot become owner confirmation.
+
+#### Current intake decision card
+
+Keep exactly one current `INTAKE-CARD-*` here. It contains at most three
+questions. Decision choices use uppercase A/B/C; A is the recommendation when
+one exists. A choice is unresolved until any required detail is supplied.
+
+| Card ID | Revision | Reply key | Question ID | Kind | Basis IDs | Prompt | Option A | Option B | Option C | Recommended | Required detail for | Detail prompt | Selection | Selection detail | Owner response |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| INTAKE-CARD-0001 | 1 | 1 | INTAKE-Q-0001 | DECISION | INTAKE-0001 | What are you starting with? | A new application; no existing product behavior is assumed. | A change to an existing application; preserve its users, data, and behavior unless you approve otherwise. | A repair, replacement, or migration; assess continuity and migration risk first. | NONE | B, C | Name the existing application or system. | PENDING | NONE | NONE |
+| INTAKE-CARD-0001 | 1 | 2 | INTAKE-Q-0002 | FACT | INTAKE-0002, INTAKE-0003 | Who will use this, and what problem should it solve for them? | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NONE | RESPONSE | Name the primary users and describe their current problem. | PENDING | NONE | NONE |
+| INTAKE-CARD-0001 | 1 | 3 | INTAKE-Q-0003 | FACT | INTAKE-0004, INTAKE-0005 | What is the first useful result they should get from the initial release? | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NONE | RESPONSE | Describe one observable first-release result. | PENDING | NONE | NONE |
+
+Persist only normalized selections and necessary details. A resolved row uses
+`OWNER_RESPONSE: OWNER-MSG-nnnn; CARD: INTAKE-CARD-nnnn; REVISION: n`.
+Assistant-authored examples, recommendations, prior messages, ambiguous prose,
+and absent replies never satisfy that provenance. Replace this card only after
+a new owner message resolves it or the Engine requests the next bounded card.
 Do not paste a second PRD into this section. Summarize the input, preserve links,
 and translate agreed facts into the requirement sections below.
 

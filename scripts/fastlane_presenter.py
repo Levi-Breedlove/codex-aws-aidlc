@@ -297,6 +297,125 @@ def _aws_core_audit(
     )
 
 
+
+def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    foundation = report.get("intake_foundation")
+    if foundation is None:
+        return None
+    if not isinstance(foundation, Mapping):
+        raise PresentationError("invalid deterministic intake foundation")
+    card = foundation.get("pending_card")
+    if card is None:
+        return None
+    if not isinstance(card, Mapping):
+        raise PresentationError("invalid deterministic intake card")
+    card_id = card.get("card_id")
+    revision = card.get("revision")
+    questions = card.get("questions")
+    exact_reply = card.get("exact_reply")
+    digest = card.get("canonical_sha256")
+    if (
+        not isinstance(card_id, str)
+        or re.fullmatch(r"INTAKE-CARD-\d{4,}", card_id) is None
+        or isinstance(revision, bool)
+        or not isinstance(revision, int)
+        or revision < 1
+        or not isinstance(questions, Sequence)
+        or isinstance(questions, (str, bytes))
+        or not 1 <= len(questions) <= 3
+        or not isinstance(exact_reply, str)
+        or not exact_reply.strip()
+        or not isinstance(digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
+        or not isinstance(card.get("accept_all_allowed"), bool)
+    ):
+        raise PresentationError("invalid deterministic intake card")
+    reply_keys: set[str] = set()
+    for question in questions:
+        if not isinstance(question, Mapping):
+            raise PresentationError("invalid deterministic intake question")
+        reply_key = question.get("reply_key")
+        kind = question.get("kind")
+        prompt = question.get("prompt")
+        options = question.get("options")
+        recommended = question.get("recommended")
+        required = question.get("required_detail_for")
+        if (
+            reply_key not in {"1", "2", "3"}
+            or reply_key in reply_keys
+            or kind not in {"FACT", "DECISION"}
+            or not isinstance(prompt, str)
+            or not prompt.strip()
+            or not isinstance(required, Sequence)
+            or isinstance(required, (str, bytes))
+        ):
+            raise PresentationError("invalid deterministic intake question")
+        reply_keys.add(str(reply_key))
+        if kind == "DECISION":
+            if (
+                not isinstance(options, Mapping)
+                or set(options) != {"A", "B", "C"}
+                or any(
+                    not isinstance(options[key], str) or not options[key].strip()
+                    for key in ("A", "B", "C")
+                )
+                or recommended not in {None, "A"}
+            ):
+                raise PresentationError("invalid deterministic intake choices")
+        elif options != {} or recommended is not None:
+            raise PresentationError("factual intake questions cannot invent choices")
+    return card
+
+
+def _intake_question_lines(card: Mapping[str, Any]) -> list[str]:
+    questions = card["questions"]
+    lines: list[str] = []
+    for question in questions:
+        reply_key = str(question["reply_key"])
+        lines.extend(("", f"{reply_key}. {question['prompt']}"))
+        if question["kind"] == "DECISION":
+            options = question["options"]
+            recommended = question["recommended"]
+            required = set(question["required_detail_for"])
+            for choice in ("A", "B", "C"):
+                prefix = "Recommended \u2014 " if recommended == choice else ""
+                lines.append(f"{choice}. {prefix}{options[choice]}")
+                if choice in required:
+                    lines.append(
+                        f"   If you choose {choice}: {question['detail_prompt']}"
+                    )
+        else:
+            lines.append(f"Reply: {question['detail_prompt']}")
+    return lines
+
+
+def _render_intake_card(
+    report: Mapping[str, Any],
+    card: Mapping[str, Any],
+    *,
+    updated: str,
+) -> str:
+    question_count = len(card["questions"])
+    noun = "decision" if question_count == 1 else "questions"
+    lines = [
+        "FASTLANE \u00b7 DEFINE",
+        "",
+        f"Status: {question_count} {noun} remain before requirements analysis.",
+        f"Updated: {updated}",
+        "Need from you: Answer the questions below.",
+    ]
+    lines.extend(_intake_question_lines(card))
+    lines.extend(
+        (
+            "",
+            "Next: Codex will record only your confirmed answers, validate them, "
+            "and continue definition.",
+        )
+    )
+    if card["accept_all_allowed"]:
+        lines.append("You may reply `Accept all recommendations.`")
+    lines.extend(("", "Copyable reply:", str(card["exact_reply"])))
+    return "\n".join(lines)
 def render_owner_update(
     report: Mapping[str, Any],
     *,
@@ -319,6 +438,16 @@ def render_owner_update(
     required = interaction.get("owner_action_required") is True
     if required == (action_kind == "NONE_CONTINUE_AUTOMATICALLY"):
         raise PresentationError("owner action requirement conflicts with action kind")
+    boundary = interaction.get("turn_boundary_required")
+    expected_boundary = required and not (
+        interaction.get("automatic_continuation_allowed") is True
+    )
+    if boundary is not None and boundary is not expected_boundary:
+        raise PresentationError("owner turn boundary conflicts with interaction state")
+    if action_kind == "ANSWER_OPEN_DECISIONS":
+        card = _pending_intake_card(report)
+        if card is not None:
+            return _render_intake_card(report, card, updated=updated)
 
     remediation_status, remediation_next = _remediation_text(report)
     status_text = remediation_status or _delivery_status(report, reason) or STATUS_TEXT[reason]
@@ -368,6 +497,14 @@ def render_side_question_response(
         "Project state changed: " + ("Yes." if project_state_changed else "No."),
         f"Pending next action: {ACTION_TEXT[action_kind]}",
     ]
+    if required and action_kind == "ANSWER_OPEN_DECISIONS":
+        card = _pending_intake_card(report)
+        if card is not None:
+            lines.extend(("", "The pending questions are unchanged:"))
+            lines.extend(_intake_question_lines(card))
+            if card["accept_all_allowed"]:
+                lines.append("You may reply `Accept all recommendations.`")
+            lines.extend(("", "Copyable reply:", str(card["exact_reply"])))
     if not required:
         reason = str(interaction.get("route_reason_code", ""))
         if reason not in NEXT_TEXT:

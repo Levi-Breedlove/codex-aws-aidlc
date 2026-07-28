@@ -25,6 +25,14 @@
 - Use `explain-fastlane` only for an explicit explanation request.
 
 ## Plain-language decisions
+For guided intake, render only the current Engine-validated
+`INTAKE-CARD-*`. Use its stable reply keys, uppercase A/B/C decision choices,
+required-detail prompts, and exact copyable reply. Do not expose its internal
+IDs or digest. Factual questions remain short free text. If no recommendation
+is justified, say so rather than guessing. Rendering a card with
+`turn_boundary_required` ends the assistant turn; only a new owner message
+may resolve it.
+
 
 - Explain the real-world consequence before a technical name or abbreviation.
   Keep precise engineering terms in canonical records, but do not require the

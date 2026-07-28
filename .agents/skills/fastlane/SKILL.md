@@ -42,6 +42,10 @@ You are the single coordinator and sole writer.
    doctor in the same turn, and continue while
    `automatic_continuation_allowed` is true. An internal route change is not an
    owner checkpoint.
+   When `turn_boundary_required` is true, rendering the owner card is the
+   final action of the turn. Do not call a tool, edit a file, rerun the
+   lifecycle router, interpret the example reply, or continue until a new
+   inbound owner message arrives.
    When remediation assigns safe `AGENT_CORRECTION` items to Codex, correct
    only those items inside the current write boundary and attempt budget,
    rerun validation, and rerun the doctor before any owner-facing pause. Never

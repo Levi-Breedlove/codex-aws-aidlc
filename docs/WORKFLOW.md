@@ -25,6 +25,21 @@ Use a finite cap with currency when one exists, or answer
 and immediately begins the next lifecycle prompt. A configured project skips
 fresh prerequisites and resumes its derived stage.
 
+The repository state and the owner's work are separate facts. After setup,
+Fastlane asks whether the owner is starting a new application, changing an
+existing one, or repairing/migrating a system; an empty repository does not
+answer that question. It then grounds intake in the users, problem, observable
+outcome, first-release boundary, success measure, and material data/operating
+boundaries. Decisions use no more than three plain-language A/B/C choices with
+one exact reply; factual questions remain short free text.
+
+The Engine projects one current card from PRD intake provenance. Rendering it
+ends that assistant turn. Only a new owner message can resolve the card, and a
+choice that requires a name, service area, fallback, or other supporting detail
+remains open until the detail is supplied. Recommendations and examples never
+become owner confirmation. Requirements stay provisional until the foundation
+and current card are complete.
+
 ## Lifecycle
 
 | Phase | Outcome | Owner decision |
@@ -106,6 +121,11 @@ current AWS facts materially affect:
 Official AWS Core is a fresh-template prerequisite and is reused when already
 available. After initialization, missing or stale AWS Core evidence pauses only
 the affected material AWS step and never repeats completed setup or intake.
+Fresh setup starts with exactly one credential-free `AWS skills`
+`search_documentation` call followed by `retrieve_skill` for an identifier
+returned by that search. Topic-specific AWS discovery begins later only for a
+material Define, Design, or AWS-10 question; it does not repeat or replace the
+completed setup chain.
 
 DESIGN-10 and AWS-10 record fresh attributable `retrieve_skill` and
 `search_documentation` results in `docs/project/VERIFY.md`. A generic
