@@ -47,9 +47,11 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn("Missing implementation scope stops", workflow)
         self.assertIn("publication never", workflow)
         self.assertNotIn("Delegate to `$fastlane`", skill)
-        self.assertIn("pull requests targeting only that preview branch", workflow)
+        self.assertIn("pull requests targeting only that customer branch", workflow)
         self.assertIn("direct push to `fast-lane-maint` requires explicit emergency", workflow)
         self.assertIn("Force pushes and deletion", workflow)
+        self.assertIn("live `fast-lane-maint` customer branch", workflow)
+        self.assertIn("legacy `main` is not a customer publication target", workflow)
         self.assertIn("separate repository-setting action", workflow)
         for check in (
             "safety-tests (3.11)",

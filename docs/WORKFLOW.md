@@ -77,18 +77,18 @@ Use `python scripts/maintenance_preflight.py --contract <contract.json> --root .
 to verify the exact baseline, allowlist, change budget, and distinct publication
 authority before maintenance work. The contract is ephemeral and untracked.
 
-The canonical `fast-lane-maint` preview uses short-lived maintenance branches
-and pull requests targeting only that preview branch. The PR branch must be
+The live `fast-lane-maint` customer branch uses short-lived maintenance branches
+and pull requests targeting only that customer branch. The PR branch must be
 current before merge, and these checks must pass: `safety-tests (3.11)`,
 `safety-tests (3.12)`, `safety-tests (3.13)`, `windows-smoke`, and
-`macos-setup-smoke`. Force pushes and deletion of the preview branch are
+`macos-setup-smoke`. Force pushes and deletion of the customer branch are
 prohibited. A direct push to `fast-lane-maint` requires explicit emergency
 publication authorization; ordinary `PUBLISH` work uses the PR-gated flow.
 
 GitHub branch-rule configuration is a separate repository-setting action. The
 repository documents the required policy but does not treat source-edit,
-commit, push, or PR authority as permission to change that setting. Frozen
-`main` is not a preview publication target.
+commit, push, or PR authority as permission to change that setting. Protected
+legacy `main` is not a customer publication target.
 
 
 ## AWS Core throughout Fastlane
