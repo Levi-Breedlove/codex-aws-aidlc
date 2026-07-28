@@ -1144,6 +1144,10 @@ AWS_CORE_OFFICIAL_DOCUMENTATION_REFERENCE_PATTERN = re.compile(
     r"https://(?:docs\.aws\.amazon\.com|aws\.amazon\.com)/\S+",
     re.IGNORECASE,
 )
+AWS_CORE_OFFICIAL_DOCUMENTATION_URL_PATTERN = re.compile(
+    r"https://(?:docs\.aws\.amazon\.com|aws\.amazon\.com)/[^\s<>)\]|,;]+",
+    re.IGNORECASE,
+)
 AWS_CORE_EVIDENCE_STATUSES = {
     "NOT_STARTED",
     "PASS",
@@ -1782,6 +1786,57 @@ def aws_core_phase_evidence_issues(
                     f"{phase} {discovery_id} retrieve timestamp precedes search"
                 )
     return issues
+
+
+def derive_aws_core_observed_usage(
+    rows: dict[tuple[str, str, str], AwsCoreEvidenceRow],
+    phase: str,
+    *,
+    issues: Sequence[str],
+) -> dict[str, Any]:
+    """Project only validated observable AWS Core use into owner-safe fields."""
+
+    unobserved: dict[str, Any] = {
+        "status": "UNOBSERVED",
+        "phase": phase,
+        "chains": [],
+    }
+    if issues:
+        return unobserved
+    chains: list[dict[str, Any]] = []
+    discovery_ids = sorted(
+        {
+            discovery_id
+            for row_phase, discovery_id, _capability in rows
+            if row_phase == phase and discovery_id
+        }
+    )
+    for discovery_id in discovery_ids:
+        search = rows.get((phase, discovery_id, "search_documentation"))
+        retrieve = rows.get((phase, discovery_id, "retrieve_skill"))
+        if search is None or retrieve is None:
+            continue
+        references = sorted(
+            set(
+                AWS_CORE_OFFICIAL_DOCUMENTATION_URL_PATTERN.findall(
+                    search.source_references
+                )
+            )
+        )
+        if not references:
+            continue
+        chains.append(
+            {
+                "discovery_id": discovery_id,
+                "skill_identifier": retrieve.returned_skill_identifier,
+                "official_references": references,
+                "credentials_inspected": False,
+                "aws_account_accessed": False,
+            }
+        )
+    if not chains:
+        return unobserved
+    return {"status": "OBSERVED", "phase": phase, "chains": chains}
 
 
 def require_aws_core_phase_evidence(
@@ -7491,6 +7546,18 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
                 "AWS execution planning: " + "; ".join(aws_10_issues),
                 VERIFY_FILE,
             )
+    aws_core_usage = {
+        "DESIGN-10": derive_aws_core_observed_usage(
+            aws_core_rows,
+            "DESIGN-10",
+            issues=design_aws_core_issues,
+        ),
+        "AWS-10": derive_aws_core_observed_usage(
+            aws_core_rows,
+            "AWS-10",
+            issues=aws_10_issues,
+        ),
+    }
     if ctx.has_errors:
         lifecycle_state, next_prompt = "BLOCKED", "STOP"
     return build_report(
@@ -7507,6 +7574,7 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         design_aws_core_ready=design_aws_core_ready,
         design_contract=design_contract,
         coverage_contract=coverage_contract,
+        aws_core_usage=aws_core_usage,
     )
 
 
@@ -8711,6 +8779,7 @@ def build_report(
     design_aws_core_ready: bool = False,
     design_contract: DesignContract | None = None,
     coverage_contract: CoverageContract | None = None,
+    aws_core_usage: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = manifest or {}
     state = state or {}
@@ -8894,7 +8963,8 @@ def build_report(
         "aws_core_evidence": {
             "aws_execution_planning": (
                 "READY" if aws_execution_planning_ready else "BLOCKED"
-            )
+            ),
+            "observed_usage": dict(aws_core_usage or {}),
         },
         "authorizations": {
             "construction": construction_authorization,

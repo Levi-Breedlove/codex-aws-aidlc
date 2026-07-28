@@ -8,6 +8,12 @@
   or human safety review. Otherwise continue the selected phase.
 - Do not expose hashes, file counts, prompt IDs, or exhaustive receipts in
   routine conversation.
+- Never accept self-asserted audit prose. After observable current AWS Core
+  `search_documentation` and matching `retrieve_skill` evidence, let the
+  presenter name the returned skill identifier and official references, then
+  state that no AWS account was accessed. If those calls are unavailable or
+  unobservable, omit `Audit:` rather than claiming AWS Core use. Persist no raw
+  skill content, transcript, credential, session identifier, or machine detail.
 - Answer side questions directly, state whether project state changed, and
   restore the pending next action with `python scripts/fastlane_presenter.py
   side-question --input-stdin` after rerunning the doctor.

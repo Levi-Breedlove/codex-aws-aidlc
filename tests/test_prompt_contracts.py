@@ -350,6 +350,24 @@ class PromptPackContractTests(unittest.TestCase):
         ):
             self.assertIn(phrase, operate_skill)
         self.assertIn("Fresh templates require current official AWS Core", self.agents)
+        fastlane_skill = (
+            PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md"
+        ).read_text(encoding="utf-8")
+        owner_responses = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/owner-responses.md"
+        ).read_text(encoding="utf-8")
+        design_reference = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("proves availability, not use", self.prompts)
+        self.assertIn("proves availability only", design_reference)
+        self.assertRegex(
+            fastlane_skill,
+            r"validated `search_documentation` then matching `retrieve_skill` chain",
+        )
+        self.assertIn("Never accept self-asserted audit prose", owner_responses)
+        self.assertIn("unavailable or unobservable calls", self.prompts)
+        self.assertIn("Persist no raw skill content", self.prompts)
 
     def test_design_edits_existing_diagrams_in_place_and_gate_b_checks_them(self) -> None:
         design = self.prompt_section("DESIGN-10")

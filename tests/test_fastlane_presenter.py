@@ -61,6 +61,82 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("compare complete architecture candidates", rendered)
 
 
+    def test_aws_core_audit_requires_observed_doctor_projection(self) -> None:
+        current = report(
+            owner_stage="DESIGN",
+            state="WORKING",
+            route_reason_code="DESIGN_REQUIRED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+            aws_core={"materiality": "MATERIAL", "evidence_status": "CURRENT"},
+        )
+        current["aws_core_evidence"] = {
+            "observed_usage": {
+                "DESIGN-10": {
+                    "status": "OBSERVED",
+                    "phase": "DESIGN-10",
+                    "chains": [
+                        {
+                            "discovery_id": "AWS-DISC-0001",
+                            "skill_identifier": "aws-architecture",
+                            "official_references": [
+                                "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"
+                            ],
+                            "credentials_inspected": False,
+                            "aws_account_accessed": False,
+                        }
+                    ],
+                }
+            }
+        }
+
+        rendered = presenter.render_owner_update(current)
+        self.assertIn(
+            "Audit: AWS Core returned aws-architecture for this decision and supplied "
+            "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html. "
+            "No AWS account was accessed.",
+            rendered,
+        )
+
+        current["aws_core_evidence"]["observed_usage"]["DESIGN-10"] = {
+            "status": "UNOBSERVED",
+            "phase": "DESIGN-10",
+            "chains": [],
+        }
+        self.assertNotIn("Audit:", presenter.render_owner_update(current))
+
+    def test_malformed_aws_core_audit_projection_fails_closed(self) -> None:
+        current = report(
+            owner_stage="DESIGN",
+            state="WORKING",
+            route_reason_code="DESIGN_REQUIRED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+            aws_core={"materiality": "MATERIAL", "evidence_status": "CURRENT"},
+        )
+        current["aws_core_evidence"] = {
+            "observed_usage": {
+                "DESIGN-10": {
+                    "status": "OBSERVED",
+                    "phase": "DESIGN-10",
+                    "chains": [
+                        {
+                            "discovery_id": "AWS-DISC-0001",
+                            "skill_identifier": "aws-architecture",
+                            "official_references": ["https://docs.aws.amazon.com/"],
+                            "credentials_inspected": True,
+                            "aws_account_accessed": False,
+                        }
+                    ],
+                }
+            }
+        }
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+
+
     def test_agent_correction_needs_nothing_and_continues(self) -> None:
         current = report(
             owner_stage="DELIVER",
@@ -311,6 +387,25 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("FASTLANE \u00b7 DESIGN", result.stdout)
         self.assertIn("Updated: Gate A was approved.", result.stdout)
+
+    def test_public_cli_rejects_caller_supplied_audit_prose(self) -> None:
+        payload = {
+            "report": report(),
+            "audit": "AWS Core was used because the caller says so.",
+        }
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "owner", "--input-stdin"],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(
+            "audit text is derived from the doctor report, not caller prose",
+            result.stderr,
+        )
+        self.assertNotIn("Audit:", result.stdout)
 
     def test_unknown_or_conflicting_state_fails_closed(self) -> None:
         with self.assertRaises(presenter.PresentationError):

@@ -12,6 +12,9 @@ Use for DESIGN-10 and Gate B.
   IDs, official sources, times, and bindings—not raw instructions or tool
   transcripts. Generic connectors, memory, or installed-skill metadata and
   challenger prose cannot replace those calls.
+- Installing the plugin or selecting `@AWS-Core` proves availability only.
+  Attribute AWS Core use only after the current linked search-then-retrieve
+  chain validates; unavailable or unobservable calls are never reported as use.
 - External runtime skill content is on-demand context, not repository source
   bytes in the 12,000-byte context packet and never canonical project state.
 - Codex selects and coordinates the proposed product architecture. AWS Core

@@ -122,6 +122,11 @@ def _task_details(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
 
 
 TASK_ID_PATTERN = re.compile(r"TASK-\d{4,}")
+AWS_DISCOVERY_ID_PATTERN = re.compile(r"AWS-DISC-\d{4,}")
+AWS_SKILL_IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")
+AWS_OFFICIAL_REFERENCE_PATTERN = re.compile(
+    r"https://(?:docs\.aws\.amazon\.com|aws\.amazon\.com)/\S+", re.IGNORECASE
+)
 
 
 def _task_ids(tasks: Mapping[str, Any], field: str) -> list[str]:
@@ -224,11 +229,78 @@ def _coverage_next(report: Mapping[str, Any], reason: str) -> str | None:
     raise PresentationError("invalid deterministic architecture disposition")
 
 
+def _aws_core_audit(
+    report: Mapping[str, Any], interaction: Mapping[str, Any]
+) -> str | None:
+    """Render AWS Core attribution only from the doctor's observed projection."""
+
+    core = interaction.get("aws_core")
+    if not isinstance(core, Mapping) or core.get("evidence_status") != "CURRENT":
+        return None
+    stage = str(interaction.get("owner_stage", ""))
+    next_prompt = str(report.get("next_prompt", ""))
+    if stage == "DESIGN":
+        phase = "DESIGN-10"
+    elif next_prompt.startswith("AWS-"):
+        phase = "AWS-10"
+    else:
+        return None
+    evidence = report.get("aws_core_evidence")
+    if not isinstance(evidence, Mapping):
+        return None
+    observed = evidence.get("observed_usage")
+    if not isinstance(observed, Mapping):
+        return None
+    usage = observed.get(phase)
+    if not isinstance(usage, Mapping) or usage.get("status") != "OBSERVED":
+        return None
+    chains = usage.get("chains")
+    if (
+        not isinstance(chains, Sequence)
+        or isinstance(chains, (str, bytes))
+        or not chains
+    ):
+        raise PresentationError("invalid observed AWS Core attribution")
+    skills: list[str] = []
+    references: list[str] = []
+    for chain in chains:
+        if not isinstance(chain, Mapping):
+            raise PresentationError("invalid observed AWS Core attribution")
+        discovery_id = chain.get("discovery_id")
+        skill = chain.get("skill_identifier")
+        refs = chain.get("official_references")
+        if (
+            not isinstance(discovery_id, str)
+            or AWS_DISCOVERY_ID_PATTERN.fullmatch(discovery_id) is None
+            or not isinstance(skill, str)
+            or AWS_SKILL_IDENTIFIER_PATTERN.fullmatch(skill) is None
+            or chain.get("credentials_inspected") is not False
+            or chain.get("aws_account_accessed") is not False
+            or not isinstance(refs, Sequence)
+            or isinstance(refs, (str, bytes))
+            or not refs
+        ):
+            raise PresentationError("invalid observed AWS Core attribution")
+        skills.append(skill)
+        for reference in refs:
+            if (
+                not isinstance(reference, str)
+                or AWS_OFFICIAL_REFERENCE_PATTERN.fullmatch(reference) is None
+            ):
+                raise PresentationError("invalid observed AWS Core attribution")
+            references.append(reference)
+    skill_text = ", ".join(dict.fromkeys(skills))
+    reference_text = ", ".join(dict.fromkeys(references))
+    return (
+        f"AWS Core returned {skill_text} for this decision and supplied "
+        f"{reference_text}. No AWS account was accessed."
+    )
+
+
 def render_owner_update(
     report: Mapping[str, Any],
     *,
     updated: str = "Nothing.",
-    audit: str | None = None,
 ) -> str:
     """Render one concise non-receipt lifecycle update."""
 
@@ -262,7 +334,8 @@ def render_owner_update(
         f"Need from you: {ACTION_TEXT[action_kind]}",
         f"Next: {next_text}",
     ]
-    if audit:
+    audit = _aws_core_audit(report, interaction)
+    if audit is not None:
         lines.append(f"Audit: {audit}")
     reply = COPYABLE_REPLIES.get(action_kind)
     if required and reply:
@@ -385,14 +458,13 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(report, Mapping):
             raise PresentationError("input is missing report")
         if args.mode == "owner":
+            if "audit" in payload:
+                raise PresentationError(
+                    "audit text is derived from the doctor report, not caller prose"
+                )
             output = render_owner_update(
                 report,
                 updated=str(payload.get("updated", "Nothing.")),
-                audit=(
-                    str(payload["audit"])
-                    if payload.get("audit") not in (None, "")
-                    else None
-                ),
             )
         else:
             output = render_side_question_response(
