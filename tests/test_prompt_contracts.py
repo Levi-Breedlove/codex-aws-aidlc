@@ -359,7 +359,7 @@ class PromptPackContractTests(unittest.TestCase):
         design_reference = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("proves availability, not use", self.prompts)
+        self.assertRegex(self.prompts, r"proves\s+availability, not use")
         self.assertIn("proves availability only", design_reference)
         self.assertRegex(
             fastlane_skill,

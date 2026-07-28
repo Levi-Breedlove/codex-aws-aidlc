@@ -86,7 +86,7 @@
     "tests/test_model_roleplay_eval.py": "2437b7d38d2c6383d8bf46a5b754fe9ab86731d790975a39e0999ad2053be406",
     "tests/test_package_release.py": "9179da9511431d64f7fc3d94ba840dd8015bea6e4f039ff6b4c3f11b96490b74",
     "tests/test_product_journeys.py": "9380a458d4fd7fada5d1a2b3affd67a0d228d2e6cbed1a034cd201397dfd4b1c",
-    "tests/test_prompt_contracts.py": "0650386404fa0241d7fdb8ff457344ba1c2b6c4657e8198f1474e63e640717cd",
+    "tests/test_prompt_contracts.py": "26e1227b655d4c16498d47d15afcfa2419f0d09655700b4367e79401be2d767b",
     "tests/test_setup_assistant.py": "a2988ebb4dbd8e3a3b7400588269e133555a516f40528849126fae884b2d89fd",
     "tests/test_task_waves.py": "dfbc169756ca5f983ad6abb6caf884e38e580b2eb84d2adce6c31ba57b375221",
     "tests/test_template_compatibility.py": "01926c31c31e9eacdc53b8801393adb9f7da3cfbeb9bc5423b821ad31d4e1494"
