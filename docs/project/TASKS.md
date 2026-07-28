@@ -70,8 +70,10 @@ its graph with tasks for the current IDs, and sets the new plan `CURRENT`.
 - One coordinator owns task selection, claims, implementation, checkpoints, and
   every write to application, infrastructure, project ledgers, manifests,
   lockfiles, schemas, generated output, and GitHub metadata.
-- `Maximum workers` remains `1`. No subagent or worker edits files or mutable
-  external state in v1.2.0.
+- `Maximum workers` remains `1` for task claims and mutable execution. A
+  conditional challenger may return one synchronous read-only critique at its
+  defined checkpoint; it is not a worker, claims no task, and changes no state.
+  No subagent or worker edits files or mutable external state.
 - Each path and mutable target has exactly one writer. Treat ambiguous globs,
   generated output, the same branch, stack, state backend, or database as
   overlapping.
