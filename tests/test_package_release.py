@@ -85,7 +85,7 @@ class PackageReleaseTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.0")
+        self.assertEqual(manifest["bootstrap_version"], "1.0.1")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -450,10 +450,12 @@ class PackageReleaseTests(unittest.TestCase):
                 package_release.load_release_files(root)
 
     def test_current_release_text_rejects_stale_versions_except_fixtures(self) -> None:
-        stale_versions = ("1" + ".0.0", "2" + ".0.0")
+        stale_product_version = "1" + ".2.0"
+        stale_versions = ("1" + ".0.0", "2" + ".0.0", stale_product_version)
         negative_fixture_marker = f'"bootstrap_version": "{stale_versions[0]}"'
         text_suffixes = {".md", ".json", ".yaml", ".yml", ".py", ".txt"}
         allowed_negative_fixtures = 0
+        allowed_aws_version_observations = 0
         violations: list[str] = []
         for path in REPOSITORY_ROOT.rglob("*"):
             if not path.is_file() or ".git" in path.parts:
@@ -473,8 +475,16 @@ class PackageReleaseTests(unittest.TestCase):
                     ):
                         allowed_negative_fixtures += 1
                         continue
+                    if (
+                        relative == "tests/test_bootstrap_doctor.py"
+                        and version == stale_product_version
+                        and "plugin_version: str =" in line
+                    ):
+                        allowed_aws_version_observations += 1
+                        continue
                     violations.append(f"{relative}:{line_number}:{version}")
         self.assertEqual(allowed_negative_fixtures, 2)
+        self.assertEqual(allowed_aws_version_observations, 2)
         self.assertEqual(violations, [])
 
 

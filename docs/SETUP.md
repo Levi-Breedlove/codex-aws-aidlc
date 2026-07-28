@@ -2,7 +2,7 @@
 
 Fastlane verifies local planning tools before changing a fresh template. Every
 check is read-only and every installation or trust action remains owner-run.
-The signed-in interactive Codex CLI is the supported Fastlane 1.2 onboarding
+The signed-in interactive Codex CLI is the supported Fastlane 1.0 onboarding
 surface.
 
 ## Normal first run
