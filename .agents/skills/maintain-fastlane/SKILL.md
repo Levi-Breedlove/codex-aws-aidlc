@@ -49,6 +49,10 @@ change budget.
    preserve unrelated work.
 3. Keep lifecycle, receipts, authorization, and package boundaries
    deterministic; skills guide while scripts validate exact state.
+   Any Semantic Contract change updates its workflow guidance, applicable
+   phase procedure, PRD schema, validator/router, owner-visible presentation
+   when affected, tests, and manifest in the same bounded change.
+
 4. Before `IMPLEMENT` or `PUBLISH`, validate the ephemeral scope contract with
    `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`.
    The preflight is read-only; keep the contract outside tracked product state.

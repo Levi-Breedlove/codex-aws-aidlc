@@ -22,6 +22,9 @@ Use for DESIGN-10 and Gate B.
   tools. Fastlane governs state, gates, authority, and evidence. The owner
   authorizes; IAM enforces; observed evidence proves what occurred. AWS Core
   never chooses the product architecture or grants authority.
+- Apply contract compatibility before rewriting design records. An unchanged approved schema 4 Gate B is grandfathered for its exact design and envelope; do not migrate it, request another approval, or interrupt construction merely because schema 5 exists. A new or unapproved design, or any design-controlled change, requires the complete schema 5 contract, new digests, and fresh Gate B approval.
+- A current approved legacy schema 1.2 Gate A is a valid design-only bridge to schema 5. Codex derives `AC-<requirement ID>` labels from approved rows; legacy `NEW_BUILD` uses first-wave journey `NONE` and binds the end-to-end Harness to the wave plus selected approved requirements. Do not rewrite Part I, synthesize owner facts, or ask the owner to repeat them. Route to REQ-10 only for a missing required owner fact or material requirements change; otherwise show `Need from you: Nothing` and continue to Gate B.
+- Grandfathering never permits invented schema 5 records, expanded authority, or skipped task, Harness, and evidence validation. It adds no lifecycle stage, owner question, or receipt.
 - Follow the current Adaptive Coverage Plan: `SELECT` compares complete
   architectures, `AMEND` reconsiders every materially affected driver and
   alternative, and `PRESERVE` is valid only when architecture, technology,
@@ -37,9 +40,15 @@ Use for DESIGN-10 and Gate B.
   trigger, and validation method. Use `NO_VIABLE_ALTERNATIVE` only when
   exactly one candidate satisfies the hard constraints.
 - Map every approved requirement to the selected `ARCH-*`, concrete
-  `COMP/API/DATA/CTRL` IDs, applicable property/test IDs, and `AWS-EV-*` IDs.
+  `COMP/API/EVENT/CLI/FILE/DATA/CTRL/BOUNDARY/STATE` IDs, applicable property/test IDs, and `AWS-EV-*` IDs.
   Each material AWS claim cites its current `AWS-DISC-*`; keep detailed live
   discovery evidence in `docs/project/VERIFY.md`.
+- Complete material interfaces and boundaries with numeric bounds or explicit
+  `NOT_APPLICABLE - <reason>`, inward dependencies, and server-side authorization.
+  Classify lifecycle, async, retry/resume, approval, migration, and meaningful
+  state triggers. For `NEW_BUILD`, bind the first wave and any blocking spike;
+  spikes use `MAX_ATTEMPTS` and one executable exit command. Digest all records.
+
 - Complete the Change impact record for `AMEND` or `PRESERVE`. Bind changed,
   affected, and preserved IDs; use `FULL_REVALIDATION` when impact is
   uncertain. It never overrides revision monotonicity or stale-gate rules.

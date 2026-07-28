@@ -556,7 +556,7 @@ class PromptPackContractTests(unittest.TestCase):
         ):
             self.assertNotIn(redundant, property_section)
         self.assertIn(
-            "Current REQ ID, requirement IDs, and applicable PROP IDs",
+            "Current REQ ID, requirement IDs, applicable acceptance/journey/PROP IDs",
             self.tasks,
         )
         for phrase in (
@@ -1439,7 +1439,7 @@ class PromptPackContractTests(unittest.TestCase):
 
     def test_normative_requirements_use_one_ears_and_acceptance_schema(self) -> None:
         header = (
-            "| ID | Requirement | EARS form | Acceptance criteria | "
+            "| ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | "
             "Acceptance form |"
         )
         self.assertEqual(self.prd.count(header), 8)
@@ -1747,6 +1747,101 @@ Approver: <name/handle>"""
             boot_compact.index("`AWS skills` search/retrieve chain"),
             boot_compact.index("Architecture-specific discovery begins"),
         )
+
+    def test_semantic_contract_profile_is_selective_local_and_update_atomic(self) -> None:
+        workflow = (PROJECT_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
+        rows = [
+            [cell.strip() for cell in line.strip("|").split("|")]
+            for line in workflow.splitlines()
+            if line.startswith("| FSC-")
+        ]
+        self.assertTrue(rows and all(len(row) == 9 for row in rows))
+        self.assertEqual(
+            [row[0] for row in rows],
+            [f"FSC-{index:03d}" for index in range(1, 17)],
+        )
+        dispositions = {row[0]: row[3] for row in rows}
+        for identifier in ("FSC-001", "FSC-004"):
+            self.assertEqual(dispositions[identifier], "ADOPT")
+        for identifier in (
+            "FSC-002", "FSC-003", "FSC-005", "FSC-006", "FSC-007", "FSC-008"
+        ):
+            self.assertEqual(dispositions[identifier], "ADAPT")
+        for identifier in ("FSC-009", "FSC-010", "FSC-011", "FSC-012", "FSC-013"):
+            self.assertEqual(dispositions[identifier], "CONDITIONAL")
+        for identifier in ("FSC-014", "FSC-015", "FSC-016"):
+            self.assertEqual(dispositions[identifier], "NOT_APPLICABLE")
+        for source in (
+            "https://llm-coding.github.io/Semantic-Anchors/",
+            "https://llm-coding.github.io/Semantic-Anchors/contracts/",
+            "https://llm-coding.github.io/Semantic-Anchors/spec-driven-development/",
+            "https://llm-coding.github.io/Semantic-Anchors/harness-inventory/",
+        ):
+            self.assertIn(source, workflow)
+        bases = " ".join(row[2] for row in rows)
+        for basis in (
+            "Meaningful Human Control",
+            "Concise Response",
+            "Requirements Discovery",
+            "Layer Boundaries",
+            "Walking Skeleton",
+            "Spike Solution",
+            "Property-Based Testing",
+            "Cockburn Use Cases",
+            "STRIDE",
+            "ATAM",
+            "Harness Inventory",
+            "Docs-as-Code",
+        ):
+            self.assertIn(basis, bases)
+        self.assertIn("not a package", workflow)
+        self.assertIn(
+            "not a package, runtime dependency, user workflow, or additional authority",
+            " ".join(workflow.split()),
+        )
+        self.assertIn(
+            "A change to an FSC contract updates its workflow rule, applicable phase\n"
+            "reference, PRD schema, deterministic validator/router, owner-visible\n"
+            "presentation when affected, tests, and manifest in the same bounded\n"
+            "maintenance change.",
+            workflow,
+        )
+        tasks = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
+        prompts = (PROJECT_ROOT / "prompts/CODEX-PROMPTS.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("`WAVE-*` for the walking skeleton", tasks)
+        self.assertIn(
+            "approved `WAVE-*` ID in that walking-skeleton task's `Requirements` metadata",
+            " ".join(prompts.split()),
+        )
+        component_table = (
+            "| Component | Responsibility | Inputs | Outputs | Dependencies | "
+            "Failure behavior | Owner |\n"
+            "|---|---|---|---|---|---|---|\n"
+            "| TODO | TODO | TODO | TODO | TODO | TODO | TODO |"
+        )
+        self.assertIn(component_table, self.prd)
+        self.assertLess(self.prd.index(component_table), self.prd.index("### Layer boundaries"))
+        design_reference = (PROJECT_ROOT / ".agents/skills/fastlane/references/design.md").read_text(
+            encoding="utf-8"
+        )
+        for kind in ("PRIMARY_USER", "SECONDARY_USER", "OPERATOR", "EXTERNAL_SYSTEM"):
+            self.assertIn(kind, self.prd)
+        for trigger in (
+            "LIFECYCLE_RESOURCE", "ASYNCHRONOUS_WORK", "RETRY_OR_RESUME",
+            "APPROVAL_FLOW", "MIGRATION_OR_CUTOVER", "OTHER_MEANINGFUL_TRANSITION",
+        ):
+            self.assertIn(trigger, self.prd)
+        for phrase in (
+            "MAX_ATTEMPTS: <positive integer>", "one executable", "INWARD",
+            "server-side", "numeric measurable bound", "first-wave journey `NONE`",
+            "wave plus every selected approved requirement",
+        ):
+            self.assertIn(phrase, self.prd + workflow + design_reference)
+        self.assertIn("FSC-009", workflow)
+        self.assertIn("retry/resume", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

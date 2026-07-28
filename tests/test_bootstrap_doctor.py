@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path, PurePosixPath
 
 
@@ -107,6 +108,95 @@ def replace_contract_table(
         *("| " + " | ".join(row) + " |" for row in rows),
     ]
     return text[:table_start] + "\n".join(rendered) + text[table_end:]
+
+
+def replace_contract_table_with_sentinel(
+    text: str,
+    heading: str,
+    reason: str,
+) -> str:
+    heading_start = text.index(heading)
+    table_start = text.index("|", heading_start)
+    table_end = text.index("\n\n", table_start)
+    sentinel = f"NOT_APPLICABLE - {reason}"
+    return text[:table_start] + sentinel + text[table_end:]
+
+
+def exact_legacy_requirements_projection(text: str) -> str:
+    text = re.sub(
+        r"(?m)^\| Project contract schema \| `1\.3` \|\r?\n",
+        "",
+        text,
+        count=1,
+    )
+    modern_pattern = re.compile(
+        r"(?m)^\| ID \| Requirement \| EARS form \| Acceptance ID \| "
+        r"Acceptance criteria \| Acceptance form \|\r?\n"
+        r"^\|[-:| ]+\|\r?\n(?:^\|.*\|\r?\n?)+"
+    )
+
+    def legacy_table(match: re.Match[str]) -> str:
+        table = doctor.markdown_tables(match.group(0))[0]
+        rows = [
+            "| ID | Requirement | Acceptance criteria |",
+            "|---|---|---|",
+            *(f"| {row[0]} | {row[1]} | {row[4]} |" for row in table[2:]),
+        ]
+        return "\n".join(rows) + "\n"
+
+    text = modern_pattern.sub(legacy_table, text)
+    for heading in (
+        doctor.ACTOR_HEADING,
+        doctor.JOURNEY_HEADING,
+        doctor.RICH_USE_CASE_APPLICABILITY_HEADING,
+        doctor.RICH_USE_CASE_HEADING,
+        doctor.BUSINESS_RULE_HEADING,
+        doctor.REQUIREMENT_COVERAGE_HEADING,
+    ):
+        heading_start = text.index(heading)
+        table_start = text.index("|", heading_start)
+        table_end = text.index("\n\n", table_start)
+        text = text[:table_start] + text[table_end + 2:]
+    return text
+
+
+def exact_legacy_schema_four_projection(text: str) -> str:
+    text = re.sub(
+        r"(?m)^\| Project design contract schema \| `5` \|\r?\n",
+        "",
+        text,
+        count=1,
+    )
+    legacy_interface_table = "\n".join([
+        "| Contract ID | Producer | Consumer | Schema or protocol | Authentication | Versioning | Idempotency |",
+        "|---|---|---|---|---|---|---|",
+        "| API-001 | Local client | Trusted application service | Versioned JSON request and response | Approved identity token | Compatible additions only | One idempotent read per request |",
+    ])
+    text = put_contract_table(
+        text,
+        doctor.INTERFACE_HEADING,
+        legacy_interface_table,
+        "## 17. Data model and lifecycle",
+    )
+
+    def remove_region(value: str, start: str, end: str) -> str:
+        start_index = value.index(start)
+        end_index = value.index(end, start_index)
+        return value[:start_index] + value[end_index:]
+
+    text = remove_region(text, doctor.LAYER_BOUNDARY_HEADING, doctor.INTERFACE_HEADING)
+    text = remove_region(text, doctor.STATE_APPLICABILITY_HEADING, "```mermaid")
+    text = remove_region(
+        text,
+        doctor.FIRST_WAVE_HEADING,
+        "`docs/project/TASKS.md` will translate this design",
+    )
+    return text.replace(
+        "DES-0001, FR-001, JOURNEY-001, WAVE-001",
+        "DES-0001, FR-001",
+        1,
+    )
+
 
 
 def confirm_intake_foundation(
@@ -335,17 +425,93 @@ def set_intake_card_resolution(
     return "".join(output)
 
 
+def complete_requirements_contract(text: str) -> str:
+    text = set_table_value(
+        text,
+        "## Document status",
+        "## 1. Workload profile",
+        "Project contract schema",
+        "`1.3`",
+    )
+    requirement_ids = sorted(doctor.authoritative_requirement_ids(text))
+    requirement_list = ", ".join(requirement_ids)
+    text = replace_contract_table(
+        text,
+        doctor.ACTOR_HEADING,
+        doctor.ACTOR_HEADERS,
+        [
+            (
+                "ACT-001",
+                "Development user",
+                "PRIMARY_USER",
+                "See the approved project outcome",
+                "May access only the local synthetic development outcome",
+                "INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0007",
+            )
+        ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.JOURNEY_HEADING,
+        doctor.JOURNEY_HEADERS,
+        [
+            (
+                "JOURNEY-001",
+                "ACT-001",
+                "See the approved project outcome",
+                "The development user requests the local result",
+                "The current approved outcome is displayed",
+                "Invalid input is rejected without changing approved state",
+                requirement_list,
+                "NONE",
+            )
+        ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.RICH_USE_CASE_APPLICABILITY_HEADING,
+        doctor.RICH_USE_CASE_APPLICABILITY_HEADERS,
+        [(
+            "NOT_APPLICABLE",
+            "NOT_APPLICABLE - low-risk single-actor synchronous fixture",
+            "NONE",
+        )],
+    )
+    text = replace_contract_table(
+        text, doctor.RICH_USE_CASE_HEADING, doctor.RICH_USE_CASE_HEADERS, []
+    )
+    text = replace_contract_table(
+        text, doctor.BUSINESS_RULE_HEADING, doctor.BUSINESS_RULE_HEADERS, []
+    )
+    return replace_contract_table(
+        text,
+        doctor.REQUIREMENT_COVERAGE_HEADING,
+        doctor.REQUIREMENT_COVERAGE_HEADERS,
+        [
+            (
+                requirement_id,
+                "INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007",
+                "ACT-001",
+                "JOURNEY-001",
+                f"AC-{requirement_id}",
+                "INTAKE-0006",
+            )
+            for requirement_id in requirement_ids
+        ],
+    )
+
+
 def approve_gate_a(text: str) -> str:
     text = complete_intake_foundation(text)
     replacements = {
-        "| FR-001 | TODO | UBIQUITOUS | TODO | MEASURABLE |": (
+        "| FR-001 | TODO | UBIQUITOUS | AC-FR-001 | TODO | MEASURABLE |": (
             "| FR-001 | The application SHALL display the current approved project outcome. "
-            "| UBIQUITOUS | A rendered-output test confirms the approved outcome is displayed. "
+            "| UBIQUITOUS | AC-FR-001 | A rendered-output test confirms the approved outcome is displayed. "
             "| MEASURABLE |"
         ),
-        "| FR-002 | TODO | UNWANTED_BEHAVIOR | TODO | GHERKIN |": (
+        "| FR-002 | TODO | UNWANTED_BEHAVIOR | AC-FR-002 | TODO | GHERKIN |": (
             "| FR-002 | IF input violates approved constraints, THEN the application SHALL "
-            "reject it without changing approved state. | UNWANTED_BEHAVIOR | GIVEN input "
+            "reject it without changing approved state. | UNWANTED_BEHAVIOR | AC-FR-002 | GIVEN input "
             "outside approved constraints, WHEN the application receives it, THEN the input "
             "is rejected and approved state is unchanged. | GHERKIN |"
         ),
@@ -360,6 +526,7 @@ def approve_gate_a(text: str) -> str:
         if text.count(before) != 1:
             raise AssertionError(f"Expected one method-contract fixture row: {before}")
         text = text.replace(before, after, 1)
+    text = complete_requirements_contract(text)
 
     for field, value in {
         "Project mode": "`greenfield`",
@@ -528,7 +695,8 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
         "Authorized requirement and design IDs": (
             "`REQ: REQ-0001; DES: DES-0001; SCOPE_IDS: FR-001, "
             "ARCH-0001, TECH-0001, TECH-0002, TECH-0003, TECH-0004, TECH-0005, "
-            "TECH-0006, TECH-0007, TECH-0008, TECH-0009, PROP-001`"
+            "TECH-0006, TECH-0007, TECH-0008, TECH-0009, PROP-001, HARNESS-004, "
+            "API-001, BOUNDARY-001, WAVE-001`"
         ),
         "Design contract SHA-256": f"`{design_contract.canonical_sha256}`",
         "Authorized baseline commit": f"`{baseline}`",
@@ -924,7 +1092,106 @@ def complete_coverage_plan(
     )
 
 
+def complete_project_design_contract(text: str) -> str:
+    text = set_table_value(
+        text,
+        "## Document status",
+        "## 1. Workload profile",
+        "Project design contract schema",
+        "`5`",
+    )
+    text = replace_contract_table(
+        text,
+        doctor.INTERFACE_HEADING,
+        doctor.INTERFACE_HEADERS,
+        [
+            (
+                "API-001",
+                "API",
+                "FR-001",
+                "Local client",
+                "Trusted application service",
+                "Versioned request/response schema",
+                "NOT_APPLICABLE - local development fixture",
+                "Server verifies the caller may request the local outcome",
+                "Reject values outside the approved schema",
+                "Return the approved outcome with success status",
+                "Return a safe error and preserve approved state",
+                "Compatible schema additions only",
+                "One idempotent read per request",
+                "2 seconds",
+                "100 requests per minute",
+                "p95 response within 2 seconds",
+            )
+        ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.LAYER_BOUNDARY_HEADING,
+        doctor.LAYER_BOUNDARY_HEADERS,
+        [
+            (
+                "BOUNDARY-001",
+                "Local client adapter",
+                "Application domain",
+                "Approved request and outcome DTOs",
+                "Explicit adapter-to-domain mapping",
+                "INWARD - adapter depends on the domain contract",
+                "SERVER_SIDE - trusted service enforces authorization",
+                "NOT_APPLICABLE - no external provider object crosses the boundary",
+                "FR-001, FR-002",
+                "AC-FR-001, AC-FR-002",
+            )
+        ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.STATE_APPLICABILITY_HEADING,
+        doctor.STATE_APPLICABILITY_HEADERS,
+        [
+            (
+                "RESOURCE-001",
+                "NOT_APPLICABLE",
+                "NOT_APPLICABLE - synchronous read has no meaningful lifecycle transition",
+                "NONE",
+            )
+        ],
+    )
+    text = replace_contract_table(
+        text, doctor.STATE_REGISTER_HEADING, doctor.STATE_REGISTER_HEADERS, []
+    )
+    text = replace_contract_table(
+        text,
+        doctor.FIRST_WAVE_HEADING,
+        doctor.FIRST_WAVE_HEADERS,
+        [
+            (
+                "WAVE-001",
+                "NEW_BUILD",
+                "JOURNEY-001",
+                "FR-001",
+                "AC-FR-001",
+                "HARNESS-004",
+                "NONE",
+            )
+        ],
+    )
+    return replace_contract_table_with_sentinel(
+        text,
+        doctor.SPIKE_HEADING,
+        "no prerequisite discovery is needed before the walking skeleton",
+    )
+
+
 def complete_design_contract(text: str) -> str:
+    foundation = doctor.contract_table_after_heading(
+        text,
+        doctor.INTAKE_FOUNDATION_HEADING,
+        doctor.INTAKE_FOUNDATION_HEADERS,
+    )
+    if foundation is None or any(row[4] != "CONFIRMED" for row in foundation.rows):
+        text = complete_intake_foundation(text)
+    text = complete_requirements_contract(text)
     text = complete_coverage_plan(text)
     requirement_ids = sorted(doctor.authoritative_requirement_ids(text))
     requirement_list = ", ".join(requirement_ids)
@@ -963,7 +1230,7 @@ def complete_design_contract(text: str) -> str:
     ]
     trace_table = "\n".join(
         [
-            "| Requirement ID | ARCH / COMP / API / DATA / CTRL IDs | Property/test IDs | Evidence IDs |",
+            "| Requirement ID | ARCH / COMP / API / EVENT / CLI / FILE / DATA / CTRL / BOUNDARY / STATE IDs | Property/test IDs | Evidence IDs |",
             "|---|---|---|---|",
             *trace_rows,
         ]
@@ -1082,6 +1349,12 @@ def complete_design_contract(text: str) -> str:
             start=1,
         )
     ]
+    harness_rows[3] = (
+        "| HARNESS-004 | End-to-end | unittest journey validation | "
+        "NEW_BUILD first outcome | DES-0001, FR-001, JOURNEY-001, WAVE-001 | "
+        "python -m unittest tests.test_product_journeys | "
+        "docs/project/VERIFY.md#harness-execution-evidence | REQUIRED |"
+    )
     harness_table = "\n".join(
         [
             "| Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | Exact command or API | Evidence destination | Required or conditional status |",
@@ -1089,11 +1362,46 @@ def complete_design_contract(text: str) -> str:
             *harness_rows,
         ]
     )
-    return put_contract_table(
+    text = put_contract_table(
         text,
         doctor.HARNESS_HEADING,
         harness_table,
         "## 27. Gate B agent review record",
+    )
+    return complete_project_design_contract(text)
+
+
+def complete_legacy_design_bridge(text: str) -> str:
+    text = exact_legacy_requirements_projection(complete_design_contract(approve_gate_a(text)))
+    text = text.replace(
+        "DES-0001, FR-001, JOURNEY-001, WAVE-001",
+        "DES-0001, FR-001, WAVE-001",
+        1,
+    )
+    text = replace_contract_table(
+        text,
+        doctor.STATE_APPLICABILITY_HEADING,
+        doctor.STATE_APPLICABILITY_HEADERS,
+        [("RESOURCE-001", "APPLICABLE", "LIFECYCLE_RESOURCE: FR-001", "STATE-001")],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.STATE_REGISTER_HEADING,
+        doctor.STATE_REGISTER_HEADERS,
+        [(
+            "STATE-001", "RESOURCE-001", "PENDING, READY", "PENDING",
+            "PENDING to READY", "READY", "Reject invalid transitions",
+            "FR-001", "AC-FR-001",
+        )],
+    )
+    return replace_contract_table(
+        text,
+        doctor.FIRST_WAVE_HEADING,
+        doctor.FIRST_WAVE_HEADERS,
+        [(
+            "WAVE-001", "NEW_BUILD", "NONE", "FR-001", "AC-FR-001",
+            "HARNESS-004", "NONE",
+        )],
     )
 
 
@@ -1413,7 +1721,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["authorizations"],
             {"construction": "NONE", "aws": "NONE"},
         )
-        self.assertEqual(report["design_contract"]["schema_version"], 4)
+        self.assertEqual(report["design_contract"]["schema_version"], 5)
         self.assertIn(
             report["design_contract"]["status"],
             {"UNINITIALIZED", "BLOCKED"},
@@ -2122,6 +2430,16 @@ class BootstrapDoctorTests(unittest.TestCase):
         amended = complete_coverage_plan(
             amended, work_kind="FEATURE", disposition="AMEND"
         )
+        amended = replace_contract_table_with_sentinel(
+            amended,
+            doctor.FIRST_WAVE_HEADING,
+            "FEATURE work does not define a greenfield walking skeleton",
+        )
+        amended = amended.replace(
+            "DES-0001, FR-001, JOURNEY-001, WAVE-001",
+            "DES-0001, FR-001",
+            1,
+        )
         impact_table = "\n".join(
             [
                 "| Change ID | Changed basis IDs | Affected IDs | Preserved IDs | Required revalidation |",
@@ -2295,7 +2613,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 4)
+        self.assertEqual(ready.schema_version, 5)
         self.assertEqual(ready.architecture.schema_version, 4)
         self.assertEqual(ready.change_impact.status, "READY")
         self.assertEqual(ready.architecture.status, "READY")
@@ -2395,43 +2713,29 @@ class BootstrapDoctorTests(unittest.TestCase):
             ready.architecture.canonical_sha256,
         )
 
-        legacy = complete.replace(
-            "| Gate B derived status | `BLOCKED` |",
-            "| Gate B derived status | `APPROVED_FOR_CONSTRUCTION` |",
-            1,
-        )
-        for heading in (
-            doctor.ARCHITECTURE_DRIVER_HEADING,
-            doctor.ARCHITECTURE_CANDIDATE_HEADING,
-            doctor.ARCHITECTURE_SELECTION_HEADING,
-            doctor.ARCHITECTURE_TRACEABILITY_HEADING,
-            doctor.MATERIAL_AWS_EVIDENCE_HEADING,
-            doctor.HARNESS_HEADING,
-        ):
-            legacy = legacy.replace(heading, heading + " (legacy v1)", 1)
+        legacy = exact_legacy_schema_four_projection(complete)
         grandfathered, grandfathered_issues = doctor.derive_design_contract(
             legacy,
             "DES-0001",
             required=True,
+            grandfather_approved_v1=True,
         )
         self.assertEqual(grandfathered_issues, [])
         self.assertEqual(grandfathered.status, "READY")
-        self.assertEqual(grandfathered.schema_version, 1)
-        self.assertTrue(grandfathered.architecture.grandfathered_v1)
+        self.assertEqual(grandfathered.schema_version, 4)
+        self.assertFalse(grandfathered.architecture.grandfathered_v1)
+        self.assertTrue(grandfathered.project_contract.grandfathered_v4)
 
-        design_changed = legacy.replace(
-            doctor.ARCHITECTURE_DRIVER_HEADING + " (legacy v1)",
-            doctor.ARCHITECTURE_DRIVER_HEADING,
-            1,
-        )
+        design_changed = legacy + "\n### State register\n"
         invalidated, invalidated_issues = doctor.derive_design_contract(
             design_changed,
             "DES-0001",
             required=True,
+            grandfather_approved_v1=True,
         )
         self.assertEqual(invalidated.status, "BLOCKED")
         self.assertTrue(
-            any("Missing ### Whole-system candidates" in issue for issue in invalidated_issues),
+            any("Project design contract schema 5" in issue for issue in invalidated_issues),
             invalidated_issues,
         )
 
@@ -2464,7 +2768,13 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertTrue(ready_report["ok"], ready_report["diagnostics"])
             self.assertEqual(ready_report["status"], "RESUME")
             self.assertEqual(ready_report["next_prompt"], "TASK-10")
-            self.assertEqual(contract["schema_version"], 4)
+            self.assertEqual(contract["schema_version"], 5)
+            self.assertEqual(
+                ready_report["requirements_contract"]["schema_version"], "1.3"
+            )
+            self.assertEqual(ready_report["requirements_contract"]["status"], "READY")
+            self.assertEqual(contract["project_contract"]["status"], "READY")
+            self.assertEqual(contract["project_contract"]["first_wave"]["wave_contract_id"], "WAVE-001")
             self.assertEqual(ready_report["coverage_plan"]["status"], "READY")
             self.assertEqual(contract["change_impact"]["status"], "READY")
             self.assertEqual(contract["status"], "READY")
@@ -2736,8 +3046,8 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.approve_project(project)
             prd_path = project / "docs/project/PRD.md"
             text = prd_path.read_text(encoding="utf-8").replace(
-                ", TECH-0009, PROP-001`",
-                ", TECH-0009`",
+                ", PROP-001, HARNESS-004",
+                ", HARNESS-004",
                 1,
             )
             prd_path.write_text(rebind_gate_b_envelope(text), encoding="utf-8")
@@ -5941,6 +6251,611 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["remediation"]["next_action"]["action_kind"],
             "REVIEW_SAFETY_BLOCKER",
         )
+    def test_schema_13_requirements_projection_is_grounded_and_migratable(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        text = approve_gate_a(source)
+        intake_contract, intake_issues = doctor.derive_intake_foundation_contract(
+            text,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+        self.assertEqual(intake_contract.status, "READY_FOR_REQUIREMENTS")
+
+        contract, issues = doctor.derive_requirements_contract(
+            text,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(contract.status, "READY")
+        self.assertEqual(contract.schema_version, "1.3")
+        self.assertEqual(contract.actor_ids, ("ACT-001",))
+        self.assertEqual(contract.journey_ids, ("JOURNEY-001",))
+        self.assertEqual(
+            set(contract.acceptance_ids),
+            {f"AC-{identifier}" for identifier in contract.requirement_ids},
+        )
+        self.assertRegex(contract.canonical_sha256 or "", r"^sha256:[0-9a-f]{64}$")
+
+        ungrounded = text.replace(
+            "INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0007",
+            "INTAKE-9999",
+            1,
+        )
+        blocked, blocked_issues = doctor.derive_requirements_contract(
+            ungrounded,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertIn(
+            "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+            {code for code, _message in blocked_issues},
+        )
+
+        legacy = text.replace(
+            "| Project contract schema | `1.3` |",
+            "| Project contract schema | `1.2` |",
+            1,
+        )
+        migration, migration_issues = doctor.derive_requirements_contract(
+            legacy,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(migration.status, "MIGRATION_REQUIRED")
+        self.assertEqual(
+            migration.missing_records,
+            ("Project contract schema 1.3",),
+        )
+        self.assertEqual(
+            {code for code, _message in migration_issues},
+            {"PROJECT_CONTRACT_MIGRATION_REQUIRED"},
+        )
+        mislabeled, mislabeled_issues = doctor.derive_requirements_contract(
+            legacy,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=True,
+        )
+        self.assertEqual(mislabeled.status, "MIGRATION_REQUIRED")
+        self.assertEqual(
+            {code for code, _message in mislabeled_issues},
+            {"PROJECT_CONTRACT_MIGRATION_REQUIRED"},
+        )
+
+        exact_legacy = """## Document status
+
+| Field | Value |
+|---|---|
+| Current requirements revision | `REQ-0001` |
+| Gate A derived status | `APPROVED_FOR_DESIGN` |
+
+## Approved legacy requirements
+
+| ID | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-001 | The application SHALL preserve the approved outcome. | An observed test confirms the approved outcome. |
+"""
+        grandfathered, grandfathered_issues = doctor.derive_requirements_contract(
+            exact_legacy,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=True,
+        )
+        self.assertEqual(grandfathered_issues, [])
+        self.assertEqual(grandfathered.status, "GRANDFATHERED")
+        self.assertEqual(grandfathered.requirement_ids, ("FR-001",))
+        self.assertTrue(grandfathered.grandfathered_approved_gate_a)
+
+    def test_rich_use_case_trigger_cannot_be_silently_ignored(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        text = approve_gate_a(source)
+        intake_contract, _issues = doctor.derive_intake_foundation_contract(
+            text,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+
+        high_risk, high_risk_issues = doctor.derive_requirements_contract(
+            text,
+            "high",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(high_risk.status, "BLOCKED")
+        self.assertIn(
+            "RICH_USE_CASE_REQUIRED",
+            {code for code, _message in high_risk_issues},
+        )
+
+        explicit_required = text.replace(
+            "| NOT_APPLICABLE | NOT_APPLICABLE - low-risk single-actor synchronous fixture | NONE |",
+            "| REQUIRED | CONFIDENTIAL_MUTATION | USECASE-001 |",
+            1,
+        )
+        required_contract, required_issues = doctor.derive_requirements_contract(
+            explicit_required,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(required_contract.status, "BLOCKED")
+        self.assertIn(
+            "RICH_USE_CASE_INVALID",
+            {code for code, _message in required_issues},
+        )
+
+    def test_inspect_project_bridges_exact_legacy_gate_a_analysis_field(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            refresh_control_hashes(project)
+            self.approve_project(project, gate_b=False)
+            prd_path = project / "docs/project/PRD.md"
+            prd_path.write_text(
+                exact_legacy_requirements_projection(
+                    prd_path.read_text(encoding="utf-8")
+                ),
+                encoding="utf-8",
+            )
+
+            report = doctor.inspect_project(project)
+
+        self.assertEqual(report["requirements_contract"]["status"], "GRANDFATHERED")
+        self.assertTrue(
+            report["requirements_contract"]["grandfathered_approved_gate_a"]
+        )
+        self.assertNotIn("PROJECT_CONTRACT_MIGRATION_REQUIRED", codes(report))
+        self.assertEqual(report["next_prompt"], "DESIGN-10")
+
+    def test_schema_five_project_design_is_digest_bound_and_fail_closed(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(source)
+        ready, issues = doctor.derive_design_contract(
+            complete,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(ready.status, "READY")
+        self.assertEqual(ready.schema_version, 5)
+        self.assertEqual(ready.project_contract.status, "READY")
+        self.assertEqual(ready.project_contract.interface_ids, ("API-001",))
+        self.assertEqual(ready.project_contract.boundary_ids, ("BOUNDARY-001",))
+        self.assertEqual(
+            ready.project_contract.first_wave.wave_contract_id,
+            "WAVE-001",
+        )
+        self.assertIsNone(ready.project_contract.spike)
+
+        changed_text = complete.replace(
+            "100 requests per minute",
+            "200 requests per minute",
+            1,
+        )
+        changed, changed_issues = doctor.derive_design_contract(
+            changed_text,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(changed_issues, [])
+        self.assertNotEqual(
+            ready.project_contract.canonical_sha256,
+            changed.project_contract.canonical_sha256,
+        )
+        self.assertNotEqual(ready.canonical_sha256, changed.canonical_sha256)
+
+        unsafe = complete.replace(
+            "Server verifies the caller may request the local outcome",
+            "TODO",
+            1,
+        )
+        blocked, blocked_issues = doctor.derive_design_contract(
+            unsafe,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertTrue(
+            any("Authorization" in issue and "must be concrete" in issue for issue in blocked_issues),
+            blocked_issues,
+        )
+
+    def test_schema_five_project_contract_rejects_false_ready_details(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(source)
+        stateful = replace_contract_table(
+            complete,
+            doctor.STATE_APPLICABILITY_HEADING,
+            doctor.STATE_APPLICABILITY_HEADERS,
+            [("RESOURCE-001", "APPLICABLE", "LIFECYCLE_RESOURCE: FR-001", "STATE-001")],
+        )
+        stateful = replace_contract_table(
+            stateful,
+            doctor.STATE_REGISTER_HEADING,
+            doctor.STATE_REGISTER_HEADERS,
+            [(
+                "STATE-001", "RESOURCE-001", "PENDING, READY", "PENDING",
+                "PENDING -> READY", "READY", "Reject invalid transitions",
+                "FR-001", "TEST-999",
+            )],
+        )
+        cases = {
+            "client-only authorization": (
+                complete.replace(
+                    "Server verifies the caller may request the local outcome",
+                    "Client sends its caller identifier",
+                    1,
+                ),
+                "Authorization must be server-side",
+            ),
+            "vague timeout": (
+                complete.replace("2 seconds", "fast", 1),
+                "Timeout bound must contain a numeric measurable bound",
+            ),
+            "invented boundary validation": (
+                complete.replace("AC-FR-001, AC-FR-002", "TEST-999", 1),
+                "unknown Validation IDs: TEST-999",
+            ),
+            "invented state validation": (
+                stateful,
+                "STATE-001: unknown Validation IDs: TEST-999",
+            ),
+            "unbound end-to-end Harness": (
+                complete.replace(
+                    "DES-0001, FR-001, JOURNEY-001, WAVE-001",
+                    "DES-0001, FR-001",
+                    1,
+                ),
+                "Basis IDs must include both JOURNEY-001 and WAVE-001",
+            ),
+        }
+        for label, (changed, expected) in cases.items():
+            with self.subTest(case=label):
+                blocked, issues = doctor.derive_design_contract(
+                    changed, "DES-0001", required=True
+                )
+                self.assertEqual(blocked.status, "BLOCKED")
+                self.assertTrue(any(expected in issue for issue in issues), issues)
+
+        mislabeled_current = complete.replace(
+            "| Project design contract schema | `5` |\n", "", 1
+        )
+        migration, migration_issues = doctor.derive_design_contract(
+            mislabeled_current,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(migration.project_contract.status, "MIGRATION_REQUIRED")
+        self.assertFalse(migration.project_contract.grandfathered_v4)
+        self.assertTrue(
+            any("Project design contract schema 5" in issue for issue in migration_issues),
+            migration_issues,
+        )
+
+    def test_exact_schema_four_shape_is_the_only_project_design_bridge(self) -> None:
+        legacy_text = """## Document status
+
+| Field | Value |
+|---|---|
+| Current design revision | `DES-0001` |
+| Gate B derived status | `APPROVED_FOR_CONSTRUCTION` |
+
+## 16. Interfaces and contracts
+
+| Contract ID | Producer | Consumer | Schema or protocol | Authentication | Versioning | Idempotency |
+|---|---|---|---|---|---|---|
+| API-001 | Browser | Application | JSON over HTTPS | Approved identity token | Versioned path | Idempotency key |
+"""
+        requirements = doctor.RequirementsContract(
+            schema_version="1.2",
+            status="GRANDFATHERED",
+            requirement_ids=("FR-001",),
+            grandfathered_approved_gate_a=True,
+        )
+        coverage = doctor.CoverageContract(status="READY", work_kind="NEW_BUILD")
+        harness = doctor.HarnessContract(
+            status="READY",
+            rows=(doctor.HarnessRow(
+                "HARNESS-001", "End-to-end", "unittest", "Approved design",
+                "DES-0001, FR-001", "python -m unittest tests.test_legacy",
+                "docs/project/VERIFY.md#legacy", "REQUIRED",
+            ),),
+            required_ids=("HARNESS-001",),
+        )
+        legacy_ids = {"ARCH-0001", "TECH-0001", "PROP-001", "HARNESS-001"}
+
+        grandfathered, issues = doctor.derive_project_design_contract(
+            legacy_text,
+            requirements,
+            coverage,
+            {"DES-0001", "FR-001"},
+            harness,
+            legacy_ids,
+            required=True,
+            grandfather_approved_v4=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "GRANDFATHERED")
+        self.assertTrue(grandfathered.grandfathered_v4)
+
+        damaged_current, damaged_issues = doctor.derive_project_design_contract(
+            legacy_text + "\n### State register\n",
+            requirements,
+            coverage,
+            {"DES-0001", "FR-001"},
+            harness,
+            legacy_ids,
+            required=True,
+            grandfather_approved_v4=True,
+        )
+        self.assertEqual(damaged_current.status, "MIGRATION_REQUIRED")
+        self.assertFalse(damaged_current.grandfathered_v4)
+        self.assertTrue(damaged_issues)
+
+    def test_new_build_wave_and_spike_are_executable_and_journey_bound(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(source)
+        requirement_ids = sorted(doctor.authoritative_requirement_ids(complete))
+        journey_one_ids = [item for item in requirement_ids if item != "FR-002"]
+        split = replace_contract_table(
+            complete,
+            doctor.JOURNEY_HEADING,
+            doctor.JOURNEY_HEADERS,
+            [
+                (
+                    "JOURNEY-001", "ACT-001", "See the approved project outcome",
+                    "The development user requests the local result",
+                    "The current approved outcome is displayed",
+                    "Invalid input is rejected without changing approved state",
+                    ", ".join(journey_one_ids), "NONE",
+                ),
+                (
+                    "JOURNEY-002", "ACT-001", "Reject invalid input",
+                    "The development user submits invalid input",
+                    "The invalid input is rejected",
+                    "Approved state remains unchanged", "FR-002", "NONE",
+                ),
+            ],
+        )
+        coverage_table = doctor.contract_table_after_heading(
+            split,
+            doctor.REQUIREMENT_COVERAGE_HEADING,
+            doctor.REQUIREMENT_COVERAGE_HEADERS,
+        )
+        assert coverage_table is not None
+        split = replace_contract_table(
+            split,
+            doctor.REQUIREMENT_COVERAGE_HEADING,
+            doctor.REQUIREMENT_COVERAGE_HEADERS,
+            [
+                (*row[:3], "JOURNEY-002", *row[4:])
+                if row[0] == "FR-002" else row
+                for row in coverage_table.rows
+            ],
+        )
+        mismatched_wave = replace_contract_table(
+            split,
+            doctor.FIRST_WAVE_HEADING,
+            doctor.FIRST_WAVE_HEADERS,
+            [(
+                "WAVE-001", "NEW_BUILD", "JOURNEY-001", "FR-001, FR-002",
+                "AC-FR-001, AC-FR-002", "HARNESS-004", "NONE",
+            )],
+        )
+        blocked, mismatch_issues = doctor.derive_design_contract(
+            mismatched_wave, "DES-0001", required=True
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                "first-wave requirement IDs are not owned by JOURNEY-001: FR-002"
+                in issue
+                for issue in mismatch_issues
+            ),
+            mismatch_issues,
+        )
+
+        spiked = replace_contract_table(
+            complete,
+            doctor.FIRST_WAVE_HEADING,
+            doctor.FIRST_WAVE_HEADERS,
+            [(
+                "WAVE-001", "NEW_BUILD", "JOURNEY-001", "FR-001",
+                "AC-FR-001", "HARNESS-004", "SPIKE-001",
+            )],
+        )
+        spike_table = "\n".join([
+            "| Spike ID | Blocking technical unknown | Time box | Disposable output boundary | Exit criterion | Required next action |",
+            "|---|---|---|---|---|---|",
+            "| SPIKE-001 | Verify the local adapter contract | MAX_ATTEMPTS: 2 | work/spike/** | python -m unittest tests.test_spike_exit | DISCARD_AND_BUILD_WALKING_SKELETON |",
+        ])
+        spiked = spiked.replace(
+            "NOT_APPLICABLE - no prerequisite discovery is needed before the walking skeleton",
+            spike_table,
+            1,
+        )
+        ready, ready_issues = doctor.derive_design_contract(
+            spiked, "DES-0001", required=True
+        )
+        self.assertEqual(ready_issues, [])
+        self.assertEqual(ready.status, "READY")
+        self.assertEqual(ready.project_contract.spike.spike_id, "SPIKE-001")
+
+        for bad_exit in (
+            "Confirm the adapter works",
+            "python -m unittest tests.test_spike_exit; echo unsafe",
+        ):
+            with self.subTest(exit_criterion=bad_exit):
+                unsafe, unsafe_issues = doctor.derive_design_contract(
+                    spiked.replace(
+                        "python -m unittest tests.test_spike_exit", bad_exit, 1
+                    ),
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(unsafe.status, "BLOCKED")
+                self.assertTrue(
+                    any("Exit criterion must be one explicit local command" in issue
+                        for issue in unsafe_issues),
+                    unsafe_issues,
+                )
+
+    def test_real_approved_schema_12_gate_a_reaches_schema_five(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        approved_modern = complete_design_contract(approve_gate_a(source))
+        legacy_basis = exact_legacy_requirements_projection(approved_modern)
+        migrated = complete_legacy_design_bridge(source)
+        self.assertEqual(
+            legacy_basis.split("# Part III", 1)[0],
+            migrated.split("# Part III", 1)[0],
+        )
+        requirements, requirement_issues = doctor.derive_requirements_contract(
+            migrated, "low", None, required=True,
+            grandfather_current_gate_a=True,
+        )
+        self.assertEqual(requirement_issues, [])
+        self.assertEqual(requirements.status, "GRANDFATHERED")
+        self.assertEqual(
+            requirements.acceptance_ids,
+            tuple(f"AC-{item}" for item in requirements.requirement_ids),
+        )
+        design, design_issues = doctor.derive_design_contract(
+            migrated, "DES-0001", required=True,
+            grandfather_approved_v1=True,
+            requirements_contract=requirements,
+        )
+        self.assertEqual(design_issues, [])
+        self.assertEqual(design.status, "READY")
+        self.assertIsNone(design.project_contract.first_wave.journey_id)
+        self.assertIn(
+            requirements.canonical_sha256.encode("utf-8"),
+            design.project_contract.canonical_bytes,
+        )
+
+    def test_legacy_schema_five_bridge_is_fail_closed(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        migrated = complete_legacy_design_bridge(source)
+        cases = {
+            "invented journey": (
+                migrated.replace(
+                    "| WAVE-001 | NEW_BUILD | NONE |",
+                    "| WAVE-001 | NEW_BUILD | JOURNEY-001 |",
+                    1,
+                ),
+                "walking-skeleton journey must be NONE",
+            ),
+            "unbound Harness": (
+                migrated.replace(
+                    "DES-0001, FR-001, WAVE-001",
+                    "DES-0001, WAVE-001",
+                    1,
+                ),
+                "Basis IDs must include the wave and every selected requirement",
+            ),
+            "missing conservative state": (
+                replace_contract_table(
+                    migrated,
+                    doctor.STATE_APPLICABILITY_HEADING,
+                    doctor.STATE_APPLICABILITY_HEADERS,
+                    [("RESOURCE-001", "NOT_APPLICABLE", "NOT_APPLICABLE - no state", "NONE")],
+                ),
+                "grandfathered Gate A design requires an applicable state model",
+            ),
+        }
+        for label, (candidate, expected) in cases.items():
+            with self.subTest(case=label):
+                design, issues = doctor.derive_design_contract(
+                    candidate, "DES-0001", required=True,
+                    grandfather_approved_v1=True,
+                )
+                self.assertEqual(design.status, "BLOCKED")
+                self.assertTrue(any(expected in issue for issue in issues), issues)
+
+        modern = complete_design_contract(source).replace(
+            "| WAVE-001 | NEW_BUILD | JOURNEY-001 |",
+            "| WAVE-001 | NEW_BUILD | NONE |",
+            1,
+        )
+        modern_design, modern_issues = doctor.derive_design_contract(
+            modern, "DES-0001", required=True,
+        )
+        self.assertEqual(modern_design.status, "BLOCKED")
+        self.assertTrue(
+            any("not a current JOURNEY ID" in issue for issue in modern_issues),
+            modern_issues,
+        )
+
+    def test_state_trigger_categories_are_typed_and_journey_bound(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(source)
+        requirements, requirement_issues = doctor.derive_requirements_contract(
+            complete, "low", None, required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(requirement_issues, [])
+
+        def stateful(trigger_basis: str) -> str:
+            text = replace_contract_table(
+                complete, doctor.STATE_APPLICABILITY_HEADING,
+                doctor.STATE_APPLICABILITY_HEADERS,
+                [("RESOURCE-001", "APPLICABLE", trigger_basis, "STATE-001")],
+            )
+            return replace_contract_table(
+                text, doctor.STATE_REGISTER_HEADING, doctor.STATE_REGISTER_HEADERS,
+                [(
+                    "STATE-001", "RESOURCE-001", "PENDING, READY", "PENDING",
+                    "PENDING to READY", "READY", "Reject invalid transitions",
+                    "FR-001", "AC-FR-001",
+                )],
+            )
+
+        for category in doctor.STATE_MODEL_TRIGGERS:
+            with self.subTest(category=category):
+                ready, issues = doctor.derive_design_contract(
+                    stateful(f"{category}: FR-001"), "DES-0001", required=True,
+                    requirements_contract=requirements,
+                )
+                self.assertEqual(issues, [])
+                self.assertEqual(ready.status, "READY")
+        for rich_trigger, state_trigger in doctor.RICH_TO_STATE_TRIGGER.items():
+            triggered = replace(requirements, rich_use_case_triggers=(rich_trigger,))
+            blocked, issues = doctor.derive_design_contract(
+                stateful("LIFECYCLE_RESOURCE: FR-001"), "DES-0001", required=True,
+                requirements_contract=triggered,
+            )
+            self.assertEqual(blocked.status, "BLOCKED")
+            self.assertTrue(any(state_trigger in issue for issue in issues), issues)
+            ready, issues = doctor.derive_design_contract(
+                stateful(f"{state_trigger}: FR-001"), "DES-0001", required=True,
+                requirements_contract=triggered,
+            )
+            self.assertEqual(issues, [])
+            self.assertEqual(ready.status, "READY")
+
+        for invalid in (
+            "UNKNOWN: FR-001",
+            "APPROVAL_FLOW: FR-001; LIFECYCLE_RESOURCE: FR-001",
+        ):
+            blocked, issues = doctor.derive_design_contract(
+                stateful(invalid), "DES-0001", required=True,
+                requirements_contract=requirements,
+            )
+            self.assertEqual(blocked.status, "BLOCKED")
+            self.assertTrue(any("State trigger" in issue for issue in issues), issues)
+
 
 if __name__ == "__main__":
     unittest.main()

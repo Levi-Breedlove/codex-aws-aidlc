@@ -684,6 +684,9 @@ previous local blocker.
    to TASK-10. Otherwise use the doctor state or stop on conflict. Never restart
    BOOT-00 or prerequisites after initialization.
 
+   Contract migration is Codex-owned generated work, not owner setup. Preserve an unchanged approved schema 1.2 Gate A as the design-only bridge to schema 5, and preserve an unchanged approved schema 4 Gate B for its exact design and envelope.
+   Ask the owner only for a missing owner fact, a material requirements decision, or the fresh Gate B required after a design-controlled change.
+
 7. For a routine interaction, render `interaction` through
    `python scripts/fastlane_presenter.py owner --input-stdin`. Return one owner
    action, include a copyable reply when input is required, and omit internal
@@ -724,11 +727,8 @@ repository code, tests, IaC, configuration, and recent relevant history.
 workload profile, intake provenance, brownfield contract, and Part I only after
 reflecting proposed facts to the user. A material edit to previously approved
 requirements must atomically mark both derived gates STALE. No design or task
-writes. Update the matching non-authoritative `bootstrap.yaml` project and
-lifecycle mirror and the identity/state fields in docs/project/TASKS.md's Active execution
-snapshot in the same coordinator checkpoint; do not generate or rewrite task
-blocks. If a CURRENT plan has IN_PROGRESS work, stop and reconcile/archive that
-work before applying the requirements change and marking the plan STALE.
+writes. In the same checkpoint, update the `bootstrap.yaml` mirror and TASKS
+Active execution snapshot. Reconcile IN_PROGRESS work before making a plan STALE.
 
 **GitHub mode:** NONE by default; READ_ONLY only when needed to understand an
 identified brownfield repository.
@@ -753,8 +753,8 @@ rounds. Read the repository first in brownfield mode and distinguish observed
 facts from recommendations.
 
 In each response:
-1. summarize what you understand in at most five bullets;
-2. ask no more than three questions;
+1. summarize the current understanding in at most five bullets;
+2. ask at most three questions;
 3. ask only questions needed to avoid a material scope, user, outcome, data,
    security, deployment, or success-measure mistake;
 4. give two or three understandable choices when helpful;
@@ -801,6 +801,7 @@ Before requirements analysis:
   unresolved sentinel values, secret-like assignments, contradictory choices,
   missing required detail, unsupported whitespace, and unparsed extra content.
 - Unapproved legacy intake reopens facts from unconfirmed context, never synthesizes `OWNER-MSG-*` provenance, and grandfathers only unchanged approved Gate A.
+- An unchanged approved schema 1.2 Gate A may remain the exact requirements basis for a design-only schema 5 migration. Do not reopen intake or ask the owner to repeat confirmed facts unless a current required owner fact is absent.
 - The `Accept all recommendations.` payload selects only complete
   recommendations when preceded by the exact current reply token, every
   question is a decision, and no selected option needs detail. Do not offer or
@@ -918,6 +919,8 @@ when the phase reference's material trigger is met. Record results in existing
 authorities and add no methodology-specific stage, gate, or document. Keep all
 methodology names out of routine owner responses unless the owner explicitly
 asks for an explanation.
+
+Complete the PRD schema 1.3 actor, journey, conditional rich-use-case, business-rule, acceptance-ID, and requirement-coverage records. Ask only for missing product facts; never expose the internal method profile or invent them.
 
 Create or increment a requirements revision such as REQ-0001. Give every
 requirement, non-goal, assumption, and material open question a stable ID.
@@ -1052,30 +1055,27 @@ receipt last after a concise readiness summary.
 
 ## DESIGN-10 — Technical PRD and Construction Envelope
 
-**Preconditions:** Current Gate A receipt for the requirements revision.
+**Preconditions:** Current Gate A receipt.
 
-**Authoritative inputs:** Applicable AGENTS.md; PRD and VERIFY; relevant
-brownfield code, tests, IaC, configuration, schemas, and history; current
-official AWS Core and primary AWS documentation; read-only advisor findings.
+**Authoritative inputs:** Applicable AGENTS.md, PRD, VERIFY, relevant brownfield
+artifacts/history, current official AWS Core/docs, and read-only findings.
 
 **Permitted writes:** PRD Parts III/IV, envelope, and DES/AUTH/Gate B status;
-one necessary ADR; VERIFY DESIGN-10 evidence; TASKS snapshot boundaries; and
-the matching bootstrap.yaml mirror. Write one coordinator checkpoint. Do not
-generate tasks; reconcile active work before staling a current plan.
+one ADR if needed; VERIFY evidence; TASKS snapshot; and bootstrap.yaml mirror,
+as one coordinator checkpoint. Do not generate tasks; reconcile active work.
 
-**GitHub mode:** READ_ONLY only when authorized and needed for design facts.
+**GitHub mode:** READ_ONLY only when authorized for design facts.
 
 **AWS mode:** DOCS_ONLY by default; authenticated READ_ONLY only when explicitly
-authorized for an existing brownfield environment.
+authorized for a brownfield environment.
 
 **Required authorization:** Design writes only; no implementation, GitHub
 writes, or AWS mutation.
 
 **Stop conditions:** Missing/invalid Gate A; requirements/design conflict;
-incomplete or stale architecture/traceability; unresolved TECH or property
-contract; wrong-source or unavailable AWS Core; missing, failed, or stale
-DESIGN-10 `search_documentation`/`retrieve_skill` evidence; or an unverified
-material AWS claim.
+incomplete/stale architecture, traceability, TECH, or property contract;
+wrong/unavailable AWS Core; missing/failed/stale DESIGN-10
+`search_documentation`/`retrieve_skill` evidence; or unverified AWS claim.
 
 **Receipt:** Routine status with REQ, DES, and proposed AUTH IDs.
 
@@ -1091,31 +1091,38 @@ basis IDs, call `search_documentation`, review returned descriptions, select
 the smallest relevant set, and call `retrieve_skill` with exact returned
 identifiers. Follow the retrieved procedure and current official references.
 
-Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md: search precedes
-retrieve; basis, identity, version, actor, results, privacy, time, and binding
-match; selected/returned IDs occur in search results. Use
+Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md. Search precedes
+retrieve; basis, identity, actor, results, privacy, time, binding, and exact
+returned/selected IDs match. Bind every `AWS-EV-*` to its chain and use
 `DES-0001; TECH: TECH-0001, TECH-0002` or
-`DES-0001; TECH: NONE — no technology/toolchain impact`. Every
-`AWS-EV-*` cites its chain; observed AWS Core version is metadata, never a pin.
-Persist no raw skill content or transcripts. Installed skills, BOOT
-metadata, cache, connectors, and memory are insufficient. Codex is the only writer and selects the design.
+`DES-0001; TECH: NONE — no technology/toolchain impact`; observed AWS Core version is metadata, never a pin.
+Persist no raw skill content or transcripts;
+installation, BOOT metadata, cache, connectors, and memory are insufficient.
+Codex is the only writer and selects the design.
 
-After completing the proposed design, use
-`fastlane-architecture-challenger` only for its conditional triggers. It
-cannot select, write, approve, authorize, or replace evidence.
+After completing the proposed design, use `fastlane-architecture-challenger`
+only when conditionally triggered; it cannot select, write, approve,
+authorize, or replace evidence.
 
 Load the Design reference, follow the Adaptive Coverage Plan, and complete
-every required existing PRD record. `SELECT` compares complete candidates;
-`AMEND` revalidates affected drivers and alternatives; `PRESERVE` proves
-architecture, technology, trust, data, recovery, Region, and Harness
-boundaries unchanged.
+required PRD records. `SELECT` compares complete candidates; `AMEND` revalidates
+affected drivers/alternatives; `PRESERVE` proves architecture, technology,
+trust, data, recovery, Region, and Harness boundaries unchanged.
+
+Apply the compatibility boundary first. An unchanged approved schema 4 Gate B
+remains current for its exact design/envelope. New, unapproved, or
+design-controlled work requires schema 5, new digests, and fresh Gate B.
+With a current approved legacy schema 1.2 Gate A, Codex may migrate schema 5
+without changing Part I. Generated migration is Codex-owned: report
+`Need from you: Nothing` unless an owner fact is missing; never invent it,
+change requirements, expand authority, or bypass task/Harness/evidence checks.
 
 - For SELECT, evaluate a secure managed-serverless baseline. Complete `DRV-*`,
   `CAND-*`, selected `ARCH-*`, traceability, and `AWS-EV-*`; apply
   hard constraints before preferences and select only an eligible candidate.
 - Record rejected alternatives, risks/mitigations, Security impact,
   Reliability impact, Operational burden, cost/breakpoints, Migration path,
-  revisit triggers, and validation for all required whole-system domains.
+  revisit triggers, and validation across required whole-system domains.
 - Complete in-scope `TECH-*`. Only `EXACT` accepts opaque versions; Active `PROPERTY_TESTING` uses
   `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
 - classify every measurable Gate A requirement exactly once. Each applicable
@@ -1124,6 +1131,8 @@ boundaries unchanged.
 - Complete the Gate B Harness Profile and Change impact record. Uncertain
   impact uses `FULL_REVALIDATION`; resolve brownfield compatibility,
   migration, and protected behavior.
+
+- Complete material interface and layer-boundary contracts, every applicable state model, and the NEW_BUILD first-wave/spike record. Bind them into the current design digest before Gate B.
 
 Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as the
 shared basis, and not append by default. Route material Part I flow changes through REQ-10. Preserve least-privilege IAM, encryption, secrets, validation,
@@ -1139,25 +1148,23 @@ compatibility/migration; Outstanding gaps. Use explicit stable IDs.
 `NOT_APPLICABLE — <reason>` is allowed only when genuine. Outstanding gaps is
 `NONE` or stable gap IDs; any gap keeps Gate B `BLOCKED`.
 
-Propose the complete construction envelope using every PRD row and grammar.
-GitHub writes include only explicitly listed operations; merge and branch
-deletion default unauthorized. AWS defaults DOCS_ONLY. A fast-dev mutation
-envelope requires non-production, exact resources/operations, a finite
-positive `USD: 20.00`-style ceiling that does not exceed or change currency of
-an owner hard cap, feasible rollback/teardown, artifact authority as an exact
-lowercase SHA-256 or deterministic authorized-source rule, and future expiry. Use
+Propose every construction-envelope row with the PRD's exact grammar. GitHub
+merge/branch deletion remain unauthorized unless listed; AWS defaults
+DOCS_ONLY. Fast-dev mutation requires non-production, exact
+resources/operations, a finite positive ceiling within the owner's cap and
+currency, feasible rollback/teardown, authorized SHA-256 provenance, future
+expiry, and the exact
 `ENVIRONMENT: <exact>; CLASS: NON_PRODUCTION`,
 `EXACT_DIGEST: sha256:<64 lowercase hex>` or
 `DERIVED_FROM_AUTHORIZED_SOURCE: SHA-256 from baseline <full authorized commit>; <deterministic rule>`,
-and `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>`.
+and `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>` grammars.
 
-Require a local Git repository and baseline commit. Compute the Design contract
-SHA-256 over Architecture driver, Candidate, Selection, Traceability, Material
-AWS evidence, Harness, Change impact, Technology, Property applicability,
-definition, and execution tables. Copy it into the envelope; include the selected `ARCH-*`, every current
-`TECH-*`, and every applicable `PROP-*` in
-`SCOPE_IDS`. Compute the final complete-envelope SHA-256 and copy it into
-the Gate B review and proposed receipt.
+Require local Git and a baseline. Hash Architecture driver, Candidate,
+Selection, Traceability, Material AWS evidence, Harness, Change impact,
+Technology, Property applicability, definition, and execution tables into the
+Design contract SHA-256. Copy it to the envelope; include the selected `ARCH-*`,
+current `TECH-*`, and applicable `PROP-*` in `SCOPE_IDS`. Hash the complete
+envelope and copy it to the Gate B review and proposed receipt.
 
 Incomplete design/envelope keeps Gate B `BLOCKED`. Only after the recommendation
 is `READY_FOR_CONSTRUCTION_APPROVAL`, atomically set the
@@ -1342,6 +1349,9 @@ force one onto a legitimate migration-only, security-only,
 infrastructure-only, or evidence-only task. Every exception still has one
 coherent outcome and independent evidence.
 
+For `NEW_BUILD`, wave 1 implements the approved first end-to-end journey. One bounded disposable spike may precede it only when the Gate B record says it blocks that path; it cannot replace or satisfy the product outcome.
+Include the approved `WAVE-*` ID in that walking-skeleton task's `Requirements` metadata.
+
 Plan each task so the unchanged Fastlane Definition of Done can be satisfied:
 all acceptance criteria, exact validation, applicable property tests, observed
 evidence, approved boundaries, current execution log and checkpoint, no
@@ -1359,7 +1369,7 @@ task IDs.
 For every task include:
 - stable ID and outcome;
 - status: BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE, or SKIPPED;
-- requirement/bug and applicable PROP traceability, plus the existing `Design`
+- requirement/bug, applicable acceptance/journey/PROP and wave/spike traceability, plus the existing `Design`
   value as `DES-0001; TECH: TECH-0001, TECH-0002` or
   `DES-0001; TECH: NONE — no technology/toolchain impact`;
 - current AUTH ID, dependencies, and explicit skipped-dependency waivers or NONE;

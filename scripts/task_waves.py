@@ -155,6 +155,11 @@ HARNESS_EVIDENCE_HEADERS = (
 HARNESS_ID_PATTERN = re.compile(r"HARNESS-\d{3,}")
 HARNESS_PASS_STATUSES = {"LOCAL_PASS", "VERIFIED"}
 HARNESS_FAILURE_STATUS = "FAILED"
+WAVE_ID_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])WAVE-\d{3,}(?![A-Za-z0-9_-])")
+SPIKE_ID_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])SPIKE-\d{3,}(?![A-Za-z0-9_-])")
+CONTRACT_ID_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_-])[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+(?![A-Za-z0-9_-])"
+)
 PROPERTY_EXECUTION_PLACEHOLDER_PATTERN = re.compile(
     r"(?:<[^>]+>|(?<![A-Za-z0-9_])(?:TODO|TBD|TBC|UNKNOWN|UNASSIGNED|"
     r"NONE|PENDING|PLACEHOLDER|NOT[ _-]*STARTED|N/?A)(?![A-Za-z0-9_]))",
@@ -334,10 +339,30 @@ class HarnessEvidenceRow:
 
 
 @dataclass(frozen=True)
+class ApprovedSpikeContract:
+    spike_id: str
+    max_attempts: int
+    disposable_boundaries: tuple[str, ...]
+    exit_criterion: str
+
+
+@dataclass(frozen=True)
+class ApprovedDeliveryContract:
+    grandfathered: bool
+    wave_contract_id: str | None = None
+    journey_id: str | None = None
+    requirement_ids: tuple[str, ...] = ()
+    acceptance_test_ids: tuple[str, ...] = ()
+    harness_id: str | None = None
+    spike: ApprovedSpikeContract | None = None
+
+
+@dataclass(frozen=True)
 class ApprovedTaskContract:
     technology_ids: frozenset[str]
     property_execution: dict[str, PropertyExecutionRow]
     harness: dict[str, HarnessExecutionRow]
+    delivery: ApprovedDeliveryContract | None = None
 
 
 def clean(value: str) -> str:
@@ -1040,6 +1065,136 @@ def harness_rows_equivalent(
     )
 
 
+def task_contract_ids(task: Task) -> list[str]:
+    """Return exact stable contract IDs from the existing Requirements field."""
+
+    return CONTRACT_ID_PATTERN.findall(clean(task.metadata.get("Requirements", "")))
+
+
+def transitively_depends_on(
+    task: Task,
+    ancestor_id: str,
+    by_id: dict[str, Task],
+) -> bool:
+    pending = list(task.dependencies)
+    visited: set[str] = set()
+    while pending:
+        dependency_id = pending.pop()
+        if dependency_id == ancestor_id:
+            return True
+        if dependency_id in visited:
+            continue
+        visited.add(dependency_id)
+        dependency = by_id.get(dependency_id)
+        if dependency is not None:
+            pending.extend(dependency.dependencies)
+    return False
+
+
+def validate_new_build_delivery_order(
+    tasks: list[Task],
+    by_id: dict[str, Task],
+    approved_delivery: ApprovedDeliveryContract | None,
+    approved_harness: dict[str, HarnessExecutionRow] | None,
+    *,
+    current_plan: bool,
+) -> list[str]:
+    """Bind a modern NEW_BUILD task graph to its approved first-wave contract."""
+
+    errors: list[str] = []
+    delivery = approved_delivery
+    if not current_plan or delivery is None or delivery.grandfathered or delivery.wave_contract_id is None:
+        return errors
+    wave_id = delivery.wave_contract_id
+    references = {task.task_id: task_contract_ids(task) for task in tasks}
+
+    def matching_ids(pattern: re.Pattern[str]) -> list[str]:
+        return [identifier for values in references.values() for identifier in values if pattern.fullmatch(identifier)]
+
+    def reject(condition: bool, message: str) -> bool:
+        if condition:
+            errors.append(message)
+        return condition
+
+    def sole_owner(identifier: str, noun: str, skipped: str) -> Task | None:
+        owners = [task for task in tasks for reference in references[task.task_id] if reference == identifier]
+        if len(owners) != 1:
+            errors.append(f"{identifier}: current NEW_BUILD task plan requires exactly one {noun} task; found {len(owners)}")
+            return None
+        owner = owners[0]
+        return None if reject(owner.status == "SKIPPED", f"{owner.task_id}: {skipped} cannot be SKIPPED") else owner
+
+    unexpected = sorted(set(matching_ids(WAVE_ID_PATTERN)) - {wave_id})
+    reject(bool(unexpected), "Current NEW_BUILD task plan references unapproved first-wave IDs: " + ", ".join(unexpected))
+    walking_task = sole_owner(wave_id, "walking-skeleton", "walking-skeleton task")
+    if walking_task is not None:
+        required_ids = {wave_id, *delivery.requirement_ids, *delivery.acceptance_test_ids}
+        if delivery.journey_id is not None:
+            required_ids.add(delivery.journey_id)
+        missing_ids = sorted(required_ids - set(references[walking_task.task_id]))
+        reject(bool(missing_ids), f"{walking_task.task_id}: walking-skeleton Requirements are missing " + ", ".join(missing_ids))
+        projected_harness: dict[str, HarnessExecutionRow] = {}
+        validation = task_subsection(walking_task, "#### Validation")
+        if validation is not None:
+            try:
+                projected_harness, _present = parse_harness_projection_rows(validation, walking_task.task_id)
+            except ValueError as exc:
+                errors.append(str(exc))
+        harness_id = delivery.harness_id
+        unavailable = harness_id is None or approved_harness is None or harness_id not in approved_harness
+        if not reject(unavailable, f"{wave_id}: approved end-to-end Harness contract is unavailable"):
+            reject(harness_id not in projected_harness, f"{walking_task.task_id}: walking-skeleton Validation must own approved end-to-end {harness_id}")
+
+    approved_spike = delivery.spike
+    observed_spike_ids = matching_ids(SPIKE_ID_PATTERN)
+    spike_task: Task | None = None
+    if approved_spike is None:
+        reject(bool(observed_spike_ids), "Current NEW_BUILD task plan references an unapproved blocking spike: " + ", ".join(sorted(set(observed_spike_ids))))
+    else:
+        unexpected = sorted(set(observed_spike_ids) - {approved_spike.spike_id})
+        reject(bool(unexpected), "Current NEW_BUILD task plan references unapproved spike IDs: " + ", ".join(unexpected))
+        spike_task = sole_owner(approved_spike.spike_id, "spike", "blocking spike")
+        same_task = walking_task is not None and spike_task is not None and spike_task.task_id == walking_task.task_id
+        if reject(same_task, f"{approved_spike.spike_id}: spike and walking skeleton must be separate tasks"):
+            spike_task = None
+    if spike_task is not None and approved_spike is not None:
+        reject(spike_task.attempt_budget > approved_spike.max_attempts, f"{spike_task.task_id}: Attempt budget exceeds approved {approved_spike.spike_id} maximum {approved_spike.max_attempts}")
+        try:
+            spike_writes = validate_write_boundary(spike_task.metadata.get("Write set", ""), spike_task.task_id)
+            outside = [path for path in spike_writes if not any(path_boundary_contains(boundary, path) for boundary in approved_spike.disposable_boundaries)]
+            reject(bool(outside), f"{spike_task.task_id}: spike Write set exceeds the approved disposable boundary: " + ", ".join(outside))
+        except ValueError as exc:
+            errors.append(str(exc))
+        reject(clean(spike_task.metadata.get("External state", "")) != "NONE", f"{spike_task.task_id}: blocking spike requires External state NONE")
+        reject(spike_task.aws_mode not in {"NONE", "DOCS_ONLY"}, f"{spike_task.task_id}: blocking spike AWS mode must be NONE or DOCS_ONLY")
+        validation = task_subsection(spike_task, "#### Validation") or ""
+        exit_count = fenced_command_lines(validation).count(approved_spike.exit_criterion)
+        reject(exit_count != 1, f"{spike_task.task_id}: approved spike exit criterion must appear unchanged exactly once in Validation code fences; found {exit_count}")
+
+    if walking_task is None or not all(dependency in by_id and dependency != task.task_id for task in tasks for dependency in task.dependencies):
+        return errors
+    try:
+        waves = compute_waves(tasks, by_id)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return errors
+    active_tasks = [task for task in tasks if task.status in ALLOWED_STATUSES - {"SKIPPED"}]
+    tasks_in_wave = lambda number: sorted(task.task_id for task in active_tasks if waves[task.task_id] == number)
+    if approved_spike is None:
+        reject(bool(walking_task.dependencies), f"{walking_task.task_id}: walking skeleton without a spike must use Depends on NONE")
+        reject(tasks_in_wave(1) != [walking_task.task_id], f"{wave_id}: walking skeleton must be the sole active structural wave 1 task")
+    elif spike_task is not None:
+        reject(bool(spike_task.dependencies), f"{spike_task.task_id}: blocking spike must use Depends on NONE")
+        reject(walking_task.dependencies != [spike_task.task_id], f"{walking_task.task_id}: walking skeleton must depend directly and only on {spike_task.task_id}")
+        reject(tasks_in_wave(1) != [spike_task.task_id], f"{approved_spike.spike_id}: spike must be the sole active structural wave 1 task")
+        reject(tasks_in_wave(2) != [walking_task.task_id], f"{wave_id}: walking skeleton must be the sole active structural wave 2 task after the spike")
+
+    excluded = {walking_task.task_id, *(task.task_id for task in (spike_task,) if task)}
+    bypassing = sorted(task.task_id for task in active_tasks if task.task_id not in excluded and not transitively_depends_on(task, walking_task.task_id, by_id))
+    reject(bool(bypassing), f"{wave_id}: active tasks must be transitively downstream of the walking skeleton: " + ", ".join(bypassing))
+    return errors
+
+
 def parse_harness_evidence(text: str) -> list[HarnessEvidenceRow]:
     """Parse the append-only Harness execution evidence ledger."""
 
@@ -1493,6 +1648,7 @@ def validate(
     approved_tech_ids: set[str] | None = None,
     approved_property_execution: dict[str, PropertyExecutionRow] | None = None,
     approved_harness: dict[str, HarnessExecutionRow] | None = None,
+    approved_delivery: ApprovedDeliveryContract | None = None,
 ) -> dict[str, Task]:
     by_id: dict[str, Task] = {}
     errors: list[str] = []
@@ -1650,6 +1806,19 @@ def validate(
                 errors.append(f"{task.task_id}: missing dependency {dependency}")
             if dependency == task.task_id:
                 errors.append(f"{task.task_id}: cannot depend on itself")
+
+    errors.extend(
+        validate_new_build_delivery_order(
+            tasks,
+            by_id,
+            approved_delivery,
+            approved_harness,
+            current_plan=(
+                snapshot is not None
+                and snapshot.get("Task-plan state") == "CURRENT"
+            ),
+        )
+    )
 
     for waiver in waivers.values():
         if waiver.skipped_task not in by_id or waiver.applies_to not in by_id:
@@ -2349,6 +2518,7 @@ def validate_gate_b_design_contract_binding(
         prd_text,
         snapshot.get("Design revision"),
         required=True,
+        grandfather_approved_v1=True,
     )
     if issues or contract.status != "READY" or contract.canonical_sha256 is None:
         detail = "; ".join(issues) if issues else contract.status
@@ -2511,12 +2681,14 @@ def approved_contract_for_tasks(
             framework.version_policy,
         )
     approved_harness: dict[str, HarnessExecutionRow] = {}
+    approved_delivery: ApprovedDeliveryContract | None = None
     if (root / "bootstrap.manifest.json").exists():
         design_revision = parse_snapshot(tasks_text).get("Design revision")
         design_contract, design_issues = doctor.derive_design_contract(
             prd_text,
             design_revision,
             required=True,
+            grandfather_approved_v1=True,
         )
         if design_issues:
             raise ValueError(
@@ -2537,8 +2709,51 @@ def approved_contract_for_tasks(
             for row in design_contract.harness.rows
             if row.harness_id in design_contract.harness.required_ids
         }
+        project_contract = design_contract.project_contract
+        if project_contract.grandfathered_v4:
+            approved_delivery = ApprovedDeliveryContract(grandfathered=True)
+        elif project_contract.first_wave is None:
+            approved_delivery = ApprovedDeliveryContract(grandfathered=False)
+        else:
+            first_wave = project_contract.first_wave
+            approved_spike: ApprovedSpikeContract | None = None
+            if first_wave.blocking_spike_id is not None:
+                spike = project_contract.spike
+                if spike is None or spike.spike_id != first_wave.blocking_spike_id:
+                    raise ValueError(
+                        "docs/project/PRD.md approved blocking spike is unavailable"
+                    )
+                match = re.fullmatch(r"MAX_ATTEMPTS: ([1-9]\d*)", spike.time_box)
+                if match is None:
+                    raise ValueError(
+                        f"docs/project/PRD.md {spike.spike_id} has an invalid time box"
+                    )
+                disposable_boundaries = tuple(
+                    validate_write_boundary(
+                        spike.disposable_boundary,
+                        f"docs/project/PRD.md {spike.spike_id}",
+                    )
+                )
+                approved_spike = ApprovedSpikeContract(
+                    spike_id=spike.spike_id,
+                    max_attempts=int(match.group(1)),
+                    disposable_boundaries=disposable_boundaries,
+                    exit_criterion=spike.exit_criterion,
+                )
+            approved_delivery = ApprovedDeliveryContract(
+                grandfathered=False,
+                wave_contract_id=first_wave.wave_contract_id,
+                journey_id=first_wave.journey_id,
+                requirement_ids=first_wave.requirement_ids,
+                acceptance_test_ids=first_wave.acceptance_test_ids,
+                harness_id=first_wave.harness_id,
+                spike=approved_spike,
+            )
     return ApprovedTaskContract(
-        frozenset(approved), enriched_property_execution, approved_harness
+        frozenset(approved),
+        enriched_property_execution,
+        approved_harness,
+        approved_delivery,
     )
 
 
@@ -2580,6 +2795,29 @@ def approved_contract_components(
         contract.property_execution,
         contract.harness,
     )
+
+
+def execution_contract_components(
+    contract: ApprovedTaskContract | None,
+) -> tuple[
+    set[str] | None,
+    dict[str, PropertyExecutionRow] | None,
+    dict[str, HarnessExecutionRow] | None,
+    ApprovedDeliveryContract | None,
+]:
+    if contract is None:
+        return None, None, None, None
+    return (
+        set(contract.technology_ids),
+        contract.property_execution,
+        contract.harness,
+        contract.delivery,
+    )
+
+
+def execution_contract_kwargs(contract: ApprovedTaskContract | None) -> dict[str, object]:
+    keys = ("approved_tech_ids", "approved_property_execution", "approved_harness", "approved_delivery")
+    return dict(zip(keys, execution_contract_components(contract)))
 
 
 def coordinator_ledger_paths(tasks_path: Path) -> set[str]:
@@ -2656,11 +2894,7 @@ def expected_execution_fields(tasks_text: str) -> dict[str, object]:
 def preflight_state_matches_tasks(
     tasks_path: Path,
     tasks_text: str,
-) -> tuple[
-    set[str] | None,
-    dict[str, PropertyExecutionRow] | None,
-    dict[str, HarnessExecutionRow] | None,
-]:
+) -> ApprovedTaskContract | None:
     """Refuse mutations when a prior partial write or manual edit caused drift."""
 
     loaded = read_bootstrap_state(tasks_path)
@@ -2671,24 +2905,16 @@ def preflight_state_matches_tasks(
     assert isinstance(lifecycle, dict)
     snapshot = parse_snapshot(tasks_text)
     tasks = parse_tasks(tasks_text)
-    approved_tech_ids, approved_property_execution, approved_harness = (
-        approved_contract_components(tasks_path, tasks_text)
-    )
-    validate(
-        tasks,
-        snapshot,
-        parse_waivers(tasks_text),
-        approved_tech_ids=approved_tech_ids,
-        approved_property_execution=approved_property_execution,
-        approved_harness=approved_harness,
-    )
+    approved_contract = approved_contract_for_tasks(tasks_path, tasks_text)
+    contract_kwargs = execution_contract_kwargs(approved_contract)
+    validate(tasks, snapshot, parse_waivers(tasks_text), **contract_kwargs)
     for task in tasks:
         if task.status == "DONE":
             validate_done_evidence_file(
                 tasks_path,
                 task,
-                approved_property_execution,
-                approved_harness,
+                contract_kwargs["approved_property_execution"],
+                contract_kwargs["approved_harness"],
                 tasks_text,
             )
 
@@ -2737,7 +2963,7 @@ def preflight_state_matches_tasks(
             "TASKS.md does not match bootstrap.yaml; reconcile before mutation: "
             + ", ".join(sorted(set(drift)))
         )
-    return approved_tech_ids, approved_property_execution, approved_harness
+    return approved_contract
 
 
 def mirror_state_text(
@@ -2860,6 +3086,7 @@ def load_contract(
     approved_tech_ids: set[str] | None = None,
     approved_property_execution: dict[str, PropertyExecutionRow] | None = None,
     approved_harness: dict[str, HarnessExecutionRow] | None = None,
+    approved_delivery: ApprovedDeliveryContract | None = None,
 ) -> tuple[list[Task], Snapshot, dict[str, Waiver], dict[str, Task]]:
     tasks = parse_tasks(text)
     snapshot = parse_snapshot(text)
@@ -2871,6 +3098,7 @@ def load_contract(
         approved_tech_ids=approved_tech_ids,
         approved_property_execution=approved_property_execution,
         approved_harness=approved_harness,
+        approved_delivery=approved_delivery,
     )
     compute_waves(tasks, by_id)
     return tasks, snapshot, waivers, by_id
@@ -2882,6 +3110,7 @@ def synchronize_current_wave(
     approved_tech_ids: set[str] | None = None,
     approved_property_execution: dict[str, PropertyExecutionRow] | None = None,
     approved_harness: dict[str, HarnessExecutionRow] | None = None,
+    approved_delivery: ApprovedDeliveryContract | None = None,
 ) -> str:
     """Advance the coordinator snapshot to the lowest runnable/active wave."""
 
@@ -2890,6 +3119,7 @@ def synchronize_current_wave(
         approved_tech_ids=approved_tech_ids,
         approved_property_execution=approved_property_execution,
         approved_harness=approved_harness,
+        approved_delivery=approved_delivery,
     )
     if snapshot.get("Run state") != "RUNNING":
         return text
@@ -2992,15 +3222,9 @@ def mutate_task_file(
 ) -> bool:
     with task_file_lock(path):
         text = path.read_text(encoding="utf-8")
-        approved_tech_ids, approved_property_execution, approved_harness = (
-            preflight_state_matches_tasks(path, text)
-        )
-        tasks, snapshot, waivers, by_id = load_contract(
-            text,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
+        approved_contract = preflight_state_matches_tasks(path, text)
+        contract_kwargs = execution_contract_kwargs(approved_contract)
+        tasks, snapshot, waivers, by_id = load_contract(text, **contract_kwargs)
         require_current_plan(snapshot, "Task mutation")
         require_active_coordinator(snapshot, coordinator, "Task mutation")
         if task_id not in by_id:
@@ -3069,21 +3293,12 @@ def mutate_task_file(
             validate_done_evidence_file(
                 path,
                 updated_task,
-                approved_property_execution,
+                contract_kwargs["approved_property_execution"],
+                contract_kwargs["approved_harness"],
                 text,
             )
-        text = synchronize_current_wave(
-            text,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
-        load_contract(
-            text,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
+        text = synchronize_current_wave(text, **contract_kwargs)
+        load_contract(text, **contract_kwargs)
         # State is replaced first. If the subsequent TASKS replacement fails,
         # doctor detects the mismatch and requires reconciliation rather than
         # allowing a silently divergent run.
@@ -3176,15 +3391,9 @@ def claim_task_file(
         raise ValueError(f"Invalid checkpoint: {checkpoint!r}")
     with task_file_lock(path):
         text = path.read_text(encoding="utf-8")
-        approved_tech_ids, approved_property_execution, approved_harness = (
-            preflight_state_matches_tasks(path, text)
-        )
-        tasks, snapshot, waivers, by_id = load_contract(
-            text,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
+        approved_contract = preflight_state_matches_tasks(path, text)
+        contract_kwargs = execution_contract_kwargs(approved_contract)
+        tasks, snapshot, waivers, by_id = load_contract(text, **contract_kwargs)
         require_current_plan(snapshot, "Claim")
         if task_id not in by_id:
             raise ValueError(f"Unknown task ID: {task_id}")
@@ -3226,12 +3435,7 @@ def claim_task_file(
         current = next(item for item in parse_tasks(text) if item.task_id == task_id)
         timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         text = replace_metadata(text, current, "Last updated", timestamp)
-        load_contract(
-            text,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
+        load_contract(text, **contract_kwargs)
         write_state_mirror(path, text)
         atomic_write_text(path, text)
         return True
@@ -3257,15 +3461,9 @@ def mutate_run_snapshot(
         raise ValueError("Run mode may be selected only when starting a run")
     with task_file_lock(path):
         text = path.read_text(encoding="utf-8")
-        approved_tech_ids, approved_property_execution, approved_harness = (
-            preflight_state_matches_tasks(path, text)
-        )
-        tasks, snapshot, waivers, by_id = load_contract(
-            text,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
+        approved_contract = preflight_state_matches_tasks(path, text)
+        contract_kwargs = execution_contract_kwargs(approved_contract)
+        tasks, snapshot, waivers, by_id = load_contract(text, **contract_kwargs)
         require_current_plan(snapshot, operation.capitalize())
         active = snapshot.get("Active run ID")
         state = snapshot.get("Run state")
@@ -3349,12 +3547,7 @@ def mutate_run_snapshot(
             )
             text = replace_snapshot_field(text, "Last checkpoint", checkpoint)
             text = replace_snapshot_field(text, "Run state", "COMPLETE" if terminal else "PAUSED")
-        load_contract(
-            text,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
+        load_contract(text, **contract_kwargs)
         write_state_mirror(path, text, run_mode=run_mode)
         atomic_write_text(path, text)
 
@@ -3617,23 +3810,16 @@ def main() -> int:
             return 0
         if not tasks:
             raise ValueError("No task blocks found for an initialized task plan")
-        approved_tech_ids, approved_property_execution, approved_harness = (
-            approved_contract_components(path, text)
-        )
-        by_id = validate(
-            tasks,
-            snapshot,
-            waivers,
-            approved_tech_ids=approved_tech_ids,
-            approved_property_execution=approved_property_execution,
-            approved_harness=approved_harness,
-        )
+        approved_contract = approved_contract_for_tasks(path, text)
+        contract_kwargs = execution_contract_kwargs(approved_contract)
+        by_id = validate(tasks, snapshot, waivers, **contract_kwargs)
         for task in tasks:
             if task.status == "DONE":
                 validate_done_evidence_file(
                     path,
                     task,
-                    approved_property_execution,
+                    contract_kwargs["approved_property_execution"],
+                    contract_kwargs["approved_harness"],
                     text,
                 )
         waves = compute_waves(tasks, by_id)
