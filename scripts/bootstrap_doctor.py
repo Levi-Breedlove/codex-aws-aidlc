@@ -118,6 +118,70 @@ CHANGE_IMPACT_HEADERS = (
     "Required revalidation",
 )
 CHANGE_ID = re.compile(r"CHANGE-\d{4,}")
+INTAKE_FOUNDATION_HEADING = "#### Intake foundation"
+INTAKE_FOUNDATION_HEADERS = (
+    "Intake ID",
+    "Field",
+    "Value",
+    "Basis",
+    "Status",
+)
+INTAKE_FOUNDATION_FIELDS = (
+    ("INTAKE-0001", "OWNER_WORK_CONTEXT"),
+    ("INTAKE-0002", "PRIMARY_USERS"),
+    ("INTAKE-0003", "OWNER_STATED_PROBLEM"),
+    ("INTAKE-0004", "OBSERVABLE_OUTCOME"),
+    ("INTAKE-0005", "FIRST_RELEASE_BOUNDARY"),
+    ("INTAKE-0006", "SUCCESS_MEASURE"),
+    ("INTAKE-0007", "MATERIAL_DATA_AND_OPERATING_BOUNDARIES"),
+)
+INTAKE_CORE_FIELDS = frozenset(
+    {
+        "OWNER_WORK_CONTEXT",
+        "PRIMARY_USERS",
+        "OWNER_STATED_PROBLEM",
+        "OBSERVABLE_OUTCOME",
+    }
+)
+OWNER_WORK_CONTEXTS = {
+    "NEW_APPLICATION",
+    "EXISTING_APPLICATION_CHANGE",
+    "REPAIR_OR_MIGRATION",
+}
+INTAKE_BASES = {
+    "OWNER_FACT",
+    "REPOSITORY_FACT",
+    "AGENT_RECOMMENDATION",
+    "PROPOSED_ASSUMPTION",
+    "OPEN_QUESTION",
+}
+INTAKE_CARD_HEADING = "#### Current intake decision card"
+INTAKE_CARD_HEADERS = (
+    "Card ID",
+    "Revision",
+    "Reply key",
+    "Question ID",
+    "Kind",
+    "Basis IDs",
+    "Prompt",
+    "Option A",
+    "Option B",
+    "Option C",
+    "Recommended",
+    "Required detail for",
+    "Detail prompt",
+    "Selection",
+    "Selection detail",
+    "Owner response",
+)
+INTAKE_ID = re.compile(r"INTAKE-\d{4,}")
+INTAKE_CARD_ID = re.compile(r"INTAKE-CARD-\d{4,}")
+INTAKE_QUESTION_ID = re.compile(r"INTAKE-Q-\d{4,}")
+OWNER_RESPONSE_ID = re.compile(r"OWNER-MSG-\d{4,}")
+INTAKE_OWNER_RESPONSE = re.compile(
+    r"OWNER_RESPONSE: (?P<message>OWNER-MSG-\d{4,}); "
+    r"CARD: (?P<card>INTAKE-CARD-\d{4,}); REVISION: (?P<revision>[1-9]\d*)"
+)
 TECHNOLOGY_DECISION_HEADING = "### Technology and toolchain decision register"
 TECHNOLOGY_DECISION_HEADERS = (
     "Decision ID",
@@ -562,6 +626,91 @@ class ContractTable:
     headers: tuple[str, ...]
     rows: tuple[tuple[str, ...], ...]
     canonical_bytes: bytes
+
+@dataclass(frozen=True)
+class IntakeQuestion:
+    reply_key: str
+    question_id: str
+    kind: str
+    basis_ids: tuple[str, ...]
+    prompt: str
+    option_a: str
+    option_b: str
+    option_c: str
+    recommended: str | None
+    required_detail_for: tuple[str, ...]
+    detail_prompt: str | None
+    selection: str
+    selection_detail: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "reply_key": self.reply_key,
+            "question_id": self.question_id,
+            "kind": self.kind,
+            "basis_ids": list(self.basis_ids),
+            "prompt": self.prompt,
+            "options": (
+                {
+                    "A": self.option_a,
+                    "B": self.option_b,
+                    "C": self.option_c,
+                }
+                if self.kind == "DECISION"
+                else {}
+            ),
+            "recommended": self.recommended,
+            "required_detail_for": list(self.required_detail_for),
+            "detail_prompt": self.detail_prompt,
+            "selection": self.selection,
+            "selection_detail": self.selection_detail,
+        }
+
+
+@dataclass(frozen=True)
+class IntakeCard:
+    card_id: str
+    revision: int
+    questions: tuple[IntakeQuestion, ...]
+    accept_all_allowed: bool
+    exact_reply: str
+    canonical_sha256: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "card_id": self.card_id,
+            "revision": self.revision,
+            "questions": [question.to_dict() for question in self.questions],
+            "accept_all_allowed": self.accept_all_allowed,
+            "exact_reply": self.exact_reply,
+            "canonical_sha256": self.canonical_sha256,
+        }
+
+
+@dataclass(frozen=True)
+class IntakeFoundationContract:
+    schema_version: int = 1
+    status: str = "UNINITIALIZED"
+    repository_mode: str | None = None
+    owner_work_context: str | None = None
+    basis_ids: tuple[str, ...] = ()
+    missing_fields: tuple[str, ...] = ()
+    pending_card: IntakeCard | None = None
+    grandfathered_approved_gate_a: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "repository_mode": self.repository_mode,
+            "owner_work_context": self.owner_work_context,
+            "basis_ids": list(self.basis_ids),
+            "missing_fields": list(self.missing_fields),
+            "pending_card": (
+                self.pending_card.to_dict() if self.pending_card else None
+            ),
+            "grandfathered_approved_gate_a": self.grandfathered_approved_gate_a,
+        }
 
 
 @dataclass(frozen=True)
@@ -3624,6 +3773,437 @@ def _canonical_id_list(
     return identifiers
 
 
+
+def _intake_required_detail(value: str, kind: str) -> tuple[str, ...]:
+    cleaned = clean_cell(value)
+    if cleaned == "NONE":
+        return ()
+    if kind == "FACT":
+        if cleaned != "RESPONSE":
+            raise ValueError("FACT questions require detail for RESPONSE")
+        return ("RESPONSE",)
+    if cleaned == "RESPONSE":
+        raise ValueError("DECISION questions require detail for A, B, or C")
+    keys = [item.strip() for item in cleaned.split(",")]
+    if (
+        not keys
+        or any(key not in {"A", "B", "C"} for key in keys)
+        or len(keys) != len(set(keys))
+        or cleaned != ", ".join(keys)
+    ):
+        raise ValueError(
+            "Required detail for must be NONE or comma-space-separated A/B/C keys"
+        )
+    return tuple(keys)
+
+
+def _intake_reply_example(questions: list[IntakeQuestion]) -> str:
+    replies: list[str] = []
+    for question in questions:
+        if question.kind == "FACT":
+            replies.append(f"{question.reply_key}: <your answer>")
+            continue
+        choice = question.recommended or "A"
+        reply = f"{question.reply_key}{choice}"
+        if choice in question.required_detail_for:
+            reply += ": <required detail>"
+        replies.append(reply)
+    return "; ".join(replies)
+
+
+def derive_intake_foundation_contract(
+    text: str,
+    repository_mode: str | None,
+    *,
+    grandfather_current_gate_a: bool,
+) -> tuple[IntakeFoundationContract, list[tuple[str, str]]]:
+    """Derive owner-grounded intake state without treating recommendations as facts."""
+
+    issues: list[tuple[str, str]] = []
+    normalized_repository_mode = (
+        repository_mode.strip().lower() if isinstance(repository_mode, str) else None
+    )
+    repository_mode_value = (
+        normalized_repository_mode.upper()
+        if normalized_repository_mode in PROJECT_MODES
+        else None
+    )
+    try:
+        foundation_table = contract_table_after_heading(
+            text, INTAKE_FOUNDATION_HEADING, INTAKE_FOUNDATION_HEADERS
+        )
+        card_table = contract_table_after_heading(
+            text, INTAKE_CARD_HEADING, INTAKE_CARD_HEADERS
+        )
+    except ValueError as exc:
+        return (
+            IntakeFoundationContract(
+                status="BLOCKED",
+                repository_mode=repository_mode_value,
+            ),
+            [("INTAKE_FOUNDATION_INVALID", str(exc))],
+        )
+
+    if foundation_table is None and card_table is None:
+        if grandfather_current_gate_a:
+            return (
+                IntakeFoundationContract(
+                    status="READY_FOR_REQUIREMENTS",
+                    repository_mode=repository_mode_value,
+                    grandfathered_approved_gate_a=True,
+                ),
+                [],
+            )
+        return (
+            IntakeFoundationContract(
+                status="FOUNDATION_REQUIRED",
+                repository_mode=repository_mode_value,
+                missing_fields=tuple(field for _identifier, field in INTAKE_FOUNDATION_FIELDS),
+            ),
+            [
+                (
+                    "INTAKE_CONTRACT_MIGRATION_REQUIRED",
+                    "Unapproved initialized projects require the intake foundation and current decision card",
+                )
+            ],
+        )
+    if foundation_table is None or card_table is None:
+        return (
+            IntakeFoundationContract(
+                status="BLOCKED",
+                repository_mode=repository_mode_value,
+            ),
+            [
+                (
+                    "INTAKE_FOUNDATION_INVALID",
+                    "Intake foundation and current decision card must exist together",
+                )
+            ],
+        )
+
+    expected_rows = dict(INTAKE_FOUNDATION_FIELDS)
+    observed_rows: dict[str, tuple[str, str, str]] = {}
+    for intake_id, field_name, value, basis, status in foundation_table.rows:
+        if intake_id in observed_rows:
+            issues.append(
+                ("INTAKE_FOUNDATION_INVALID", f"Duplicate intake ID {intake_id}")
+            )
+            continue
+        if INTAKE_ID.fullmatch(intake_id) is None:
+            issues.append(
+                ("INTAKE_FOUNDATION_INVALID", f"Invalid intake ID {intake_id!r}")
+            )
+        if expected_rows.get(intake_id) != field_name:
+            issues.append(
+                (
+                    "INTAKE_FOUNDATION_INVALID",
+                    f"{intake_id} must define {expected_rows.get(intake_id)!r}",
+                )
+            )
+        if basis not in INTAKE_BASES:
+            issues.append(
+                ("INTAKE_FOUNDATION_INVALID", f"{intake_id} has invalid basis {basis!r}")
+            )
+        if status not in {"OPEN", "CONFIRMED"}:
+            issues.append(
+                ("INTAKE_FOUNDATION_INVALID", f"{intake_id} has invalid status {status!r}")
+            )
+        if status == "CONFIRMED":
+            if not explicit_value(value, allow_none=False):
+                issues.append(
+                    ("INTAKE_FOUNDATION_INVALID", f"{intake_id} has no concrete owner value")
+                )
+            if basis != "OWNER_FACT":
+                issues.append(
+                    (
+                        "INTAKE_FOUNDATION_INVALID",
+                        f"{intake_id} can be confirmed only with OWNER_FACT provenance",
+                    )
+                )
+            if (
+                field_name == "OWNER_WORK_CONTEXT"
+                and value not in OWNER_WORK_CONTEXTS
+            ):
+                issues.append(
+                    (
+                        "INTAKE_FOUNDATION_INVALID",
+                        "OWNER_WORK_CONTEXT must be NEW_APPLICATION, "
+                        "EXISTING_APPLICATION_CHANGE, or REPAIR_OR_MIGRATION",
+                    )
+                )
+        elif basis == "OWNER_FACT":
+            issues.append(
+                (
+                    "INTAKE_FOUNDATION_INVALID",
+                    f"{intake_id} cannot remain OPEN with OWNER_FACT provenance",
+                )
+            )
+        observed_rows[intake_id] = (field_name, value, status)
+
+    if tuple((identifier, row[0]) for identifier, row in observed_rows.items()) != INTAKE_FOUNDATION_FIELDS:
+        issues.append(
+            (
+                "INTAKE_FOUNDATION_INVALID",
+                "Intake foundation rows and order must match the seven canonical INTAKE IDs",
+            )
+        )
+
+    missing_fields = tuple(
+        field_name
+        for intake_id, field_name in INTAKE_FOUNDATION_FIELDS
+        if observed_rows.get(intake_id, ("", "", "OPEN"))[2] != "CONFIRMED"
+    )
+    basis_ids = tuple(
+        intake_id
+        for intake_id, _field_name in INTAKE_FOUNDATION_FIELDS
+        if observed_rows.get(intake_id, ("", "", "OPEN"))[2] == "CONFIRMED"
+    )
+    owner_work_context = None
+    owner_row = observed_rows.get("INTAKE-0001")
+    if owner_row is not None and owner_row[2] == "CONFIRMED":
+        owner_work_context = owner_row[1]
+
+    all_questions: list[IntakeQuestion] = []
+    pending_questions: list[IntakeQuestion] = []
+    card_ids: set[str] = set()
+    revisions: set[int] = set()
+    reply_keys: set[str] = set()
+    question_ids: set[str] = set()
+    for raw in card_table.rows:
+        (
+            card_id,
+            revision_text,
+            reply_key,
+            question_id,
+            kind,
+            basis_value,
+            prompt,
+            option_a,
+            option_b,
+            option_c,
+            recommended,
+            required_detail_value,
+            detail_prompt,
+            selection,
+            selection_detail,
+            owner_response,
+        ) = raw
+        card_ids.add(card_id)
+        try:
+            revision = int(revision_text)
+            if revision < 1 or str(revision) != revision_text:
+                raise ValueError
+        except ValueError:
+            issues.append(
+                ("INTAKE_CARD_INVALID", f"{question_id} has invalid card revision")
+            )
+            revision = 0
+        revisions.add(revision)
+        if INTAKE_CARD_ID.fullmatch(card_id) is None:
+            issues.append(("INTAKE_CARD_INVALID", f"Invalid card ID {card_id!r}"))
+        if reply_key not in {"1", "2", "3"} or reply_key in reply_keys:
+            issues.append(
+                ("INTAKE_CARD_INVALID", f"{question_id} has invalid or duplicate reply key")
+            )
+        reply_keys.add(reply_key)
+        if (
+            INTAKE_QUESTION_ID.fullmatch(question_id) is None
+            or question_id in question_ids
+        ):
+            issues.append(
+                ("INTAKE_CARD_INVALID", f"Invalid or duplicate question ID {question_id!r}")
+            )
+        question_ids.add(question_id)
+        if kind not in {"FACT", "DECISION"}:
+            issues.append(
+                ("INTAKE_CARD_INVALID", f"{question_id} kind must be FACT or DECISION")
+            )
+        try:
+            question_basis = tuple(
+                _canonical_id_list(
+                    basis_value, INTAKE_ID, f"{question_id} Basis IDs"
+                )
+            )
+            if not set(question_basis).issubset(expected_rows):
+                raise ValueError("Basis IDs must cite canonical intake foundation rows")
+        except ValueError as exc:
+            issues.append(("INTAKE_CARD_INVALID", f"{question_id}: {exc}"))
+            question_basis = ()
+        if not explicit_value(prompt, allow_none=False):
+            issues.append(
+                ("INTAKE_CARD_INVALID", f"{question_id} prompt is unresolved")
+            )
+
+        if kind == "DECISION":
+            options = (option_a, option_b, option_c)
+            if any(not explicit_value(option, allow_none=False) for option in options):
+                issues.append(
+                    ("INTAKE_CARD_INVALID", f"{question_id} requires concrete A/B/C choices")
+                )
+            if len(set(options)) != 3:
+                issues.append(
+                    ("INTAKE_CARD_INVALID", f"{question_id} choices must be distinct")
+                )
+            if recommended not in {"A", "NONE"}:
+                issues.append(
+                    ("INTAKE_CARD_INVALID", f"{question_id} recommendation must be A or NONE")
+                )
+        else:
+            if any(option != "NOT_APPLICABLE" for option in (option_a, option_b, option_c)):
+                issues.append(
+                    ("INTAKE_CARD_INVALID", f"{question_id} FACT choices must be NOT_APPLICABLE")
+                )
+            if recommended != "NONE":
+                issues.append(
+                    ("INTAKE_CARD_INVALID", f"{question_id} FACT recommendation must be NONE")
+                )
+        try:
+            required_detail = _intake_required_detail(required_detail_value, kind)
+        except ValueError as exc:
+            issues.append(("INTAKE_CARD_INVALID", f"{question_id}: {exc}"))
+            required_detail = ()
+        if required_detail:
+            if not explicit_value(detail_prompt, allow_none=False):
+                issues.append(
+                    ("INTAKE_CARD_INVALID", f"{question_id} requires a concrete detail prompt")
+                )
+            detail_prompt_value: str | None = detail_prompt
+        else:
+            if detail_prompt != "NONE":
+                issues.append(
+                    ("INTAKE_CARD_INVALID", f"{question_id} detail prompt must be NONE")
+                )
+            detail_prompt_value = None
+
+        allowed_selections = {"PENDING", "RESPONSE"} if kind == "FACT" else {
+            "PENDING", "A", "B", "C"
+        }
+        if selection not in allowed_selections:
+            issues.append(
+                ("INTAKE_CARD_INVALID", f"{question_id} has invalid selection {selection!r}")
+            )
+        resolved = selection != "PENDING"
+        provenance = INTAKE_OWNER_RESPONSE.fullmatch(owner_response)
+        if not resolved:
+            if selection_detail != "NONE" or owner_response != "NONE":
+                issues.append(
+                    (
+                        "INTAKE_SELECTION_PROVENANCE_INVALID",
+                        f"{question_id} has an unproven selection; remove it and present the current card again",
+                    )
+                )
+        else:
+            if (
+                provenance is None
+                or provenance.group("card") != card_id
+                or int(provenance.group("revision")) != revision
+            ):
+                issues.append(
+                    (
+                        "INTAKE_SELECTION_PROVENANCE_INVALID",
+                        f"{question_id} selection is not bound to a current OWNER_RESPONSE",
+                    )
+                )
+            detail_required = (
+                selection == "RESPONSE"
+                or selection in required_detail
+            )
+            if detail_required and not explicit_value(selection_detail, allow_none=False):
+                issues.append(
+                    (
+                        "INTAKE_SELECTION_PROVENANCE_INVALID",
+                        f"{question_id} remains unresolved until its required detail is supplied",
+                    )
+                )
+            if not detail_required and selection_detail != "NONE":
+                issues.append(
+                    (
+                        "INTAKE_SELECTION_PROVENANCE_INVALID",
+                        f"{question_id} has unexpected selection detail",
+                    )
+                )
+
+        question = IntakeQuestion(
+            reply_key=reply_key,
+            question_id=question_id,
+            kind=kind,
+            basis_ids=question_basis,
+            prompt=prompt,
+            option_a=option_a,
+            option_b=option_b,
+            option_c=option_c,
+            recommended=None if recommended == "NONE" else recommended,
+            required_detail_for=required_detail,
+            detail_prompt=detail_prompt_value,
+            selection=selection,
+            selection_detail=None if selection_detail == "NONE" else selection_detail,
+        )
+        all_questions.append(question)
+        if not resolved:
+            pending_questions.append(question)
+
+    if not 1 <= len(all_questions) <= 3:
+        issues.append(
+            ("INTAKE_CARD_INVALID", "Current intake card must contain one to three questions")
+        )
+    if len(card_ids) != 1 or len(revisions) != 1:
+        issues.append(
+            ("INTAKE_CARD_INVALID", "Current intake card must use one ID and revision")
+        )
+    if sorted(reply_keys) != [str(index) for index in range(1, len(reply_keys) + 1)]:
+        issues.append(
+            ("INTAKE_CARD_INVALID", "Reply keys must be consecutive uppercase-choice numbers")
+        )
+
+    pending_card = None
+    if pending_questions and len(card_ids) == 1 and len(revisions) == 1:
+        card_id = next(iter(card_ids))
+        revision = next(iter(revisions))
+        accept_all = all(
+            question.kind == "DECISION"
+            and question.recommended == "A"
+            and "A" not in question.required_detail_for
+            for question in pending_questions
+        )
+        pending_card = IntakeCard(
+            card_id=card_id,
+            revision=revision,
+            questions=tuple(pending_questions),
+            accept_all_allowed=accept_all,
+            exact_reply=_intake_reply_example(pending_questions),
+            canonical_sha256=(
+                "sha256:" + hashlib.sha256(card_table.canonical_bytes).hexdigest()
+            ),
+        )
+    if missing_fields and not pending_questions:
+        issues.append(
+            (
+                "INTAKE_CARD_REQUIRED",
+                "Create the next one-to-three-question intake card for the remaining foundation fields",
+            )
+        )
+
+    if any(code in {"INTAKE_FOUNDATION_INVALID", "INTAKE_CARD_INVALID"} for code, _ in issues):
+        status = "BLOCKED"
+    elif pending_questions or missing_fields:
+        status = (
+            "FOUNDATION_REQUIRED"
+            if INTAKE_CORE_FIELDS.intersection(missing_fields)
+            else "FOUNDATION_READY"
+        )
+    else:
+        status = "READY_FOR_REQUIREMENTS"
+    return (
+        IntakeFoundationContract(
+            status=status,
+            repository_mode=repository_mode_value,
+            owner_work_context=owner_work_context,
+            basis_ids=basis_ids,
+            missing_fields=missing_fields,
+            pending_card=pending_card,
+        ),
+        issues,
+    )
 def _none_with_reason(value: str) -> bool:
     cleaned = clean_cell(value)
     return bool(re.fullmatch(r"NONE\s+(?:-|—)\s+\S.*", cleaned)) and not unresolved(cleaned)
@@ -5963,10 +6543,11 @@ def validate_prd(
     bool,
     DesignContract,
     CoverageContract,
+    IntakeFoundationContract,
 ]:
     text = ctx.texts.get(PRD_FILE) or safe_read_text(ctx, PRD_FILE)
     if text is None:
-        return {}, {}, {}, False, DesignContract(), CoverageContract()
+        return {}, {}, {}, False, DesignContract(), CoverageContract(), IntakeFoundationContract()
     try:
         document = table_after_heading(text, "## Document status")
         workload = table_after_heading(text, "## 1. Workload profile")
@@ -5983,7 +6564,7 @@ def validate_prd(
         marked_receipt(text, "gate-b")
     except ValueError as exc:
         ctx.error("PRD_STRUCTURE", str(exc), PRD_FILE)
-        return {}, {}, {}, False, DesignContract(), CoverageContract()
+        return {}, {}, {}, False, DesignContract(), CoverageContract(), IntakeFoundationContract()
 
     project = state.get("project", {})
     lifecycle = state.get("lifecycle", {})
@@ -6091,6 +6672,31 @@ def validate_prd(
         and gate_a_owner.get("Authorized requirements revision")
         == fields["requirements_revision"]
     )
+    intake_repository_mode = selections.get("mode")
+    setup_state = state.get("setup") if isinstance(state.get("setup"), dict) else {}
+    if (
+        intake_repository_mode is None
+        and not ctx.template_source
+        and setup_state.get("status")
+        not in {"UNCONFIGURED_TEMPLATE", "{{SETUP_STATUS}}"}
+    ):
+        intake_repository_mode = "greenfield"
+    intake_contract, intake_issues = derive_intake_foundation_contract(
+        text,
+        intake_repository_mode,
+        grandfather_current_gate_a=grandfather_approved_v1_requirements,
+    )
+    for code, issue in intake_issues:
+        ctx.error(code, issue, PRD_FILE)
+    if (
+        gate_a_ready_or_current
+        and intake_contract.status != "READY_FOR_REQUIREMENTS"
+    ):
+        ctx.error(
+            "INTAKE_FOUNDATION_REQUIRED",
+            "Gate A requires a complete owner-grounded intake foundation and no pending card",
+            PRD_FILE,
+        )
     coverage_contract, coverage_issues = derive_coverage_contract(
         text,
         fields.get("requirements_revision"),
@@ -6220,6 +6826,10 @@ def validate_prd(
     if functional_match is not None:
         rows = re.findall(r"^\|\s*FR-\d+\s*\|(.+)$", functional_match.group(0), re.MULTILINE)
         requirements_present = requirements_present and any("TODO" not in row.upper() for row in rows)
+    requirements_present = (
+        requirements_present
+        and intake_contract.status == "READY_FOR_REQUIREMENTS"
+    )
 
     if gate_a_ready_or_current:
         if gate_a_agent.get("Requirements revision analyzed") != fields["requirements_revision"]:
@@ -6392,6 +7002,7 @@ def validate_prd(
         requirements_present or gate_b_agent_ready,
         design_contract,
         coverage_contract,
+        intake_contract,
     )
 
 
@@ -7430,6 +8041,7 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         requirements_present,
         design_contract,
         coverage_contract,
+        intake_contract,
     ) = validate_prd(ctx, state)
     allow_legacy_design_discovery = bool(
         prd_fields.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
@@ -7573,6 +8185,7 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         aws_execution_planning_ready=aws_execution_planning_ready,
         design_aws_core_ready=design_aws_core_ready,
         design_contract=design_contract,
+        intake_contract=intake_contract,
         coverage_contract=coverage_contract,
         aws_core_usage=aws_core_usage,
     )
@@ -7600,6 +8213,9 @@ def inspect_git_baseline(root: Path) -> str:
 DEFINE_AGENT_DIAGNOSTICS = frozenset(
     {
         "ADAPTIVE_COVERAGE_INVALID",
+        "INTAKE_CARD_REQUIRED",
+        "INTAKE_CONTRACT_MIGRATION_REQUIRED",
+        "INTAKE_SELECTION_PROVENANCE_INVALID",
         "GATE_A_LIFECYCLE_TRANSITION",
         "GATE_A_READINESS_CARD",
         "GATE_A_RECOMMENDATION",
@@ -7651,6 +8267,7 @@ OWNER_DECISION_DIAGNOSTICS = frozenset(
         "GATE_A_ASSUMPTIONS",
         "GATE_A_BLOCKER",
         "GATE_A_COST_POSTURE",
+        "INTAKE_FOUNDATION_REQUIRED",
         "PLACEHOLDER_UNRESOLVED",
         "PROJECT_COST_POSTURE",
         "PROJECT_IDENTITY",
@@ -8014,6 +8631,9 @@ def derive_interaction(
         "owner_action_kind": action_kind,
         "blocking_ids": blocking_ids,
         "automatic_continuation_allowed": automatic,
+        "turn_boundary_required": (
+            action_kind != "NONE_CONTINUE_AUTOMATICALLY" and not automatic
+        ),
         "formal_receipt_required": formal_receipt,
         "aws_core": {
             "materiality": "MATERIAL" if material else "NOT_MATERIAL",
@@ -8036,6 +8656,7 @@ def derive_unconfigured_template_interaction(
         "owner_action_kind": "COMPLETE_PREREQUISITE_CHECKLIST",
         "blocking_ids": sorted(set(diagnostic_codes)),
         "automatic_continuation_allowed": False,
+        "turn_boundary_required": True,
         "formal_receipt_required": False,
         "aws_core": {
             "materiality": "NOT_MATERIAL",
@@ -8778,6 +9399,7 @@ def build_report(
     aws_execution_planning_ready: bool = False,
     design_aws_core_ready: bool = False,
     design_contract: DesignContract | None = None,
+    intake_contract: IntakeFoundationContract | None = None,
     coverage_contract: CoverageContract | None = None,
     aws_core_usage: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -8798,6 +9420,8 @@ def build_report(
         )
     if coverage_contract is None:
         coverage_contract = CoverageContract()
+    if intake_contract is None:
+        intake_contract = IntakeFoundationContract()
     if ctx.template_source:
         classification = "TEMPLATE_SOURCE"
     elif setup.get("status") in {
@@ -8977,6 +9601,7 @@ def build_report(
             "design_revision": prd_fields.get("design_revision"),
             "construction_authorization": prd_fields.get("construction_authorization"),
         },
+        "intake_foundation": intake_contract.to_dict(),
         "coverage_plan": coverage_contract.to_dict(),
         "design_contract": design_contract.to_dict(),
         "tasks": {

@@ -77,7 +77,76 @@ def set_receipt(text: str, gate: str, receipt: str) -> str:
     return text[:start] + body + text[end:]
 
 
+def complete_intake_foundation(text: str) -> str:
+    values = {
+        "INTAKE-0001": "NEW_APPLICATION",
+        "INTAKE-0002": "Development users",
+        "INTAKE-0003": "Users need to see the approved project outcome",
+        "INTAKE-0004": "Display the current approved project outcome",
+        "INTAKE-0005": "Local development slice only",
+        "INTAKE-0006": "A rendered-output test confirms the approved outcome",
+        "INTAKE-0007": "Synthetic internal development data; us-west-2 only",
+    }
+    answers = {
+        "INTAKE-Q-0001": ("A", "NONE"),
+        "INTAKE-Q-0002": (
+            "RESPONSE",
+            "Development users need to see the approved project outcome.",
+        ),
+        "INTAKE-Q-0003": (
+            "RESPONSE",
+            "The first release displays the approved outcome locally.",
+        ),
+    }
+    output: list[str] = []
+    for line in text.splitlines(keepends=True):
+        cells = doctor.split_markdown_table_row(line)
+        line_ending = "\n" if line.endswith("\n") else ""
+        if cells and len(cells) == 5 and cells[0] in values:
+            cells[2] = values[cells[0]]
+            cells[3] = "OWNER_FACT"
+            cells[4] = "CONFIRMED"
+            line = "| " + " | ".join(cells) + " |" + line_ending
+        elif cells and len(cells) == 16 and cells[3] in answers:
+            selection, detail = answers[cells[3]]
+            cells[13] = selection
+            cells[14] = detail
+            cells[15] = (
+                "OWNER_RESPONSE: OWNER-MSG-0001; CARD: INTAKE-CARD-0001; "
+                "REVISION: 1"
+            )
+            line = "| " + " | ".join(cells) + " |" + line_ending
+        output.append(line)
+    return "".join(output)
+
+
+def set_intake_card_resolution(
+    text: str,
+    question_id: str,
+    selection: str,
+    *,
+    detail: str = "NONE",
+    owner_response: str = "NONE",
+) -> str:
+    output: list[str] = []
+    matched = 0
+    for line in text.splitlines(keepends=True):
+        cells = doctor.split_markdown_table_row(line)
+        line_ending = "\n" if line.endswith("\n") else ""
+        if cells and len(cells) == 16 and cells[3] == question_id:
+            cells[13] = selection
+            cells[14] = detail
+            cells[15] = owner_response
+            line = "| " + " | ".join(cells) + " |" + line_ending
+            matched += 1
+        output.append(line)
+    if matched != 1:
+        raise AssertionError(f"Expected one intake-card row for {question_id}")
+    return "".join(output)
+
+
 def approve_gate_a(text: str) -> str:
+    text = complete_intake_foundation(text)
     replacements = {
         "| FR-001 | TODO | UBIQUITOUS | TODO | MEASURABLE |": (
             "| FR-001 | The application SHALL display the current approved project outcome. "
@@ -1127,6 +1196,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                     {item["code"] for item in report["diagnostics"]}
                 ),
                 "automatic_continuation_allowed": False,
+                "turn_boundary_required": True,
                 "formal_receipt_required": False,
                 "aws_core": {
                     "materiality": "NOT_MATERIAL",
@@ -5018,6 +5088,152 @@ class BootstrapDoctorTests(unittest.TestCase):
                     prompt,
                 )
 
+
+    def test_greenfield_repository_does_not_infer_a_new_application(self) -> None:
+        text = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+
+        contract, issues = doctor.derive_intake_foundation_contract(
+            text, "greenfield", grandfather_current_gate_a=False
+        )
+
+        self.assertEqual(issues, [])
+        self.assertEqual(contract.repository_mode, "GREENFIELD")
+        self.assertIsNone(contract.owner_work_context)
+        self.assertEqual(contract.status, "FOUNDATION_REQUIRED")
+        self.assertIn("OWNER_WORK_CONTEXT", contract.missing_fields)
+        self.assertIsNotNone(contract.pending_card)
+        assert contract.pending_card is not None
+        self.assertEqual(len(contract.pending_card.questions), 3)
+        self.assertEqual(
+            contract.pending_card.questions[0].prompt,
+            "What are you starting with?",
+        )
+        self.assertIsNone(contract.pending_card.questions[0].recommended)
+        self.assertFalse(contract.pending_card.accept_all_allowed)
+
+    def test_intake_selection_requires_current_owner_provenance_and_detail(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        current_response = (
+            "OWNER_RESPONSE: OWNER-MSG-0002; CARD: INTAKE-CARD-0001; REVISION: 1"
+        )
+        cases = {
+            "assistant-authored selection": set_intake_card_resolution(
+                source, "INTAKE-Q-0001", "A"
+            ),
+            "stale card response": set_intake_card_resolution(
+                source,
+                "INTAKE-Q-0001",
+                "A",
+                owner_response=(
+                    "OWNER_RESPONSE: OWNER-MSG-0002; CARD: INTAKE-CARD-0999; "
+                    "REVISION: 1"
+                ),
+            ),
+            "missing required detail": set_intake_card_resolution(
+                source,
+                "INTAKE-Q-0001",
+                "B",
+                owner_response=current_response,
+            ),
+        }
+        for label, text in cases.items():
+            with self.subTest(case=label):
+                _contract, issues = doctor.derive_intake_foundation_contract(
+                    text, "greenfield", grandfather_current_gate_a=False
+                )
+                self.assertIn(
+                    "INTAKE_SELECTION_PROVENANCE_INVALID",
+                    {code for code, _message in issues},
+                )
+
+    def test_complete_owner_grounded_intake_is_ready_for_requirements(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+
+        contract, issues = doctor.derive_intake_foundation_contract(
+            complete_intake_foundation(source),
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+
+        self.assertEqual(issues, [])
+        self.assertEqual(contract.status, "READY_FOR_REQUIREMENTS")
+        self.assertEqual(contract.owner_work_context, "NEW_APPLICATION")
+        self.assertEqual(len(contract.basis_ids), 7)
+        self.assertEqual(contract.missing_fields, ())
+        self.assertIsNone(contract.pending_card)
+
+    def test_intake_contract_migrates_only_unapproved_legacy_projects(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        start = source.index("#### Intake foundation")
+        end = source.index("### 1.2 Brownfield baseline and preservation contract")
+        legacy = source[:start] + source[end:]
+
+        unapproved, unapproved_issues = doctor.derive_intake_foundation_contract(
+            legacy, "greenfield", grandfather_current_gate_a=False
+        )
+        approved, approved_issues = doctor.derive_intake_foundation_contract(
+            legacy, "greenfield", grandfather_current_gate_a=True
+        )
+
+        self.assertEqual(unapproved.status, "FOUNDATION_REQUIRED")
+        self.assertIn(
+            "INTAKE_CONTRACT_MIGRATION_REQUIRED",
+            {code for code, _message in unapproved_issues},
+        )
+        self.assertEqual(approved_issues, [])
+        self.assertEqual(approved.status, "READY_FOR_REQUIREMENTS")
+        self.assertTrue(approved.grandfathered_approved_gate_a)
+
+    def test_owner_input_creates_a_turn_boundary_but_automatic_work_does_not(self) -> None:
+        owner_input = doctor.derive_interaction(
+            "INTAKE_REQUIRED",
+            "INTAKE-10",
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=False,
+            aws_execution_planning_ready=False,
+        )
+        automatic = doctor.derive_interaction(
+            "DESIGN_REQUIRED",
+            "DESIGN-10",
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=False,
+            aws_execution_planning_ready=False,
+        )
+
+        self.assertTrue(owner_input["turn_boundary_required"])
+        self.assertFalse(owner_input["automatic_continuation_allowed"])
+        self.assertFalse(automatic["turn_boundary_required"])
+        self.assertTrue(automatic["automatic_continuation_allowed"])
+
+    def test_unproven_selection_is_agent_correctable_without_owner_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            prd_path = project / "docs/project/PRD.md"
+            text = set_intake_card_resolution(
+                prd_path.read_text(encoding="utf-8"),
+                "INTAKE-Q-0001",
+                "A",
+            )
+            prd_path.write_text(text, encoding="utf-8")
+
+            report = doctor.inspect_project(project)
+
+        self.assertIn("INTAKE_SELECTION_PROVENANCE_INVALID", codes(report))
+        item = next(
+            item
+            for item in report["remediation"]["items"]
+            if item["diagnostic_code"] == "INTAKE_SELECTION_PROVENANCE_INVALID"
+        )
+        self.assertEqual(item["responsible_party"], "CODEX")
+        self.assertEqual(item["category"], "AGENT_CORRECTION")
+        self.assertTrue(item["automatic_correction_allowed"])
+        self.assertEqual(
+            report["remediation"]["next_action"]["action_kind"],
+            "CORRECT_AND_REVALIDATE",
+        )
+        self.assertFalse(report["interaction"]["turn_boundary_required"])
 
     def test_incomplete_intake_routes_as_open_decisions_not_corruption(self) -> None:
         choices = {

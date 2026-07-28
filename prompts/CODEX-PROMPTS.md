@@ -611,6 +611,10 @@ previous local blocker.
    `aws/agent-toolkit-for-aws` and confirm no credential inspection or account
    access. Installation metadata, bundled/local skills, memory, and prose are
    insufficient; a documentation URL is not required merely to prove discovery.
+   This exact `AWS skills` search/retrieve chain runs first. Do not run an
+   exploratory topic search before it, and do not repeat it after valid setup
+   evidence exists. Architecture-specific discovery begins only when a later
+   material Define or Design question requires it.
 
    When blocked, render the returned checklist as one owner action and stop.
    Never execute its installation commands, change plugin state, approve native
@@ -762,7 +766,37 @@ In each response:
 8. include one short copyable reply. Permit `Accept all recommendations.` only
    when every presented default is independently safe and complete.
 
+Before requirements analysis:
+- Keep repository mode (`GREENFIELD` or `BROWNFIELD`) separate from owner
+  work context (`NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, or
+  `REPAIR_OR_MIGRATION`). Empty code never proves a new application.
+- Record the seven canonical `INTAKE-*` foundation rows. Only a direct owner
+  statement may become a confirmed `OWNER_FACT`; repository observations,
+  recommendations, inferred risk, assumptions, and questions remain separate.
+- Keep normative requirements provisional while any material foundation field
+  or current card question is unresolved.
+- Store one current `INTAKE-CARD-*` in PRD intake provenance. Decision rows
+  use uppercase A/B/C, one practical effect and tradeoff per option, A as the
+  recommendation when one is justified, any required supporting detail, and
+  an exact reply. Factual rows use short free text and no invented choices.
+- A selection is current only when it is bound to the current card and revision
+  with normalized `OWNER_RESPONSE` provenance. A recommendation, assistant
+  example, prior owner message, ambiguous shorthand, stale-card reply, or
+  absent reply never confirms a choice.
+- `Accept all recommendations.` selects only complete A recommendations on
+  the current card. Do not offer it for factual questions or a recommendation
+  that still needs detail.
+- If the owner asks for advice or says `recommend one`, explain the options
+  and practical tradeoff, state that project state did not change, and restore
+  the unchanged card.
+- When `interaction.turn_boundary_required` is true, the rendered card is the
+  final action of the assistant turn. Do not call another tool, edit the PRD,
+  rerun the Engine, interpret the copyable example, or continue until a new
+  inbound owner message arrives.
+
 Capture:
+- owner work context: new application, existing application change, or
+  repair/migration, independent of repository mode;
 - project mode: greenfield or brownfield;
 - delivery profile: quick-mvp, standard, or high-risk;
 - users, problem, observable outcome, and success measures;
