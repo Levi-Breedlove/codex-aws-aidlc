@@ -1598,5 +1598,58 @@ Approver: <name/handle>"""
         for line in (*deployment_lines, *teardown_lines):
             self.assertIn(line, self.prompts)
 
+    def test_consultations_are_consequence_first_plain_and_bounded(self) -> None:
+        intake = self.prompt_section("INTAKE-10")
+        requirements = self.prompt_section("REQ-10")
+        owner = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/owner-responses.md"
+        ).read_text(encoding="utf-8")
+        define = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/define.md"
+        ).read_text(encoding="utf-8")
+        coordinator = (
+            PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md"
+        ).read_text(encoding="utf-8")
+        challenger = (
+            PROJECT_ROOT / ".codex/agents/fastlane-requirements-challenger.toml"
+        ).read_text(encoding="utf-8")
+
+        owner_compact = " ".join(owner.split())
+        for phrase in (
+            "real-world consequence",
+            "at least 95 out of every 100 requests",
+            "people using the product at the same time",
+            "hidden location and device details",
+            "at most three numbered decisions",
+            "Accept all recommendations.",
+            "short copyable reply",
+        ):
+            self.assertIn(phrase, owner_compact)
+        for surface in (intake, define):
+            self.assertIn("real-world consequence", surface)
+            self.assertIn("Accept all recommendations.", surface)
+        self.assertIn("RTO: TODO; RPO: TODO", self.prd)
+        self.assertIn("Project state changed: No.", owner)
+        self.assertIn(
+            "clarification, not learning mode", " ".join(coordinator.split())
+        )
+
+        for surface in (requirements, define, coordinator, challenger):
+            self.assertIn("complete", surface.lower())
+            self.assertIn("owner decision", surface.lower())
+        for surface in (requirements, define, coordinator):
+            self.assertIn("60 seconds", surface)
+            self.assertIn("requirements revision", surface)
+            self.assertIn("unavailable", surface.lower())
+        self.assertIn(
+            "Independent requirements challenge: UNAVAILABLE",
+            requirements,
+        )
+        self.assertIn("Never edit files", challenger)
+        self.assertIn(
+            "Never expose reviewer timing or orchestration",
+            " ".join(requirements.split()),
+        )
+
 if __name__ == "__main__":
     unittest.main()

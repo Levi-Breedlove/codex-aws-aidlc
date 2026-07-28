@@ -597,8 +597,16 @@ def reduce_prerequisites(evidence: Mapping[str, Any]) -> dict[str, Any]:
 def opening_greeting() -> str:
     return """Welcome to AWS Codex Fastlane.
 
-Fastlane turns your idea into approved requirements, a current AWS-informed
-technical design, and an autonomous local build inside the boundary you approve.
+Fastlane turns your idea into a clear AWS application plan and a tested local
+build. Describe the outcome in plain language; Codex asks focused questions,
+uses current AWS guidance through AWS Core, recommends the technical approach,
+and builds inside the boundaries you approve. You do not need to choose AWS
+services.
+
+You approve two checkpoints: Gate A confirms what should be built, and Gate B
+confirms the design and build boundaries. AWS account changes never happen
+automatically—they require a separate, exact approval.
+
 Setup did not inspect AWS credentials or access an AWS account.
 
 Reply once with:

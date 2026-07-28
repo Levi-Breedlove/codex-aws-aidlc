@@ -5214,6 +5214,24 @@ def exact_selection(
     return None
 
 
+def unselected_selection(value: str, allowed: set[str]) -> bool:
+    """Return whether a selection cell still represents an unanswered choice."""
+
+    cleaned = clean_cell(value)
+    if unresolved(cleaned):
+        return True
+    parts = [part.strip() for part in str(value).strip().split("/")]
+    if len(parts) <= 1:
+        return False
+    choices: list[str] = []
+    for part in parts:
+        match = re.fullmatch(r"`?([a-z][a-z0-9-]*)`?", part)
+        if match is None:
+            return False
+        choices.append(match.group(1))
+    return len(choices) == len(allowed) and set(choices) == allowed
+
+
 def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
     expected_fields = {
         "schema_version",
@@ -5914,34 +5932,63 @@ def validate_prd(
 
     project = state.get("project", {})
     lifecycle = state.get("lifecycle", {})
-    allow_unselected = project.get("mode") is None
+    selection_values = {
+        "mode": document.get("Project mode", ""),
+        "delivery_profile": document.get("Delivery profile", ""),
+        "effective_risk": document.get("Effective risk", ""),
+        "aws_lane": document.get("AWS lane", ""),
+    }
+    selection_options = {
+        "mode": PROJECT_MODES,
+        "delivery_profile": DELIVERY_PROFILES,
+        "effective_risk": RISK_LEVELS,
+        "aws_lane": AWS_LANES,
+    }
+    unselected_fields = {
+        key: unselected_selection(selection_values[key], allowed)
+        for key, allowed in selection_options.items()
+    }
     selections = {
         "mode": exact_selection(
-            ctx, document.get("Project mode", ""), PROJECT_MODES,
-            "PROJECT_VOCABULARY", "Project mode", allow_unselected=allow_unselected,
+            ctx, selection_values["mode"], PROJECT_MODES,
+            "PROJECT_VOCABULARY", "Project mode",
+            allow_unselected=unselected_fields["mode"],
         ),
         "delivery_profile": exact_selection(
-            ctx, document.get("Delivery profile", ""), DELIVERY_PROFILES,
-            "PROJECT_VOCABULARY", "Delivery profile", allow_unselected=allow_unselected,
+            ctx, selection_values["delivery_profile"], DELIVERY_PROFILES,
+            "PROJECT_VOCABULARY", "Delivery profile",
+            allow_unselected=unselected_fields["delivery_profile"],
         ),
         "effective_risk": exact_selection(
-            ctx, document.get("Effective risk", ""), RISK_LEVELS,
-            "PROJECT_VOCABULARY", "Effective risk", allow_unselected=allow_unselected,
+            ctx, selection_values["effective_risk"], RISK_LEVELS,
+            "PROJECT_VOCABULARY", "Effective risk",
+            allow_unselected=unselected_fields["effective_risk"],
         ),
         "aws_lane": exact_selection(
-            ctx, document.get("AWS lane", ""), AWS_LANES,
-            "PROJECT_VOCABULARY", "AWS lane", allow_unselected=allow_unselected,
+            ctx, selection_values["aws_lane"], AWS_LANES,
+            "PROJECT_VOCABULARY", "AWS lane",
+            allow_unselected=unselected_fields["aws_lane"],
         ),
     }
     for key, selected in selections.items():
+        if unselected_fields[key] and project.get(key) is None:
+            continue
         if project.get(key) != selected:
             ctx.error(
                 "STATE_PRD_DRIFT",
                 f"project.{key}={project.get(key)!r} does not match PRD value {selected!r}",
                 STATE_FILE,
             )
-    if selections["effective_risk"] in {"high", "critical"} and selections["delivery_profile"] != "high-risk":
-        ctx.error("PROJECT_RISK_PROFILE", "High or critical risk requires the high-risk profile", PRD_FILE)
+    if (
+        selections["effective_risk"] in {"high", "critical"}
+        and selections["delivery_profile"] is not None
+        and selections["delivery_profile"] != "high-risk"
+    ):
+        ctx.error(
+            "PROJECT_RISK_PROFILE",
+            "High or critical risk requires the high-risk profile",
+            PRD_FILE,
+        )
 
     fields = {
         "requirements_revision": document.get("Current requirements revision", ""),
@@ -6088,11 +6135,14 @@ def validate_prd(
             PRD_FILE,
         )
     if gate_a_ready_or_current or gate_b_ready_or_current:
-        missing_selections = sorted(key for key, value in selections.items() if value is None)
+        missing_selections = sorted(
+            key for key, value in selections.items() if value is None
+        )
         if missing_selections:
             ctx.error(
                 "PROJECT_SELECTION_REQUIRED",
-                "Gate readiness requires explicit project selections: " + ", ".join(missing_selections),
+                "Gate readiness requires explicit project selections: "
+                + ", ".join(missing_selections),
                 PRD_FILE,
             )
     if selections["mode"] == "greenfield" and project.get("brownfield_baseline") != "NOT_APPLICABLE":
@@ -7321,7 +7371,7 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
     (
         prd_fields,
         envelope,
-        _selections,
+        selections,
         requirements_present,
         design_contract,
         coverage_contract,
@@ -7404,6 +7454,12 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         state.get("execution", {}).get("mode", "NONE"),
         release_decision,
     )
+    if (
+        gate_a == "BLOCKED"
+        and not ctx.has_errors
+        and any(value is None for value in selections.values())
+    ):
+        lifecycle_state, next_prompt = "INTAKE_REQUIRED", "INTAKE-10"
     aws_execution_planning_ready = False
     aws_10_issues = ["AWS-10 active artifact binding is unresolved"]
     if verify_text is not None:
@@ -7777,6 +7833,7 @@ def derive_interaction(
     if not design_evidence_failure and owner_stage_hint in {"DEFINE", "DESIGN", "DELIVER"}:
         owner_stage = owner_stage_hint
 
+    route_reason_code = lifecycle_state
     if has_errors or lifecycle_state == "BLOCKED":
         next_action = remediation.get("next_action") if remediation else None
         remediation_action = (
@@ -7789,8 +7846,13 @@ def derive_interaction(
             state = "WORKING"
             action_kind = "NONE_CONTINUE_AUTOMATICALLY"
             automatic = True
+        elif remediation_action == "ANSWER_OPEN_DECISIONS":
+            response_mode = "OWNER_UPDATE"
+            state = "NEEDS_INPUT"
+            action_kind = remediation_action
+            automatic = False
+            route_reason_code = "INTAKE_REQUIRED"
         elif remediation_action in {
-            "ANSWER_OPEN_DECISIONS",
             "APPROVE_GATE_A",
             "APPROVE_GATE_B",
             "AUTHORIZE_AWS_OPERATION",
@@ -7879,7 +7941,7 @@ def derive_interaction(
         "owner_stage": owner_stage,
         "response_mode": response_mode,
         "state": state,
-        "route_reason_code": lifecycle_state,
+        "route_reason_code": route_reason_code,
         "owner_action_required": action_kind != "NONE_CONTINUE_AUTOMATICALLY",
         "owner_action_kind": action_kind,
         "blocking_ids": blocking_ids,
