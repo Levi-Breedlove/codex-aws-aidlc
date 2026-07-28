@@ -1363,6 +1363,11 @@ with `python scripts/task_waves.py docs/project/TASKS.md`, inspect candidates wi
 current plan locally within the Gate B command/write boundary, update Last
 known-green and the checkpoint registry, and rerun the doctor. Never push or
 touch a remote unless separately authorized. Return the routine status.
+
+`Maximum workers: 1` limits task claims and mutable execution. A conditional
+challenger may run synchronously at its defined checkpoint as a read-only
+critic; it is not a worker, claims no task, changes no state, and cannot select
+architecture, approve or authorize, or satisfy AWS evidence.
 ~~~
 
 ## BUILD-10 — Execute One Task

@@ -258,6 +258,7 @@ class PromptPackContractTests(unittest.TestCase):
     def test_optional_challengers_are_conditional_and_non_authoritative(self) -> None:
         requirements = self.prompt_section("REQ-10")
         design = self.prompt_section("DESIGN-10")
+        tasks = self.prompt_section("TASK-10")
         gate_a = self.prompt_section("INTAKE-20")
         gate_b = self.prompt_section("DESIGN-20")
         self.assertIn("fastlane-requirements-challenger", requirements)
@@ -270,6 +271,19 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("material AWS feasibility fact", gate_a)
         self.assertIn("material AWS design evidence", gate_b)
 
+        coordinator = (
+            PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md"
+        ).read_text(encoding="utf-8")
+        ledger = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
+        for surface in (self.agents, coordinator, tasks, ledger):
+            compact = " ".join(surface.split())
+            self.assertIn("Maximum workers", compact)
+            self.assertIn("task claim", compact)
+            self.assertIn("mutable execution", compact)
+            self.assertIn("not a worker", compact)
+            self.assertIn("claims no task", compact)
+            self.assertIn("changes no state", compact)
+
         for name in (
             "fastlane-requirements-challenger",
             "fastlane-architecture-challenger",
@@ -280,6 +294,10 @@ class PromptPackContractTests(unittest.TestCase):
             self.assertIn('sandbox_mode = "read-only"', content)
             self.assertIn("Never edit files", content)
             self.assertRegex(content, r"Never .*approve")
+            self.assertIn("not a task worker", content)
+            self.assertIn("claim no task", content)
+            self.assertIn("change no state", content)
+            self.assertIn("synchronous read-only critique", content)
     def test_aws_core_is_wired_through_planning_build_and_operations(self) -> None:
         deliver_reference = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/deliver.md"

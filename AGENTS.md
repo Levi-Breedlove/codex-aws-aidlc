@@ -91,11 +91,11 @@ or missing external authority.
 
 ## Challengers and explanation
 
-Quick MVP uses no subagent by default. Use the requirements challenger for
-material ambiguity, contradiction, sensitive data, identity, payments,
-migration, shared interfaces, high risk, or owner request. Use the architecture
-challenger after a complete proposal for high-risk, hard-to-reverse, shared,
-isolation, recovery, or owner-requested review. Both are read-only.
+`Maximum workers: 1` governs task claims and mutable execution. Codex remains
+sole coordinator and writer. At a defined checkpoint, one conditional
+challenger may run synchronously as a read-only critic. It is not a worker: it
+claims no task, changes no state, and cannot write, select architecture,
+approve, authorize, or satisfy AWS evidence. Quick MVP otherwise uses none.
 
 Use `explain-fastlane` only when explicitly invoked or asked to teach. It
 changes no state and restores the pending owner action.

@@ -68,15 +68,17 @@ or missing external authority. Safely agent-correctable validation failures
 continue automatically. Gate A approval continues to design; Gate B approval
 continues to task generation and permitted local construction.
 
-Optional requirements and architecture challengers are read-only critics at
-their defined checkpoints. Start a requirements challenge only after the
-complete draft exists and no owner decision remains open. Make one attempt per
-current requirements revision and wait no more than 60 seconds. If it fails,
-stalls, or is unavailable, stop it, note the unavailable independent review in
-the existing Gate A recommendation rationale, perform the same checklist as
-coordinator, rerun the doctor and presenter, and continue. Never narrate this
-or make reviewer availability an owner action. Challengers never write files,
-choose the proposal, approve gates, satisfy AWS evidence, or authorize actions.
+`Maximum workers: 1` limits task claiming and mutable execution, not one
+synchronous read-only critique at its defined checkpoint. A challenger is not
+a worker: it claims no task and changes no state. Start a requirements
+challenge only after the complete draft exists and no owner decision remains
+open. Make one attempt per current requirements revision and wait no more than
+60 seconds. If it fails, stalls, or is unavailable, stop it, note the
+unavailable independent review in the existing Gate A recommendation
+rationale, perform the same checklist as coordinator, rerun the doctor and
+presenter, and continue. Never narrate this or make reviewer availability an
+owner action. Challengers never write files, choose architecture, approve
+gates, satisfy AWS evidence, or authorize actions.
 
 Never install software, alter Codex/plugin state, inspect credentials, access
 an AWS account during planning, persist prerequisite observations, or
