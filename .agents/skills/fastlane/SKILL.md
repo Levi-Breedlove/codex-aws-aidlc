@@ -42,6 +42,17 @@ You are the single coordinator and sole writer.
    doctor in the same turn, and continue while
    `automatic_continuation_allowed` is true. An internal route change is not an
    owner checkpoint.
+   When a new owner message may answer a pending `INTAKE-CARD-*`, run the
+   deterministic intake-response parser against that exact card ID, revision,
+   digest, and a new `OWNER-MSG-*` ID before any PRD or derived-state write.
+   A rejected parse causes zero writes: keep the card unchanged and present the
+   parser's precise correction plus its valid reply shape. A successful partial
+   parse updates only the returned reply keys and leaves every other question
+   pending on the same card. Project each parsed answer through the normalized
+   owner-response register, matching card row, and every foundation basis row;
+   all foundation facts derived from one question cite the same parsed record.
+   This provenance proves deterministic interpretation and current-card
+   binding, not that Fastlane authenticated the human's identity.
    When `turn_boundary_required` is true, rendering the owner card is the
    final action of the turn. Do not call a tool, edit a file, rerun the
    lifecycle router, interpret the example reply, or continue until a new

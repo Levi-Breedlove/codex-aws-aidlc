@@ -34,6 +34,21 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
         resolve_context_packet,
     )
 
+try:
+    from intake_response import (
+        MAX_RESPONSE_CHARACTERS,
+        intake_detail_safety_code,
+        intake_reply_token,
+        parse_intake_owner_response,
+    )
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.intake_response import (
+        MAX_RESPONSE_CHARACTERS,
+        intake_detail_safety_code,
+        intake_reply_token,
+        parse_intake_owner_response,
+    )
+
 
 STATE_FILE = "bootstrap.yaml"
 MANIFEST_FILE = "bootstrap.manifest.json"
@@ -125,7 +140,9 @@ INTAKE_FOUNDATION_HEADERS = (
     "Value",
     "Basis",
     "Status",
+    "Owner response",
 )
+LEGACY_INTAKE_FOUNDATION_HEADERS = INTAKE_FOUNDATION_HEADERS[:-1]
 INTAKE_FOUNDATION_FIELDS = (
     ("INTAKE-0001", "OWNER_WORK_CONTEXT"),
     ("INTAKE-0002", "PRIMARY_USERS"),
@@ -147,6 +164,11 @@ OWNER_WORK_CONTEXTS = {
     "NEW_APPLICATION",
     "EXISTING_APPLICATION_CHANGE",
     "REPAIR_OR_MIGRATION",
+}
+OWNER_WORK_CONTEXT_SELECTIONS = {
+    "A": "NEW_APPLICATION",
+    "B": "EXISTING_APPLICATION_CHANGE",
+    "C": "REPAIR_OR_MIGRATION",
 }
 INTAKE_BASES = {
     "OWNER_FACT",
@@ -180,7 +202,21 @@ INTAKE_QUESTION_ID = re.compile(r"INTAKE-Q-\d{4,}")
 OWNER_RESPONSE_ID = re.compile(r"OWNER-MSG-\d{4,}")
 INTAKE_OWNER_RESPONSE = re.compile(
     r"OWNER_RESPONSE: (?P<message>OWNER-MSG-\d{4,}); "
-    r"CARD: (?P<card>INTAKE-CARD-\d{4,}); REVISION: (?P<revision>[1-9]\d*)"
+    r"CARD: (?P<card>INTAKE-CARD-\d{4,}); REVISION: (?P<revision>[1-9]\d*); "
+    r"SHA256: (?P<digest>sha256:[0-9a-f]{64}); "
+    r"QUESTION: (?P<question>INTAKE-Q-\d{4,}); ANSWER: (?P<answer>A|B|C|RESPONSE)"
+)
+INTAKE_RESPONSE_REGISTER_HEADING = "#### Normalized owner response register"
+INTAKE_RESPONSE_REGISTER_HEADERS = (
+    "Owner response ID",
+    "Card ID",
+    "Revision",
+    "Presented card digest",
+    "Reply key",
+    "Question ID",
+    "Selection",
+    "Selection detail",
+    "Basis IDs",
 )
 TECHNOLOGY_DECISION_HEADING = "### Technology and toolchain decision register"
 TECHNOLOGY_DECISION_HEADERS = (
@@ -675,6 +711,7 @@ class IntakeCard:
     accept_all_allowed: bool
     exact_reply: str
     canonical_sha256: str
+    reply_token: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -684,6 +721,42 @@ class IntakeCard:
             "accept_all_allowed": self.accept_all_allowed,
             "exact_reply": self.exact_reply,
             "canonical_sha256": self.canonical_sha256,
+            "reply_token": self.reply_token,
+        }
+
+
+@dataclass(frozen=True)
+class NormalizedOwnerResponse:
+    owner_response_id: str
+    card_id: str
+    revision: int
+    presented_card_digest: str
+    reply_key: str
+    question_id: str
+    selection: str
+    selection_detail: str | None
+    basis_ids: tuple[str, ...]
+
+    @property
+    def provenance(self) -> str:
+        return (
+            f"OWNER_RESPONSE: {self.owner_response_id}; CARD: {self.card_id}; "
+            f"REVISION: {self.revision}; SHA256: {self.presented_card_digest}; "
+            f"QUESTION: {self.question_id}; ANSWER: {self.selection}"
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "owner_response_id": self.owner_response_id,
+            "card_id": self.card_id,
+            "revision": self.revision,
+            "presented_card_digest": self.presented_card_digest,
+            "reply_key": self.reply_key,
+            "question_id": self.question_id,
+            "selection": self.selection,
+            "selection_detail": self.selection_detail,
+            "basis_ids": list(self.basis_ids),
+            "provenance": self.provenance,
         }
 
 
@@ -3797,18 +3870,130 @@ def _intake_required_detail(value: str, kind: str) -> tuple[str, ...]:
     return tuple(keys)
 
 
-def _intake_reply_example(questions: list[IntakeQuestion]) -> str:
+def _intake_reply_example(questions: list[IntakeQuestion], reply_token: str) -> str:
     replies: list[str] = []
     for question in questions:
         if question.kind == "FACT":
             replies.append(f"{question.reply_key}: <your answer>")
             continue
-        choice = question.recommended or "A"
+        if question.recommended is None:
+            replies.append(f"{question.reply_key}: <choose A, B, or C>")
+            continue
+        choice = question.recommended
         reply = f"{question.reply_key}{choice}"
         if choice in question.required_detail_for:
             reply += ": <required detail>"
         replies.append(reply)
-    return "; ".join(replies)
+    return reply_token + "; " + "; ".join(replies)
+
+
+def _parse_intake_response_register(
+    table: ContractTable,
+    expected_foundation_rows: Mapping[str, str],
+    issues: list[tuple[str, str]],
+) -> tuple[NormalizedOwnerResponse, ...]:
+    responses: list[NormalizedOwnerResponse] = []
+    seen_question_rows: set[tuple[str, str]] = set()
+    seen_reply_rows: set[tuple[str, str]] = set()
+    seen_presented_questions: set[tuple[str, int, str]] = set()
+    message_identities: dict[str, tuple[str, int, str]] = {}
+    response_numbers: set[int] = set()
+    for raw in table.rows:
+        (
+            owner_response_id,
+            card_id,
+            revision_text,
+            presented_card_digest,
+            reply_key,
+            question_id,
+            selection,
+            selection_detail,
+            basis_value,
+        ) = raw
+        valid = True
+        if OWNER_RESPONSE_ID.fullmatch(owner_response_id) is None:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"Invalid owner response ID {owner_response_id!r}"))
+            valid = False
+        else:
+            response_numbers.add(int(owner_response_id.rsplit("-", 1)[1]))
+        if INTAKE_CARD_ID.fullmatch(card_id) is None:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid card ID"))
+            valid = False
+        try:
+            revision = int(revision_text)
+            if revision < 1 or str(revision) != revision_text:
+                raise ValueError
+        except ValueError:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid revision"))
+            revision = 0
+            valid = False
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", presented_card_digest) is None:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid presented-card digest"))
+            valid = False
+        if reply_key not in {"1", "2", "3"}:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid reply key"))
+            valid = False
+        if INTAKE_QUESTION_ID.fullmatch(question_id) is None:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid question ID"))
+            valid = False
+        if selection not in {"A", "B", "C", "RESPONSE"}:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid selection"))
+            valid = False
+        if selection_detail != "NONE" and not explicit_value(selection_detail, allow_none=False):
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has unresolved selection detail"))
+            valid = False
+        detail_safety = (
+            None if selection_detail == "NONE"
+            else intake_detail_safety_code(selection_detail)
+        )
+        if detail_safety is not None:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has unsafe or placeholder selection detail"))
+            valid = False
+        if selection == "RESPONSE" and (selection_detail == "NONE" or detail_safety is not None):
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} requires concrete factual detail"))
+            valid = False
+        try:
+            basis_ids = tuple(_canonical_id_list(basis_value, INTAKE_ID, f"{owner_response_id} Basis IDs"))
+            if not set(basis_ids).issubset(expected_foundation_rows):
+                raise ValueError("Basis IDs must cite canonical intake foundation rows")
+        except ValueError as exc:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id}: {exc}"))
+            basis_ids = ()
+            valid = False
+        question_key = (owner_response_id, question_id)
+        reply_key_pair = (owner_response_id, reply_key)
+        if question_key in seen_question_rows or reply_key_pair in seen_reply_rows:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has a duplicate normalized answer"))
+            valid = False
+        seen_question_rows.add(question_key)
+        seen_reply_rows.add(reply_key_pair)
+        presented_question = (card_id, revision, question_id)
+        if presented_question in seen_presented_questions:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} repeats an answer to one presented question"))
+            valid = False
+        seen_presented_questions.add(presented_question)
+        identity = (card_id, revision, presented_card_digest)
+        if owner_response_id in message_identities and message_identities[owner_response_id] != identity:
+            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} mixes card identities"))
+            valid = False
+        message_identities[owner_response_id] = identity
+        if valid:
+            responses.append(
+                NormalizedOwnerResponse(
+                    owner_response_id=owner_response_id,
+                    card_id=card_id,
+                    revision=revision,
+                    presented_card_digest=presented_card_digest,
+                    reply_key=reply_key,
+                    question_id=question_id,
+                    selection=selection,
+                    selection_detail=None if selection_detail == "NONE" else selection_detail,
+                    basis_ids=basis_ids,
+                )
+            )
+    if response_numbers and sorted(response_numbers) != list(range(1, max(response_numbers) + 1)):
+        issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", "Owner response IDs must be monotonic without gaps"))
+    return tuple(responses)
 
 
 def derive_intake_foundation_contract(
@@ -3832,10 +4017,45 @@ def derive_intake_foundation_contract(
         foundation_table = contract_table_after_heading(
             text, INTAKE_FOUNDATION_HEADING, INTAKE_FOUNDATION_HEADERS
         )
+        response_table = contract_table_after_heading(
+            text, INTAKE_RESPONSE_REGISTER_HEADING, INTAKE_RESPONSE_REGISTER_HEADERS
+        )
         card_table = contract_table_after_heading(
             text, INTAKE_CARD_HEADING, INTAKE_CARD_HEADERS
         )
     except ValueError as exc:
+        try:
+            legacy_foundation = contract_table_after_heading(
+                text, INTAKE_FOUNDATION_HEADING, LEGACY_INTAKE_FOUNDATION_HEADERS
+            )
+            legacy_card = contract_table_after_heading(
+                text, INTAKE_CARD_HEADING, INTAKE_CARD_HEADERS
+            )
+            legacy_response = contract_table_after_heading(
+                text,
+                INTAKE_RESPONSE_REGISTER_HEADING,
+                INTAKE_RESPONSE_REGISTER_HEADERS,
+            )
+        except ValueError:
+            legacy_foundation = legacy_card = legacy_response = None
+        if legacy_foundation is not None and legacy_card is not None and legacy_response is None:
+            if grandfather_current_gate_a:
+                return (
+                    IntakeFoundationContract(
+                        status="READY_FOR_REQUIREMENTS",
+                        repository_mode=repository_mode_value,
+                        grandfathered_approved_gate_a=True,
+                    ),
+                    [],
+                )
+            return (
+                IntakeFoundationContract(
+                    status="FOUNDATION_REQUIRED",
+                    repository_mode=repository_mode_value,
+                    missing_fields=tuple(field for _identifier, field in INTAKE_FOUNDATION_FIELDS),
+                ),
+                [("INTAKE_CONTRACT_MIGRATION_REQUIRED", "Unapproved legacy intake requires owner-response provenance and the normalized response register; retain legacy values only as unconfirmed context, reopen affected facts, and present the smallest current owner card without synthesizing historical OWNER-MSG records")],
+            )
         return (
             IntakeFoundationContract(
                 status="BLOCKED",
@@ -3844,7 +4064,7 @@ def derive_intake_foundation_contract(
             [("INTAKE_FOUNDATION_INVALID", str(exc))],
         )
 
-    if foundation_table is None and card_table is None:
+    if foundation_table is None and response_table is None and card_table is None:
         if grandfather_current_gate_a:
             return (
                 IntakeFoundationContract(
@@ -3863,27 +4083,33 @@ def derive_intake_foundation_contract(
             [
                 (
                     "INTAKE_CONTRACT_MIGRATION_REQUIRED",
-                    "Unapproved initialized projects require the intake foundation and current decision card",
+                    "Unapproved initialized projects require the intake foundation, normalized response register, and current decision card",
                 )
             ],
         )
-    if foundation_table is None or card_table is None:
+    if foundation_table is None or response_table is None or card_table is None:
+        missing_records = ", ".join(name for name, table in (("intake foundation", foundation_table), ("normalized response register", response_table), ("current decision card", card_table)) if table is None)
         return (
             IntakeFoundationContract(
-                status="BLOCKED",
+                status="FOUNDATION_REQUIRED",
                 repository_mode=repository_mode_value,
+                missing_fields=tuple(field for _identifier, field in INTAKE_FOUNDATION_FIELDS),
             ),
             [
                 (
-                    "INTAKE_FOUNDATION_INVALID",
-                    "Intake foundation and current decision card must exist together",
+                    "INTAKE_CONTRACT_MIGRATION_REQUIRED",
+                    "Unapproved project is missing: " + missing_records,
                 )
             ],
         )
 
     expected_rows = dict(INTAKE_FOUNDATION_FIELDS)
-    observed_rows: dict[str, tuple[str, str, str]] = {}
-    for intake_id, field_name, value, basis, status in foundation_table.rows:
+    normalized_responses = _parse_intake_response_register(response_table, expected_rows, issues)
+    responses_by_provenance = {
+        response.provenance: response for response in normalized_responses
+    }
+    observed_rows: dict[str, tuple[str, str, str, str]] = {}
+    for intake_id, field_name, value, basis, status, owner_response in foundation_table.rows:
         if intake_id in observed_rows:
             issues.append(
                 ("INTAKE_FOUNDATION_INVALID", f"Duplicate intake ID {intake_id}")
@@ -3913,6 +4139,25 @@ def derive_intake_foundation_contract(
                 issues.append(
                     ("INTAKE_FOUNDATION_INVALID", f"{intake_id} has no concrete owner value")
                 )
+            normalized_response = responses_by_provenance.get(owner_response)
+            if normalized_response is None or intake_id not in normalized_response.basis_ids:
+                issues.append(
+                    (
+                        "INTAKE_FOUNDATION_PROVENANCE_INVALID",
+                        f"{intake_id} is not bound to one normalized owner response that cites it",
+                    )
+                )
+            if field_name == "OWNER_WORK_CONTEXT" and normalized_response is not None:
+                expected_context = OWNER_WORK_CONTEXT_SELECTIONS.get(
+                    normalized_response.selection
+                )
+                if expected_context is None or value != expected_context:
+                    issues.append(
+                        (
+                            "INTAKE_FOUNDATION_PROVENANCE_INVALID",
+                            "OWNER_WORK_CONTEXT must map A/B/C to NEW_APPLICATION/EXISTING_APPLICATION_CHANGE/REPAIR_OR_MIGRATION",
+                        )
+                    )
             if basis != "OWNER_FACT":
                 issues.append(
                     (
@@ -3931,14 +4176,19 @@ def derive_intake_foundation_contract(
                         "EXISTING_APPLICATION_CHANGE, or REPAIR_OR_MIGRATION",
                     )
                 )
-        elif basis == "OWNER_FACT":
-            issues.append(
-                (
-                    "INTAKE_FOUNDATION_INVALID",
-                    f"{intake_id} cannot remain OPEN with OWNER_FACT provenance",
+        else:
+            if basis == "OWNER_FACT":
+                issues.append(
+                    (
+                        "INTAKE_FOUNDATION_INVALID",
+                        f"{intake_id} cannot remain OPEN with OWNER_FACT provenance",
+                    )
                 )
-            )
-        observed_rows[intake_id] = (field_name, value, status)
+            if owner_response != "NONE":
+                issues.append(
+                    ("INTAKE_FOUNDATION_PROVENANCE_INVALID", f"{intake_id} is OPEN but cites an owner response")
+                )
+        observed_rows[intake_id] = (field_name, value, status, owner_response)
 
     if tuple((identifier, row[0]) for identifier, row in observed_rows.items()) != INTAKE_FOUNDATION_FIELDS:
         issues.append(
@@ -4092,11 +4342,26 @@ def derive_intake_foundation_contract(
                         f"{question_id} has an unproven selection; remove it and present the current card again",
                     )
                 )
+            if any(
+                response.card_id == card_id and response.revision == revision
+                and response.question_id == question_id
+                for response in normalized_responses
+            ):
+                issues.append(
+                    (
+                        "INTAKE_SELECTION_PROVENANCE_INVALID",
+                        f"{question_id} has an unproven selection; remove it and present the current card again",
+                    )
+                )
         else:
+            normalized_response = responses_by_provenance.get(owner_response)
             if (
                 provenance is None
                 or provenance.group("card") != card_id
                 or int(provenance.group("revision")) != revision
+                or provenance.group("question") != question_id
+                or provenance.group("answer") != selection
+                or normalized_response is None
             ):
                 issues.append(
                     (
@@ -4104,6 +4369,31 @@ def derive_intake_foundation_contract(
                         f"{question_id} selection is not bound to a current OWNER_RESPONSE",
                     )
                 )
+            elif (
+                normalized_response.reply_key != reply_key
+                or normalized_response.selection_detail
+                != (None if selection_detail == "NONE" else selection_detail)
+                or normalized_response.basis_ids != question_basis
+            ):
+                issues.append(
+                    (
+                        "INTAKE_SELECTION_PROVENANCE_INVALID",
+                        f"{question_id} does not match its normalized owner response",
+                    )
+                )
+            for basis_id in question_basis:
+                foundation_row = observed_rows.get(basis_id)
+                if (
+                    foundation_row is None
+                    or foundation_row[2] != "CONFIRMED"
+                    or foundation_row[3] != owner_response
+                ):
+                    issues.append(
+                        (
+                            "INTAKE_FOUNDATION_PROVENANCE_INVALID",
+                            f"{question_id} and {basis_id} must cite the same parsed owner response",
+                        )
+                    )
             detail_required = (
                 selection == "RESPONSE"
                 or selection in required_detail
@@ -4165,15 +4455,18 @@ def derive_intake_foundation_contract(
             and "A" not in question.required_detail_for
             for question in pending_questions
         )
+        canonical_sha256 = (
+            "sha256:" + hashlib.sha256(card_table.canonical_bytes).hexdigest()
+        )
+        reply_token = intake_reply_token(card_id, revision, canonical_sha256)
         pending_card = IntakeCard(
             card_id=card_id,
             revision=revision,
             questions=tuple(pending_questions),
             accept_all_allowed=accept_all,
-            exact_reply=_intake_reply_example(pending_questions),
-            canonical_sha256=(
-                "sha256:" + hashlib.sha256(card_table.canonical_bytes).hexdigest()
-            ),
+            exact_reply=_intake_reply_example(pending_questions, reply_token),
+            canonical_sha256=canonical_sha256,
+            reply_token=reply_token,
         )
     if missing_fields and not pending_questions:
         issues.append(
@@ -4183,7 +4476,14 @@ def derive_intake_foundation_contract(
             )
         )
 
-    if any(code in {"INTAKE_FOUNDATION_INVALID", "INTAKE_CARD_INVALID"} for code, _ in issues):
+    invalid_codes = {
+        "INTAKE_FOUNDATION_INVALID",
+        "INTAKE_FOUNDATION_PROVENANCE_INVALID",
+        "INTAKE_RESPONSE_REGISTER_INVALID",
+        "INTAKE_CARD_INVALID",
+        "INTAKE_SELECTION_PROVENANCE_INVALID",
+    }
+    if any(code in invalid_codes for code, _ in issues):
         status = "BLOCKED"
     elif pending_questions or missing_fields:
         status = (
@@ -8215,7 +8515,7 @@ DEFINE_AGENT_DIAGNOSTICS = frozenset(
         "ADAPTIVE_COVERAGE_INVALID",
         "INTAKE_CARD_REQUIRED",
         "INTAKE_CONTRACT_MIGRATION_REQUIRED",
-        "INTAKE_SELECTION_PROVENANCE_INVALID",
+        "INTAKE_SELECTION_PROVENANCE_INVALID", "INTAKE_FOUNDATION_PROVENANCE_INVALID", "INTAKE_RESPONSE_REGISTER_INVALID",
         "GATE_A_LIFECYCLE_TRANSITION",
         "GATE_A_READINESS_CARD",
         "GATE_A_RECOMMENDATION",
@@ -9651,6 +9951,52 @@ def print_human(report: dict[str, Any]) -> None:
         print(f"{item['severity']} {item['code']}{location}: {item['message']}")
 
 
+def _parse_current_intake_response(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    report = inspect_project(args.root, template_source=args.template_source)
+    if not report["ok"]:
+        return {
+            "schema_version": 1,
+            "status": "FAIL",
+            "errors": [{"code": "INTAKE_PROJECT_INVALID", "message": "Project must pass the Fastlane Engine before an intake response can be parsed"}],
+        }, 1
+    pending_card = report["intake_foundation"].get("pending_card")
+    if not isinstance(pending_card, dict):
+        return {
+            "schema_version": 1,
+            "status": "FAIL",
+            "errors": [{"code": "INTAKE_CARD_INVALID", "message": "Project has no valid pending intake card"}],
+        }, 1
+    try:
+        text = (args.root.resolve() / PRD_FILE).read_text(encoding="utf-8")
+        response_table = contract_table_after_heading(
+            text, INTAKE_RESPONSE_REGISTER_HEADING, INTAKE_RESPONSE_REGISTER_HEADERS
+        )
+        if response_table is None:
+            raise ValueError("Normalized owner response register is missing")
+        register_issues: list[tuple[str, str]] = []
+        responses = _parse_intake_response_register(
+            response_table, dict(INTAKE_FOUNDATION_FIELDS), register_issues
+        )
+        if register_issues:
+            raise ValueError("Normalized owner response register is invalid")
+    except (OSError, UnicodeError, ValueError):
+        return {
+            "schema_version": 1,
+            "status": "FAIL",
+            "errors": [{"code": "INTAKE_PROJECT_INVALID", "message": "Current intake contract cannot be parsed safely"}],
+        }, 1
+    numbers = [int(response.owner_response_id.rsplit("-", 1)[1]) for response in responses]
+    result = parse_intake_owner_response(
+        sys.stdin.read(MAX_RESPONSE_CHARACTERS + 1),
+        pending_card,
+        expected_card_id=args.presented_card_id,
+        expected_revision=args.presented_card_revision,
+        expected_sha256=args.presented_card_sha256,
+        owner_response_id=f"OWNER-MSG-{max(numbers, default=0) + 1:04d}",
+    )
+    return result.to_dict(), 0 if result.status == "PASS" else 2
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only AWS Codex Fastlane project doctor")
     parser.add_argument(
@@ -9665,7 +10011,35 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Allow unresolved render tokens in the reusable template source",
     )
+    parser.add_argument("--parse-intake-response", action="store_true")
+    parser.add_argument("--input-stdin", action="store_true")
+    parser.add_argument("--presented-card-id")
+    parser.add_argument("--presented-card-revision", type=int)
+    parser.add_argument("--presented-card-sha256")
     args = parser.parse_args(argv)
+    if args.parse_intake_response:
+        if (
+            not args.input_stdin
+            or not args.json
+            or args.presented_card_id is None
+            or args.presented_card_revision is None
+            or args.presented_card_sha256 is None
+        ):
+            print(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "status": "FAIL",
+                        "errors": [{"code": "INTAKE_PARSE_USAGE", "message": "Parsing requires stdin, JSON, and the presented card ID, revision, and digest"}],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 1
+        result, exit_code = _parse_current_intake_response(args)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return exit_code
     report = inspect_project(args.root, template_source=args.template_source)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

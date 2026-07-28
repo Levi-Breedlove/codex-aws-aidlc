@@ -9,6 +9,11 @@ import re
 import sys
 from typing import Any, Mapping, Sequence
 
+try:
+    from intake_response import intake_reply_token
+except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
+    from scripts.intake_response import intake_reply_token
+
 
 class PresentationError(RuntimeError):
     """Raised when state cannot be rendered as a routine owner update."""
@@ -313,6 +318,7 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
     revision = card.get("revision")
     questions = card.get("questions")
     exact_reply = card.get("exact_reply")
+    reply_token = card.get("reply_token")
     digest = card.get("canonical_sha256")
     if (
         not isinstance(card_id, str)
@@ -327,9 +333,13 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
         or not exact_reply.strip()
         or not isinstance(digest, str)
         or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
+        or not isinstance(reply_token, str)
+        or re.fullmatch(r"R-[0-9A-F]{12}", reply_token) is None
         or not isinstance(card.get("accept_all_allowed"), bool)
     ):
         raise PresentationError("invalid deterministic intake card")
+    if reply_token != intake_reply_token(card_id, revision, digest) or not exact_reply.startswith(reply_token + "; "):
+        raise PresentationError("intake copyable reply is not bound to its current card")
     reply_keys: set[str] = set()
     for question in questions:
         if not isinstance(question, Mapping):
@@ -352,6 +362,7 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
             raise PresentationError("invalid deterministic intake question")
         reply_keys.add(str(reply_key))
         if kind == "DECISION":
+            required_values = tuple(required)
             if (
                 not isinstance(options, Mapping)
                 or set(options) != {"A", "B", "C"}
@@ -360,10 +371,32 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
                     for key in ("A", "B", "C")
                 )
                 or recommended not in {None, "A"}
+                or any(value not in {"A", "B", "C"} for value in required_values)
+                or len(required_values) != len(set(required_values))
             ):
                 raise PresentationError("invalid deterministic intake choices")
-        elif options != {} or recommended is not None:
-            raise PresentationError("factual intake questions cannot invent choices")
+            if required_values:
+                if (
+                    not isinstance(question.get("detail_prompt"), str)
+                    or not question["detail_prompt"].strip()
+                ):
+                    raise PresentationError(
+                        "intake choices requiring detail need a concrete prompt"
+                    )
+            elif question.get("detail_prompt") is not None:
+                raise PresentationError(
+                    "intake choices without required detail cannot add a detail prompt"
+                )
+        elif (
+            options != {}
+            or recommended is not None
+            or tuple(required) != ("RESPONSE",)
+            or not isinstance(question.get("detail_prompt"), str)
+            or not question["detail_prompt"].strip()
+        ):
+            raise PresentationError(
+                "factual intake questions require one concrete response prompt"
+            )
     return card
 
 
@@ -384,6 +417,10 @@ def _intake_question_lines(card: Mapping[str, Any]) -> list[str]:
                     lines.append(
                         f"   If you choose {choice}: {question['detail_prompt']}"
                     )
+            if recommended is None:
+                lines.append(
+                    "No recommendation—choose the option that matches your situation."
+                )
         else:
             lines.append(f"Reply: {question['detail_prompt']}")
     return lines
@@ -396,11 +433,16 @@ def _render_intake_card(
     updated: str,
 ) -> str:
     question_count = len(card["questions"])
-    noun = "decision" if question_count == 1 else "questions"
+    if question_count == 1:
+        status = "1 question remains before requirements analysis."
+    else:
+        status = (
+            f"{question_count} questions remain before requirements analysis."
+        )
     lines = [
         "FASTLANE \u00b7 DEFINE",
         "",
-        f"Status: {question_count} {noun} remain before requirements analysis.",
+        f"Status: {status}",
         f"Updated: {updated}",
         "Need from you: Answer the questions below.",
     ]
@@ -413,7 +455,7 @@ def _render_intake_card(
         )
     )
     if card["accept_all_allowed"]:
-        lines.append("You may reply `Accept all recommendations.`")
+        lines.append(f"You may also reply `{card['reply_token']}; Accept all recommendations.`")
     lines.extend(("", "Copyable reply:", str(card["exact_reply"])))
     return "\n".join(lines)
 def render_owner_update(
@@ -503,7 +545,7 @@ def render_side_question_response(
             lines.extend(("", "The pending questions are unchanged:"))
             lines.extend(_intake_question_lines(card))
             if card["accept_all_allowed"]:
-                lines.append("You may reply `Accept all recommendations.`")
+                lines.append(f"You may also reply `{card['reply_token']}; Accept all recommendations.`")
             lines.extend(("", "Copyable reply:", str(card["exact_reply"])))
     if not required:
         reason = str(interaction.get("route_reason_code", ""))

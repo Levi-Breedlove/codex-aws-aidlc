@@ -16,6 +16,8 @@ if SPEC is None or SPEC.loader is None:
 presenter = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(presenter)
 
+from scripts import intake_response
+
 
 def report(**updates: object) -> dict[str, object]:
     interaction: dict[str, object] = {
@@ -36,6 +38,8 @@ def report(**updates: object) -> dict[str, object]:
 
 
 def intake_foundation() -> dict[str, object]:
+    digest = "sha256:" + "a" * 64
+    token = presenter.intake_reply_token("INTAKE-CARD-0001", 1, digest)
     return {
         "schema_version": 1,
         "status": "FOUNDATION_REQUIRED",
@@ -48,8 +52,11 @@ def intake_foundation() -> dict[str, object]:
             "card_id": "INTAKE-CARD-0001",
             "revision": 1,
             "accept_all_allowed": False,
-            "exact_reply": "1A; 2: <your answer>; 3: <your answer>",
-            "canonical_sha256": "sha256:" + "a" * 64,
+            "exact_reply": (
+                f"{token}; 1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>"
+            ),
+            "canonical_sha256": digest,
+            "reply_token": token,
             "questions": [
                 {
                     "reply_key": "1",
@@ -76,7 +83,7 @@ def intake_foundation() -> dict[str, object]:
                     "prompt": "Who needs this, and what problem should it solve?",
                     "options": {},
                     "recommended": None,
-                    "required_detail_for": [],
+                    "required_detail_for": ["RESPONSE"],
                     "detail_prompt": "Name the primary users and their problem.",
                     "selection": "PENDING",
                     "selection_detail": None,
@@ -89,7 +96,7 @@ def intake_foundation() -> dict[str, object]:
                     "prompt": "What is the first useful result?",
                     "options": {},
                     "recommended": None,
-                    "required_detail_for": [],
+                    "required_detail_for": ["RESPONSE"],
                     "detail_prompt": "Describe the first-release outcome.",
                     "selection": "PENDING",
                     "selection_detail": None,
@@ -486,8 +493,20 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("B. A change to an existing application.", rendered)
         self.assertIn("C. A repair or migration.", rendered)
         self.assertIn("If you choose B: Name the existing application.", rendered)
+        self.assertIn(
+            "No recommendation—choose the option that matches your situation.",
+            rendered,
+        )
         self.assertIn("Reply: Name the primary users and their problem.", rendered)
-        self.assertIn("1A; 2: <your answer>; 3: <your answer>", rendered)
+        foundation = current["intake_foundation"]
+        assert isinstance(foundation, dict)
+        card = foundation["pending_card"]
+        assert isinstance(card, dict)
+        self.assertIn(
+            f"Copyable reply:\n{card['reply_token']}; 1: <choose A, B, or C>; "
+            "2: <your answer>; 3: <your answer>",
+            rendered,
+        )
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("INTAKE-CARD", rendered)
         self.assertNotIn("sha256:", rendered)
@@ -502,7 +521,7 @@ class FastlanePresenterTests(unittest.TestCase):
         question["detail_prompt"] = None
         card["questions"] = [question]
         card["accept_all_allowed"] = True
-        card["exact_reply"] = "1A"
+        card["exact_reply"] = f"{card['reply_token']}; 1A"
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = foundation
 
@@ -510,7 +529,32 @@ class FastlanePresenterTests(unittest.TestCase):
 
         self.assertEqual(rendered.count("Accept all recommendations."), 1)
         self.assertIn("A. Recommended \u2014 A new application.", rendered)
-        self.assertIn("Copyable reply:\n1A", rendered)
+        self.assertIn(
+            f"You may also reply `{card['reply_token']}; Accept all recommendations.`",
+            rendered,
+        )
+        self.assertIn(f"Copyable reply:\n{card['reply_token']}; 1A", rendered)
+        accepted = intake_response.parse_intake_owner_response(
+            f"{card['reply_token']}; Accept all recommendations.",
+            card,
+            expected_card_id=str(card["card_id"]),
+            expected_revision=int(card["revision"]),
+            expected_sha256=str(card["canonical_sha256"]),
+            owner_response_id="OWNER-MSG-0001",
+        )
+        self.assertEqual(accepted.status, "PASS", accepted.to_dict())
+        self.assertEqual(accepted.answers[0].selection, "A")
+
+    def test_presenter_rejects_tokenless_or_mismatched_copyable_reply(self) -> None:
+        for field, value in (("reply_token", None), ("exact_reply", "1A")):
+            foundation = intake_foundation()
+            card = foundation["pending_card"]
+            assert isinstance(card, dict)
+            card[field] = value
+            current = report(turn_boundary_required=True)
+            current["intake_foundation"] = foundation
+            with self.subTest(field=field), self.assertRaises(presenter.PresentationError):
+                presenter.render_owner_update(current)
 
     def test_side_question_explains_without_resolving_or_replacing_card(self) -> None:
         current = report(turn_boundary_required=True)
@@ -528,7 +572,77 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("The pending questions are unchanged:", rendered)
         self.assertIn("1. What are you starting with?", rendered)
         self.assertIn("A. A new application.", rendered)
-        self.assertIn("1A; 2: <your answer>; 3: <your answer>", rendered)
+        self.assertIn(
+            "No recommendation—choose the option that matches your situation.",
+            rendered,
+        )
+        self.assertIn(
+            "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
+            rendered,
+        )
+
+    def test_intake_status_uses_exact_singular_and_plural_question_copy(self) -> None:
+        foundation = intake_foundation()
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = foundation
+
+        plural = presenter.render_owner_update(current)
+        self.assertIn(
+            "Status: 3 questions remain before requirements analysis.", plural
+        )
+
+        card = foundation["pending_card"]
+        assert isinstance(card, dict)
+        card["questions"] = [card["questions"][1]]
+        card["exact_reply"] = f"{card['reply_token']}; 2: <your answer>"
+        singular = presenter.render_owner_update(current)
+        self.assertIn(
+            "Status: 1 question remains before requirements analysis.", singular
+        )
+        self.assertNotIn("1 decision remain", singular)
+
+    def test_fact_question_requires_response_marker_and_concrete_prompt(self) -> None:
+        foundation = intake_foundation()
+        card = foundation["pending_card"]
+        assert isinstance(card, dict)
+        fact = card["questions"][1]
+        card["questions"] = [fact]
+        card["exact_reply"] = f"{card['reply_token']}; 2: <your answer>"
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = foundation
+
+        fact["required_detail_for"] = []
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+
+        fact["required_detail_for"] = ["RESPONSE"]
+        fact["detail_prompt"] = "   "
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+
+    def test_decision_detail_contract_fails_closed_on_inconsistent_rules(self) -> None:
+        foundation = intake_foundation()
+        card = foundation["pending_card"]
+        assert isinstance(card, dict)
+        decision = card["questions"][0]
+        card["questions"] = [decision]
+        card["exact_reply"] = f"{card['reply_token']}; 1: <choose A, B, or C>"
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = foundation
+
+        decision["required_detail_for"] = ["B", "B"]
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+
+        decision["required_detail_for"] = ["B"]
+        decision["detail_prompt"] = None
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+
+        decision["required_detail_for"] = []
+        decision["detail_prompt"] = "Unexpected detail request."
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
 
     def test_owner_card_requires_a_final_turn_boundary(self) -> None:
         current = report(turn_boundary_required=False)

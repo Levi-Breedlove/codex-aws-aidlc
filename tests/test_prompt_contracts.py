@@ -1660,7 +1660,7 @@ Approver: <name/handle>"""
             "at least 95 out of every 100 requests",
             "people using the product at the same time",
             "hidden location and device details",
-            "at most three numbered decisions",
+            "at most three numbered questions",
             "Accept all recommendations.",
             "short copyable reply",
         ):
@@ -1711,6 +1711,34 @@ Approver: <name/handle>"""
         self.assertIn("EXISTING_APPLICATION_CHANGE", intake_compact)
         self.assertIn("REPAIR_OR_MIGRATION", intake_compact)
         self.assertIn("Empty code never proves a new application", intake_compact)
+        self.assertIn(
+            "No recommendation\u2014choose the option that matches your situation.",
+            owner,
+        )
+        self.assertIn("`1: <choose A, B, or C>`", owner)
+        self.assertIn(
+            "`A` to `NEW_APPLICATION`, `B` to `EXISTING_APPLICATION_CHANGE`, and `C` to",
+            intake,
+        )
+        self.assertIn("`REPAIR_OR_MIGRATION`", intake)
+        self.assertIn(
+            "| Intake ID | Field | Value | Basis | Status | Owner response |",
+            self.prd,
+        )
+        self.assertIn("#### Normalized owner response register", self.prd)
+        self.assertIn("Never store a raw chat transcript", self.prd)
+        self.assertIn(
+            "do not cryptographically authenticate", " ".join(self.prd.split())
+        )
+        self.assertIn("does not authenticate the owner's identity", intake)
+        combined_intake_contract = (intake + define + owner + self.prd).casefold()
+        for phrase in (
+            "owner-safe status",
+            "secret-like",
+            "unconfirmed context",
+            "never synthesize",
+        ):
+            self.assertIn(phrase, combined_intake_contract)
         self.assertIn("exact `AWS skills` search/retrieve chain runs first", boot_compact)
         self.assertIn("Do not run an", boot_compact)
         self.assertIn("exploratory topic search before it", boot_compact)

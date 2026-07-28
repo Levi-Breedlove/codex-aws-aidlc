@@ -156,25 +156,43 @@ Owner work context is separate and comes only from the owner:
 `NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, or `REPAIR_OR_MIGRATION`.
 An empty repository never proves that the owner is creating a new product.
 
-| Intake ID | Field | Value | Basis | Status |
-|---|---|---|---|---|
-| INTAKE-0001 | OWNER_WORK_CONTEXT | TODO | OPEN_QUESTION | OPEN |
-| INTAKE-0002 | PRIMARY_USERS | TODO | OPEN_QUESTION | OPEN |
-| INTAKE-0003 | OWNER_STATED_PROBLEM | TODO | OPEN_QUESTION | OPEN |
-| INTAKE-0004 | OBSERVABLE_OUTCOME | TODO | OPEN_QUESTION | OPEN |
-| INTAKE-0005 | FIRST_RELEASE_BOUNDARY | TODO | OPEN_QUESTION | OPEN |
-| INTAKE-0006 | SUCCESS_MEASURE | TODO | OPEN_QUESTION | OPEN |
-| INTAKE-0007 | MATERIAL_DATA_AND_OPERATING_BOUNDARIES | TODO | OPEN_QUESTION | OPEN |
+| Intake ID | Field | Value | Basis | Status | Owner response |
+|---|---|---|---|---|---|
+| INTAKE-0001 | OWNER_WORK_CONTEXT | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0002 | PRIMARY_USERS | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0003 | OWNER_STATED_PROBLEM | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0004 | OBSERVABLE_OUTCOME | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0005 | FIRST_RELEASE_BOUNDARY | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0006 | SUCCESS_MEASURE | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0007 | MATERIAL_DATA_AND_OPERATING_BOUNDARIES | TODO | OPEN_QUESTION | OPEN | NONE |
 
-`CONFIRMED` rows require a concrete value and `OWNER_FACT` provenance.
-Repository facts, recommendations, assumptions, and open questions remain
-separate and cannot become owner confirmation.
+`CONFIRMED` rows require a concrete value, `OWNER_FACT` provenance, and an
+`Owner response` value that matches a normalized record below. Every fact
+derived from one card question cites that same normalized owner-response
+record. Repository facts, recommendations, assumptions, and open questions
+remain separate and cannot become owner confirmation.
+
+#### Normalized owner response register
+
+| Owner response ID | Card ID | Revision | Presented card digest | Reply key | Question ID | Selection | Selection detail | Basis IDs |
+|---|---|---|---|---|---|---|---|---|
+
+Persist only the normalized selection and necessary detail needed to ground the
+foundation rows. Never store a raw chat transcript in this register. The card
+identity, revision, digest, reply key, and question ID prove deterministic
+interpretation of the recorded reply against the presented card; they do not
+cryptographically authenticate the human's identity. Each presented question
+has at most one normalized answer, and every `RESPONSE` requires concrete
+detail. Unapproved legacy values remain unconfirmed context; never synthesize
+historical `OWNER-MSG-*` provenance.
 
 #### Current intake decision card
 
 Keep exactly one current `INTAKE-CARD-*` here. It contains at most three
-questions. Decision choices use uppercase A/B/C; A is the recommendation when
-one exists. A choice is unresolved until any required detail is supplied.
+questions. Decision choices use uppercase A/B/C; A is the recommendation only
+when the card explicitly records it. When no recommendation exists, the Engine
+presents a neutral choice and never preselects A. A choice remains unresolved
+until its required detail is supplied.
 
 | Card ID | Revision | Reply key | Question ID | Kind | Basis IDs | Prompt | Option A | Option B | Option C | Recommended | Required detail for | Detail prompt | Selection | Selection detail | Owner response |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -183,7 +201,7 @@ one exists. A choice is unresolved until any required detail is supplied.
 | INTAKE-CARD-0001 | 1 | 3 | INTAKE-Q-0003 | FACT | INTAKE-0004, INTAKE-0005 | What is the first useful result they should get from the initial release? | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NONE | RESPONSE | Describe one observable first-release result. | PENDING | NONE | NONE |
 
 Persist only normalized selections and necessary details. A resolved row uses
-`OWNER_RESPONSE: OWNER-MSG-nnnn; CARD: INTAKE-CARD-nnnn; REVISION: n`.
+`OWNER_RESPONSE: OWNER-MSG-nnnn; CARD: INTAKE-CARD-nnnn; REVISION: n; SHA256: sha256:<64-lowercase-hex>; QUESTION: INTAKE-Q-nnnn; ANSWER: <A-or-B-or-C-or-RESPONSE>`.
 Assistant-authored examples, recommendations, prior messages, ambiguous prose,
 and absent replies never satisfy that provenance. Replace this card only after
 a new owner message resolves it or the Engine requests the next bounded card.

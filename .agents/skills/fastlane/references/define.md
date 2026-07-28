@@ -17,19 +17,41 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   uppercase A/B/C, at most three questions, a practical effect and tradeoff,
   any required supporting detail, and one exact reply. Facts use short free
   text rather than invented choices.
+- Do not invent a universal default. Recommend an option only when current
+  owner or repository evidence justifies it. Otherwise render exactly
+  `No recommendation—choose the option that matches your situation.` and use
+  the neutral copyable form `1: <choose A, B, or C>` for that decision.
 - A recommendation, copyable example, prior message, ambiguous shorthand, or
   absent reply is never owner confirmation. Resolve only the current card from
-  a new owner response, record normalized `OWNER_RESPONSE` provenance, then
-  rerun the Engine. The card is the final action when its turn boundary is set.
-- `Accept all recommendations.` applies only to the current card and only when
-  every question is a decision with a complete recommended option.
+  a new owner response. Before any PRD or derived-state write, run the
+  deterministic intake-response parser against the exact current card ID,
+  revision, digest, and a new `OWNER-MSG-*` ID. A rejected parse causes zero
+  writes: use its owner-safe status, preserve the entire card, and give the
+  exact reply-specific correction without echoing secret-like input. A
+  successful partial parse updates only returned reply keys and leaves the
+  remaining questions pending on the same card. Then rerun the Engine. The card
+  is the final action when its turn boundary is set.
+- Unapproved legacy intake never gains synthetic owner provenance. Retain prior
+  values only as unconfirmed context, reopen the affected facts, and present the
+  smallest current card. Grandfather only an unchanged approved Gate A.
+- The `Accept all recommendations.` payload applies only after the current reply
+  token and when every question is a decision with a complete recommended option
+  that needs no supporting detail. Never apply it to a factual, partially
+  recommended, stale-token, or changed card.
+- Normalize lowercase decision letters to uppercase. For the initial work
+  context decision, project `A` to `NEW_APPLICATION`, `B` to
+  `EXISTING_APPLICATION_CHANGE`, and `C` to `REPAIR_OR_MIGRATION`. Record each
+  parsed answer in the owner-response register, its card row, and every cited
+  foundation row using the same card-bound provenance. Multiple facts derived
+  from one question must cite the same parsed record. This provenance proves
+  deterministic interpretation; it is not identity authentication.
 - Ask no more than three related, plain-language owner decisions per response.
 - Lead with the real-world consequence. Keep `RTO`, `RPO`, `p95`, concurrency,
   metadata, and methodology labels in internal records unless the owner used
   the term or explicitly asks for technical detail. Translate them using the
-  Owner responses reference, mark one recommendation with its main tradeoff,
-  and provide a short copyable reply. Permit `Accept all recommendations.`
-  when every presented default is complete and safe to accept together.
+  Owner responses reference, mark one recommendation only when justified with
+  its main tradeoff, and provide a short copyable reply. Permit the current
+  token-bound `R-*; Accept all recommendations.` alternative when every
 - Separate owner facts, repository facts, recommendations, proposed
   assumptions, and unresolved decisions.
 - Give requirements and assumptions stable IDs and observable acceptance

@@ -77,9 +77,223 @@ def set_receipt(text: str, gate: str, receipt: str) -> str:
     return text[:start] + body + text[end:]
 
 
-def complete_intake_foundation(text: str) -> str:
+def intake_provenance(
+    owner_response_id: str,
+    card_id: str,
+    revision: int,
+    card_digest: str,
+    question_id: str,
+    selection: str,
+) -> str:
+    return (
+        f"OWNER_RESPONSE: {owner_response_id}; CARD: {card_id}; "
+        f"REVISION: {revision}; SHA256: {card_digest}; "
+        f"QUESTION: {question_id}; ANSWER: {selection}"
+    )
+
+
+def replace_contract_table(
+    text: str,
+    heading: str,
+    headers: tuple[str, ...],
+    rows: list[tuple[str, ...]],
+) -> str:
+    heading_start = text.index(heading)
+    table_start = text.index("|", heading_start)
+    table_end = text.index("\n\n", table_start)
+    rendered = [
+        "| " + " | ".join(headers) + " |",
+        "|" + "|".join("---" for _header in headers) + "|",
+        *("| " + " | ".join(row) + " |" for row in rows),
+    ]
+    return text[:table_start] + "\n".join(rendered) + text[table_end:]
+
+
+def confirm_intake_foundation(
+    text: str,
+    values: dict[str, str],
+    owner_responses: dict[str, str],
+) -> str:
+    output: list[str] = []
+    for line in text.splitlines(keepends=True):
+        cells = doctor.split_markdown_table_row(line)
+        line_ending = "\n" if line.endswith("\n") else ""
+        if cells and len(cells) == 6 and cells[0] in values:
+            cells[2] = values[cells[0]]
+            cells[3] = "OWNER_FACT"
+            cells[4] = "CONFIRMED"
+            cells[5] = owner_responses[cells[0]]
+            line = "| " + " | ".join(cells) + " |" + line_ending
+        output.append(line)
+    return "".join(output)
+
+
+def complete_intake_foundation(
+    text: str,
+    *,
+    work_context_choice: str = "A",
+) -> str:
+    initial, initial_issues = doctor.derive_intake_foundation_contract(
+        text, "greenfield", grandfather_current_gate_a=False
+    )
+    if initial_issues or initial.pending_card is None:
+        raise AssertionError(f"Initial intake card is invalid: {initial_issues}")
+    first_digest = initial.pending_card.canonical_sha256
+    context_values = {
+        "A": ("NEW_APPLICATION", "NONE"),
+        "B": ("EXISTING_APPLICATION_CHANGE", "Existing application"),
+        "C": ("REPAIR_OR_MIGRATION", "Existing system migration"),
+    }
+    if work_context_choice not in context_values:
+        raise AssertionError("work_context_choice must be A, B, or C")
+    work_context, work_context_detail = context_values[work_context_choice]
+    register_rows: list[tuple[str, ...]] = []
+    provenance_by_intake: dict[str, str] = {}
+
+    def resolve(
+        owner_response_id: str,
+        card_id: str,
+        card_digest: str,
+        reply_key: str,
+        question_id: str,
+        selection: str,
+        detail: str,
+        basis_ids: tuple[str, ...],
+    ) -> None:
+        nonlocal text
+        provenance = intake_provenance(
+            owner_response_id,
+            card_id,
+            1,
+            card_digest,
+            question_id,
+            selection,
+        )
+        text = set_intake_card_resolution(
+            text,
+            question_id,
+            selection,
+            detail=detail,
+            owner_response=provenance,
+        )
+        register_rows.append(
+            (
+                owner_response_id,
+                card_id,
+                "1",
+                card_digest,
+                reply_key,
+                question_id,
+                selection,
+                detail,
+                ", ".join(basis_ids),
+            )
+        )
+        for basis_id in basis_ids:
+            provenance_by_intake[basis_id] = provenance
+
+    resolve(
+        "OWNER-MSG-0001",
+        "INTAKE-CARD-0001",
+        first_digest,
+        "1",
+        "INTAKE-Q-0001",
+        work_context_choice,
+        work_context_detail,
+        ("INTAKE-0001",),
+    )
+    resolve(
+        "OWNER-MSG-0001",
+        "INTAKE-CARD-0001",
+        first_digest,
+        "2",
+        "INTAKE-Q-0002",
+        "RESPONSE",
+        "Development users need to see the approved project outcome.",
+        ("INTAKE-0002", "INTAKE-0003"),
+    )
+    resolve(
+        "OWNER-MSG-0001",
+        "INTAKE-CARD-0001",
+        first_digest,
+        "3",
+        "INTAKE-Q-0003",
+        "RESPONSE",
+        "The first release displays the approved outcome locally.",
+        ("INTAKE-0004", "INTAKE-0005"),
+    )
+
+    text = replace_contract_table(
+        text,
+        doctor.INTAKE_CARD_HEADING,
+        doctor.INTAKE_CARD_HEADERS,
+        [
+            (
+                "INTAKE-CARD-0002",
+                "1",
+                "1",
+                "INTAKE-Q-0004",
+                "FACT",
+                "INTAKE-0006",
+                "How will you know the first release succeeds?",
+                "NOT_APPLICABLE",
+                "NOT_APPLICABLE",
+                "NOT_APPLICABLE",
+                "NONE",
+                "RESPONSE",
+                "Name one observable success measure.",
+                "PENDING",
+                "NONE",
+                "NONE",
+            ),
+            (
+                "INTAKE-CARD-0002",
+                "1",
+                "2",
+                "INTAKE-Q-0005",
+                "FACT",
+                "INTAKE-0007",
+                "What data and operating boundaries materially affect the first release?",
+                "NOT_APPLICABLE",
+                "NOT_APPLICABLE",
+                "NOT_APPLICABLE",
+                "NONE",
+                "RESPONSE",
+                "Describe sensitive data, Region, release audience, or other boundaries.",
+                "PENDING",
+                "NONE",
+                "NONE",
+            ),
+        ],
+    )
+    second_table = doctor.contract_table_after_heading(
+        text, doctor.INTAKE_CARD_HEADING, doctor.INTAKE_CARD_HEADERS
+    )
+    if second_table is None:
+        raise AssertionError("Second intake card is missing")
+    second_digest = "sha256:" + hashlib.sha256(second_table.canonical_bytes).hexdigest()
+    resolve(
+        "OWNER-MSG-0002",
+        "INTAKE-CARD-0002",
+        second_digest,
+        "1",
+        "INTAKE-Q-0004",
+        "RESPONSE",
+        "A rendered-output test confirms the approved outcome",
+        ("INTAKE-0006",),
+    )
+    resolve(
+        "OWNER-MSG-0002",
+        "INTAKE-CARD-0002",
+        second_digest,
+        "2",
+        "INTAKE-Q-0005",
+        "RESPONSE",
+        "Synthetic internal development data; us-west-2 only",
+        ("INTAKE-0007",),
+    )
     values = {
-        "INTAKE-0001": "NEW_APPLICATION",
+        "INTAKE-0001": work_context,
         "INTAKE-0002": "Development users",
         "INTAKE-0003": "Users need to see the approved project outcome",
         "INTAKE-0004": "Display the current approved project outcome",
@@ -87,37 +301,13 @@ def complete_intake_foundation(text: str) -> str:
         "INTAKE-0006": "A rendered-output test confirms the approved outcome",
         "INTAKE-0007": "Synthetic internal development data; us-west-2 only",
     }
-    answers = {
-        "INTAKE-Q-0001": ("A", "NONE"),
-        "INTAKE-Q-0002": (
-            "RESPONSE",
-            "Development users need to see the approved project outcome.",
-        ),
-        "INTAKE-Q-0003": (
-            "RESPONSE",
-            "The first release displays the approved outcome locally.",
-        ),
-    }
-    output: list[str] = []
-    for line in text.splitlines(keepends=True):
-        cells = doctor.split_markdown_table_row(line)
-        line_ending = "\n" if line.endswith("\n") else ""
-        if cells and len(cells) == 5 and cells[0] in values:
-            cells[2] = values[cells[0]]
-            cells[3] = "OWNER_FACT"
-            cells[4] = "CONFIRMED"
-            line = "| " + " | ".join(cells) + " |" + line_ending
-        elif cells and len(cells) == 16 and cells[3] in answers:
-            selection, detail = answers[cells[3]]
-            cells[13] = selection
-            cells[14] = detail
-            cells[15] = (
-                "OWNER_RESPONSE: OWNER-MSG-0001; CARD: INTAKE-CARD-0001; "
-                "REVISION: 1"
-            )
-            line = "| " + " | ".join(cells) + " |" + line_ending
-        output.append(line)
-    return "".join(output)
+    text = confirm_intake_foundation(text, values, provenance_by_intake)
+    return replace_contract_table(
+        text,
+        doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+        doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+        register_rows,
+    )
 
 
 def set_intake_card_resolution(
@@ -5148,11 +5338,22 @@ class BootstrapDoctorTests(unittest.TestCase):
 
     def test_complete_owner_grounded_intake_is_ready_for_requirements(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        completed = complete_intake_foundation(source)
 
         contract, issues = doctor.derive_intake_foundation_contract(
-            complete_intake_foundation(source),
+            completed,
             "greenfield",
             grandfather_current_gate_a=False,
+        )
+        response_table = doctor.contract_table_after_heading(
+            completed,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+        )
+        card_table = doctor.contract_table_after_heading(
+            completed,
+            doctor.INTAKE_CARD_HEADING,
+            doctor.INTAKE_CARD_HEADERS,
         )
 
         self.assertEqual(issues, [])
@@ -5161,12 +5362,319 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(len(contract.basis_ids), 7)
         self.assertEqual(contract.missing_fields, ())
         self.assertIsNone(contract.pending_card)
+        assert response_table is not None
+        assert card_table is not None
+        self.assertEqual(len(response_table.rows), 5)
+        self.assertEqual(
+            {row[0] for row in response_table.rows},
+            {"OWNER-MSG-0001", "OWNER-MSG-0002"},
+        )
+        self.assertEqual({row[0] for row in card_table.rows}, {"INTAKE-CARD-0002"})
+        foundation_table = doctor.contract_table_after_heading(
+            completed,
+            doctor.INTAKE_FOUNDATION_HEADING,
+            doctor.INTAKE_FOUNDATION_HEADERS,
+        )
+        assert foundation_table is not None
+        historical = {row[0]: row[5] for row in foundation_table.rows}
+        self.assertIn("OWNER-MSG-0001", historical["INTAKE-0001"])
+        self.assertIn("OWNER-MSG-0001", historical["INTAKE-0005"])
+        self.assertIn("OWNER-MSG-0002", historical["INTAKE-0006"])
+        self.assertIn("OWNER-MSG-0002", historical["INTAKE-0007"])
+
+    def test_owner_work_context_choices_map_exactly_to_semantic_values(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        expected = {
+            "A": "NEW_APPLICATION",
+            "B": "EXISTING_APPLICATION_CHANGE",
+            "C": "REPAIR_OR_MIGRATION",
+        }
+        for choice, owner_work_context in expected.items():
+            with self.subTest(choice=choice):
+                contract, issues = doctor.derive_intake_foundation_contract(
+                    complete_intake_foundation(source, work_context_choice=choice),
+                    "greenfield",
+                    grandfather_current_gate_a=False,
+                )
+                self.assertEqual(issues, [])
+                self.assertEqual(contract.owner_work_context, owner_work_context)
+
+    def test_partial_intake_rerenders_and_parses_original_remaining_keys(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        initial, issues = doctor.derive_intake_foundation_contract(
+            source, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertEqual(issues, [])
+        assert initial.pending_card is not None
+        digest = initial.pending_card.canonical_sha256
+        provenance = intake_provenance(
+            "OWNER-MSG-0001", "INTAKE-CARD-0001", 1, digest, "INTAKE-Q-0001", "A"
+        )
+        partial = set_intake_card_resolution(
+            source, "INTAKE-Q-0001", "A", owner_response=provenance
+        )
+        partial = confirm_intake_foundation(
+            partial,
+            {"INTAKE-0001": "NEW_APPLICATION"},
+            {"INTAKE-0001": provenance},
+        )
+        partial = replace_contract_table(
+            partial,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+            [(
+                "OWNER-MSG-0001", "INTAKE-CARD-0001", "1", digest, "1",
+                "INTAKE-Q-0001", "A", "NONE", "INTAKE-0001",
+            )],
+        )
+        contract, issues = doctor.derive_intake_foundation_contract(
+            partial, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertEqual(issues, [])
+        assert contract.pending_card is not None
+        self.assertEqual(
+            [question.reply_key for question in contract.pending_card.questions],
+            ["2", "3"],
+        )
+        remaining_digest = contract.pending_card.canonical_sha256
+        parsed = doctor.parse_intake_owner_response(
+            f"{contract.pending_card.reply_token}; 2: Users; 3: First useful result",
+            contract.pending_card.to_dict(),
+            expected_card_id="INTAKE-CARD-0001",
+            expected_revision=1,
+            expected_sha256=remaining_digest,
+            owner_response_id="OWNER-MSG-0002",
+        )
+        self.assertEqual(parsed.status, "PASS", parsed.to_dict())
+        self.assertEqual(
+            [answer.reply_key for answer in parsed.answers], ["2", "3"]
+        )
+
+    def test_response_register_rejects_repeated_questions_and_empty_facts(self) -> None:
+        source = complete_intake_foundation(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        table = doctor.contract_table_after_heading(
+            source,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+        )
+        assert table is not None
+        repeated_row = list(table.rows[0])
+        repeated_row[0] = "OWNER-MSG-0003"
+        repeated_row[3] = "sha256:" + "e" * 64
+        repeated = list(table.rows) + [tuple(repeated_row)]
+        repeated_text = replace_contract_table(
+            source,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+            repeated,
+        )
+        _contract, issues = doctor.derive_intake_foundation_contract(
+            repeated_text, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertIn(
+            "INTAKE_RESPONSE_REGISTER_INVALID",
+            {code for code, _message in issues},
+        )
+        empty_fact = list(table.rows) + [(
+            "OWNER-MSG-0003", "INTAKE-CARD-0999", "1", "sha256:" + "f" * 64,
+            "1", "INTAKE-Q-0999", "RESPONSE", "NONE", "INTAKE-0001",
+        )]
+        empty_text = replace_contract_table(
+            source,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+            empty_fact,
+        )
+        _contract, issues = doctor.derive_intake_foundation_contract(
+            empty_text, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertTrue(
+            any(
+                code == "INTAKE_RESPONSE_REGISTER_INVALID"
+                and "concrete factual detail" in message
+                for code, message in issues
+            )
+        )
+        placeholder_row = list(table.rows[1])
+        placeholder_row[7] = "NONE - unavailable"
+        placeholder_text = replace_contract_table(
+            source,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+            [table.rows[0], tuple(placeholder_row), *table.rows[2:]],
+        )
+        _contract, issues = doctor.derive_intake_foundation_contract(
+            placeholder_text, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertIn(
+            "INTAKE_RESPONSE_REGISTER_INVALID", {code for code, _message in issues}
+        )
+
+    def test_intake_parser_cli_is_normalizing_partial_stale_and_zero_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            refresh_control_hashes(project)
+            report = doctor.inspect_project(project)
+            self.assertTrue(report["ok"], report["diagnostics"])
+            card = report["intake_foundation"]["pending_card"]
+            assert isinstance(card, dict)
+
+            def snapshot() -> dict[str, str]:
+                return {
+                    path.relative_to(project).as_posix(): hashlib.sha256(
+                        path.read_bytes()
+                    ).hexdigest()
+                    for path in project.rglob("*")
+                    if path.is_file()
+                }
+
+            baseline = snapshot()
+            command = [
+                sys.executable,
+                "scripts/bootstrap_doctor.py",
+                "--root",
+                str(project),
+                "--parse-intake-response",
+                "--input-stdin",
+                "--presented-card-id",
+                str(card["card_id"]),
+                "--presented-card-revision",
+                str(card["revision"]),
+                "--presented-card-sha256",
+                str(card["canonical_sha256"]),
+                "--json",
+            ]
+            environment = dict(os.environ)
+            environment["PYTHONDONTWRITEBYTECODE"] = "1"
+
+            def parse(reply: str, *, stale: bool = False) -> tuple[int, dict[str, object]]:
+                current = list(command)
+                if stale:
+                    digest_index = current.index("--presented-card-sha256") + 1
+                    current[digest_index] = "sha256:" + "f" * 64
+                completed = subprocess.run(
+                    current,
+                    cwd=project,
+                    input=f"{card['reply_token']}; {reply}",
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    env=environment,
+                )
+                self.assertEqual(completed.stderr, "", completed.stderr)
+                return completed.returncode, json.loads(completed.stdout)
+
+            valid_exit, valid = parse(
+                "1a; 2: Development users need a clear outcome; "
+                "3: The first release displays that outcome"
+            )
+            partial_exit, partial = parse(
+                "2: Development users need a clear outcome"
+            )
+            stale_exit, stale = parse("1A", stale=True)
+            rejected_exit, rejected = parse("1A; 1B")
+            secret_exit, secret = parse(
+                "2: aws_secret_access_key=synthetic-value"
+            )
+
+            self.assertEqual(valid_exit, 0)
+            self.assertEqual(valid["status"], "PASS")
+            self.assertEqual(valid["owner_response_id"], "OWNER-MSG-0001")
+            self.assertEqual(valid["answers"][0]["selection"], "A")
+            self.assertEqual(valid["unresolved_reply_keys"], [])
+            self.assertEqual(partial_exit, 0)
+            self.assertEqual(partial["status"], "PASS")
+            self.assertEqual(partial["unresolved_reply_keys"], ["1", "3"])
+            self.assertEqual(
+                partial["owner_status"]["required_from_you"],
+                "Nothing until Codex records them and presents only the remaining questions.",
+            )
+            self.assertEqual(stale_exit, 2)
+            self.assertIn(
+                "INTAKE_CARD_STALE",
+                {item["code"] for item in stale["errors"]},
+            )
+            self.assertEqual(rejected_exit, 2)
+            self.assertIn(
+                "INTAKE_REPLY_KEY_DUPLICATE",
+                {item["code"] for item in rejected["errors"]},
+            )
+            self.assertEqual(secret_exit, 2)
+            self.assertIn(
+                "INTAKE_SECRET_MATERIAL",
+                {item["code"] for item in secret["errors"]},
+            )
+            self.assertNotIn(
+                "synthetic-value", json.dumps(secret, sort_keys=True)
+            )
+            self.assertEqual(snapshot(), baseline)
+
+    def test_cli_rejects_a_delayed_reply_bound_to_the_previous_card(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            refresh_control_hashes(project)
+            old = doctor.inspect_project(project)["intake_foundation"]["pending_card"]
+            assert isinstance(old, dict)
+            delayed = f"{old['reply_token']}; 1A"
+            prd = project / "docs/project/PRD.md"
+            prd.write_text(
+                prd.read_text(encoding="utf-8").replace(
+                    "What are you starting with?",
+                    "Which starting point matches this work?",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            refresh_control_hashes(project)
+            current = doctor.inspect_project(project)["intake_foundation"]["pending_card"]
+            assert isinstance(current, dict)
+            self.assertNotEqual(old["reply_token"], current["reply_token"])
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/bootstrap_doctor.py",
+                    "--root",
+                    str(project),
+                    "--parse-intake-response",
+                    "--input-stdin",
+                    "--presented-card-id",
+                    str(current["card_id"]),
+                    "--presented-card-revision",
+                    str(current["revision"]),
+                    "--presented-card-sha256",
+                    str(current["canonical_sha256"]),
+                    "--json",
+                ],
+                cwd=project,
+                input=delayed,
+                capture_output=True,
+                text=True,
+                check=False,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            )
+            result = json.loads(completed.stdout)
+            self.assertEqual(completed.returncode, 2)
+            self.assertIn("INTAKE_CARD_STALE", {item["code"] for item in result["errors"]})
 
     def test_intake_contract_migrates_only_unapproved_legacy_projects(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
-        start = source.index("#### Intake foundation")
-        end = source.index("### 1.2 Brownfield baseline and preservation contract")
-        legacy = source[:start] + source[end:]
+        foundation_start = source.index(doctor.INTAKE_FOUNDATION_HEADING)
+        register_start = source.index(doctor.INTAKE_RESPONSE_REGISTER_HEADING)
+        card_start = source.index(doctor.INTAKE_CARD_HEADING)
+        legacy_foundation_lines: list[str] = []
+        for line in source[foundation_start:register_start].splitlines(keepends=True):
+            cells = doctor.split_markdown_table_row(line)
+            if cells and len(cells) == 6:
+                ending = "\n" if line.endswith("\n") else ""
+                line = "| " + " | ".join(cells[:-1]) + " |" + ending
+            legacy_foundation_lines.append(line)
+        legacy = (
+            source[:foundation_start]
+            + "".join(legacy_foundation_lines)
+            + source[card_start:]
+        )
 
         unapproved, unapproved_issues = doctor.derive_intake_foundation_contract(
             legacy, "greenfield", grandfather_current_gate_a=False
@@ -5180,9 +5688,41 @@ class BootstrapDoctorTests(unittest.TestCase):
             "INTAKE_CONTRACT_MIGRATION_REQUIRED",
             {code for code, _message in unapproved_issues},
         )
+        self.assertTrue(
+            any(
+                "owner-response provenance" in message
+                and "normalized response register" in message
+                and "unconfirmed context" in message
+                and "without synthesizing" in message
+                for code, message in unapproved_issues
+                if code == "INTAKE_CONTRACT_MIGRATION_REQUIRED"
+            )
+        )
         self.assertEqual(approved_issues, [])
         self.assertEqual(approved.status, "READY_FOR_REQUIREMENTS")
         self.assertTrue(approved.grandfathered_approved_gate_a)
+
+    def test_missing_modern_intake_record_names_the_exact_migration_target(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        register_start = source.index(doctor.INTAKE_RESPONSE_REGISTER_HEADING)
+        card_start = source.index(doctor.INTAKE_CARD_HEADING)
+        missing_register = source[:register_start] + source[card_start:]
+
+        contract, issues = doctor.derive_intake_foundation_contract(
+            missing_register,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+
+        self.assertEqual(contract.status, "FOUNDATION_REQUIRED")
+        self.assertIn(
+            (
+                "INTAKE_CONTRACT_MIGRATION_REQUIRED",
+                "Unapproved project is missing: normalized response register",
+            ),
+            issues,
+        )
+
 
     def test_owner_input_creates_a_turn_boundary_but_automatic_work_does_not(self) -> None:
         owner_input = doctor.derive_interaction(
@@ -5234,6 +5774,61 @@ class BootstrapDoctorTests(unittest.TestCase):
             "CORRECT_AND_REVALIDATE",
         )
         self.assertFalse(report["interaction"]["turn_boundary_required"])
+
+    def test_generated_intake_provenance_defects_are_agent_correctable(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_intake_foundation(source)
+        foundation_table = doctor.contract_table_after_heading(
+            complete,
+            doctor.INTAKE_FOUNDATION_HEADING,
+            doctor.INTAKE_FOUNDATION_HEADERS,
+        )
+        response_table = doctor.contract_table_after_heading(
+            complete,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+        )
+        assert foundation_table is not None
+        assert response_table is not None
+        foundation_rows = [list(row) for row in foundation_table.rows]
+        foundation_rows[0][5] = "NONE"
+        invalid_foundation = replace_contract_table(
+            complete,
+            doctor.INTAKE_FOUNDATION_HEADING,
+            doctor.INTAKE_FOUNDATION_HEADERS,
+            [tuple(row) for row in foundation_rows],
+        )
+        response_rows = [list(row) for row in response_table.rows]
+        response_rows[0][0] = "OWNER-MSG-invalid"
+        invalid_register = replace_contract_table(
+            complete,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADING,
+            doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
+            [tuple(row) for row in response_rows],
+        )
+        cases = {
+            "INTAKE_FOUNDATION_PROVENANCE_INVALID": invalid_foundation,
+            "INTAKE_RESPONSE_REGISTER_INVALID": invalid_register,
+        }
+
+        for expected_code, prd_text in cases.items():
+            with self.subTest(code=expected_code), tempfile.TemporaryDirectory() as directory:
+                project = self.copy_project(Path(directory))
+                (project / "docs/project/PRD.md").write_text(
+                    prd_text, encoding="utf-8"
+                )
+                report = doctor.inspect_project(project)
+
+            self.assertIn(expected_code, codes(report))
+            item = next(
+                item
+                for item in report["remediation"]["items"]
+                if item["diagnostic_code"] == expected_code
+            )
+            self.assertEqual(item["responsible_party"], "CODEX")
+            self.assertEqual(item["category"], "AGENT_CORRECTION")
+            self.assertTrue(item["automatic_correction_allowed"])
+            self.assertFalse(report["interaction"]["turn_boundary_required"])
 
     def test_incomplete_intake_routes_as_open_decisions_not_corruption(self) -> None:
         choices = {

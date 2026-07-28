@@ -175,15 +175,31 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertFalse(card["accept_all_allowed"])
             self.assertEqual(
                 card["exact_reply"],
-                "1A; 2: <your answer>; 3: <your answer>",
+                f"{card['reply_token']}; 1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
             )
             resumed = presenter.render_owner_update(first_resume)
             self.assertIn("1. What are you starting with?", resumed)
             self.assertIn("A. A new application", resumed)
             self.assertIn("B. A change to an existing application", resumed)
             self.assertIn("C. A repair", resumed)
+            self.assertIn(
+                "No recommendation\u2014choose the option that matches your situation.",
+                resumed,
+            )
             self.assertNotIn("Accept all recommendations.", resumed)
             self.assertNotIn("INTAKE-CARD", resumed)
+            self.assertIn(str(card["reply_token"]), resumed)
+            parsed = doctor.parse_intake_owner_response(
+                f"{card['reply_token']}; 1A; 2: Development team; "
+                "3: Show the first useful result",
+                card,
+                expected_card_id=str(card["card_id"]),
+                expected_revision=int(card["revision"]),
+                expected_sha256=str(card["canonical_sha256"]),
+                owner_response_id="OWNER-MSG-0001",
+            )
+            self.assertEqual(parsed.status, "PASS", parsed.to_dict())
+            self.assertEqual(parsed.unresolved_reply_keys, ())
             self.assertEqual(resumed.count("Need from you:"), 1)
             for setup_text in (
                 "Welcome to AWS Codex Fastlane",
@@ -592,6 +608,13 @@ class ProductJourneyTests(unittest.TestCase):
         self.assertIn("A. A new application", rendered)
         self.assertIn("B. A change to an existing application", rendered)
         self.assertIn("C. A repair", rendered)
+        self.assertIn(
+            "No recommendation\u2014choose the option that matches your situation.",
+            rendered,
+        )
+        self.assertIn(
+            "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>", rendered
+        )
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)
         self.assertNotIn("Welcome to AWS Codex Fastlane", rendered)
