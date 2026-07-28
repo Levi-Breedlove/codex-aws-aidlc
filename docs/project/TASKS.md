@@ -105,6 +105,12 @@ legitimate migration-only, security-only, infrastructure-only, or evidence-only
 task does not need artificial vertical behavior, but it still needs one
 coherent outcome and independent evidence.
 
+For `NEW_BUILD`, the Gate-B-approved first construction wave implements one
+tested end-to-end user journey. It is the only first-wave task unless a
+documented, time-boxed, disposable technical spike blocks that path. The spike
+may record learning, but its code is discarded and it cannot satisfy the
+approved outcome or replace the earliest non-spike end-to-end task.
+
 ### Fastlane Definition of Done
 
 The existing DONE transition remains authoritative. A task is DONE only when:
@@ -191,7 +197,7 @@ routes to `TASK-10`, not construction.
 | Metadata key | Required content |
 |---|---|
 | `Status` | One status from the transition contract |
-| `Requirements` | Current REQ ID, requirement IDs, and applicable PROP IDs |
+| `Requirements` | Current REQ ID, requirement IDs, applicable acceptance/journey/PROP IDs, `WAVE-*` for the walking skeleton, and `SPIKE-*` when authorized |
 | `Design` | Exact `DES-nnnn; TECH: TECH-nnnn[, TECH-nnnn...]` trace, or `DES-nnnn; TECH: NONE — no technology/toolchain impact` |
 | `Authorization` | Current AUTH ID |
 | `Depends on` | Stable task IDs or `NONE` |

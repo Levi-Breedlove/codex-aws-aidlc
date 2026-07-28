@@ -303,7 +303,7 @@ ARCHITECTURE_SELECTION_HEADERS = (
 ARCHITECTURE_TRACEABILITY_HEADING = "### Architecture traceability"
 ARCHITECTURE_TRACEABILITY_HEADERS = (
     "Requirement ID",
-    "ARCH / COMP / API / DATA / CTRL IDs",
+    "ARCH / COMP / API / EVENT / CLI / FILE / DATA / CTRL / BOUNDARY / STATE IDs",
     "Property/test IDs",
     "Evidence IDs",
 )
@@ -328,7 +328,7 @@ MATERIAL_AWS_EVIDENCE_HEADERS = (
 ARCHITECTURE_DRIVER_ID = re.compile(r"DRV-\d{4,}")
 ARCHITECTURE_CANDIDATE_ID = re.compile(r"CAND-\d{4,}")
 ARCHITECTURE_ID = re.compile(r"ARCH-\d{4,}")
-ARCHITECTURE_DESIGN_ID = re.compile(r"(?:ARCH|COMP|API|DATA|CTRL)-\d{3,}")
+ARCHITECTURE_DESIGN_ID = re.compile(r"(?:ARCH|COMP|API|EVENT|CLI|FILE|DATA|CTRL|BOUNDARY|STATE)-\d{3,}")
 ARCHITECTURE_TEST_ID = re.compile(r"(?:PROP|EX|TEST)-\d{3,}")
 AWS_MATERIAL_EVIDENCE_ID = re.compile(r"AWS-EV-\d{4,}")
 AWS_DISCOVERY_ID = re.compile(r"AWS-DISC-\d{4,}")
@@ -336,13 +336,88 @@ ARCHITECTURE_DRIVER_CLASSES = {"HARD_CONSTRAINT", "PREFERENCE", "REVISIT_TRIGGER
 ARCHITECTURE_ELIGIBILITY = {"ELIGIBLE", "INELIGIBLE"}
 AWS_DOCUMENTATION_CAPABILITIES = {"retrieve_skill", "search_documentation"}
 NORMATIVE_REQUIREMENT_HEADERS = (
-    "ID",
-    "Requirement",
-    "EARS form",
-    "Acceptance criteria",
-    "Acceptance form",
+    "ID", "Requirement", "EARS form", "Acceptance ID", "Acceptance criteria", "Acceptance form",
+)
+LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
+    "ID", "Requirement", "EARS form", "Acceptance criteria", "Acceptance form",
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
+PROJECT_CONTRACT_SCHEMA = "1.3"
+PROJECT_DESIGN_CONTRACT_SCHEMA = "5"
+ACTOR_HEADING = "## 4. Users and outcomes"
+ACTOR_HEADERS = ("Actor ID", "Actor or external system", "Kind",
+                 "Desired outcome or responsibility", "Permission/data boundary", "Intake basis IDs")
+ACTOR_KINDS = {"PRIMARY_USER", "SECONDARY_USER", "OPERATOR", "EXTERNAL_SYSTEM"}
+ACTOR_ID = re.compile(r"ACT-\d{3,}")
+ACCEPTANCE_ID = re.compile(r"AC-[A-Z][A-Z0-9_]*(?:-[A-Z][A-Z0-9_]*)*-\d{3,}")
+JOURNEY_HEADING = "### Journey register"
+JOURNEY_HEADERS = ("Journey ID", "Actor IDs", "Goal", "Trigger", "Main success outcome",
+                   "Alternate/failure behavior", "Requirement IDs", "Rich-use-case triggers")
+JOURNEY_ID = re.compile(r"JOURNEY-\d{3,}")
+RICH_USE_CASE_TRIGGERS = {
+    "DISTINCT_PERMISSIONED_ACTORS", "CONFIDENTIAL_OR_REGULATED_MUTATION",
+    "MONEY_OR_ENTITLEMENT", "IRREVERSIBLE_ACTION", "MIGRATION_OR_CUTOVER",
+    "ASYNCHRONOUS_WORK", "PARTIAL_FAILURE",
+}
+RICH_USE_CASE_APPLICABILITY_HEADING = "### Rich-use-case applicability"
+RICH_USE_CASE_APPLICABILITY_HEADERS = ("Applicability", "Trigger basis", "Use-case IDs")
+RICH_USE_CASE_HEADING = "### Rich use cases"
+RICH_USE_CASE_HEADERS = ("Use case ID", "Journey ID", "Primary actor ID", "Stakeholder interests",
+                         "Preconditions", "Success guarantee", "Minimum failure guarantee",
+                         "Business rule IDs", "Requirement IDs")
+USE_CASE_ID = re.compile(r"USECASE-\d{3,}")
+BUSINESS_RULE_HEADING = "### Business rules"
+BUSINESS_RULE_HEADERS = ("Rule ID", "Rule", "Basis IDs", "Journey/use-case IDs", "Validation ID")
+BUSINESS_RULE_ID = re.compile(r"BR-\d{3,}")
+REQUIREMENT_COVERAGE_HEADING = "### Requirement coverage"
+REQUIREMENT_COVERAGE_HEADERS = ("Requirement ID", "Intake basis IDs", "Actor IDs",
+                                "Journey IDs", "Acceptance/test IDs", "Approved success measure ID")
+INTAKE_FOUNDATION_IDS = {f"INTAKE-{index:04d}" for index in range(1, 8)}
+INTERFACE_HEADING = "## 16. Interfaces and contracts"
+INTERFACE_HEADERS = ("Contract ID", "Kind", "Requirement basis", "Producer", "Consumer",
+                     "Schema or protocol", "Authentication", "Authorization", "Input validation",
+                     "Success output/status", "Error and recovery behavior",
+                     "Compatibility/versioning", "Idempotency/concurrency", "Timeout bound",
+                     "Rate bound", "Performance bound")
+LEGACY_INTERFACE_HEADERS_V4 = ("Contract ID", "Producer", "Consumer", "Schema or protocol",
+                               "Authentication", "Versioning", "Idempotency")
+INTERFACE_ID = re.compile(r"(?:API|EVENT|CLI|FILE)-\d{3,}")
+INTERFACE_KINDS = {"API", "EVENT", "CLI", "FILE"}
+LAYER_BOUNDARY_HEADING = "### Layer boundaries"
+LAYER_BOUNDARY_HEADERS = ("Boundary ID", "Outer adapter/layer", "Inner domain layer",
+                          "Boundary DTO/schema", "Explicit mapping", "Dependency direction",
+                          "Authorization enforcement", "External anti-corruption adapter",
+                          "Requirement IDs", "Validation IDs")
+BOUNDARY_ID = re.compile(r"BOUNDARY-\d{3,}")
+STATE_APPLICABILITY_HEADING = "### State-model applicability"
+STATE_APPLICABILITY_HEADERS = ("Subject ID", "Applicability", "Trigger basis IDs", "State model IDs")
+STATE_REGISTER_HEADING = "### State register"
+STATE_REGISTER_HEADERS = ("State model ID", "Subject ID", "States", "Initial state",
+                          "Allowed transitions", "Terminal states", "Invalid-transition behavior",
+                          "Requirement IDs", "Validation IDs")
+STATE_ID = re.compile(r"STATE-\d{3,}")
+STATE_MODEL_TRIGGERS = ("LIFECYCLE_RESOURCE", "ASYNCHRONOUS_WORK", "RETRY_OR_RESUME",
+                        "APPROVAL_FLOW", "MIGRATION_OR_CUTOVER", "OTHER_MEANINGFUL_TRANSITION")
+RICH_TO_STATE_TRIGGER = {"ASYNCHRONOUS_WORK": "ASYNCHRONOUS_WORK",
+                         "MIGRATION_OR_CUTOVER": "MIGRATION_OR_CUTOVER", "PARTIAL_FAILURE": "RETRY_OR_RESUME"}
+FIRST_WAVE_HEADING = "### First construction wave"
+FIRST_WAVE_HEADERS = ("Wave contract ID", "Work kind", "Walking-skeleton journey ID",
+                      "Requirement IDs", "Acceptance/test IDs", "End-to-end Harness ID",
+                      "Blocking spike ID")
+WAVE_ID = re.compile(r"WAVE-\d{3,}")
+SPIKE_HEADING = "### Blocking spike"
+SPIKE_HEADERS = ("Spike ID", "Blocking technical unknown", "Time box",
+                 "Disposable output boundary", "Exit criterion", "Required next action")
+SPIKE_ID = re.compile(r"SPIKE-\d{3,}")
+MEASURABLE_INTERFACE_BOUND = re.compile(
+    r"(?:\b\d+(?:\.\d+)?\s*(?:ns|nanoseconds?|us|microseconds?|ms|"
+    r"milliseconds?|s|secs?|seconds?|minutes?|hours?|days?|weeks?|bytes?|"
+    r"kib|mib|gib|kb|mb|gb|tb|requests?|operations?|events?|items?|records?|"
+    r"users?|transactions?|messages?|files?|rps|qps|tps|percent)\b|"
+    r"\b\d+(?:\.\d+)?\s*%|\b\d+(?:\.\d+)?\s*/\s*(?:s|sec(?:ond)?s?|"
+    r"m|min(?:ute)?s?|h|hours?)\b|\b\d+(?:\.\d+)?\s+per\s+"
+    r"(?:second|minute|hour|day)\b)", re.IGNORECASE,
+)
 EARS_FORMS = {
     "UBIQUITOUS",
     "EVENT_DRIVEN",
@@ -662,6 +737,34 @@ class ContractTable:
     headers: tuple[str, ...]
     rows: tuple[tuple[str, ...], ...]
     canonical_bytes: bytes
+
+@dataclass(frozen=True)
+class RequirementsContract:
+    schema_version: str = "1.3"
+    status: str = "UNINITIALIZED"
+    actor_ids: tuple[str, ...] = ()
+    requirement_ids: tuple[str, ...] = ()
+    journey_ids: tuple[str, ...] = ()
+    acceptance_ids: tuple[str, ...] = ()
+    use_case_ids: tuple[str, ...] = ()
+    business_rule_ids: tuple[str, ...] = ()
+    rich_use_case_triggers: tuple[str, ...] = ()
+    missing_records: tuple[str, ...] = ()
+    canonical_sha256: str | None = None
+    grandfathered_approved_gate_a: bool = False
+    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version, "status": self.status,
+            "actor_ids": list(self.actor_ids), "requirement_ids": list(self.requirement_ids),
+            "journey_ids": list(self.journey_ids), "acceptance_ids": list(self.acceptance_ids),
+            "use_case_ids": list(self.use_case_ids),
+            "business_rule_ids": list(self.business_rule_ids),
+            "rich_use_case_triggers": list(self.rich_use_case_triggers),
+            "missing_records": list(self.missing_records), "canonical_sha256": self.canonical_sha256,
+            "grandfathered_approved_gate_a": self.grandfathered_approved_gate_a,
+        }
 
 @dataclass(frozen=True)
 class IntakeQuestion:
@@ -1096,6 +1199,69 @@ class ArchitectureContract:
 
 
 @dataclass(frozen=True)
+class FirstWaveContract:
+    wave_contract_id: str
+    work_kind: str
+    journey_id: str | None
+    requirement_ids: tuple[str, ...]
+    acceptance_test_ids: tuple[str, ...]
+    harness_id: str
+    blocking_spike_id: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "wave_contract_id": self.wave_contract_id, "work_kind": self.work_kind,
+            "journey_id": self.journey_id,
+            "requirement_ids": list(self.requirement_ids),
+            "acceptance_test_ids": list(self.acceptance_test_ids),
+            "harness_id": self.harness_id, "blocking_spike_id": self.blocking_spike_id,
+        }
+
+
+@dataclass(frozen=True)
+class SpikeContract:
+    spike_id: str
+    technical_unknown: str
+    time_box: str
+    disposable_boundary: str
+    exit_criterion: str
+    required_next_action: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "spike_id": self.spike_id, "technical_unknown": self.technical_unknown,
+            "time_box": self.time_box, "disposable_boundary": self.disposable_boundary,
+            "exit_criterion": self.exit_criterion, "required_next_action": self.required_next_action,
+        }
+
+
+@dataclass(frozen=True)
+class ProjectDesignContract:
+    schema_version: int = 5
+    status: str = "UNINITIALIZED"
+    interface_ids: tuple[str, ...] = ()
+    boundary_ids: tuple[str, ...] = ()
+    state_ids: tuple[str, ...] = ()
+    first_wave: FirstWaveContract | None = None
+    spike: SpikeContract | None = None
+    missing_records: tuple[str, ...] = ()
+    canonical_sha256: str | None = None
+    grandfathered_v4: bool = False
+    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version, "status": self.status,
+            "interface_ids": list(self.interface_ids), "boundary_ids": list(self.boundary_ids),
+            "state_ids": list(self.state_ids),
+            "first_wave": self.first_wave.to_dict() if self.first_wave else None,
+            "spike": self.spike.to_dict() if self.spike else None,
+            "missing_records": list(self.missing_records), "canonical_sha256": self.canonical_sha256,
+            "grandfathered_v4": self.grandfathered_v4,
+        }
+
+
+@dataclass(frozen=True)
 class DesignContract:
     schema_version: int = 1
     status: str = "UNINITIALIZED"
@@ -1106,6 +1272,7 @@ class DesignContract:
     harness: HarnessContract = field(default_factory=HarnessContract)
     change_impact: ChangeImpactContract = field(default_factory=ChangeImpactContract)
     canonical_sha256: str | None = None
+    project_contract: ProjectDesignContract = field(default_factory=ProjectDesignContract)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -1118,6 +1285,7 @@ class DesignContract:
             "harness": self.harness.to_dict(),
             "change_impact": self.change_impact.to_dict(),
             "canonical_sha256": self.canonical_sha256,
+            "project_contract": self.project_contract.to_dict(),
         }
 
 
@@ -3528,6 +3696,7 @@ def authoritative_requirement_ids(text: str) -> set[str]:
         if not table or tuple(table[0]) not in {
             NORMATIVE_REQUIREMENT_HEADERS,
             LEGACY_REQUIREMENT_HEADERS,
+            LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
         }:
             continue
         expected_cells = len(table[0])
@@ -3727,26 +3896,23 @@ def quality_attribute_scenario_issues(
 
 
 def validate_gate_a_method_contract(
-    ctx: Context,
-    text: str,
-    *,
-    grandfather_approved_v1: bool = False,
+    ctx: Context, text: str, *, grandfather_approved_v1: bool = False,
 ) -> None:
     """Fail closed on the Fastlane EARS Contract at Gate A boundaries."""
 
     found = False
     legacy_rows: list[str] = []
+    legacy_header_shapes: set[tuple[str, ...]] = set()
     modern_tables = 0
     for table in markdown_tables(text):
         if not table:
             continue
         headers = tuple(table[0])
-        if headers == LEGACY_REQUIREMENT_HEADERS:
+        if headers in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}:
             found = True
-            legacy_rows.extend(
-                clean_cell(row[0]) if row else "REQ-UNKNOWN"
-                for row in table[2:]
-            )
+            legacy_header_shapes.add(headers)
+            legacy_rows.extend(clean_cell(row[0]) if row else "REQ-UNKNOWN"
+                               for row in table[2:])
             continue
         if headers != NORMATIVE_REQUIREMENT_HEADERS:
             continue
@@ -3755,32 +3921,31 @@ def validate_gate_a_method_contract(
         for row in table[2:]:
             row_id = clean_cell(row[0]) if row else "REQ-UNKNOWN"
             if len(row) != len(NORMATIVE_REQUIREMENT_HEADERS):
-                ctx.error(
-                    "REQUIREMENT_METHOD_CONTRACT",
-                    f"{row_id}: normative requirement row must have exactly five fields",
-                    PRD_FILE,
-                )
+                ctx.error("REQUIREMENT_METHOD_CONTRACT",
+                          f"{row_id}: normative requirement row must have exactly six fields", PRD_FILE)
                 continue
-            for issue in requirement_method_issues(*row):
+            acceptance_id = clean_cell(row[3])
+            expected_acceptance_id = f"AC-{row_id}"
+            if ACCEPTANCE_ID.fullmatch(acceptance_id) is None or acceptance_id != expected_acceptance_id:
+                ctx.error("REQUIREMENT_METHOD_CONTRACT",
+                          f"{row_id}: Acceptance ID must be exactly {expected_acceptance_id}", PRD_FILE)
+            for issue in requirement_method_issues(row[0], row[1], row[2], row[4], row[5]):
                 ctx.error("REQUIREMENT_METHOD_CONTRACT", issue, PRD_FILE)
     if not found:
-        ctx.error(
-            "REQUIREMENT_METHOD_CONTRACT",
-            "REQ-SECTION: no authoritative normative requirement table was found",
-            PRD_FILE,
-        )
+        ctx.error("REQUIREMENT_METHOD_CONTRACT",
+                  "REQ-SECTION: no authoritative normative requirement table was found", PRD_FILE)
         return
 
     legacy_is_grandfathered = bool(
         grandfather_approved_v1 and legacy_rows and modern_tables == 0
+        and len(legacy_header_shapes) == 1
     )
     if legacy_rows and not legacy_is_grandfathered:
         for row_id in legacy_rows:
             ctx.error(
                 "REQUIREMENT_METHOD_MIGRATION_REQUIRED",
                 f"{row_id}: migrate the complete normative table to the Fastlane "
-                "EARS Contract before Gate A can become ready",
-                PRD_FILE,
+                "EARS Contract before Gate A can become ready", PRD_FILE,
             )
     if legacy_is_grandfathered:
         return
@@ -3788,6 +3953,484 @@ def validate_gate_a_method_contract(
     requirement_ids = authoritative_requirement_ids(text)
     for issue in quality_attribute_scenario_issues(text, requirement_ids):
         ctx.error("QAS_CONTRACT", issue, PRD_FILE)
+
+
+def _schema_13_requirement_rows(text: str) -> tuple[list[tuple[str, ...]], dict[str, str], list[str]]:
+    rows: list[tuple[str, ...]] = []
+    acceptance_by_requirement: dict[str, str] = {}
+    legacy_ids: list[str] = []
+    for table in markdown_tables(text):
+        if not table:
+            continue
+        headers = tuple(table[0])
+        if headers in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}:
+            legacy_ids.extend(clean_cell(row[0]) if row else "REQ-UNKNOWN"
+                              for row in table[2:])
+            continue
+        if headers != NORMATIVE_REQUIREMENT_HEADERS:
+            continue
+        for row in table[2:]:
+            if len(row) != len(NORMATIVE_REQUIREMENT_HEADERS):
+                continue
+            normalized = tuple(clean_cell(cell) for cell in row)
+            rows.append(normalized)
+            acceptance_by_requirement[normalized[0]] = normalized[3]
+    return rows, acceptance_by_requirement, legacy_ids
+
+
+def _contract_table_or_issue(
+    text: str,
+    heading: str,
+    headers: tuple[str, ...],
+    issues: list[Any],
+    missing_records: list[str],
+    code: str | None = None,
+) -> ContractTable | None:
+    try:
+        table = contract_table_after_heading(text, heading, headers)
+    except ValueError as exc:
+        table, message = None, f"{heading}: {exc}"
+    else:
+        message = f"Missing {heading}" if table is None else None
+    if table is None:
+        issues.append((code, message) if code else message)
+        missing_records.append(heading)
+    return table
+
+
+def _contract_ids(
+    value: str,
+    pattern: re.Pattern[str],
+    field_name: str,
+) -> list[str]:
+    return _canonical_id_list(clean_cell(value), pattern, field_name)
+
+
+def _rich_trigger_list(value: str, journey_id: str) -> list[str]:
+    cleaned = clean_cell(value)
+    if cleaned == "NONE":
+        return []
+    if unresolved(cleaned):
+        raise ValueError(f"{journey_id}: Rich-use-case triggers is unresolved")
+    triggers = cleaned.split(", ")
+    if cleaned != ", ".join(triggers):
+        raise ValueError(f"{journey_id}: Rich-use-case triggers must use comma-space separation")
+    unknown = sorted(set(triggers) - RICH_USE_CASE_TRIGGERS)
+    if unknown:
+        raise ValueError(f"{journey_id}: unknown Rich-use-case triggers: " + ", ".join(unknown))
+    if len(triggers) != len(set(triggers)):
+        raise ValueError(f"{journey_id}: Rich-use-case triggers contains duplicates")
+    return triggers
+
+
+def _state_trigger_map(value: str, subject_id: str) -> dict[str, tuple[str, ...]]:
+    cleaned = clean_cell(value); segments = cleaned.split("; ")
+    if unresolved(cleaned) or cleaned != "; ".join(segments):
+        raise ValueError(f"{subject_id}: State trigger basis must use canonical '; ' segments")
+    result: dict[str, tuple[str, ...]] = {}
+    for segment in segments:
+        parts = segment.split(": ", 1)
+        if len(parts) != 2 or parts[0] not in STATE_MODEL_TRIGGERS:
+            raise ValueError(f"{subject_id}: invalid State trigger category")
+        category, basis_value = parts
+        if category in result:
+            raise ValueError(f"{subject_id}: duplicate State trigger category {category}")
+        result[category] = tuple(_contract_ids(basis_value, STABLE_CONTRACT_ID,
+                                               f"{subject_id} {category} basis IDs"))
+    if list(result) != [item for item in STATE_MODEL_TRIGGERS if item in result]:
+        raise ValueError(f"{subject_id}: State trigger categories are not in canonical order")
+    return result
+
+
+def derive_requirements_contract(
+    text: str, effective_risk: str | None,
+    intake_contract: IntakeFoundationContract | None = None, *,
+    required: bool, grandfather_current_gate_a: bool,
+) -> tuple[RequirementsContract, list[tuple[str, str]]]:
+    """Derive the owner-grounded schema 1.3 requirements projection."""
+
+    issues: list[tuple[str, str]] = []
+    add = lambda code, message: issues.append((code, message))
+    missing_records: list[str] = []
+    try:
+        document = table_after_heading(text, "## Document status")
+    except ValueError as exc:
+        document = {}
+        if required:
+            add("PROJECT_CONTRACT_MIGRATION_REQUIRED", str(exc))
+    project_schema = clean_cell(document.get("Project contract schema", ""))
+    requirement_rows, acceptance_by_requirement, legacy_ids = _schema_13_requirement_rows(text)
+    observed_headers = {tuple(table[0]) for table in markdown_tables(text) if table}
+    current_header_map = {
+        NORMATIVE_REQUIREMENT_HEADERS: "Six-column normative requirements",
+        ACTOR_HEADERS: ACTOR_HEADING,
+        JOURNEY_HEADERS: JOURNEY_HEADING,
+        RICH_USE_CASE_APPLICABILITY_HEADERS: RICH_USE_CASE_APPLICABILITY_HEADING,
+        RICH_USE_CASE_HEADERS: RICH_USE_CASE_HEADING,
+        BUSINESS_RULE_HEADERS: BUSINESS_RULE_HEADING,
+        REQUIREMENT_COVERAGE_HEADERS: REQUIREMENT_COVERAGE_HEADING,
+    }
+    current_present_headers = observed_headers & set(current_header_map)
+    header_sections = (
+        (ACTOR_HEADING, ACTOR_HEADERS),
+        (JOURNEY_HEADING, JOURNEY_HEADERS),
+        (RICH_USE_CASE_APPLICABILITY_HEADING, RICH_USE_CASE_APPLICABILITY_HEADERS),
+        (RICH_USE_CASE_HEADING, RICH_USE_CASE_HEADERS),
+        (BUSINESS_RULE_HEADING, BUSINESS_RULE_HEADERS),
+        (REQUIREMENT_COVERAGE_HEADING, REQUIREMENT_COVERAGE_HEADERS),
+    )
+    for heading, headers in header_sections:
+        try:
+            if contract_table_after_heading(text, heading, headers) is not None:
+                current_present_headers.add(headers)
+        except ValueError:
+            pass
+    if project_schema != PROJECT_CONTRACT_SCHEMA:
+        legacy_headers = observed_headers & {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}
+        real_legacy_ids = [
+            identifier for identifier in legacy_ids if STABLE_CONTRACT_ID.fullmatch(identifier)
+        ]
+        exact_legacy_shape = bool(
+            not project_schema and real_legacy_ids
+            and len(real_legacy_ids) == len(legacy_ids)
+            and len(real_legacy_ids) == len(set(real_legacy_ids))
+            and len(legacy_headers) == 1 and not current_present_headers
+        )
+        if grandfather_current_gate_a and exact_legacy_shape:
+            approved_ids = tuple(sorted(real_legacy_ids))
+            legacy_rows = [tuple(clean_cell(cell) for cell in row) for table in markdown_tables(text)
+                           if table and tuple(table[0]) in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
+                           LEGACY_REQUIREMENT_HEADERS} for row in table[2:]]
+            canonical_bytes = b"PROJECT_CONTRACT_SCHEMA: 1.2\n" + json.dumps(
+                (clean_cell(document.get("Current requirements revision", "")), legacy_rows),
+                ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n"
+            contract = RequirementsContract(schema_version="1.2", status="GRANDFATHERED",
+                requirement_ids=approved_ids, acceptance_ids=tuple(f"AC-{item}" for item in approved_ids),
+                canonical_sha256="sha256:" + hashlib.sha256(canonical_bytes).hexdigest(),
+                canonical_bytes=canonical_bytes, grandfathered_approved_gate_a=True)
+            return contract, []
+        if not required:
+            return RequirementsContract(status="UNINITIALIZED"), []
+        migration_targets = ["Project contract schema 1.3"]
+        migration_targets.extend(label for headers, label in current_header_map.items()
+                                 if headers not in current_present_headers)
+        message = (
+            "Project contract schema 1.3 is required before Gate A readiness; "
+            "migrate only the listed generated records without inventing owner facts: "
+            + ", ".join(migration_targets)
+        )
+        return (
+            RequirementsContract(status="MIGRATION_REQUIRED", missing_records=tuple(migration_targets)),
+            [("PROJECT_CONTRACT_MIGRATION_REQUIRED", message)],
+        )
+
+
+    if intake_contract is None:
+        repository_mode = clean_cell(document.get("Project mode", "")).lower()
+        intake_contract, _intake_issues = derive_intake_foundation_contract(
+            text, repository_mode if repository_mode in PROJECT_MODES else None,
+            grandfather_current_gate_a=grandfather_current_gate_a)
+    confirmed_intake_ids = set(intake_contract.basis_ids)
+    if required and intake_contract.status != "READY_FOR_REQUIREMENTS":
+        add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+            "Schema 1.3 actor and success-measure bases require a complete confirmed intake foundation")
+
+    table_specs = (
+        (ACTOR_HEADING, ACTOR_HEADERS, "ACTOR_CONTRACT_INVALID"),
+        (JOURNEY_HEADING, JOURNEY_HEADERS, "JOURNEY_CONTRACT_INVALID"),
+        (RICH_USE_CASE_APPLICABILITY_HEADING, RICH_USE_CASE_APPLICABILITY_HEADERS, "RICH_USE_CASE_INVALID"),
+        (RICH_USE_CASE_HEADING, RICH_USE_CASE_HEADERS, "RICH_USE_CASE_INVALID"),
+        (BUSINESS_RULE_HEADING, BUSINESS_RULE_HEADERS, "BUSINESS_RULE_INVALID"),
+        (REQUIREMENT_COVERAGE_HEADING, REQUIREMENT_COVERAGE_HEADERS, "REQUIREMENT_COVERAGE_INVALID"),
+    )
+    tables = tuple(
+        _contract_table_or_issue(text, heading, headers, issues, missing_records, code)
+        for heading, headers, code in table_specs
+    )
+    actors, journeys, applicability, use_cases, business_rules, coverage = tables
+    if legacy_ids:
+        add("PROJECT_CONTRACT_MIGRATION_REQUIRED",
+            "Migrate legacy normative rows to schema 1.3: " + ", ".join(legacy_ids))
+        missing_records.extend(legacy_ids)
+    requirement_ids = [row[0] for row in requirement_rows]
+    duplicate_requirements = sorted(identifier for identifier in set(requirement_ids)
+                                    if requirement_ids.count(identifier) > 1)
+    if duplicate_requirements:
+        add("REQUIREMENT_COVERAGE_INVALID",
+            "Duplicate authoritative requirement IDs: " + ", ".join(duplicate_requirements))
+    if not requirement_rows:
+        add("REQUIREMENT_COVERAGE_INVALID", "Schema 1.3 requires at least one normative requirement")
+    acceptance_ids: list[str] = []
+    for row in requirement_rows:
+        requirement_id = row[0]
+        acceptance_id = row[3]
+        if STABLE_CONTRACT_ID.fullmatch(requirement_id) is None:
+            add("REQUIREMENT_COVERAGE_INVALID", f"Invalid requirement ID {requirement_id!r}")
+        expected_acceptance = f"AC-{requirement_id}"
+        if ACCEPTANCE_ID.fullmatch(acceptance_id) is None or acceptance_id != expected_acceptance:
+            add("REQUIREMENT_COVERAGE_INVALID",
+                f"{requirement_id}: Acceptance ID must be exactly {expected_acceptance}")
+        acceptance_ids.append(acceptance_id)
+    duplicate_acceptance = sorted(identifier for identifier in set(acceptance_ids)
+                                  if acceptance_ids.count(identifier) > 1)
+    if duplicate_acceptance:
+        add("REQUIREMENT_COVERAGE_INVALID",
+            "Duplicate acceptance IDs: " + ", ".join(duplicate_acceptance))
+    requirement_set = set(requirement_ids)
+
+    if not required and (
+        any(table is None for table in tables)
+        or any(unresolved(cell) for table in tables if table for row in table.rows for cell in row)
+        or any(unresolved(cell) for row in requirement_rows for cell in row)
+    ):
+        return RequirementsContract(status="UNINITIALIZED"), []
+
+    actor_ids: list[str] = []
+    actor_kinds: dict[str, str] = {}
+    if actors is not None:
+        if not actors.rows:
+            add("ACTOR_CONTRACT_INVALID", "Actor contract has no rows")
+        for actor_id, name, kind, outcome, boundary, basis_value in actors.rows:
+            if ACTOR_ID.fullmatch(actor_id) is None:
+                add("ACTOR_CONTRACT_INVALID", f"Invalid actor ID {actor_id!r}")
+                continue
+            if actor_id in actor_ids:
+                add("ACTOR_CONTRACT_INVALID", f"Duplicate actor ID {actor_id}")
+            actor_ids.append(actor_id)
+            actor_kinds[actor_id] = kind
+            if kind not in ACTOR_KINDS:
+                add("ACTOR_CONTRACT_INVALID", f"{actor_id}: invalid actor kind {kind!r}")
+            for label, value in (
+                ("Actor or external system", name),
+                ("Desired outcome or responsibility", outcome),
+                ("Permission/data boundary", boundary),
+            ):
+                if not explicit_value(value, allow_none=False):
+                    add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+                        f"{actor_id}: {label} requires an owner-grounded value")
+            try:
+                basis_ids = _contract_ids(basis_value, re.compile(r"INTAKE-\d{4}"),
+                                          f"{actor_id} Intake basis IDs")
+                unknown = sorted(set(basis_ids) - confirmed_intake_ids)
+                if unknown:
+                    add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+                        f"{actor_id}: intake basis IDs are not currently confirmed: "
+                        + ", ".join(unknown))
+            except ValueError as exc:
+                add("ACTOR_CONTRACT_INVALID", str(exc))
+
+    journey_ids: list[str] = []
+    journey_requirements: dict[str, set[str]] = {}
+    journey_actors: dict[str, set[str]] = {}
+    declared_rich_triggers: set[str] = set()
+    if journeys is not None:
+        if not journeys.rows:
+            add("JOURNEY_CONTRACT_INVALID", "Journey register has no rows")
+        for row in journeys.rows:
+            journey_id, actor_value, goal, trigger, success, failure, requirement_value, trigger_value = row
+            if JOURNEY_ID.fullmatch(journey_id) is None:
+                add("JOURNEY_CONTRACT_INVALID", f"Invalid journey ID {journey_id!r}")
+                continue
+            if journey_id in journey_ids:
+                add("JOURNEY_CONTRACT_INVALID", f"Duplicate journey ID {journey_id}")
+            journey_ids.append(journey_id)
+            for label, value in (
+                ("Goal", goal), ("Trigger", trigger),
+                ("Main success outcome", success),
+                ("Alternate/failure behavior", failure),
+            ):
+                if not explicit_value(value, allow_none=False):
+                    add("JOURNEY_CONTRACT_INVALID",
+                        f"{journey_id}: {label} requires a concrete generated value grounded in approved requirements")
+            try:
+                refs = _contract_ids(actor_value, ACTOR_ID, f"{journey_id} Actor IDs")
+                journey_actors[journey_id] = set(refs)
+                unknown = sorted(set(refs) - set(actor_ids))
+                if unknown:
+                    add("JOURNEY_CONTRACT_INVALID", f"{journey_id}: unknown actor IDs: " + ", ".join(unknown))
+            except ValueError as exc:
+                add("JOURNEY_CONTRACT_INVALID", str(exc))
+            try:
+                refs = _contract_ids(requirement_value, STABLE_CONTRACT_ID, f"{journey_id} Requirement IDs")
+                journey_requirements[journey_id] = set(refs)
+                unknown = sorted(set(refs) - requirement_set)
+                if unknown:
+                    add("JOURNEY_CONTRACT_INVALID", f"{journey_id}: unknown requirement IDs: " + ", ".join(unknown))
+            except ValueError as exc:
+                add("JOURNEY_CONTRACT_INVALID", str(exc))
+            try:
+                declared_rich_triggers.update(_rich_trigger_list(trigger_value, journey_id))
+            except ValueError as exc:
+                add("JOURNEY_CONTRACT_INVALID", str(exc))
+
+    policy_requires_rich = (
+        effective_risk in {"high", "critical"} or bool(declared_rich_triggers)
+    )
+    rich_required = policy_requires_rich
+    required_use_case_ids: list[str] = []
+    if applicability is not None:
+        if len(applicability.rows) != 1:
+            add("RICH_USE_CASE_INVALID", "Rich-use-case applicability requires exactly one row")
+        else:
+            status, trigger_basis, use_case_value = applicability.rows[0]
+            if status == "REQUIRED":
+                rich_required = True
+                if not explicit_value(trigger_basis, allow_none=False):
+                    add("RICH_USE_CASE_INVALID", "Rich-use-case trigger basis is unresolved")
+                try:
+                    required_use_case_ids = _contract_ids(use_case_value, USE_CASE_ID, "Rich use-case IDs")
+                except ValueError as exc:
+                    add("RICH_USE_CASE_INVALID", str(exc))
+            elif status == "NOT_APPLICABLE":
+                if policy_requires_rich:
+                    add("RICH_USE_CASE_REQUIRED",
+                        "High/critical risk or a declared material journey trigger requires rich use cases")
+                if not trigger_basis.startswith("NOT_APPLICABLE") or unresolved(trigger_basis):
+                    add("RICH_USE_CASE_INVALID", "NOT_APPLICABLE requires a concrete trigger-basis reason")
+                if use_case_value != "NONE":
+                    add("RICH_USE_CASE_INVALID", "Non-applicable rich use cases require Use-case IDs NONE")
+            else:
+                add("RICH_USE_CASE_INVALID", "Applicability must be REQUIRED or NOT_APPLICABLE")
+
+    if not rich_required:
+        if use_cases is not None and use_cases.rows:
+            add("RICH_USE_CASE_INVALID", "NOT_APPLICABLE rich use cases require an empty rich-use-case table")
+        if business_rules is not None and business_rules.rows:
+            add("BUSINESS_RULE_INVALID", "NOT_APPLICABLE rich use cases require an empty business-rule table")
+
+    use_case_ids: list[str] = []
+    referenced_business_rules: set[str] = set()
+    if use_cases is not None and rich_required:
+        for row in use_cases.rows:
+            use_case_id, journey_id, primary_actor, interests, preconditions, success, minimum_failure, rules_value, requirements_value = row
+            if USE_CASE_ID.fullmatch(use_case_id) is None:
+                add("RICH_USE_CASE_INVALID", f"Invalid use-case ID {use_case_id!r}")
+                continue
+            if use_case_id in use_case_ids:
+                add("RICH_USE_CASE_INVALID", f"Duplicate use-case ID {use_case_id}")
+            use_case_ids.append(use_case_id)
+            if journey_id not in journey_ids:
+                add("RICH_USE_CASE_INVALID", f"{use_case_id}: unknown journey {journey_id}")
+            if primary_actor not in journey_actors.get(journey_id, set()):
+                add("RICH_USE_CASE_INVALID", f"{use_case_id}: primary actor is not part of {journey_id}")
+            for label, value in (
+                ("Stakeholder interests", interests), ("Preconditions", preconditions),
+                ("Success guarantee", success),
+                ("Minimum failure guarantee", minimum_failure),
+            ):
+                if not explicit_value(value, allow_none=False):
+                    add("RICH_USE_CASE_INVALID", f"{use_case_id}: {label} must be concrete")
+            try:
+                referenced_business_rules.update(_contract_ids(rules_value, BUSINESS_RULE_ID, f"{use_case_id} Business rule IDs"))
+            except ValueError as exc:
+                add("RICH_USE_CASE_INVALID", str(exc))
+            try:
+                refs = set(_contract_ids(requirements_value, STABLE_CONTRACT_ID, f"{use_case_id} Requirement IDs"))
+                unknown = sorted(refs - requirement_set)
+                if unknown:
+                    add("RICH_USE_CASE_INVALID", f"{use_case_id}: unknown requirement IDs: " + ", ".join(unknown))
+                journey_basis = journey_requirements.get(journey_id, set())
+                outside_journey = sorted(refs - journey_basis)
+                if outside_journey:
+                    add("RICH_USE_CASE_INVALID", f"{use_case_id}: requirement IDs are not part of {journey_id}: " + ", ".join(outside_journey))
+            except ValueError as exc:
+                add("RICH_USE_CASE_INVALID", str(exc))
+        if use_case_ids != required_use_case_ids:
+            add("RICH_USE_CASE_INVALID", "Rich use-case rows must exactly match the applicability record")
+
+    business_rule_ids: list[str] = []
+    if business_rules is not None and rich_required:
+        for rule_id, rule, basis_value, journey_use_case_value, validation_id in business_rules.rows:
+            if BUSINESS_RULE_ID.fullmatch(rule_id) is None:
+                add("BUSINESS_RULE_INVALID", f"Invalid business-rule ID {rule_id!r}")
+                continue
+            if rule_id in business_rule_ids:
+                add("BUSINESS_RULE_INVALID", f"Duplicate business-rule ID {rule_id}")
+            business_rule_ids.append(rule_id)
+            if not explicit_value(rule, allow_none=False):
+                add("BUSINESS_RULE_INVALID", f"{rule_id}: Rule must be concrete")
+            try:
+                basis_refs = set(_contract_ids(basis_value, STABLE_CONTRACT_ID, f"{rule_id} Basis IDs"))
+                refs = set(_contract_ids(journey_use_case_value, STABLE_CONTRACT_ID, f"{rule_id} Journey/use-case IDs"))
+                unknown = sorted(refs - set(journey_ids) - set(use_case_ids))
+                if unknown:
+                    add("BUSINESS_RULE_INVALID", f"{rule_id}: unknown journey/use-case IDs: " + ", ".join(unknown))
+                allowed_basis = (
+                    requirement_set | confirmed_intake_ids | set(journey_ids) | set(use_case_ids)
+                )
+                unknown_basis = sorted(basis_refs - allowed_basis)
+                if unknown_basis:
+                    add("BUSINESS_RULE_INVALID", f"{rule_id}: unknown basis IDs: " + ", ".join(unknown_basis))
+            except ValueError as exc:
+                add("BUSINESS_RULE_INVALID", str(exc))
+            if validation_id not in set(acceptance_ids):
+                add("BUSINESS_RULE_INVALID", f"{rule_id}: Validation ID must reference a current acceptance ID")
+        missing_rules = sorted(referenced_business_rules - set(business_rule_ids))
+        extra_rules = sorted(set(business_rule_ids) - referenced_business_rules)
+        if missing_rules or extra_rules:
+            add("BUSINESS_RULE_INVALID", "Business-rule rows must exactly match rich-use-case references; missing=" + ",".join(missing_rules) + "; extra=" + ",".join(extra_rules))
+
+    covered_requirements: list[str] = []
+    if coverage is not None:
+        for requirement_id, intake_value, actor_value, journey_value, acceptance_value, success_measure in coverage.rows:
+            if requirement_id in covered_requirements:
+                add("REQUIREMENT_COVERAGE_INVALID", f"Duplicate coverage row for {requirement_id}")
+            covered_requirements.append(requirement_id)
+            if requirement_id not in requirement_set:
+                add("REQUIREMENT_COVERAGE_INVALID", f"Coverage references unknown requirement {requirement_id}")
+            intake_refs: set[str] = set(); actor_refs: set[str] = set()
+            journey_refs: set[str] = set(); acceptance_refs: set[str] = set()
+            try:
+                intake_refs = set(_contract_ids(intake_value, re.compile(r"INTAKE-\d{4}"), f"{requirement_id} Intake basis IDs"))
+                actor_refs = set(_contract_ids(actor_value, ACTOR_ID, f"{requirement_id} Actor IDs"))
+                journey_refs = set(_contract_ids(journey_value, JOURNEY_ID, f"{requirement_id} Journey IDs"))
+                acceptance_refs = set(_contract_ids(acceptance_value, STABLE_CONTRACT_ID, f"{requirement_id} Acceptance/test IDs"))
+                if not intake_refs <= confirmed_intake_ids:
+                    add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED", f"{requirement_id}: coverage cites intake basis IDs that are not currently confirmed")
+                if not actor_refs <= set(actor_ids):
+                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: unknown actor IDs")
+                if not journey_refs <= set(journey_ids):
+                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: unknown journey IDs")
+                expected_acceptance = acceptance_by_requirement.get(requirement_id)
+                if expected_acceptance not in acceptance_refs:
+                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: coverage must include {expected_acceptance}")
+                if any(requirement_id not in journey_requirements.get(item, set()) for item in journey_refs):
+                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: cited journey does not include the requirement")
+                journey_actor_union = set().union(*(journey_actors.get(item, set()) for item in journey_refs))
+                if not actor_refs <= journey_actor_union:
+                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: every coverage actor must participate in a cited journey")
+            except ValueError as exc:
+                add("REQUIREMENT_COVERAGE_INVALID", str(exc))
+            if success_measure != "INTAKE-0006" or "INTAKE-0006" not in confirmed_intake_ids:
+                add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: Approved success measure ID must be INTAKE-0006")
+        if covered_requirements != sorted(requirement_set):
+            missing = sorted(requirement_set - set(covered_requirements))
+            extra = sorted(set(covered_requirements) - requirement_set)
+            add("REQUIREMENT_COVERAGE_INVALID", "Coverage must enumerate every requirement exactly once in sorted order; missing=" + ",".join(missing) + "; extra=" + ",".join(extra))
+
+    canonical_bytes: bytes | None = None
+    canonical_sha256: str | None = None
+    if all(table is not None for table in tables):
+        requirement_payload = json.dumps(requirement_rows, ensure_ascii=False,
+                                         separators=(",", ":")).encode("utf-8") + b"\n"
+        canonical_bytes = (
+            PROJECT_CONTRACT_SCHEMA.encode("utf-8") + b"\n" + requirement_payload
+            + b"".join(table.canonical_bytes for table in tables if table is not None)
+        )
+        canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
+    return (
+        RequirementsContract(
+            status="READY" if not issues else "BLOCKED",
+            actor_ids=tuple(actor_ids), journey_ids=tuple(journey_ids),
+            acceptance_ids=tuple(acceptance_by_requirement.get(item, "") for item in sorted(requirement_set)),
+            use_case_ids=tuple(use_case_ids), business_rule_ids=tuple(business_rule_ids),
+            requirement_ids=tuple(sorted(requirement_set)),
+            rich_use_case_triggers=tuple(sorted(declared_rich_triggers)),
+            missing_records=tuple(dict.fromkeys(missing_records)),
+            canonical_sha256=canonical_sha256, canonical_bytes=canonical_bytes,
+        ),
+        issues,
+    )
 
 
 def current_prd_basis_ids(
@@ -5411,6 +6054,405 @@ def derive_harness_contract(
     )
 
 
+def _explicit_not_applicable_section(text: str, heading: str) -> bytes | None:
+    section = _heading_section_lines(text, heading)
+    if section is None:
+        return None
+    lines, structural_lines = section
+    visible_lines = [
+        line.strip()
+        for line, structural in zip(lines, structural_lines)
+        if structural.strip() and not structural.strip().startswith("|")
+    ]
+    for line in visible_lines:
+        match = re.fullmatch(
+            r"NOT_APPLICABLE\s+(?:\u2014|-)\s+(?P<reason>[^\r\n]+)",
+            line,
+        )
+        if match is None:
+            continue
+        if explicit_value(match.group("reason"), allow_none=False):
+            return (
+                f"{heading}\nNOT_APPLICABLE - {match.group('reason').strip()}\n"
+            ).encode("utf-8")
+    return None
+
+
+def _explicit_not_applicable_value(value: str) -> bool:
+    match = re.fullmatch(
+        r"NOT_APPLICABLE\s+(?:\u2014|-)\s+(?P<reason>.+)", clean_cell(value)
+    )
+    return bool(match and explicit_value(match.group("reason"), allow_none=False))
+
+
+def _server_side_authorization_or_not_applicable(value: str) -> bool:
+    cleaned = clean_cell(value)
+    if _explicit_not_applicable_value(cleaned):
+        return True
+    normalized = re.sub(r"[\s-]+", "_", cleaned.upper())
+    return "SERVER_SIDE" in normalized or bool(re.search(
+        r"\bserver(?:-side)?\b.*\b(?:authoriz\w*|enforc\w*|verif\w*|den\w*|reject\w*)\b",
+        cleaned, re.IGNORECASE,
+    ))
+
+
+def _measurable_interface_bound_or_not_applicable(value: str) -> bool:
+    cleaned = clean_cell(value)
+    return _explicit_not_applicable_value(cleaned) or bool(
+        explicit_value(cleaned, allow_none=False)
+        and UNDEFINED_QUALITY_TERM.search(cleaned) is None
+        and MEASURABLE_INTERFACE_BOUND.search(cleaned)
+    )
+
+
+def _design_reference_issues(
+    identifier: str, requirement_value: str, validation_value: str,
+    requirement_ids: set[str], validation_ids: set[str],
+) -> list[str]:
+    issues: list[str] = []
+    try:
+        refs = set(_contract_ids(requirement_value, STABLE_CONTRACT_ID,
+                                 f"{identifier} Requirement IDs"))
+        unknown = sorted(refs - requirement_ids)
+        if unknown:
+            issues.append(f"{identifier}: unknown requirement IDs: " + ", ".join(unknown))
+        refs = set(_contract_ids(validation_value, STABLE_CONTRACT_ID,
+                                 f"{identifier} Validation IDs"))
+        unknown = sorted(refs - validation_ids)
+        if unknown:
+            issues.append(f"{identifier}: unknown Validation IDs: " + ", ".join(unknown))
+    except ValueError as exc:
+        issues.append(str(exc))
+    return issues
+
+
+def derive_project_design_contract(
+    text: str, requirements_contract: RequirementsContract,
+    coverage_contract: CoverageContract, allowed_basis_ids: set[str],
+    harness: HarnessContract, legacy_design_ids: set[str], *,
+    required: bool, grandfather_approved_v4: bool,
+) -> tuple[ProjectDesignContract, list[str]]:
+    """Validate the schema-5 interface, boundary, state, and delivery contract."""
+
+    issues: list[str] = []
+    add = issues.append
+    missing_records: list[str] = []
+    try:
+        document = table_after_heading(text, "## Document status")
+    except ValueError as exc:
+        document = {}
+        if required:
+            issues.append(str(exc))
+    design_schema = clean_cell(document.get("Project design contract schema", ""))
+    if design_schema != PROJECT_DESIGN_CONTRACT_SCHEMA:
+        observed_tables = [table for table in markdown_tables(text) if table]
+        observed_headers = {tuple(table[0]) for table in observed_tables}
+        current_headers = {INTERFACE_HEADERS, LAYER_BOUNDARY_HEADERS,
+                           STATE_APPLICABILITY_HEADERS, STATE_REGISTER_HEADERS,
+                           FIRST_WAVE_HEADERS, SPIKE_HEADERS}
+        legacy_interface_tables = [table for table in observed_tables
+                                   if tuple(table[0]) == LEGACY_INTERFACE_HEADERS_V4]
+        legacy_interface_ids = [
+            clean_cell(row[0]) for table in legacy_interface_tables for row in table[2:]
+            if len(row) == len(LEGACY_INTERFACE_HEADERS_V4)
+        ]
+        structural_text = without_fenced_code(text)
+        schema_five_only_headings = (LAYER_BOUNDARY_HEADING, STATE_APPLICABILITY_HEADING,
+                                     STATE_REGISTER_HEADING, FIRST_WAVE_HEADING, SPIKE_HEADING)
+        exact_legacy_shape = bool(
+            not design_schema
+            and len(legacy_interface_tables) == 1
+            and legacy_interface_ids
+            and all(INTERFACE_ID.fullmatch(item) for item in legacy_interface_ids)
+            and not (observed_headers & current_headers)
+            and not any(re.search(rf"^{re.escape(heading)}[ \t]*$", structural_text,
+                                  re.MULTILINE) for heading in schema_five_only_headings)
+            and any(ARCHITECTURE_ID.fullmatch(item) for item in legacy_design_ids)
+            and any(TECHNOLOGY_DECISION_ID.fullmatch(item) for item in legacy_design_ids)
+            and any(PROPERTY_ID.fullmatch(item) for item in legacy_design_ids)
+            and any(HARNESS_ID.fullmatch(item) for item in legacy_design_ids)
+        )
+        if grandfather_approved_v4 and exact_legacy_shape:
+            return (ProjectDesignContract(schema_version=4, status="GRANDFATHERED",
+                                          grandfathered_v4=True), [])
+        if not required:
+            return ProjectDesignContract(status="UNINITIALIZED"), []
+        return (
+            ProjectDesignContract(
+                status="MIGRATION_REQUIRED",
+                missing_records=("Project design contract schema 5", INTERFACE_HEADING,
+                                 LAYER_BOUNDARY_HEADING, STATE_APPLICABILITY_HEADING,
+                                 STATE_REGISTER_HEADING, FIRST_WAVE_HEADING, SPIKE_HEADING),
+            ),
+            ["Project design contract schema 5 requires current interface, "
+             "layer-boundary, state-applicability, first-wave, and spike records"],
+        )
+
+    interfaces, boundaries, state_applicability, states = (
+        _contract_table_or_issue(text, heading, headers, issues, missing_records)
+        for heading, headers in ((INTERFACE_HEADING, INTERFACE_HEADERS),
+            (LAYER_BOUNDARY_HEADING, LAYER_BOUNDARY_HEADERS),
+            (STATE_APPLICABILITY_HEADING, STATE_APPLICABILITY_HEADERS),
+            (STATE_REGISTER_HEADING, STATE_REGISTER_HEADERS))
+    )
+
+    requirement_ids = set(requirements_contract.requirement_ids) or authoritative_requirement_ids(text)
+    current_validation_ids = (set(allowed_basis_ids) | set(requirements_contract.acceptance_ids)
+                              | set(harness.required_ids))
+    journey_requirement_ids: dict[str, set[str]] = {}
+    try:
+        journey_table = contract_table_after_heading(text, JOURNEY_HEADING, JOURNEY_HEADERS)
+    except ValueError:
+        journey_table = None
+    if journey_table is not None:
+        for journey_row in journey_table.rows:
+            journey_id = journey_row[0]
+            if JOURNEY_ID.fullmatch(journey_id) is None:
+                continue
+            try:
+                journey_requirement_ids[journey_id] = set(
+                    _contract_ids(journey_row[6], STABLE_CONTRACT_ID,
+                                  f"{journey_id} Requirement IDs"))
+            except ValueError:
+                continue
+    interface_ids: list[str] = []
+    if interfaces is not None:
+        if not interfaces.rows and coverage_contract.work_kind == "NEW_BUILD":
+            add("NEW_BUILD requires at least one material interface contract")
+        for row in interfaces.rows:
+            contract_id, kind, requirement_value, *details = row
+            if INTERFACE_ID.fullmatch(contract_id) is None:
+                add(f"Invalid material interface ID {contract_id!r}")
+                continue
+            if contract_id in interface_ids: add(f"Duplicate material interface ID {contract_id}")
+            interface_ids.append(contract_id)
+            if kind not in INTERFACE_KINDS or not contract_id.startswith(kind + "-"):
+                add(f"{contract_id}: Kind must match its API/EVENT/CLI/FILE prefix")
+            try:
+                refs = set(_contract_ids(requirement_value, STABLE_CONTRACT_ID,
+                                         f"{contract_id} Requirement basis"))
+                unknown = sorted(refs - requirement_ids)
+                if unknown: add(f"{contract_id}: unknown requirement basis IDs: " + ", ".join(unknown))
+            except ValueError as exc:
+                add(str(exc))
+            for header, value in zip(INTERFACE_HEADERS[3:], details):
+                if not explicit_value(value, allow_none=False): add(f"{contract_id}: {header} must be concrete")
+            detail_values = dict(zip(INTERFACE_HEADERS[3:], details))
+            if not _server_side_authorization_or_not_applicable(detail_values["Authorization"]):
+                add(
+                    f"{contract_id}: Authorization must be server-side or use "
+                    "NOT_APPLICABLE - <reason>"
+                )
+            for header in ("Timeout bound", "Rate bound", "Performance bound"):
+                if not _measurable_interface_bound_or_not_applicable(detail_values[header]):
+                    add(
+                        f"{contract_id}: {header} must contain a numeric measurable "
+                        "bound or use NOT_APPLICABLE - <reason>"
+                    )
+
+    boundary_ids: list[str] = []
+    if boundaries is not None:
+        if not boundaries.rows and coverage_contract.work_kind == "NEW_BUILD":
+            add("NEW_BUILD requires at least one explicit layer boundary")
+        for row in boundaries.rows:
+            boundary_id, outer, inner, dto, mapping, direction, authorization, adapter, requirement_value, validation_value = row
+            if BOUNDARY_ID.fullmatch(boundary_id) is None:
+                add(f"Invalid boundary ID {boundary_id!r}")
+                continue
+            if boundary_id in boundary_ids: add(f"Duplicate boundary ID {boundary_id}")
+            boundary_ids.append(boundary_id)
+            for header, value in zip(LAYER_BOUNDARY_HEADERS[1:8],
+                                     (outer, inner, dto, mapping, direction, authorization, adapter)):
+                if not explicit_value(value, allow_none=False): add(f"{boundary_id}: {header} must be concrete")
+            if "INWARD" not in direction.upper(): add(f"{boundary_id}: Dependency direction must explicitly point inward")
+            normalized_authorization = authorization.upper().replace("-", "_")
+            if "SERVER_SIDE" not in normalized_authorization: add(f"{boundary_id}: Authorization enforcement must be server-side")
+            issues.extend(_design_reference_issues(
+                boundary_id, requirement_value, validation_value, requirement_ids, current_validation_ids))
+
+    applicable_state_ids: set[str] = set(); state_subjects: dict[str, str] = {}
+    declared_state_triggers: set[str] = set()
+    required_state_triggers = {RICH_TO_STATE_TRIGGER[item]
+        for item in requirements_contract.rich_use_case_triggers if item in RICH_TO_STATE_TRIGGER}
+    if state_applicability is not None:
+        if not state_applicability.rows: add("State-model applicability requires at least one row")
+        for subject_id, applicability, trigger_basis, state_value in state_applicability.rows:
+            if STABLE_CONTRACT_ID.fullmatch(subject_id) is None: add(f"Invalid state subject ID {subject_id!r}")
+            if applicability == "APPLICABLE":
+                try:
+                    refs = _contract_ids(state_value, STATE_ID, f"{subject_id} State model IDs")
+                    for state_id in refs: applicable_state_ids.add(state_id); state_subjects[state_id] = subject_id
+                    trigger_map = _state_trigger_map(trigger_basis, subject_id); declared_state_triggers.update(trigger_map)
+                    trigger_refs = {item for values in trigger_map.values() for item in values}
+                    unknown_trigger = sorted(trigger_refs - current_validation_ids - requirement_ids)
+                    if unknown_trigger: add(f"{subject_id}: unknown State trigger basis IDs: " + ", ".join(unknown_trigger))
+                except ValueError as exc: add(str(exc))
+            elif applicability == "NOT_APPLICABLE":
+                if (not trigger_basis.startswith("NOT_APPLICABLE") or
+                        not explicit_value(trigger_basis, allow_none=False) or state_value != "NONE"):
+                    add(f"{subject_id}: NOT_APPLICABLE requires a concrete reason and State model IDs NONE")
+            else: add(f"{subject_id}: State applicability must be APPLICABLE or NOT_APPLICABLE")
+    missing_state_triggers = sorted(required_state_triggers - declared_state_triggers)
+    if missing_state_triggers: add("Journey triggers require applicable state categories: " + ", ".join(missing_state_triggers))
+    if requirements_contract.grandfathered_approved_gate_a and not applicable_state_ids: add("A grandfathered Gate A design requires an applicable state model")
+
+    state_ids: list[str] = []
+    if states is not None:
+        for row in states.rows:
+            state_id, subject_id, state_value, initial_state, transitions, terminal_value, invalid_behavior, requirement_value, validation_value = row
+            if STATE_ID.fullmatch(state_id) is None:
+                add(f"Invalid state model ID {state_id!r}")
+                continue
+            if state_id in state_ids: add(f"Duplicate state model ID {state_id}")
+            state_ids.append(state_id)
+            if state_id not in applicable_state_ids: add(f"{state_id}: state row is not declared APPLICABLE")
+            if state_subjects.get(state_id) != subject_id: add(f"{state_id}: Subject ID does not match state applicability")
+            declared_states = [item.strip() for item in state_value.split(",") if item.strip()]
+            if (not declared_states or state_value != ", ".join(declared_states)
+                    or initial_state not in declared_states):
+                add(f"{state_id}: States must be canonical and contain the initial state")
+            if terminal_value != "NONE":
+                terminal_states = [item.strip() for item in terminal_value.split(",") if item.strip()]
+                if not set(terminal_states) <= set(declared_states):
+                    add(f"{state_id}: Terminal states must be declared states or NONE")
+            for label, value in (("Allowed transitions", transitions),
+                                 ("Invalid-transition behavior", invalid_behavior)):
+                if not explicit_value(value, allow_none=False): add(f"{state_id}: {label} must be concrete")
+            issues.extend(_design_reference_issues(
+                state_id, requirement_value, validation_value, requirement_ids, current_validation_ids))
+        missing_states = sorted(applicable_state_ids - set(state_ids))
+        if missing_states:
+            add("Applicable state models have no state row: " + ", ".join(missing_states))
+
+    first_wave_table: ContractTable | None = None
+    first_wave_sentinel = _explicit_not_applicable_section(text, FIRST_WAVE_HEADING)
+    try:
+        first_wave_table = contract_table_after_heading(text, FIRST_WAVE_HEADING, FIRST_WAVE_HEADERS)
+    except ValueError as exc:
+        if first_wave_sentinel is None:
+            add(f"{FIRST_WAVE_HEADING}: {exc}")
+            missing_records.append(FIRST_WAVE_HEADING)
+    first_wave: FirstWaveContract | None = None
+    work_kind = coverage_contract.work_kind
+    if work_kind == "NEW_BUILD":
+        if first_wave_table is None or len(first_wave_table.rows) != 1:
+            add("NEW_BUILD requires exactly one first construction wave row")
+        else:
+            wave_id, row_work_kind, journey_id, requirement_value, acceptance_value, harness_id, spike_value = first_wave_table.rows[0]
+            if WAVE_ID.fullmatch(wave_id) is None: add(f"Invalid first-wave ID {wave_id!r}")
+            if row_work_kind != "NEW_BUILD": add("First-wave Work kind must exactly match NEW_BUILD")
+            legacy_bridge = requirements_contract.grandfathered_approved_gate_a
+            journey_reference: str | None = None if legacy_bridge else journey_id
+            if legacy_bridge and journey_id != "NONE": add(f"{wave_id}: grandfathered Gate A walking-skeleton journey must be NONE")
+            elif not legacy_bridge and journey_id not in set(requirements_contract.journey_ids): add(f"{wave_id}: walking-skeleton journey is not a current JOURNEY ID")
+            try:
+                wave_requirements = tuple(_contract_ids(requirement_value, STABLE_CONTRACT_ID, f"{wave_id} Requirement IDs"))
+                unknown = sorted(set(wave_requirements) - requirement_ids)
+                if unknown: add(f"{wave_id}: unknown requirement IDs: " + ", ".join(unknown))
+                selected_journey_requirements = journey_requirement_ids.get(journey_reference or "")
+                if selected_journey_requirements is not None:
+                    outside_journey = sorted(set(wave_requirements) - selected_journey_requirements)
+                    if outside_journey: add(f"{wave_id}: first-wave requirement IDs are not owned by {journey_reference}: " + ", ".join(outside_journey))
+                acceptance_ids = tuple(_contract_ids(acceptance_value, STABLE_CONTRACT_ID, f"{wave_id} Acceptance/test IDs"))
+                expected_acceptance = {f"AC-{item}" for item in wave_requirements}
+                missing_acceptance = sorted(expected_acceptance - set(acceptance_ids))
+                if missing_acceptance: add(f"{wave_id}: missing acceptance IDs: " + ", ".join(missing_acceptance))
+                unknown_acceptance = sorted(set(acceptance_ids) - current_validation_ids)
+                if unknown_acceptance: add(f"{wave_id}: unknown acceptance/test IDs: " + ", ".join(unknown_acceptance))
+            except ValueError as exc:
+                wave_requirements = (); acceptance_ids = (); add(str(exc))
+            harness_row = next((row for row in harness.rows if row.harness_id == harness_id), None)
+            if harness_row is None or harness_row.layer != "End-to-end" or harness_id not in set(harness.required_ids):
+                add(f"{wave_id}: End-to-end Harness ID must reference a current required end-to-end check")
+            else:
+                harness_basis = set(_canonical_id_list(harness_row.basis_ids, STABLE_CONTRACT_ID, f"{harness_id} Basis IDs"))
+                required_harness_basis = {wave_id, *wave_requirements} if legacy_bridge else {wave_id, journey_id}
+                if not required_harness_basis <= harness_basis:
+                    message = "include the wave and every selected requirement" if legacy_bridge else f"include both {journey_id} and {wave_id}"
+                    add(f"{wave_id}: {harness_id} Basis IDs must {message}")
+            spike_id: str | None
+            if spike_value == "NONE": spike_id = None
+            elif SPIKE_ID.fullmatch(spike_value) is None:
+                spike_id = None
+                add(f"{wave_id}: invalid Blocking spike ID {spike_value!r}")
+            else: spike_id = spike_value
+            first_wave = FirstWaveContract(
+                wave_contract_id=wave_id, work_kind=row_work_kind, journey_id=journey_reference,
+                requirement_ids=wave_requirements, acceptance_test_ids=acceptance_ids,
+                harness_id=harness_id, blocking_spike_id=spike_id,
+            )
+    elif first_wave_sentinel is None:
+        add("Non-NEW_BUILD work requires an explicit NOT_APPLICABLE first-wave reason")
+
+    spike_table: ContractTable | None = None
+    spike_sentinel = _explicit_not_applicable_section(text, SPIKE_HEADING)
+    try:
+        spike_table = contract_table_after_heading(text, SPIKE_HEADING, SPIKE_HEADERS)
+    except ValueError as exc:
+        if spike_sentinel is None:
+            issues.append(f"{SPIKE_HEADING}: {exc}")
+            missing_records.append(SPIKE_HEADING)
+    spike: SpikeContract | None = None
+    expected_spike_id = first_wave.blocking_spike_id if first_wave is not None else None
+    if expected_spike_id is None:
+        if spike_sentinel is None:
+            add("A first wave without a blocking spike requires an explicit NOT_APPLICABLE spike reason")
+    elif spike_table is None or len(spike_table.rows) != 1:
+        add("A referenced blocking spike requires exactly one spike row")
+    else:
+        spike_id, unknown, time_box, disposable, exit_criterion, next_action = spike_table.rows[0]
+        if spike_id != expected_spike_id: add("Blocking spike row must exactly match the first-wave spike ID")
+        if not explicit_value(unknown, allow_none=False): add(f"{spike_id}: Blocking technical unknown must be concrete")
+        if re.fullmatch(r"MAX_ATTEMPTS: [1-9]\d*", time_box) is None:
+            add(f"{spike_id}: Time box must use MAX_ATTEMPTS: <positive integer>")
+        for label, value in (("Disposable output boundary", disposable),
+                             ("Exit criterion", exit_criterion)):
+            if not explicit_value(value, allow_none=False): add(f"{spike_id}: {label} must be concrete")
+        if not valid_property_execution_command(exit_criterion):
+            add(
+                f"{spike_id}: Exit criterion must be one explicit local command, "
+                "not prose, shell control, or placeholder content"
+            )
+        if next_action != "DISCARD_AND_BUILD_WALKING_SKELETON":
+            add(f"{spike_id}: Required next action must be DISCARD_AND_BUILD_WALKING_SKELETON")
+        spike = SpikeContract(
+            spike_id=spike_id, technical_unknown=unknown, time_box=time_box,
+            disposable_boundary=disposable, exit_criterion=exit_criterion,
+            required_next_action=next_action,
+        )
+
+    canonical_parts: list[bytes] = [b"PROJECT_DESIGN_CONTRACT_SCHEMA: 5\n"]
+    if requirements_contract.grandfathered_approved_gate_a and requirements_contract.canonical_sha256 is None: add("Grandfathered Gate A design requires a canonical legacy requirements projection")
+    elif requirements_contract.grandfathered_approved_gate_a: canonical_parts.append(f"LEGACY_GATE_A_BRIDGE: {requirements_contract.canonical_sha256}\n".encode("utf-8"))
+    for table in (interfaces, boundaries, state_applicability, states):
+        if table is not None:
+            canonical_parts.append(table.canonical_bytes)
+    if first_wave_table is not None:
+        canonical_parts.append(first_wave_table.canonical_bytes)
+    elif first_wave_sentinel is not None:
+        canonical_parts.append(first_wave_sentinel)
+    if spike_table is not None and expected_spike_id is not None:
+        canonical_parts.append(spike_table.canonical_bytes)
+    elif spike_sentinel is not None:
+        canonical_parts.append(spike_sentinel)
+    canonical_bytes = b"".join(canonical_parts)
+    canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
+    if not required and any(unresolved(cell)
+                            for table in (interfaces, boundaries, state_applicability, states)
+                            if table is not None for row in table.rows for cell in row):
+        return ProjectDesignContract(status="UNINITIALIZED"), []
+    return (
+        ProjectDesignContract(
+            status="READY" if not issues else "BLOCKED",
+            interface_ids=tuple(interface_ids), boundary_ids=tuple(boundary_ids),
+            state_ids=tuple(state_ids), first_wave=first_wave, spike=spike,
+            missing_records=tuple(dict.fromkeys(missing_records)),
+            canonical_sha256=canonical_sha256, canonical_bytes=canonical_bytes,
+        ),
+        issues,
+    )
+
+
 def derive_design_contract(
     text: str,
     design_revision: str | None,
@@ -5418,6 +6460,7 @@ def derive_design_contract(
     required: bool = False,
     grandfather_approved_v1: bool = False,
     coverage_contract: CoverageContract | None = None,
+    requirements_contract: RequirementsContract | None = None,
 ) -> tuple[DesignContract, list[str]]:
     issues: list[str] = []
     if coverage_contract is None:
@@ -5436,6 +6479,28 @@ def derive_design_contract(
         )
         if required:
             issues.extend(coverage_issues)
+    if requirements_contract is None:
+        try:
+            requirements_document = table_after_heading(text, "## Document status")
+        except ValueError:
+            requirements_document = {}
+        repository_mode = clean_cell(
+            requirements_document.get("Project mode", "")
+        ).lower()
+        intake_contract, _intake_issues = derive_intake_foundation_contract(
+            text,
+            repository_mode if repository_mode in PROJECT_MODES else None,
+            grandfather_current_gate_a=grandfather_approved_v1,
+        )
+        requirements_contract, requirement_issues = derive_requirements_contract(
+            text,
+            clean_cell(requirements_document.get("Effective risk", "")) or None,
+            intake_contract,
+            required=required,
+            grandfather_current_gate_a=grandfather_approved_v1,
+        )
+        if required:
+            issues.extend(issue for _code, issue in requirement_issues)
     try:
         technology_table = contract_table_after_heading(
             text, TECHNOLOGY_DECISION_HEADING, TECHNOLOGY_DECISION_HEADERS
@@ -5460,7 +6525,8 @@ def derive_design_contract(
     technologies: list[TechnologyDecision] = []
     seen_technology_ids: set[str] = set()
     concern_counts: dict[str, int] = {}
-    allowed_basis_ids = current_prd_basis_ids(text, design_revision)
+    allowed_basis_ids = current_prd_basis_ids(text, design_revision) | set(requirements_contract.actor_ids
+        + requirements_contract.journey_ids + requirements_contract.acceptance_ids)
     if technology_table is not None:
         if not technology_table.rows:
             issues.append("Technology decision register has no stored rows")
@@ -5751,6 +6817,27 @@ def derive_design_contract(
     )
     if required:
         issues.extend(change_impact_issues)
+    project_contract, project_contract_issues = derive_project_design_contract(
+        text,
+        requirements_contract,
+        coverage_contract,
+        allowed_basis_ids | set(technology_by_id),
+        harness,
+        (
+            set(technology_by_id)
+            | {execution.property_id for execution in executions}
+            | {row.harness_id for row in harness.rows}
+            | (
+                {architecture.selection.architecture_id}
+                if architecture.selection is not None
+                else set()
+            )
+        ),
+        required=required,
+        grandfather_approved_v4=grandfather_approved_v1,
+    )
+    if required:
+        issues.extend(project_contract_issues)
 
 
     canonical_sha256: str | None = None
@@ -5767,14 +6854,20 @@ def derive_design_contract(
             change_impact.canonical_bytes is not None
             or grandfather_approved_v1
         )
+        and (
+            project_contract.canonical_bytes is not None
+            or project_contract.grandfathered_v4
+        )
     ):
         architecture_bytes = architecture.canonical_bytes or b""
         harness_bytes = harness.canonical_bytes or b""
         change_impact_bytes = change_impact.canonical_bytes or b""
+        project_contract_bytes = project_contract.canonical_bytes or b""
         canonical_sha256 = "sha256:" + hashlib.sha256(
             architecture_bytes
             + harness_bytes
             + change_impact_bytes
+            + project_contract_bytes
             + technology_table.canonical_bytes
             + applicability_table.canonical_bytes
             + definition_table.canonical_bytes
@@ -5790,9 +6883,9 @@ def derive_design_contract(
     return (
         DesignContract(
             schema_version=(
-                architecture.schema_version
-                if harness.grandfathered_v1
-                else max(4, architecture.schema_version)
+                max(4, architecture.schema_version)
+                if project_contract.grandfathered_v4
+                else 5
             ),
             status=status,
             design_revision=design_revision,
@@ -5802,6 +6895,7 @@ def derive_design_contract(
             harness=harness,
             canonical_sha256=canonical_sha256,
             change_impact=change_impact,
+            project_contract=project_contract,
         ),
         issues,
     )
@@ -6663,6 +7757,18 @@ def validate_construction_envelope(
                 design_contract.architecture.selection.architecture_id
             )
         required_scope_ids.update(design_contract.harness.required_ids)
+        if not design_contract.project_contract.grandfathered_v4:
+            required_scope_ids.update(design_contract.project_contract.interface_ids)
+            required_scope_ids.update(design_contract.project_contract.boundary_ids)
+            required_scope_ids.update(design_contract.project_contract.state_ids)
+            if design_contract.project_contract.first_wave is not None:
+                required_scope_ids.add(
+                    design_contract.project_contract.first_wave.wave_contract_id
+                )
+            if design_contract.project_contract.spike is not None:
+                required_scope_ids.add(
+                    design_contract.project_contract.spike.spike_id
+                )
         missing_scope_ids = sorted(required_scope_ids - set(authorized_ids[2:]))
         if missing_scope_ids:
             ctx.error(
@@ -6844,10 +7950,14 @@ def validate_prd(
     DesignContract,
     CoverageContract,
     IntakeFoundationContract,
+    RequirementsContract,
 ]:
     text = ctx.texts.get(PRD_FILE) or safe_read_text(ctx, PRD_FILE)
     if text is None:
-        return {}, {}, {}, False, DesignContract(), CoverageContract(), IntakeFoundationContract()
+        return (
+            {}, {}, {}, False, DesignContract(), CoverageContract(),
+            IntakeFoundationContract(), RequirementsContract(),
+        )
     try:
         document = table_after_heading(text, "## Document status")
         workload = table_after_heading(text, "## 1. Workload profile")
@@ -6864,7 +7974,10 @@ def validate_prd(
         marked_receipt(text, "gate-b")
     except ValueError as exc:
         ctx.error("PRD_STRUCTURE", str(exc), PRD_FILE)
-        return {}, {}, {}, False, DesignContract(), CoverageContract(), IntakeFoundationContract()
+        return (
+            {}, {}, {}, False, DesignContract(), CoverageContract(),
+            IntakeFoundationContract(), RequirementsContract(),
+        )
 
     project = state.get("project", {})
     lifecycle = state.get("lifecycle", {})
@@ -6967,7 +8080,7 @@ def validate_prd(
     coverage_required = gate_a_agent_ready or gate_a_ready_or_current
     grandfather_approved_v1_requirements = bool(
         fields["gate_a"] == "APPROVED_FOR_DESIGN"
-        and gate_a_agent.get("Requirements revision reviewed")
+        and gate_a_agent.get("Requirements revision analyzed")
         == fields["requirements_revision"]
         and gate_a_owner.get("Authorized requirements revision")
         == fields["requirements_revision"]
@@ -7009,6 +8122,22 @@ def validate_prd(
     if coverage_required:
         for issue in coverage_issues:
             ctx.error("ADAPTIVE_COVERAGE_INVALID", issue, PRD_FILE)
+    requirements_contract, requirements_contract_issues = derive_requirements_contract(
+        text,
+        selections.get("effective_risk"),
+        intake_contract,
+        required=coverage_required,
+        grandfather_current_gate_a=grandfather_approved_v1_requirements,
+    )
+    if coverage_required:
+        for code, issue in requirements_contract_issues:
+            ctx.error(code, issue, PRD_FILE)
+        if requirements_contract.status not in {"READY", "GRANDFATHERED"}:
+            ctx.error(
+                "PROJECT_CONTRACT_MIGRATION_REQUIRED",
+                "Gate A requires a complete schema 1.3 requirements contract or an unchanged approved legacy Gate A",
+                PRD_FILE,
+            )
     design_contract_required = gate_b_agent_ready or gate_b_ready_or_current
     grandfather_approved_v1_design = bool(
         fields["gate_b"] == "APPROVED_FOR_CONSTRUCTION"
@@ -7027,6 +8156,7 @@ def validate_prd(
         required=design_contract_required,
         grandfather_approved_v1=grandfather_approved_v1_design,
         coverage_contract=coverage_contract,
+        requirements_contract=requirements_contract,
     )
     if design_contract_required:
         for issue in design_contract_issues:
@@ -7303,6 +8433,7 @@ def validate_prd(
         design_contract,
         coverage_contract,
         intake_contract,
+        requirements_contract,
     )
 
 
@@ -8342,6 +9473,7 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         design_contract,
         coverage_contract,
         intake_contract,
+        requirements_contract,
     ) = validate_prd(ctx, state)
     allow_legacy_design_discovery = bool(
         prd_fields.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
@@ -8487,6 +9619,7 @@ def inspect_project(root: Path, *, template_source: bool = False) -> dict[str, A
         design_contract=design_contract,
         intake_contract=intake_contract,
         coverage_contract=coverage_contract,
+        requirements_contract=requirements_contract,
         aws_core_usage=aws_core_usage,
     )
 
@@ -8513,6 +9646,13 @@ def inspect_git_baseline(root: Path) -> str:
 DEFINE_AGENT_DIAGNOSTICS = frozenset(
     {
         "ADAPTIVE_COVERAGE_INVALID",
+        "PROJECT_CONTRACT_MIGRATION_REQUIRED",
+        "ACTOR_CONTRACT_INVALID",
+        "JOURNEY_CONTRACT_INVALID",
+        "RICH_USE_CASE_REQUIRED",
+        "RICH_USE_CASE_INVALID",
+        "BUSINESS_RULE_INVALID",
+        "REQUIREMENT_COVERAGE_INVALID",
         "INTAKE_CARD_REQUIRED",
         "INTAKE_CONTRACT_MIGRATION_REQUIRED",
         "INTAKE_SELECTION_PROVENANCE_INVALID", "INTAKE_FOUNDATION_PROVENANCE_INVALID", "INTAKE_RESPONSE_REGISTER_INVALID",
@@ -8562,6 +9702,7 @@ DELIVER_AGENT_DIAGNOSTICS = frozenset(
 OWNER_DECISION_DIAGNOSTICS = frozenset(
     {
         "BROWNFIELD_PRD_BASELINE",
+        "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
         "BROWNFIELD_PRD_PRESERVATION",
         "BROWNFIELD_STATE",
         "GATE_A_ASSUMPTIONS",
@@ -9701,6 +10842,7 @@ def build_report(
     design_contract: DesignContract | None = None,
     intake_contract: IntakeFoundationContract | None = None,
     coverage_contract: CoverageContract | None = None,
+    requirements_contract: RequirementsContract | None = None,
     aws_core_usage: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = manifest or {}
@@ -9722,6 +10864,8 @@ def build_report(
         coverage_contract = CoverageContract()
     if intake_contract is None:
         intake_contract = IntakeFoundationContract()
+    if requirements_contract is None:
+        requirements_contract = RequirementsContract()
     if ctx.template_source:
         classification = "TEMPLATE_SOURCE"
     elif setup.get("status") in {
@@ -9902,6 +11046,7 @@ def build_report(
             "construction_authorization": prd_fields.get("construction_authorization"),
         },
         "intake_foundation": intake_contract.to_dict(),
+        "requirements_contract": requirements_contract.to_dict(),
         "coverage_plan": coverage_contract.to_dict(),
         "design_contract": design_contract.to_dict(),
         "tasks": {

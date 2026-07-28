@@ -51,7 +51,9 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   the term or explicitly asks for technical detail. Translate them using the
   Owner responses reference, mark one recommendation only when justified with
   its main tradeoff, and provide a short copyable reply. Permit the current
-  token-bound `R-*; Accept all recommendations.` alternative when every
+  token-bound `R-*; Accept all recommendations.` alternative only when every
+  presented question is a decision with a complete recommendation and no
+  required supporting detail.
 - Separate owner facts, repository facts, recommendations, proposed
   assumptions, and unresolved decisions.
 - Give requirements and assumptions stable IDs and observable acceptance
@@ -63,6 +65,10 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
 - Add `QAS-*` rows only for material performance, availability, reliability,
   recovery, scalability, security-response, or operational-response concerns;
   otherwise record `NOT_APPLICABLE — <concrete reason>`.
+- Complete the schema 1.3 actor, journey, business-rule, acceptance-ID, and
+  requirement-coverage records before Gate A is ready. Require richer use-case
+  guarantees only for high/critical risk or a declared material journey
+  trigger. Never invent missing owner facts to complete those records.
 - Derive one internal Adaptive Coverage Plan before Gate A. Infer the work kind
   and `SELECT`/`AMEND`/`PRESERVE` disposition without adding an owner question.
   Every omission needs a current requirement or repository basis; uncertain

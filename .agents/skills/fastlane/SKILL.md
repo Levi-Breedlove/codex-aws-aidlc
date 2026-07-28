@@ -72,6 +72,10 @@ You are the single coordinator and sole writer.
 9. After recording an accepted Gate A or Gate B receipt, rerun the doctor
    immediately. Gate A continues into Design. Gate B continues into task
    generation and permitted local construction.
+   Gate A readiness requires the current requirements-contract projection;
+   Gate B readiness requires the current design-contract projection, including
+   material interfaces, boundaries, states, and the approved first wave.
+
 
 For a side question, answer directly without changing project state unless the
 owner requested a change. Rerun the doctor, then use

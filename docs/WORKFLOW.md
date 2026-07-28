@@ -69,7 +69,9 @@ identity.
 For unapproved legacy intake, prior values remain unconfirmed context: Codex
 reopens the affected facts and asks the smallest current card rather than
 inventing historical owner-response provenance. An unchanged approved Gate A
-remains grandfathered until a requirements-controlled change.
+remains grandfathered until a requirements-controlled change and may bridge
+directly into current design work without asking the owner to repeat confirmed
+facts.
 
 ## Lifecycle
 
@@ -110,6 +112,35 @@ Gate B also records a risk-derived Harness Profile. It selects the smallest
 exact checks justified by the approved technology, risk, data, identity,
 exposure, recovery, and AWS lane; it never imposes a universal scanner.
 
+### Fastlane Semantic Contract profile
+
+Reviewed 2026-07-28 against [Semantic Anchors](https://llm-coding.github.io/Semantic-Anchors/),
+[Semantic Contracts](https://llm-coding.github.io/Semantic-Anchors/contracts/),
+[spec-driven development](https://llm-coding.github.io/Semantic-Anchors/spec-driven-development/),
+and the [Harness Inventory](https://llm-coding.github.io/Semantic-Anchors/harness-inventory/).
+These are design vocabulary, not a package, runtime dependency, user workflow,
+or additional authority. `NOT_APPLICABLE` means Fastlane does not mandate the
+technique; a project may still select it when approved technology or risk warrants it.
+
+| Profile ID | Local contract | Official basis | Disposition | Fastlane meaning | Authority | Activation trigger / exclusion | Deterministic validation or evidence | Owner-facing effect |
+|---|---|---|---|---|---|---|---|---|
+| FSC-001 | Single source of truth and meaningful human control | SSOT; Meaningful Human Control; Semantic Contracts | ADOPT | One authority per fact; owners approve consequential boundaries | `AGENTS.md`; canonical project records | Always | Engine state, receipt, and authority checks | Two understandable approvals |
+| FSC-002 | Concise, plain-language progressive disclosure | Concise Response; BLUF; Plain English; Progressive Disclosure; Explaining and Teaching | ADAPT | Lead with status, needed action, and what follows; teaching is opt-in | Presenter, prompt pack, explain skill | Always; teaching only on request | Presenter and prompt-contract tests | Concise responses without ledger dumps |
+| FSC-003 | Focused Socratic discovery and completeness | Requirements Discovery; Socratic Method; MECE | ADAPT | Ask at most three related questions and cover non-overlapping product concerns | REQ procedure and intake contract | Define | Intake parser, foundation, and journey checks | Short questions in ordinary language |
+| FSC-004 | Outcome, actor, and first-release traceability | Specification; Actor-Goal List; Impact Mapping; User Story Mapping | ADOPT | Every first-release requirement maps to its owner-grounded outcome | PRD requirements contract | Gate A readiness | Requirements-contract projection | Clear product agreement |
+| FSC-005 | Observable normative requirements and acceptance | Specification; EARS; Gherkin; Quality Attribute Scenario | ADAPT | Normative requirements are observable and testable | PRD normative tables | Gate A; QAS only when material | Requirement and QAS validators | Requirements state what success means |
+| FSC-006 | Whole-system choices, traceability, and layer boundaries | Strategic Architecture Analysis; Layer Boundaries; ADR | ADAPT | Compare viable systems and preserve explicit inward boundaries | PRD design contract | New or materially changed architecture | Candidate, boundary, traceability, and digest checks | One reasoned recommendation |
+| FSC-007 | Bounded work and the first end-to-end outcome | INVEST; Vertical Slicing; Walking Skeleton; Thin Vertical Slice; Spike Solution | ADAPT | A new build starts with one tested usable path; a blocking spike is disposable | TASKS ledger and first-wave contract | TASK-10 for `NEW_BUILD` | Task graph, wave, and spike checks | Useful progress appears early |
+| FSC-008 | Closed-loop construction and maintenance | Implement Next; Red/Green TDD; Property-Based Testing; Definition of Done; Refactoring; Mikado Method | ADAPT | Construction and maintenance iterate against exact checks and observed evidence | Harness, tasks, VERIFY, maintenance skill | When selected by risk, technology, or bounded repair | Harness/task/evidence validators | Codex corrects safe in-scope failures |
+| FSC-009 | Rich use cases and state machines | Cockburn Use Cases; State Machines | CONDITIONAL | Add failure guarantees or states only when triggered | PRD journey and state contracts | High/critical risk; lifecycle, async, retry/resume, approval, migration, or meaningful-transition trigger | Applicability and record validators | Extra questions only when risk demands them |
+| FSC-010 | Threat and privacy analysis | Quality Review; STRIDE; LINDDUN | CONDITIONAL | Threat and privacy analysis deepen material security work | PRD design and risk records | Material security/privacy trigger | Recorded trigger plus bound findings and validation IDs | Security depth matches exposure |
+| FSC-011 | Consequential decision and review depth | Quality Review; ATAM; ADR; Fagan Inspection | CONDITIONAL | Hard-to-reverse choices receive deeper review | PRD and `docs/adr/` | One-way door, high/critical risk, or material tradeoff | Recorded trigger plus decision/evidence review | Tradeoffs are visible when consequential |
+| FSC-012 | Extended Harness checks | Harness Inventory | CONDITIONAL | Accessibility, visual, mutation, SAST/DAST, and formal checks activate from technology/risk | Gate B Harness Profile | Recorded trigger | Exact command/API and evidence row | No universal scanner burden |
+| FSC-013 | External issue tracking | Backlog Management | CONDITIONAL | Mirror tasks only when authorized and operationally useful | TASKS and GitHub boundary | Current external-write authority | Issue reconciliation checks | No issue ceremony by default |
+| FSC-014 | Mandatory external documentation stack | Architecture Documentation; Docs-as-Code; arc42; AsciiDoc/docToolchain; PlantUML | NOT_APPLICABLE | Repository-native Markdown/Mermaid authorities remain canonical | Fastlane package contract | External stack excluded as mandatory machinery | Manifest and Markdown integrity tests | Familiar repository documents |
+| FSC-015 | Extra lifecycle and approval machinery | Pugh Matrix; Backlog Management | NOT_APPLICABLE | No second lifecycle, extra gate, universal scoring, or issue-per-task execution | Workflow and receipt contracts | Excluded from Fastlane | Route and exact-receipt tests | No added approval bureaucracy |
+| FSC-016 | Semantic Anchors package or runtime | Semantic Anchors; Semantic Contracts | NOT_APPLICABLE | The profile is locally defined and dependency-free | This table and local validators | Excluded from runtime/package | Manifest and package inventory checks | No additional installation |
+
 ## Framework maintenance
 
 Fastlane framework work uses `maintain-fastlane`, never the adopter lifecycle.
@@ -119,6 +150,10 @@ acceptance criteria, and change budget; and `PUBLISH` requires separate exact
 authority for each Git or release action. Missing implementation scope stops
 before editing. Unrelated findings remain report-only, and publication never
 follows merely from permission to edit.
+A change to an FSC contract updates its workflow rule, applicable phase
+reference, PRD schema, deterministic validator/router, owner-visible
+presentation when affected, tests, and manifest in the same bounded
+maintenance change.
 Use `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`
 to verify the exact baseline, allowlist, change budget, and distinct publication
 authority before maintenance work. The contract is ephemeral and untracked.
@@ -179,6 +214,16 @@ checkpoints, GitHub permission, and planned AWS lane.
 After Gate B, Codex can build normally without repeated approvals. A material
 change in requirements, design, scope, risk, cost, or authority makes the
 applicable gate stale and stops affected work.
+
+### Legacy contract compatibility
+
+Schema transitions do not create another owner gate. An unchanged approved schema 1.2 Gate A may be used as the requirements basis while Codex performs a design-only migration to schema 5. Codex writes generated migration records and reports `Need from you: Nothing` unless an owner fact required by the current requirements is genuinely missing. A requirements-controlled change instead requires schema 1.3 and makes the applicable approvals stale.
+
+That bridge derives acceptance labels from approved legacy rows. A legacy
+`NEW_BUILD` uses first-wave journey `NONE` and binds its end-to-end Harness to
+the wave plus every selected approved requirement; it does not invent a journey.
+
+An unchanged approved schema 4 Gate B remains valid for its exact design and construction envelope. A new or unapproved design, or any design-controlled change, requires the complete schema 5 design contract and a fresh Gate B. Legacy compatibility cannot expand authority, invent design values, or bypass task and evidence checks. The owner supplies a missing product fact when one is needed and approves the resulting Gate B; Codex owns the mechanical migration.
 
 ## AWS authorization
 

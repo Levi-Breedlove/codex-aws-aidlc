@@ -17,6 +17,11 @@ Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10.
   not force vertical slicing on a legitimate migration-only, security-only,
   infrastructure-only, or evidence-only task; it still needs one coherent
   outcome and independent evidence.
+- For `NEW_BUILD`, structural wave 1 implements the Gate-B-approved first
+  end-to-end journey. One approved disposable spike may precede it only when a
+  documented technical unknown blocks the path; the spike cannot satisfy the
+  product outcome or replace the earliest non-spike end-to-end task.
+
 - Use Red/Green TDD when it provides meaningful executable feedback: Chicago
   School for state-based behavior and public APIs, or London School for
   interaction-heavy orchestration. Preserve the initial failing observation,

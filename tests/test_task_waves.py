@@ -382,6 +382,88 @@ def harness_execution_values(
     return "| " + " | ".join(values) + " |", task_waves.HarnessExecutionRow(*values)
 
 
+def walking_harness_values() -> tuple[str, task_waves.HarnessExecutionRow]:
+    values = (
+        "HARNESS-900",
+        "End-to-end",
+        "Walking-skeleton journey check",
+        "Before first-wave completion",
+        "REQ-0001, DES-0001, JOURNEY-001, FR-001",
+        "python -m unittest tests.test_walking_skeleton",
+        "docs/project/VERIFY.md#harness-execution-evidence",
+        "REQUIRED",
+    )
+    return "| " + " | ".join(values) + " |", task_waves.HarnessExecutionRow(*values)
+
+
+def new_build_delivery_contract(
+    *,
+    spike: bool = False,
+    grandfathered: bool = False,
+) -> task_waves.ApprovedDeliveryContract:
+    approved_spike = (
+        task_waves.ApprovedSpikeContract(
+            spike_id="SPIKE-001",
+            max_attempts=2,
+            disposable_boundaries=("scratch/**",),
+            exit_criterion="python -m unittest tests.test_spike_exit",
+        )
+        if spike
+        else None
+    )
+    return task_waves.ApprovedDeliveryContract(
+        grandfathered=grandfathered,
+        wave_contract_id=None if grandfathered else "WAVE-001",
+        journey_id=None if grandfathered else "JOURNEY-001",
+        requirement_ids=() if grandfathered else ("FR-001",),
+        acceptance_test_ids=() if grandfathered else ("AC-FR-001",),
+        harness_id=None if grandfathered else "HARNESS-900",
+        spike=approved_spike,
+    )
+
+
+def walking_task_block(
+    *,
+    task_id: str = "TASK-001",
+    status: str = "READY",
+    dependencies: str = "NONE",
+) -> str:
+    row, harness = walking_harness_values()
+    return task_block(
+        task_id,
+        status,
+        dependencies,
+        requirements=(
+            "REQ-0001, FR-001, AC-FR-001, JOURNEY-001, WAVE-001"
+        ),
+        validation_command=harness.exact_command,
+        harness_projection_rows=(row,),
+    )
+
+
+def spike_task_block(
+    *,
+    status: str = "READY",
+    dependencies: str = "NONE",
+    attempt_budget: int = 2,
+    write_set: str = "scratch/probe.txt",
+    external_state: str = "NONE",
+    aws_mode: str = "NONE",
+    validation_command: str = "python -m unittest tests.test_spike_exit",
+) -> str:
+    return task_block(
+        "TASK-001",
+        status,
+        dependencies,
+        requirements="REQ-0001, SPIKE-001",
+        attempt_budget=attempt_budget,
+        write_set=write_set,
+        external_state=external_state,
+        aws_mode=aws_mode,
+        validation_command=validation_command,
+    )
+
+
 def harness_evidence_row(
     *,
     evidence_id: str,
@@ -630,6 +712,332 @@ Not started.
         self.assertEqual(
             [task.task_id for task in task_waves.ready_tasks(tasks, by_id, waivers)],
             ["TASK-9001"],
+        )
+
+    def test_new_build_walking_skeleton_is_the_only_first_wave(self) -> None:
+        row, harness = walking_harness_values()
+        text = document(
+            [
+                walking_task_block(),
+                task_block("TASK-002", "BACKLOG", "TASK-001"),
+            ]
+        )
+        tasks = task_waves.parse_tasks(text)
+        snap = task_waves.parse_snapshot(text)
+
+        by_id = task_waves.validate(
+            tasks,
+            snap,
+            approved_harness={harness.harness_id: harness},
+            approved_delivery=new_build_delivery_contract(),
+        )
+
+        self.assertEqual(task_waves.compute_waves(tasks, by_id), {
+            "TASK-001": 1,
+            "TASK-002": 2,
+        })
+        self.assertEqual(set(tasks[0].metadata), set(task_waves.REQUIRED_METADATA))
+        self.assertNotIn("Wave contract", task_waves.REQUIRED_METADATA)
+        self.assertIn(row, tasks[0].block)
+
+    def test_legacy_gate_a_schema_five_wave_needs_no_invented_journey(self) -> None:
+        row, harness = walking_harness_values()
+        text = document([
+            task_block(
+                "TASK-001",
+                "READY",
+                requirements="REQ-0001, FR-001, AC-FR-001, WAVE-001",
+                validation_command=harness.exact_command,
+                harness_projection_rows=(row,),
+            ),
+            task_block("TASK-002", "BACKLOG", "TASK-001"),
+        ])
+        delivery = task_waves.ApprovedDeliveryContract(
+            grandfathered=False,
+            wave_contract_id="WAVE-001",
+            journey_id=None,
+            requirement_ids=("FR-001",),
+            acceptance_test_ids=("AC-FR-001",),
+            harness_id=harness.harness_id,
+        )
+        tasks = task_waves.parse_tasks(text)
+        snapshot = task_waves.parse_snapshot(text)
+        by_id = task_waves.validate(
+            tasks,
+            snapshot,
+            approved_harness={harness.harness_id: harness},
+            approved_delivery=delivery,
+        )
+        self.assertEqual(task_waves.compute_waves(tasks, by_id)["TASK-001"], 1)
+        self.assertNotIn("JOURNEY-", tasks[0].metadata["Requirements"])
+        self.assertNotIn("NONE", tasks[0].metadata["Requirements"])
+
+    def test_new_build_delivery_contract_rejects_missing_duplicate_and_bypassed_walk(self) -> None:
+        _row, harness = walking_harness_values()
+        approved_harness = {harness.harness_id: harness}
+        delivery = new_build_delivery_contract()
+
+        missing = document([task_block("TASK-001", "READY")])
+        with self.assertRaisesRegex(
+            ValueError, "requires exactly one walking-skeleton task; found 0"
+        ):
+            task_waves.validate(
+                task_waves.parse_tasks(missing),
+                task_waves.parse_snapshot(missing),
+                approved_harness=approved_harness,
+                approved_delivery=delivery,
+            )
+
+        duplicate = document(
+            [
+                walking_task_block(),
+                walking_task_block(
+                    task_id="TASK-002",
+                    dependencies="TASK-001",
+                ),
+            ]
+        )
+        with self.assertRaisesRegex(
+            ValueError, "requires exactly one walking-skeleton task; found 2"
+        ):
+            task_waves.validate(
+                task_waves.parse_tasks(duplicate),
+                task_waves.parse_snapshot(duplicate),
+                approved_harness=approved_harness,
+                approved_delivery=delivery,
+            )
+
+        peer_root = document(
+            [
+                walking_task_block(),
+                task_block("TASK-002", "READY"),
+            ]
+        )
+        with self.assertRaisesRegex(
+            ValueError, "sole active structural wave 1"
+        ):
+            task_waves.validate(
+                task_waves.parse_tasks(peer_root),
+                task_waves.parse_snapshot(peer_root),
+                approved_harness=approved_harness,
+                approved_delivery=delivery,
+            )
+
+        later_harness_row, _later_harness = walking_harness_values()
+        wrong_harness_owner = document(
+            [
+                task_block(
+                    "TASK-001",
+                    "READY",
+                    requirements=(
+                        "REQ-0001, FR-001, AC-FR-001, JOURNEY-001, WAVE-001"
+                    ),
+                ),
+                task_block(
+                    "TASK-002",
+                    "BACKLOG",
+                    "TASK-001",
+                    validation_command=harness.exact_command,
+                    harness_projection_rows=(later_harness_row,),
+                ),
+            ]
+        )
+        with self.assertRaisesRegex(
+            ValueError, "walking-skeleton Validation must own approved end-to-end"
+        ):
+            task_waves.validate(
+                task_waves.parse_tasks(wrong_harness_owner),
+                task_waves.parse_snapshot(wrong_harness_owner),
+                approved_harness=approved_harness,
+                approved_delivery=delivery,
+            )
+
+    def test_new_build_allows_one_bounded_spike_before_the_walking_skeleton(self) -> None:
+        _row, harness = walking_harness_values()
+        text = document(
+            [
+                spike_task_block(),
+                walking_task_block(task_id="TASK-002", dependencies="TASK-001"),
+                task_block("TASK-003", "BACKLOG", "TASK-002"),
+            ]
+        )
+        tasks = task_waves.parse_tasks(text)
+        snap = task_waves.parse_snapshot(text)
+
+        by_id = task_waves.validate(
+            tasks,
+            snap,
+            approved_harness={harness.harness_id: harness},
+            approved_delivery=new_build_delivery_contract(spike=True),
+        )
+
+        self.assertEqual(task_waves.compute_waves(tasks, by_id), {
+            "TASK-001": 1,
+            "TASK-002": 2,
+            "TASK-003": 3,
+        })
+
+    def test_bounded_spike_rejects_scope_authority_and_sequence_violations(self) -> None:
+        _row, harness = walking_harness_values()
+        approved_harness = {harness.harness_id: harness}
+        delivery = new_build_delivery_contract(spike=True)
+
+        cases = (
+            (
+                "attempt budget",
+                spike_task_block(attempt_budget=3),
+                "Attempt budget exceeds approved",
+            ),
+            (
+                "write boundary",
+                spike_task_block(write_set="app/probe.py"),
+                "Write set exceeds the approved disposable boundary",
+            ),
+            (
+                "external state",
+                spike_task_block(external_state="github:issue:1"),
+                "blocking spike requires External state NONE",
+            ),
+            (
+                "aws mode",
+                spike_task_block(aws_mode="READ_ONLY"),
+                "blocking spike AWS mode must be NONE or DOCS_ONLY",
+            ),
+            (
+                "missing exit",
+                spike_task_block(validation_command="python -m unittest tests.other"),
+                "exit criterion must appear unchanged exactly once",
+            ),
+            (
+                "duplicate exit",
+                spike_task_block(
+                    validation_command=(
+                        "python -m unittest tests.test_spike_exit\n"
+                        "python -m unittest tests.test_spike_exit"
+                    )
+                ),
+                "exit criterion must appear unchanged exactly once",
+            ),
+        )
+        for label, spike_block, message in cases:
+            with self.subTest(label=label), self.assertRaisesRegex(ValueError, message):
+                text = document(
+                    [
+                        spike_block,
+                        walking_task_block(
+                            task_id="TASK-002",
+                            dependencies="TASK-001",
+                        ),
+                    ]
+                )
+                task_waves.validate(
+                    task_waves.parse_tasks(text),
+                    task_waves.parse_snapshot(text),
+                    approved_harness=approved_harness,
+                    approved_delivery=delivery,
+                )
+
+        bypass = document(
+            [
+                spike_task_block(),
+                walking_task_block(task_id="TASK-002", dependencies="TASK-001"),
+                task_block("TASK-003", "BACKLOG", "TASK-001"),
+            ]
+        )
+        with self.assertRaisesRegex(
+            ValueError, "walking skeleton must be the sole active structural wave 2"
+        ):
+            task_waves.validate(
+                task_waves.parse_tasks(bypass),
+                task_waves.parse_snapshot(bypass),
+                approved_harness=approved_harness,
+                approved_delivery=delivery,
+            )
+
+    def test_walking_skeleton_and_blocking_spike_cannot_be_skipped(self) -> None:
+        _row, harness = walking_harness_values()
+        approved_harness = {harness.harness_id: harness}
+
+        skipped_walk = document([walking_task_block(status="SKIPPED")])
+        with self.assertRaisesRegex(ValueError, "walking-skeleton task cannot be SKIPPED"):
+            task_waves.validate(
+                task_waves.parse_tasks(skipped_walk),
+                task_waves.parse_snapshot(skipped_walk),
+                approved_harness=approved_harness,
+                approved_delivery=new_build_delivery_contract(),
+            )
+
+        skipped_spike = document(
+            [
+                spike_task_block(status="SKIPPED"),
+                walking_task_block(task_id="TASK-002", dependencies="TASK-001"),
+            ]
+        )
+        with self.assertRaisesRegex(ValueError, "blocking spike cannot be SKIPPED"):
+            task_waves.validate(
+                task_waves.parse_tasks(skipped_spike),
+                task_waves.parse_snapshot(skipped_spike),
+                approved_harness=approved_harness,
+                approved_delivery=new_build_delivery_contract(spike=True),
+            )
+
+    def test_invalid_delivery_graph_is_rejected_before_mutation_writes(self) -> None:
+        _row, harness = walking_harness_values()
+        text = document(
+            [
+                walking_task_block(),
+                task_block("TASK-002", "READY"),
+            ]
+        )
+        approved = task_waves.ApprovedTaskContract(
+            technology_ids=frozenset({"TECH-0001"}),
+            property_execution={},
+            harness={harness.harness_id: harness},
+            delivery=new_build_delivery_contract(),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tasks_path, state_path = write_task_project(root, text)
+            original_tasks = tasks_path.read_bytes()
+            original_state = state_path.read_bytes()
+
+            with mock.patch.object(
+                task_waves,
+                "approved_contract_for_tasks",
+                return_value=approved,
+            ), self.assertRaisesRegex(ValueError, "sole active structural wave 1"):
+                task_waves.mutate_run_snapshot(
+                    tasks_path,
+                    operation="start",
+                    run_id="RUN-0001",
+                    coordinator="lead",
+                    run_mode="AUTONOMOUS",
+                )
+
+            self.assertEqual(tasks_path.read_bytes(), original_tasks)
+            self.assertEqual(state_path.read_bytes(), original_state)
+
+    def test_delivery_order_is_noop_for_non_new_build_and_grandfathered_designs(self) -> None:
+        text = document(
+            [
+                task_block("TASK-001", "READY"),
+                task_block("TASK-002", "READY"),
+            ]
+        )
+        tasks = task_waves.parse_tasks(text)
+        snap = task_waves.parse_snapshot(text)
+
+        task_waves.validate(
+            tasks,
+            snap,
+            approved_delivery=task_waves.ApprovedDeliveryContract(
+                grandfathered=False
+            ),
+        )
+        task_waves.validate(
+            tasks,
+            snap,
+            approved_delivery=new_build_delivery_contract(grandfathered=True),
         )
 
     def test_design_trace_parses_and_serializes_technology_refs(self) -> None:
