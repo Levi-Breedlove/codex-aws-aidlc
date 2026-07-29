@@ -105,6 +105,82 @@ def intake_foundation() -> dict[str, object]:
         },
     }
 
+
+def aws_progress_report(
+    progress_state: str,
+    *,
+    action_kind: str = "NONE_CONTINUE_AUTOMATICALLY",
+    owner_action_required: bool = False,
+    automatic_continuation_allowed: bool = True,
+    formal_receipt_required: bool = False,
+    preflight_status: str = "NOT_STARTED",
+    account_access: str = "NOT_OBSERVED",
+    lane: str = "read-only",
+) -> dict[str, object]:
+    current = report(
+        owner_stage="DELIVER",
+        response_mode="AWS_RECEIPT" if formal_receipt_required else "OWNER_UPDATE",
+        state="AWAITING_APPROVAL" if formal_receipt_required else "WORKING",
+        route_reason_code=progress_state,
+        owner_action_required=owner_action_required,
+        owner_action_kind=action_kind,
+        automatic_continuation_allowed=automatic_continuation_allowed,
+        formal_receipt_required=formal_receipt_required,
+    )
+    current["next_prompt"] = "AWS-10"
+    current["aws_execution"] = {
+        "schema_version": 1,
+        "active": True,
+        "lane": lane,
+        "progress_state": progress_state,
+        "preflight": {
+            "status": preflight_status,
+            "account_access": account_access,
+            "account": "123456789012",
+            "region": "us-west-2",
+            "environment": "development",
+        },
+    }
+    return current
+
+
+def aws_teardown_report(
+    reason: str,
+    *,
+    action_kind: str = "NONE_CONTINUE_AUTOMATICALLY",
+    owner_action_required: bool = False,
+    automatic_continuation_allowed: bool = True,
+    formal_receipt_required: bool = False,
+) -> dict[str, object]:
+    current = report(
+        owner_stage="DELIVER",
+        response_mode="AWS_RECEIPT" if formal_receipt_required else "OWNER_UPDATE",
+        state=(
+            "AWAITING_APPROVAL"
+            if formal_receipt_required
+            else "NEEDS_INPUT" if owner_action_required else "WORKING"
+        ),
+        route_reason_code=reason,
+        owner_action_required=owner_action_required,
+        owner_action_kind=action_kind,
+        automatic_continuation_allowed=automatic_continuation_allowed,
+        formal_receipt_required=formal_receipt_required,
+    )
+    current["next_prompt"] = (
+        "AWS-50" if reason == "WAITING_AWS_TEARDOWN_AUTH" else "AWS-40"
+    )
+    current["aws_execution"] = {
+        "schema_version": 1,
+        "active": False,
+        "lane": "explicit-gate",
+        "progress_state": "NOT_ACTIVE",
+    }
+    if reason == "AWS_RESIDUAL_REVIEW_BLOCKED":
+        current["aws_teardown"] = {
+            "blocker_or_stale_reason": "caller identity could not be verified"
+        }
+    return current
+
 class FastlanePresenterTests(unittest.TestCase):
     def test_owner_update_has_one_action_and_no_internal_prompt_id(self) -> None:
         rendered = presenter.render_owner_update(report())
@@ -131,6 +207,435 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("Need from you: Nothing.", rendered)
         self.assertIn("compare complete architecture candidates", rendered)
 
+
+    def test_aws_guidance_is_automatic_and_credential_free(self) -> None:
+        rendered = presenter.render_owner_update(
+            aws_progress_report("AWS_GUIDANCE_REQUIRED")
+        )
+
+        self.assertIn("Status: Current AWS guidance is needed", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("without accessing an AWS account", rendered)
+        self.assertNotIn("deployment receipt", rendered)
+
+    def test_read_scope_restores_only_the_read_only_receipt_action(self) -> None:
+        current = aws_progress_report(
+            "AWS_READ_SCOPE_REQUIRED",
+            action_kind="AUTHORIZE_AWS_READ_PREFLIGHT",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+            formal_receipt_required=True,
+        )
+
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+        rendered = presenter.render_side_question_response(
+            current,
+            answer="The requested preflight can inspect only the named scope.",
+        )
+        self.assertIn(
+            "Pending next action: Review the exact read-only AWS preflight receipt. "
+            "It grants no mutation.",
+            rendered,
+        )
+        self.assertNotIn("deployment receipt", rendered)
+
+    def test_preflight_running_names_read_only_scope_without_owner_work(self) -> None:
+        rendered = presenter.render_owner_update(
+            aws_progress_report("AWS_PREFLIGHT_RUNNING")
+        )
+
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("named-account read-only checks", rendered)
+        self.assertIn("named AWS account scope read-only", rendered)
+        self.assertIn("No mutation is authorized.", rendered)
+
+    def test_preflight_ready_requires_observed_read_only_access(self) -> None:
+        current = aws_progress_report(
+            "AWS_PREFLIGHT_READY",
+            automatic_continuation_allowed=False,
+            preflight_status="READY",
+            account_access="READ_ONLY_OBSERVED",
+        )
+        rendered = presenter.render_owner_update(current)
+
+        self.assertIn("authorized read-only AWS inspection is complete", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("No AWS resource mutation will occur.", rendered)
+        self.assertIn("No mutation was performed.", rendered)
+
+        current["aws_execution"]["preflight"]["account_access"] = "NOT_VERIFIED"
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
+
+    def test_documentation_only_ready_states_no_account_access(self) -> None:
+        current = aws_progress_report(
+            "AWS_PREFLIGHT_READY",
+            automatic_continuation_allowed=False,
+            preflight_status="NOT_APPLICABLE",
+            account_access="NOT_USED",
+            lane="documentation-only",
+        )
+        current["aws_execution"]["preflight"].update(
+            {"account": "NONE", "region": "NONE", "environment": "NONE"}
+        )
+        rendered = presenter.render_owner_update(current)
+        self.assertIn("Status: Documentation-only AWS guidance is complete.", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("Next: No AWS account or resource action will occur.", rendered)
+        self.assertIn("No AWS account was accessed.", rendered)
+        self.assertNotIn("Authenticated preflight accessed", rendered)
+        self.assertNotIn("Read-only AWS preflight", rendered)
+        self.assertNotIn("observed preflight", rendered)
+
+    def test_fast_dev_ready_uses_bounded_nonproduction_mutation_copy(self) -> None:
+        current = aws_progress_report(
+            "AWS_PREFLIGHT_READY",
+            preflight_status="READY",
+            account_access="READ_ONLY_OBSERVED",
+            lane="fast-dev",
+        )
+        rendered = presenter.render_owner_update(current)
+        side_question = presenter.render_side_question_response(
+            current,
+            answer="The preflight itself remained read-only.",
+        )
+        expected = "exact Gate-B-authorized non-production mutation"
+        self.assertIn(expected, rendered)
+        self.assertIn(expected, side_question)
+        self.assertIn("No mutation was performed.", rendered)
+        self.assertNotIn("without changing AWS resources", rendered)
+    def test_preflight_ready_rejects_lane_continuation_mismatch(self) -> None:
+        cases = (
+            ("documentation-only", True, "NOT_APPLICABLE", "NOT_USED"),
+            ("read-only", True, "READY", "READ_ONLY_OBSERVED"),
+            ("fast-dev", False, "READY", "READ_ONLY_OBSERVED"),
+        )
+        for lane, automatic, preflight_status, account_access in cases:
+            with self.subTest(lane=lane, automatic=automatic):
+                current = aws_progress_report(
+                    "AWS_PREFLIGHT_READY",
+                    automatic_continuation_allowed=automatic,
+                    preflight_status=preflight_status,
+                    account_access=account_access,
+                    lane=lane,
+                )
+                if lane == "documentation-only":
+                    current["aws_execution"]["preflight"].update(
+                        {
+                            "account": "NONE",
+                            "region": "NONE",
+                            "environment": "NONE",
+                        }
+                    )
+
+                with self.assertRaisesRegex(
+                    presenter.PresentationError,
+                    "terminal AWS preflight state is inconsistent",
+                ):
+                    presenter.render_owner_update(current)
+
+
+    def test_blocked_or_stale_preflight_renders_the_safety_stop(self) -> None:
+        for preflight_status in ("BLOCKED", "STALE"):
+            with self.subTest(preflight_status=preflight_status):
+                current = aws_progress_report(
+                    "AWS_PREFLIGHT_RUNNING",
+                    action_kind="REVIEW_SAFETY_BLOCKER",
+                    owner_action_required=True,
+                    automatic_continuation_allowed=False,
+                    preflight_status=preflight_status,
+                    account_access="NOT_VERIFIED",
+                )
+                current["interaction"].update(
+                    {
+                        "response_mode": "BLOCKER",
+                        "state": "BLOCKED",
+                        "route_reason_code": "BLOCKED",
+                    }
+                )
+                rendered = presenter.render_owner_update(current)
+                self.assertIn(
+                    "Status: Fastlane stopped at a validation boundary.", rendered
+                )
+                self.assertIn(
+                    "Need from you: Review the reported safety blocker", rendered
+                )
+                self.assertNotIn("Authenticated preflight accessed", rendered)
+                self.assertNotIn("preflight is complete", rendered)
+                self.assertNotIn("preflight is in progress", rendered)
+
+    def test_current_mutation_authority_reports_automatic_bounded_execution(self) -> None:
+        current = aws_progress_report(
+            "WAITING_AWS_MUTATION_AUTH",
+            preflight_status="READY",
+            account_access="READ_ONLY_OBSERVED",
+            lane="explicit-gate",
+        )
+        rendered = presenter.render_owner_update(current)
+        side_question = presenter.render_side_question_response(
+            current,
+            answer="The accepted receipt remains limited to its exact resource boundary.",
+        )
+        self.assertIn("exact deployment authorization are current", rendered)
+        self.assertIn("Codex will perform only the exact authorized AWS mutation.", rendered)
+        self.assertNotIn("needs separate authorization", rendered)
+        self.assertNotIn("After authorization", rendered)
+        self.assertIn(
+            "Codex will perform only the exact authorized AWS mutation.", side_question
+        )
+
+    def test_mutation_receipt_action_is_limited_to_mutation_wait_state(self) -> None:
+        current = aws_progress_report(
+            "WAITING_AWS_MUTATION_AUTH",
+            action_kind="AUTHORIZE_AWS_OPERATION",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+            formal_receipt_required=True,
+            preflight_status="READY",
+            account_access="READ_ONLY_OBSERVED",
+        )
+        rendered = presenter.render_side_question_response(
+            current,
+            answer="Preflight is complete; deployment remains separately gated.",
+        )
+        self.assertIn(
+            "Pending next action: Review the exact AWS deployment receipt before any "
+            "AWS mutation.",
+            rendered,
+        )
+
+        current["interaction"]["route_reason_code"] = "AWS_PREFLIGHT_RUNNING"
+        current["aws_execution"]["progress_state"] = "AWS_PREFLIGHT_RUNNING"
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_side_question_response(current, answer="Still running.")
+
+    def test_residual_review_renders_before_deployment_progress(self) -> None:
+        current = aws_teardown_report("AWS_RESIDUAL_REVIEW")
+        current["aws_execution"] = {
+            "schema_version": 1,
+            "active": True,
+            "lane": "explicit-gate",
+            "progress_state": "WAITING_AWS_MUTATION_AUTH",
+        }
+
+        rendered = presenter.render_owner_update(current)
+        side_question = presenter.render_side_question_response(
+            current,
+            answer="The residual check remains read-only.",
+        )
+
+        self.assertIn("Authorized read-only AWS residual review", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("authorized read-only residual checks", rendered)
+        self.assertNotIn("deployment authorization", rendered)
+        self.assertIn("authorized read-only residual checks", side_question)
+
+    def test_residual_review_restores_read_authorization_action(self) -> None:
+        current = aws_teardown_report(
+            "AWS_RESIDUAL_REVIEW",
+            action_kind="AUTHORIZE_AWS_READ_PREFLIGHT",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+            formal_receipt_required=True,
+        )
+
+        rendered = presenter.render_side_question_response(
+            current,
+            answer="The review cannot remove resources.",
+        )
+
+        self.assertIn(
+            "Pending next action: Review the exact read-only AWS preflight receipt. "
+            "It grants no mutation.",
+            rendered,
+        )
+        self.assertNotIn("deployment receipt", rendered)
+        self.assertNotIn("teardown receipt", rendered)
+
+    def test_teardown_receipt_action_is_distinct_from_deployment(self) -> None:
+        current = aws_teardown_report(
+            "WAITING_AWS_TEARDOWN_AUTH",
+            action_kind="AUTHORIZE_AWS_TEARDOWN",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+            formal_receipt_required=True,
+        )
+
+        rendered = presenter.render_side_question_response(
+            current,
+            answer="Deployment approval cannot authorize cleanup.",
+        )
+
+        self.assertIn(
+            "Pending next action: Review the exact AWS teardown receipt before any "
+            "resource is removed.",
+            rendered,
+        )
+        self.assertNotIn("deployment receipt", rendered)
+
+    def test_current_teardown_authority_continues_exact_cleanup(self) -> None:
+        current = aws_teardown_report("WAITING_AWS_TEARDOWN_AUTH")
+
+        rendered = presenter.render_owner_update(current)
+        side_question = presenter.render_side_question_response(
+            current,
+            answer="The teardown remains bounded by the accepted receipt.",
+        )
+
+        self.assertIn("exact teardown authorization are current", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn(
+            "Codex will remove only the exact resources authorized for teardown.",
+            rendered,
+        )
+        self.assertIn(
+            "Codex will remove only the exact resources authorized for teardown.",
+            side_question,
+        )
+        self.assertNotIn("deployment authorization", rendered)
+
+    def test_terminal_residual_and_teardown_states_are_explicit(self) -> None:
+        cases = (
+            (
+                "AWS_RESIDUAL_REVIEW_COMPLETE",
+                "no unexpected resources remain",
+                "No teardown is required",
+            ),
+            (
+                "AWS_TEARDOWN_COMPLETE",
+                "teardown and read-only reconciliation are complete",
+                "No further AWS action is required",
+            ),
+        )
+        for reason, status, next_text in cases:
+            with self.subTest(reason=reason):
+                current = aws_teardown_report(
+                    reason,
+                    automatic_continuation_allowed=False,
+                )
+                current["interaction"]["state"] = "COMPLETE"
+
+                rendered = presenter.render_owner_update(current)
+                side_question = presenter.render_side_question_response(
+                    current,
+                    answer="The recorded terminal state is unchanged.",
+                )
+
+                self.assertIn(status, rendered)
+                self.assertIn("Need from you: Nothing.", rendered)
+                self.assertIn(next_text, rendered)
+                self.assertIn(next_text, side_question)
+
+    def test_residuals_remaining_require_one_owner_disposition(self) -> None:
+        current = aws_teardown_report(
+            "AWS_RESIDUALS_REMAIN",
+            action_kind="REVIEW_AWS_RESIDUALS",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+        )
+
+        rendered = presenter.render_owner_update(current)
+        side_question = presenter.render_side_question_response(
+            current,
+            answer="Residual resources can continue generating cost.",
+        )
+
+        expected = (
+            "Review the remaining AWS resources and decide which to retain, remove, "
+            "or investigate."
+        )
+        self.assertIn("residual resources that need your decision", rendered)
+        self.assertIn(f"Need from you: {expected}", rendered)
+        self.assertIn("Copyable reply:", rendered)
+        self.assertIn("RETAIN, REMOVE under new authorization, or INVESTIGATE", rendered)
+        self.assertIn(f"Pending next action: {expected}", side_question)
+
+    def test_blocked_residual_review_requires_safety_review(self) -> None:
+        current = aws_teardown_report(
+            "AWS_RESIDUAL_REVIEW_BLOCKED",
+            action_kind="REVIEW_SAFETY_BLOCKER",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+        )
+        current["interaction"].update(
+            {"response_mode": "BLOCKER", "state": "BLOCKED"}
+        )
+
+        rendered = presenter.render_owner_update(current)
+        side_question = presenter.render_side_question_response(
+            current,
+            answer="No AWS resource will be changed while review is blocked.",
+        )
+
+        self.assertIn(
+            "Read-only AWS residual review stopped: caller identity could not be verified",
+            rendered,
+        )
+        self.assertIn("Need from you: Review the reported safety blocker", rendered)
+        self.assertIn(
+            "Pending next action: Review the reported safety blocker", side_question
+        )
+        self.assertIn(
+            "Safety blocker: caller identity could not be verified", side_question
+        )
+
+    def test_blocked_residual_review_rejects_unsafe_reason(self) -> None:
+        for reason in ("NONE", "line one\nline two"):
+            with self.subTest(reason=reason):
+                current = aws_teardown_report(
+                    "AWS_RESIDUAL_REVIEW_BLOCKED",
+                    action_kind="REVIEW_SAFETY_BLOCKER",
+                    owner_action_required=True,
+                    automatic_continuation_allowed=False,
+                )
+                current["interaction"].update(
+                    {"response_mode": "BLOCKER", "state": "BLOCKED"}
+                )
+                current["aws_teardown"] = {"blocker_or_stale_reason": reason}
+                with self.assertRaises(presenter.PresentationError):
+                    presenter.render_owner_update(current)
+
+    def test_teardown_actions_fail_closed_outside_exact_states(self) -> None:
+        cases = (
+            report(
+                owner_stage="DELIVER",
+                state="AWAITING_APPROVAL",
+                route_reason_code="WAITING_AWS_MUTATION_AUTH",
+                owner_action_required=True,
+                owner_action_kind="AUTHORIZE_AWS_TEARDOWN",
+                automatic_continuation_allowed=False,
+                formal_receipt_required=True,
+            ),
+            aws_teardown_report(
+                "WAITING_AWS_TEARDOWN_AUTH",
+                action_kind="AUTHORIZE_AWS_OPERATION",
+                owner_action_required=True,
+                automatic_continuation_allowed=False,
+                formal_receipt_required=True,
+            ),
+            aws_teardown_report(
+                "AWS_RESIDUALS_REMAIN",
+                automatic_continuation_allowed=False,
+            ),
+        )
+        for current in cases:
+            with self.subTest(reason=current["interaction"]["route_reason_code"]):
+                with self.assertRaises(presenter.PresentationError):
+                    presenter.render_side_question_response(current, answer="Explain.")
+
+    def test_legacy_aws_preflight_reason_remains_renderable(self) -> None:
+        rendered = presenter.render_owner_update(
+            report(
+                owner_stage="DELIVER",
+                state="WORKING",
+                route_reason_code="AWS_PREFLIGHT_REQUIRED",
+                owner_action_required=False,
+                owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+                automatic_continuation_allowed=True,
+            )
+        )
+        self.assertIn("documentation evidence without accessing an AWS account", rendered)
 
     def test_aws_core_audit_requires_observed_doctor_projection(self) -> None:
         current = report(
@@ -453,6 +958,7 @@ class FastlanePresenterTests(unittest.TestCase):
             input=json.dumps(payload),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -469,6 +975,7 @@ class FastlanePresenterTests(unittest.TestCase):
             input=json.dumps(payload),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
         )
         self.assertEqual(result.returncode, 2)
@@ -477,6 +984,27 @@ class FastlanePresenterTests(unittest.TestCase):
             result.stderr,
         )
         self.assertNotIn("Audit:", result.stdout)
+
+    def test_public_cli_emits_strict_utf8_bytes(self) -> None:
+        payload = {
+            "report": report(
+                owner_stage="DESIGN",
+                state="WORKING",
+                route_reason_code="DESIGN_REQUIRED",
+                owner_action_required=False,
+                owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+                automatic_continuation_allowed=True,
+            )
+        }
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "owner", "--input-stdin"],
+            input=json.dumps(payload).encode("utf-8"),
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+        output = result.stdout.decode("utf-8", errors="strict")
+        self.assertIn("FASTLANE \u00b7 DESIGN", output)
 
     def test_grounded_intake_card_uses_uppercase_choices_and_exact_reply(self) -> None:
         current = report(turn_boundary_required=True)

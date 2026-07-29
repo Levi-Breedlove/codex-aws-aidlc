@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Sequence
+from scripts.fastlane_stdio import configure_utf8_standard_streams
+
 
 PLACEHOLDERS = {
     "My AWS Project": "AWS Codex Project",
@@ -44,6 +46,7 @@ NO_RENDER_PATHS = {
     "bootstrap.manifest.json",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
 }
@@ -60,6 +63,7 @@ CORE_CONTROL_PATHS = {
     "bootstrap.yaml",
     "prompts/CODEX-PROMPTS.md",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
 }
@@ -68,6 +72,7 @@ RUNTIME_CONTROL_PATHS = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
 }
@@ -1106,6 +1111,7 @@ def copy_template(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(
         description="Create or safely adopt an AWS Codex Fastlane project."
     )

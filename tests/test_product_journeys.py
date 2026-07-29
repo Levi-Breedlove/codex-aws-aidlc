@@ -20,6 +20,7 @@ if str(SCRIPTS) not in sys.path:
 
 from tests import test_bootstrap_doctor as doctor_fixtures
 from tests import test_fastlane_hooks as hook_fixtures
+from tests import test_fastlane_presenter as presenter_fixtures
 from tests import test_setup_assistant as setup_fixtures
 from tests import test_task_waves as task_fixtures
 
@@ -270,18 +271,25 @@ class ProductJourneyTests(unittest.TestCase):
             missing = doctor.inspect_project(deliver_project)
             self.assertFalse(missing["ok"])
             self.assertEqual(
-                missing["interaction"]["owner_action_kind"], "ENABLE_AWS_CORE"
+                missing["interaction"]["owner_action_kind"],
+                "NONE_CONTINUE_AUTOMATICALLY",
             )
             self.assertEqual(missing["interaction"]["owner_stage"], "DESIGN")
-            self.assertEqual(
-                presenter.render_owner_update(missing).count("Need from you:"), 1
-            )
+            repair_update = presenter.render_owner_update(missing)
+            self.assertEqual(repair_update.count("Need from you:"), 1)
+            self.assertIn("Need from you: Nothing.", repair_update)
+            self.assertIn("Codex will correct", repair_update)
             side_answer = presenter.render_side_question_response(
                 missing,
                 answer="Official AWS Core evidence is needed only for this material design step.",
             )
             self.assertIn("Project state changed: No.", side_answer)
-            self.assertIn("Pending next action: Enable official AWS Core", side_answer)
+            self.assertIn("Pending next action: Nothing.", side_answer)
+            self.assertIn(
+                "Next: Codex will correct the reported in-scope failure and rerun "
+                "validation.",
+                side_answer,
+            )
 
             verify_path.write_text(current_evidence, encoding="utf-8")
             recovered = doctor.inspect_project(deliver_project)
@@ -469,6 +477,132 @@ class ProductJourneyTests(unittest.TestCase):
             },
         )
         self.assertIn("blocked", opaque["hookSpecificOutput"]["permissionDecisionReason"])
+
+    def test_aws_guidance_read_scope_preflight_and_mutation_wait_are_serial(self) -> None:
+        materiality = {"materiality": "REQUIRED", "status": "CURRENT"}
+        no_preflight = {
+            "status": "NOT_STARTED",
+            "account_access": "NOT_OBSERVED",
+            "account": "NONE",
+            "region": "NONE",
+            "environment": "NONE",
+        }
+        read_authority = {
+            "validity": "CURRENT",
+            "authorization_id": "AWS-READ-AUTH-0001",
+        }
+        observed = {
+            "status": "READY",
+            "account_access": "READ_ONLY_OBSERVED",
+            "account": "111122223333",
+            "region": "us-west-2",
+            "environment": "development",
+        }
+        guidance = doctor.derive_aws_execution_projection(
+            materiality,
+            release_decision="READY_TO_DEPLOY",
+            guidance_ready=False,
+            read_authority=None,
+            preflight=no_preflight,
+            lane="explicit-gate",
+        )
+        read_scope = doctor.derive_aws_execution_projection(
+            materiality,
+            release_decision="READY_TO_DEPLOY",
+            guidance_ready=True,
+            read_authority=None,
+            preflight=no_preflight,
+            lane="explicit-gate",
+        )
+        running = doctor.derive_aws_execution_projection(
+            materiality,
+            release_decision="READY_TO_DEPLOY",
+            guidance_ready=True,
+            read_authority=read_authority,
+            preflight=no_preflight,
+            lane="explicit-gate",
+        )
+        ready = doctor.derive_aws_execution_projection(
+            materiality,
+            release_decision="READY_TO_DEPLOY",
+            guidance_ready=True,
+            read_authority=read_authority,
+            preflight=observed,
+            lane="read-only",
+        )
+        mutation_wait = doctor.derive_aws_execution_projection(
+            materiality,
+            release_decision="READY_TO_DEPLOY",
+            guidance_ready=True,
+            read_authority=read_authority,
+            preflight=observed,
+            lane="explicit-gate",
+        )
+        self.assertEqual(
+            [
+                guidance["progress_state"],
+                read_scope["progress_state"],
+                running["progress_state"],
+                ready["progress_state"],
+                mutation_wait["progress_state"],
+            ],
+            [
+                "AWS_GUIDANCE_REQUIRED",
+                "AWS_READ_SCOPE_REQUIRED",
+                "AWS_PREFLIGHT_RUNNING",
+                "AWS_PREFLIGHT_READY",
+                "WAITING_AWS_MUTATION_AUTH",
+            ],
+        )
+        self.assertFalse(
+            bool(guidance.get("preflight", {}).get("account_access") == "READ_ONLY_OBSERVED")
+        )
+        self.assertIn("AWS_PREFLIGHT_READY", mutation_wait["completed_states"])
+
+        guidance_text = presenter.render_owner_update(
+            presenter_fixtures.aws_progress_report("AWS_GUIDANCE_REQUIRED")
+        )
+        self.assertIn("without accessing an AWS account", guidance_text)
+        read_scope_text = presenter.render_side_question_response(
+            presenter_fixtures.aws_progress_report(
+                "AWS_READ_SCOPE_REQUIRED",
+                action_kind="AUTHORIZE_AWS_READ_PREFLIGHT",
+                owner_action_required=True,
+                automatic_continuation_allowed=False,
+                formal_receipt_required=True,
+            ),
+            answer="The preflight can inspect only the exact named scope.",
+        )
+        self.assertIn("It grants no mutation.", read_scope_text)
+        running_text = presenter.render_owner_update(
+            presenter_fixtures.aws_progress_report("AWS_PREFLIGHT_RUNNING")
+        )
+        self.assertIn("Need from you: Nothing.", running_text)
+        self.assertIn("No mutation is authorized.", running_text)
+        ready_text = presenter.render_owner_update(
+            presenter_fixtures.aws_progress_report(
+                "AWS_PREFLIGHT_READY",
+                preflight_status="READY",
+                account_access="READ_ONLY_OBSERVED",
+                automatic_continuation_allowed=False,
+            )
+        )
+        self.assertIn("authorized read-only AWS inspection is complete", ready_text)
+        self.assertIn("No AWS resource mutation will occur.", ready_text)
+        mutation_text = presenter.render_side_question_response(
+            presenter_fixtures.aws_progress_report(
+                "WAITING_AWS_MUTATION_AUTH",
+                action_kind="AUTHORIZE_AWS_OPERATION",
+                owner_action_required=True,
+                automatic_continuation_allowed=False,
+                formal_receipt_required=True,
+                preflight_status="READY",
+                account_access="READ_ONLY_OBSERVED",
+            ),
+            answer="The preflight does not authorize deployment.",
+        )
+        self.assertIn("deployment receipt", mutation_text)
+        self.assertNotIn("teardown receipt", mutation_text)
 
     def test_failed_task_evidence_cannot_produce_false_done(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

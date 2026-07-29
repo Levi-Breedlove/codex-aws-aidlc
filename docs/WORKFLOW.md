@@ -85,8 +85,8 @@ facts.
 | TASK-10 / BUILD | Dependency-aware tasks run inside the approved boundary | No task-by-task approval |
 | RELEASE-10 | Release evidence evaluated | Only when the release contract requires it |
 | AWS-10 | Read-only deployment preflight | No mutation authority |
-| AWS-20 / AWS-50 | Exact authorized deployment or teardown | Separate expiring AWS authorization |
-| AWS-30 / AWS-40 | Deployed evidence and residual review | Governed by the authorization and runbook |
+| AWS-20 / AWS-50 | Exact authorized deployment or teardown mutation | Separate expiring action authorization |
+| AWS-30 / AWS-40 | Deployed evidence plus all authenticated residual and teardown reconciliation | Governed by current read authority and the runbook |
 
 Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
 ## Internal precision and delivery methods
@@ -193,8 +193,18 @@ returned by that search. Topic-specific AWS discovery begins later only for a
 material Define, Design, or AWS-10 question; it does not repeat or replace the
 completed setup chain.
 
-DESIGN-10 and AWS-10 record fresh attributable `retrieve_skill` and
-`search_documentation` results in `docs/project/VERIFY.md`. A generic
+REQ-10 classifies AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
+`NOT_MATERIAL`. `REQUIRED` applies when Gate A depends on a current AWS fact
+about Region or service feasibility, identity, sensitive data or uploads,
+public exposure, encryption, deletion or recovery, quotas, availability, or
+material cost. The coordinator then records a fresh
+`search_documentation`-then-matching-`retrieve_skill` chain against the current
+REQ and affected requirement IDs without selecting architecture or accessing
+an AWS account.
+
+REQ-10 when required, DESIGN-10, and AWS-10 record fresh attributable
+`search_documentation` and matching `retrieve_skill` results in
+`docs/project/VERIFY.md`. A generic
 connector, cached prose, or model memory does not satisfy required evidence.
 AWS Core advises; it cannot approve Gate A, Gate B, or an AWS change.
 
@@ -227,8 +237,44 @@ An unchanged approved schema 4 Gate B remains valid for its exact design and con
 
 ## AWS authorization
 
-An AWS lane describes intended access; it never grants access. Every AWS
-mutation requires a separate current record naming:
+An AWS lane describes intended access; it never grants access. Documentation
+guidance is credential-free and accesses no AWS account. Authenticated AWS-10
+preflight requires a separate exact `AUTHORIZE AWS READ-ONLY PREFLIGHT`
+receipt naming:
+
+- profile or role, account, Region, and environment;
+- immutable artifact, exact resources, and allowed read-only operations;
+- expiration; and
+- human approver.
+
+That receipt grants no mutation. Fastlane then moves deterministically through
+`AWS_GUIDANCE_REQUIRED`, `AWS_READ_SCOPE_REQUIRED`, `AWS_PREFLIGHT_RUNNING`,
+and an observed `AWS_PREFLIGHT_READY`. Only after observed readiness may an
+explicit-gate workflow enter `WAITING_AWS_MUTATION_AUTH` and present the exact
+deployment receipt.
+
+For a Gate B boundary that permits authenticated AWS work, `AWS allowed
+operations` names the union of the exact read-only preflight/reconciliation
+operations and any later mutation or teardown operations. This is one maximum
+approved envelope, not authority to run every listed operation: AWS-10,
+AWS-30, and AWS-40 remain read-only, while AWS-20 and AWS-50 still require
+their own current phase evidence and action-specific authority.
+
+After a release is verified, the optional `AWS lifecycle intent` records the
+owner's requested follow-up route without granting access or mutation:
+
+- `NONE` stops the workflow;
+- `RESIDUAL_REVIEW` routes to AWS-40 for one authorized read-only review and
+  then stops with its explicit clean, residual, or blocked result; and
+- `TEARDOWN` routes first to AWS-40, may continue to AWS-50 only after an exact
+  teardown receipt, and always returns to AWS-40 for terminal reconciliation.
+
+AWS-50 records only the directly observed mutation attempt. All authenticated
+pre- and post-teardown reads—including inventory, retention, operation
+history, backups, residual resources, and continuing billing signals—belong to
+AWS-40 under current read authority.
+
+Every AWS mutation requires a separate current record naming:
 
 - account, Region, and environment;
 - allowed resources and operations;
@@ -237,7 +283,9 @@ mutation requires a separate current record naming:
 - expiration.
 
 Tools, credentials, sandbox permission, prior access, or AWS Core availability
-never replace this authorization.
+never replace either authorization. A read-only receipt cannot authorize
+deployment or teardown, and a deployment receipt is not accepted as retroactive
+read-scope authority.
 
 ## Measured context packets
 

@@ -66,6 +66,12 @@ You are the single coordinator and sole writer.
    Codex and owner items coexist, repair only independent Codex items first,
    then rerun the doctor to derive the remaining next action.
    Plugin installation or selecting `@AWS-Core` proves availability, not use.
+   For an immediate safe correction, pass the report's remediation fingerprint
+   back only to the next doctor invocation. Never persist it. If the same
+   fingerprint remains, stop automatic repair and route the resulting human
+   safety review. During AWS delivery, obey the doctor's authoritative
+   `aws_execution.progress_state`; documentation guidance, read-only authority,
+   observed preflight, and mutation authority are separate states.
    Mention AWS Core in `Audit:` only when the current doctor report projects a
    validated `search_documentation` then matching `retrieve_skill` chain; never
    supply audit prose to the presenter.
@@ -101,7 +107,9 @@ unavailable independent review in the existing Gate A recommendation
 rationale, perform the same checklist as coordinator, rerun the doctor and
 presenter, and continue. Never narrate this or make reviewer availability an
 owner action. Challengers never write files, choose architecture, approve
-gates, satisfy AWS evidence, or authorize actions.
+gates, satisfy AWS evidence, or authorize actions. These restrictions propagate
+to every descendant subagent; a read-only challenger cannot spawn a writer,
+task claimant, state mutator, approver, authorizer, or AWS operator.
 
 Never install software, alter Codex/plugin state, inspect credentials, access
 an AWS account during planning, persist prerequisite observations, or

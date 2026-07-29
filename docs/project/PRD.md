@@ -71,7 +71,7 @@ Gate B boundary are separate fields; do not invent synonyms.
 | `documentation-only` | `DOCS_ONLY` | `DOCS_ONLY` |
 | `read-only` | `READ_ONLY` | `READ_ONLY` |
 | `fast-dev` | `MUTATION` only after read-only preflight | `MUTATE_LISTED_RESOURCES` |
-| `explicit-gate` | `DOCS_ONLY` or `READ_ONLY` | `DOCS_ONLY` or `READ_ONLY`; mutation requires a separate action-specific receipt |
+| `explicit-gate` | `DOCS_ONLY` or `READ_ONLY` until AWS-20 | `DOCS_ONLY`, `READ_ONLY`, or `MUTATE_LISTED_RESOURCES` for a planned mutation; AWS-20 still requires a separate action-specific receipt |
 
 `NONE` means no AWS access for the current prompt.
 
@@ -559,8 +559,30 @@ recommendation is not acceptance.
 | Open blocking finding IDs | TODO / `NONE` |
 | Proposed assumption IDs required to proceed | TODO / `NONE` |
 | Open blocking decision IDs | TODO / `NONE` |
+| AWS Core materiality | `REQUIRED` / `OPTIONAL` / `NOT_MATERIAL` |
+| AWS materiality basis IDs | TODO (current REQ plus affected requirement IDs) / `NONE — <reason>` |
+| AWS Core discovery IDs | TODO (current `AWS-DISC-*` IDs) / `NONE — <reason>` |
+| Unresolved material AWS fact IDs | TODO (open `RA-*` / `DEC-*` IDs) / `NONE` |
 | Agent recommendation | `BLOCKED` / `READY_WITH_PROPOSED_ASSUMPTIONS` / `READY_FOR_OWNER_APPROVAL` |
 | Recommendation rationale | TODO |
+
+Classify REQ-10 AWS Core materiality as `REQUIRED` when Gate A depends on a
+current AWS fact involving service or Region feasibility, identity or
+authorization, sensitive data or uploads, public exposure, encryption,
+deletion or recovery, quotas, availability, or material cost. `OPTIONAL` means
+current AWS guidance could improve confidence but does not decide readiness.
+`NOT_MATERIAL` requires an explicit reason. Never infer `NOT_MATERIAL` merely
+because evidence has not been collected.
+
+When materiality is `REQUIRED`, the coordinator records fresh linked REQ-10
+`search_documentation` then exact matching `retrieve_skill` evidence in
+`docs/project/VERIFY.md`. Basis IDs include the current REQ revision and every
+affected requirement. The evidence is documentation-only: credentials are not
+inspected, no AWS account is accessed, and no architecture is selected before
+Gate A. Any unresolved material AWS fact remains a blocking finding or
+decision. An unchanged already-approved legacy Gate A may retain its exact
+approval until a requirements-controlled change, but its absent materiality
+record is reported as legacy/unrecorded rather than `NOT_MATERIAL`.
 
 The agent recommendation is advisory. It is not Gate A authorization.
 
@@ -634,7 +656,8 @@ model identity are invalid regardless of capitalization.
 The requirements revision is a monotonic ID (`REQ-0001`, `REQ-0002`, and so on).
 It covers the workflow, project mode, delivery profile, effective risk, AWS lane,
 workload profile, intake provenance, brownfield contract, Parts I and II findings,
-proposed assumptions, and open decisions.
+proposed assumptions, open decisions, and the REQ-10 AWS Core materiality and
+evidence basis.
 
 Gate A is valid only when all of the following are true:
 
@@ -644,12 +667,16 @@ Gate A is valid only when all of the following are true:
 4. No finding or decision marked blocking remains open.
 5. The agent recommendation is `READY_WITH_PROPOSED_ASSUMPTIONS` or
    `READY_FOR_OWNER_APPROVAL`.
-6. The owner decision is `APPROVED` for that exact revision and exact cost
+6. AWS Core materiality is explicit. `REQUIRED` has a current linked REQ-10
+   discovery chain, current basis IDs, and no unresolved material AWS fact;
+   `OPTIONAL` or `NOT_MATERIAL` has the explicit no-evidence reason required by
+   its grammar.
+7. The owner decision is `APPROVED` for that exact revision and exact cost
    posture. The receipt, owner record, readiness card, and `bootstrap.yaml` must
    all contain the same normalized cost posture.
-7. Every proposed assumption required to proceed is explicitly accepted by ID,
+8. Every proposed assumption required to proceed is explicitly accepted by ID,
    or the requirement is revised so that the assumption is no longer needed.
-8. The authorization source and verbatim owner receipt are present and agree
+9. The authorization source and verbatim owner receipt are present and agree
    with the structured fields.
 
 The accepted-assumption value must exactly equal the ordered assumption list on
@@ -1472,7 +1499,11 @@ The AWS rows are conditional, keeping documentation-only projects lean. For
 allowed read operations, prohibited operations, and validity are explicit;
 mutation-only artifact, cost, and rollback rows may use a precise
 `NOT_APPLICABLE — <reason>`. For `MUTATE_LISTED_RESOURCES`, every AWS row is
-explicit and `NOT_APPLICABLE` is invalid. Never combine identities, targets,
+explicit and `NOT_APPLICABLE` is invalid. Its `AWS allowed operations` row is
+the deduplicated maximum union of exact operations needed across applicable
+AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 phases. Each phase may use only the
+intersection of that maximum, the phase mode, current evidence, and current
+phase-specific authority. Never combine identities, targets,
 operations, spend, artifact provenance, rollback, or validity into one cell.
 The environment uses the exact `ENVIRONMENT: ...; CLASS: ...` grammar. A
 `fast-dev` mutation requires `CLASS: NON_PRODUCTION`; production requires

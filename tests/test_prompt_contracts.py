@@ -71,6 +71,20 @@ class PromptPackContractTests(unittest.TestCase):
         cls.bootstrap_source = (REPOSITORY_ROOT / "bootstrap.py").read_text(
             encoding="utf-8"
         )
+        cls.workflow = (PROJECT_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
+        cls.fastlane_deliver = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/deliver.md"
+        ).read_text(encoding="utf-8")
+        cls.operate_fastlane_aws = (
+            PROJECT_ROOT / ".agents/skills/operate-fastlane-aws/SKILL.md"
+        ).read_text(encoding="utf-8")
+        cls.fastlane_design = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
+        ).read_text(encoding="utf-8")
+        cls.authorization_receipts = (
+            PROJECT_ROOT
+            / ".agents/skills/fastlane/references/authorization-receipts.md"
+        ).read_text(encoding="utf-8")
 
     def prompt_section(self, prompt_id: str) -> str:
         pattern = re.compile(
@@ -284,6 +298,19 @@ class PromptPackContractTests(unittest.TestCase):
             self.assertIn("claims no task", compact)
             self.assertIn("changes no state", compact)
 
+        infrastructure_guide = (
+            PROJECT_ROOT / "infrastructure/AGENTS.md"
+        ).read_text(encoding="utf-8")
+        infrastructure_compact = " ".join(infrastructure_guide.split())
+        self.assertIn("coordinator alone performs every repository and infrastructure edit", infrastructure_compact)
+        self.assertIn("Helpers and challengers are read-only", infrastructure_compact)
+        self.assertIn("never edit", infrastructure_compact)
+        self.assertNotIn("workers may edit assigned disjoint paths", infrastructure_compact.lower())
+        for descendant_surface in (self.agents, coordinator, infrastructure_guide):
+            descendant_compact = " ".join(descendant_surface.split())
+            self.assertIn("descendant subagent", descendant_compact)
+            self.assertIn("cannot spawn a writer", descendant_compact)
+
         for name in (
             "fastlane-requirements-challenger",
             "fastlane-architecture-challenger",
@@ -298,6 +325,8 @@ class PromptPackContractTests(unittest.TestCase):
             self.assertIn("claim no task", content)
             self.assertIn("change no state", content)
             self.assertIn("synchronous read-only critique", content)
+            self.assertIn("descendant subagent", content)
+            self.assertIn("Never spawn a writer", content)
     def test_aws_core_is_wired_through_planning_build_and_operations(self) -> None:
         deliver_reference = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/deliver.md"
@@ -322,6 +351,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("aws-core@agent-toolkit-for-aws", operate_skill)
         self.assertIn("Fresh templates require current official AWS Core", self.agents)
     def test_design_and_aws_preflight_require_fresh_aws_core_evidence(self) -> None:
+        requirements = self.prompt_section("REQ-10")
         design = self.prompt_section("DESIGN-10")
         aws_preflight = self.prompt_section("AWS-10")
         verify = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(encoding="utf-8")
@@ -332,24 +362,64 @@ class PromptPackContractTests(unittest.TestCase):
             self.assertIn("docs/project/VERIFY.md", section)
             self.assertIn(phase, section)
             self.assertRegex(section.lower(), r"(?:block|stop).*(?:missing|failed|stale|wrong)")
+        for phrase in (
+            "`REQUIRED`, `OPTIONAL`, or\n`NOT_MATERIAL`",
+            "service/Region feasibility",
+            "identity/authorization",
+            "sensitive data/uploads",
+            "public exposure",
+            "deletion/recovery",
+            "quotas, availability",
+            "material cost",
+            "current REQ and affected requirements",
+            "no architecture\nselected",
+            "Record credentials/account access as `NO`",
+            "Missing/stale discovery is\nCodex work, not owner setup",
+        ):
+            self.assertIn(phrase, requirements)
+        self.assertLess(
+            requirements.index("`search_documentation`"),
+            requirements.index("`retrieve_skill`"),
+        )
         self.assertIn("## AWS Core evidence", verify)
-        for phase in ("DESIGN-10", "AWS-10"):
+        for phase in ("REQ-10", "DESIGN-10", "AWS-10"):
             self.assertEqual(verify.count(f"| `{phase}` |"), 2)
+        expected_discovery_ids = {
+            "REQ-10": "AWS-DISC-0001",
+            "DESIGN-10": "AWS-DISC-0002",
+            "AWS-10": "AWS-DISC-0003",
+        }
+        for phase, discovery_id in expected_discovery_ids.items():
+            self.assertEqual(verify.count(f"| `{phase}` | `{discovery_id}` |"), 2)
+        self.assertEqual(len(set(expected_discovery_ids.values())), 3)
         self.assertNotIn("| `BOOT-00` |", verify)
-        self.assertEqual(verify.count("| `retrieve_skill` |"), 2)
-        self.assertEqual(verify.count("| `search_documentation` |"), 2)
+        self.assertEqual(verify.count("| `retrieve_skill` |"), 3)
+        self.assertEqual(verify.count("| `search_documentation` |"), 3)
         self.assertIn("Fresh prerequisite capability\nobservations are ephemeral", verify)
         operate_skill = (
             PROJECT_ROOT / ".agents/skills/operate-fastlane-aws/SKILL.md"
         ).read_text(encoding="utf-8")
         for phrase in (
-            "aws_core_evidence.aws_execution_planning",
+            "aws_execution.progress_state",
+            "AWS_READ_SCOPE_REQUIRED",
+            "AWS_PREFLIGHT_READY",
+            "fast-dev",
+            "WAITING_AWS_MUTATION_AUTH",
             "CODEX_LIVE_TOOL_CALL",
             "Credentials inspected` = `NO",
             "AWS account accessed` = `NO",
         ):
             self.assertIn(phrase, operate_skill)
+        operate_compact = " ".join(operate_skill.split())
+        self.assertIn("legacy readiness boolean is compatibility output only", operate_compact)
+
         self.assertIn("Fresh templates require current official AWS Core", self.agents)
+        self.assertLess(
+            operate_skill.index("search_documentation"),
+            operate_skill.index("retrieve_skill"),
+        )
+        self.assertIn("explicit-gate`, require", operate_skill)
+        self.assertIn("fast-dev`, require", operate_skill)
         fastlane_skill = (
             PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md"
         ).read_text(encoding="utf-8")
@@ -705,17 +775,47 @@ class PromptPackContractTests(unittest.TestCase):
 
         self.assertIn("BUILD-10 never\nexecutes an AWS mutation directly", build_single)
         self.assertIn("Route AWS mutation through AWS-10/AWS-20", build_auto)
-        self.assertIn("**AWS mode:** READ_ONLY.", preflight)
+        self.assertIn("**AWS mode:** DOCS_ONLY until", preflight)
+        self.assertIn("then READ_ONLY\nfor that named account scope", preflight)
         self.assertNotIn("DOCS_ONLY plus", preflight)
+        self.assertIn("AUTHORIZE AWS READ-ONLY PREFLIGHT", self.prompts)
         self.assertIn("AUTHORIZE AWS DEPLOYMENT", self.prompts)
         self.assertIn("AUTHORIZE AWS TEARDOWN", self.prompts)
+        self.assertIn("AUTHORIZE AWS READ-ONLY PREFLIGHT", self.runbook)
         self.assertIn("AUTHORIZE AWS DEPLOYMENT", self.runbook)
         self.assertIn("AUTHORIZE AWS TEARDOWN", self.runbook)
         self.assertIn("action-authorization evidence", self.runbook)
         self.assertIn("## Action authorization provenance", self.verify)
         self.assertIn("| Role or profile |", self.verify)
+        self.assertIn("<!-- bootstrap:aws-read-preflight-receipt:start -->", self.verify)
         self.assertIn("| Approver |", self.verify)
         self.assertIn("<!-- bootstrap:aws-deployment-receipt:start -->", self.verify)
+
+        expected_read_receipt = """AUTHORIZE AWS READ-ONLY PREFLIGHT
+Read authorization: AWS-READ-AUTH-0001
+Construction authorization: AUTH-0001
+Profile or role: <allowlisted profile or role>
+Account: <12-digit account ID or approved alias>
+Region: <AWS Region>
+Environment: <environment>
+Stack, application, and resources: <exact boundary>
+Allowed read-only operations: <exact read-only operations>
+Artifact digest: <immutable digest>
+Prohibited operations: ALL_MUTATIONS
+Valid until: <ISO 8601 time or exact one-operation condition>
+Approver: <name/handle>"""
+
+        def exact_read_receipt(document: str) -> str:
+            matches = re.findall(
+                r"(?s)(?:~~~|```)text\n"
+                r"(AUTHORIZE AWS READ-ONLY PREFLIGHT\n.*?)\n(?:~~~|```)",
+                document.replace("\r\n", "\n"),
+            )
+            self.assertEqual(len(matches), 1)
+            return matches[0]
+
+        for document in (self.prompts, self.runbook, self.verify):
+            self.assertEqual(exact_read_receipt(document), expected_read_receipt)
         self.assertIn("<!-- bootstrap:aws-teardown-receipt:start -->", self.verify)
 
         self.assertIn("put\n`VERIFIED`, `PENDING_AWS`", evidence)
@@ -723,6 +823,7 @@ class PromptPackContractTests(unittest.TestCase):
     def test_aws_delivery_evidence_is_technology_selected_and_authority_bound(self) -> None:
         preflight = self.prompt_section("AWS-10")
         deployment = self.prompt_section("AWS-20")
+        residual_review = self.prompt_section("AWS-40")
         teardown = self.prompt_section("AWS-50")
 
         for document in (self.prd, self.runbook, self.verify, self.prompts):
@@ -755,8 +856,11 @@ class PromptPackContractTests(unittest.TestCase):
             "Inventory or discovery limits",
         ):
             self.assertIn(field, self.verify)
-        self.assertIn("expected manifest", teardown)
-        self.assertIn("inventory/discovery limits", teardown)
+        self.assertIn("expected removal", residual_review)
+        self.assertRegex(residual_review, r"inventory/discovery (?:scope|limits)")
+        self.assertIn("AWS-40", teardown)
+        self.assertIn("no authenticated read-only", teardown)
+        self.assertNotIn("Perform post-teardown read-only verification", teardown)
 
         self.assertIn("Lightweight Well-Architected decision review", self.prd)
         self.assertRegex(self.prd, r"not a separate audit or\s+gate")
@@ -1322,6 +1426,21 @@ class PromptPackContractTests(unittest.TestCase):
             "AWS authorization validity",
         ):
             self.assertIn(f"| {row} |", self.prd)
+        for document in (
+            self.prd,
+            self.workflow,
+            self.prompts,
+        ):
+            self.assertRegex(document, r"AWS allowed\s+operations")
+            self.assertIn("union", document.lower())
+        for document in (self.prd, self.prompts):
+            self.assertRegex(
+                document,
+                r"(?is)explicit-gate.{0,240}MUTATE_LISTED_RESOURCES.{0,240}separate.{0,120}(?:action|AWS-20)",
+            )
+        self.assertNotIn(
+            "If a fast development deployment is proposed", self.prompts
+        )
 
     def test_git_checkpoint_plan_and_release_lifecycles_are_explicit(self) -> None:
         self.assertIn("| Task-plan state | `UNINITIALIZED` |", self.tasks)
@@ -1367,6 +1486,40 @@ class PromptPackContractTests(unittest.TestCase):
             self.assertIn("Gate B AWS boundary", document)
             self.assertIn("MUTATE_LISTED_RESOURCES", document)
         self.assertNotIn("PLAN_ONLY", self.prd)
+        expected_explicit_gate = (
+            "| `explicit-gate` | `DOCS_ONLY` or `READ_ONLY` until AWS-20 | "
+            "`DOCS_ONLY`, `READ_ONLY`, or `MUTATE_LISTED_RESOURCES` for a planned "
+            "mutation; AWS-20 still requires a separate action-specific receipt |"
+        )
+        self.assertIn(expected_explicit_gate, self.prd)
+        self.assertIn(expected_explicit_gate, self.prompts)
+        for document in (
+            self.prd,
+            self.workflow,
+            self.runbook,
+            self.prompts,
+            self.fastlane_design,
+        ):
+            self.assertRegex(document, r"AWS allowed\s+operations")
+            self.assertIn("union", document.lower())
+            for phase in ("AWS-10", "AWS-20", "AWS-30", "AWS-40", "AWS-50"):
+                self.assertIn(phase, document)
+        self.assertRegex(
+            self.authorization_receipts,
+            r"(?is)subset.{0,220}Gate B.{0,220}(?:current phase|phase mode).{0,220}(?:intersection|never broadens)",
+        )
+        self.assertRegex(
+            self.prompts,
+            r"(?is)explicit-gate maximum grants no\s+mutation by itself",
+        )
+        self.assertIn("phase-appropriate subset", self.fastlane_deliver)
+        self.assertIn("mutation-capable Gate B envelope", self.fastlane_deliver)
+        self.assertRegex(self.operate_fastlane_aws, r"subset permitted in the\s+current phase")
+        self.assertIn("mutation-capable Gate B envelope", self.operate_fastlane_aws)
+        self.assertIn("wildcard-free subset of the Gate B maximum", self.authorization_receipts)
+        self.assertIn(
+            "a receipt never broadens an approved", self.authorization_receipts
+        )
 
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
@@ -1615,6 +1768,13 @@ Construction authorization: AUTH-0001
 Construction envelope SHA-256: sha256:<64-lowercase-hex>
 Use the proposed construction envelope above.
 Approver: <name/handle>"""
+        read_lines = (
+            "AUTHORIZE AWS READ-ONLY PREFLIGHT",
+            "Read authorization: AWS-READ-AUTH-0001",
+            "Construction authorization: AUTH-0001",
+            "Prohibited operations: ALL_MUTATIONS",
+            "Valid until: <ISO 8601 time or exact one-operation condition>",
+        )
         deployment_lines = (
             "AUTHORIZE AWS DEPLOYMENT",
             "AWS authorization: AWS-AUTH-0001",
@@ -1631,7 +1791,7 @@ Approver: <name/handle>"""
         )
         self.assertIn(gate_a, self.prompts)
         self.assertIn(gate_b, self.prompts)
-        for line in (*deployment_lines, *teardown_lines):
+        for line in (*read_lines, *deployment_lines, *teardown_lines):
             self.assertIn(line, self.prompts)
 
     def test_consultations_are_consequence_first_plain_and_bounded(self) -> None:

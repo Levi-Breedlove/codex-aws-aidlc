@@ -25,6 +25,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from fastlane_stdio import configure_utf8_standard_streams
 from fastlane_presenter import PresentationError, render_prerequisite_update
 
 
@@ -646,6 +647,7 @@ def _error_report(message: str) -> dict[str, Any]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("welcome", help="Print the post-prerequisite welcome")

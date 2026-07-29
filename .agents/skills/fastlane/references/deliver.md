@@ -57,6 +57,18 @@ Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10.
 - Derive owner-visible task progress only from the doctor's task totals and
   task-ID fields through `fastlane_presenter.py`; never estimate progress from
   narration.
+- At READY_TO_DEPLOY, keep AWS documentation guidance, authenticated read-only
+  preflight, and mutation authority separate. Search current AWS documentation
+  and retrieve exact returned skills without account access; obtain the exact
+  read-only preflight receipt before touching the named account; record
+  authenticated reads as `RUNNING`, `READY`, `BLOCKED`, or `STALE`; and present
+  mutation authority only after a current matching `READY` observation. A
+  read-only receipt permits only its exact reads and never deployment or
+  teardown. For a mutation-capable Gate B envelope, ensure `AWS allowed
+  operations` contains the union of exact preflight/reconciliation reads and
+  later mutation or teardown operations; use only the phase-appropriate subset.
+  Follow `aws_execution.progress_state` rather than the legacy
+  compatibility boolean.
 - Pause only on validation failure, stale state, exhausted attempts, scope
   change, missing external authority, or another declared stop condition.
 - Route AWS mutation through AWS-10/AWS-20 and GitHub mutation through the

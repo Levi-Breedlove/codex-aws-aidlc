@@ -33,12 +33,16 @@ Remove the copied `.codex/hooks.json` to disable the pack.
 | `PostToolUse` | Runs the smallest relevant validation and returns bounded corrective context without creating evidence. |
 | `Stop` | Continues only when the doctor permits automatic continuation, no owner action is required, and no formal receipt is pending. |
 
-AWS documentation tools remain available without mutation authority. Read-only
-AWS tools require the existing read-authority contract. Fast Dev mutations must
-fit a current Gate B `MUTATE_LISTED_RESOURCES` envelope. Explicit-gate
-mutations must match current exact AWS-20 authority, and teardown must match a
-distinct teardown receipt. The handler consumes only the doctor's derived,
-normalized `external_authority.request_match`; it never reparses a receipt.
+AWS documentation tools remain available without account access or mutation
+authority. Authenticated AWS preflight tools require the exact current
+`AUTHORIZE AWS READ-ONLY PREFLIGHT` receipt and may perform only its named reads
+against its named identity and boundary. The doctor projects this bounded scope
+as `AWS_READ_ONLY`; the receipt never authorizes mutation. Fast Dev mutations
+must fit a current Gate B `MUTATE_LISTED_RESOURCES` envelope and follow an
+observed ready preflight. Explicit-gate mutations additionally require current
+exact AWS-20 authority, and teardown requires its distinct receipt. The handler
+consumes only the doctor's derived, normalized
+`external_authority.request_match`; it never reparses a receipt.
 
 The example matches generic `aws___*` and `mcp__server__tool` families.
 Fastlane classifies an AWS request by observable capability, not by advertising

@@ -152,6 +152,92 @@ class ContextPacketTests(unittest.TestCase):
         self.assertEqual(overlapping["budget_status"], "SOURCE_INVALID")
         self.assertTrue(any("overlapping" in item["reason"] for item in issues))
 
+    def test_aws40_and_aws50_context_packets_are_phase_specific(self) -> None:
+        tasks = doctor.TaskSummary(
+            statuses={"TASK-0001": "DONE"},
+        )
+        coverage = doctor.CoverageContract(
+            status="READY",
+            basis_ids=("REQ-0001", "SEC-001"),
+        )
+        aws_40 = doctor.derive_context_plan(
+            {
+                "owner_stage": "DELIVER",
+                "route_reason_code": "AWS_RESIDUAL_REVIEW",
+                "blocking_ids": [],
+            },
+            tasks,
+            coverage,
+            next_prompt="AWS-40",
+        )
+        aws_50 = doctor.derive_context_plan(
+            {
+                "owner_stage": "DELIVER",
+                "route_reason_code": "WAITING_AWS_TEARDOWN_AUTH",
+                "blocking_ids": [],
+            },
+            tasks,
+            coverage,
+            next_prompt="AWS-50",
+        )
+
+        self.assertIn(
+            f"{doctor.VERIFY_FILE}#Teardown reconciliation evidence",
+            aws_40["source_slices"],
+        )
+        self.assertIn(
+            f"{doctor.RUNBOOK_FILE}#14. Residual-resource and billing verification",
+            aws_40["source_slices"],
+        )
+        self.assertIn(
+            f"{doctor.VERIFY_FILE}#Action authorization provenance",
+            aws_50["source_slices"],
+        )
+        self.assertIn(
+            f"{doctor.VERIFY_FILE}#Teardown reconciliation evidence",
+            aws_50["source_slices"],
+        )
+        self.assertIn(
+            f"{doctor.RUNBOOK_FILE}#Conditional AWS action receipts",
+            aws_50["source_slices"],
+        )
+        self.assertIn(
+            f"{doctor.RUNBOOK_FILE}#13. Teardown and decommissioning",
+            aws_50["source_slices"],
+        )
+        self.assertNotEqual(aws_40["source_slices"], aws_50["source_slices"])
+        for reason in (
+            "AWS_RESIDUAL_REVIEW_COMPLETE",
+            "AWS_RESIDUALS_REMAIN",
+            "AWS_RESIDUAL_REVIEW_BLOCKED",
+            "AWS_TEARDOWN_COMPLETE",
+        ):
+            with self.subTest(reason=reason):
+                terminal = doctor.derive_context_plan(
+                    {
+                        "owner_stage": "DELIVER",
+                        "route_reason_code": reason,
+                        "blocking_ids": [],
+                    },
+                    tasks,
+                    coverage,
+                    next_prompt="STOP",
+                )
+                self.assertIn(
+                    f"{doctor.VERIFY_FILE}#Teardown reconciliation evidence",
+                    terminal["source_slices"],
+                )
+                self.assertIn(
+                    f"{doctor.RUNBOOK_FILE}#14. Residual-resource and billing verification",
+                    terminal["source_slices"],
+                )
+        self.assertEqual(
+            len(aws_40["source_slices"]), len(set(aws_40["source_slices"]))
+        )
+        self.assertEqual(
+            len(aws_50["source_slices"]), len(set(aws_50["source_slices"]))
+        )
+
     def test_context_source_failure_uses_remediation_contract(self) -> None:
         ctx = doctor.Context(REPOSITORY_ROOT)
         report = doctor.build_report(

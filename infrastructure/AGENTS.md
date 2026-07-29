@@ -27,7 +27,13 @@ evidence in `../docs/project/VERIFY.md`, and deployment/recovery procedures in
   never authorizes.
 - The coordinator alone writes project ledgers, lifecycle state, shared
   manifests, lockfiles, schemas, generated output, checkpoints, and GitHub
-  state. Workers edit only assigned disjoint paths and return receipts.
+  state. The coordinator alone performs every repository and infrastructure
+  edit. Helpers and challengers are read-only: they may inspect assigned
+  disjoint paths and return findings or receipts, but never edit, claim tasks,
+  approve, authorize, or mutate AWS.
+  This restriction propagates to every descendant subagent: a read-only
+  helper or challenger cannot spawn a writer, task claimant, state mutator,
+  approver, authorizer, or AWS operator.
 - Give every path, stack, state backend, environment, database, generated
   output, and mutable resource one writer. Serialize state operations, imports,
   migrations, deployments, rollback, and every AWS mutation.
@@ -38,7 +44,7 @@ evidence in `../docs/project/VERIFY.md`, and deployment/recovery procedures in
 | AWS lane | Allowed behavior |
 |---|---|
 | `documentation-only` | Repository planning and documentation lookup; no authenticated AWS access |
-| `read-only` | Observe only the identity, Region, environment, and resources named by AUTH |
+| `read-only` | Observe only the identity, Region, environment, and resources named by the exact current owner-authored read-only preflight receipt within Gate B's maximum boundary |
 | `fast-dev` | Mutate listed non-production resources only after matching AWS-10 preflight |
 | `explicit-gate` | Remain documentation-only/read-only until an exact current AWS-20 authorization |
 

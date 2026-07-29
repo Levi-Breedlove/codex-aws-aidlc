@@ -255,6 +255,7 @@ class BootstrapSafetyTests(unittest.TestCase):
                 "bootstrap.py": b"bootstrap",
                 "scripts/bootstrap_dependencies.py": b"dependencies",
                 "scripts/bootstrap_doctor.py": b"doctor",
+                "scripts/fastlane_stdio.py": b"stdio",
                 "scripts/setup_assistant.py": b"setup-assistant",
                 "scripts/task_waves.py": b"tasks",
             }

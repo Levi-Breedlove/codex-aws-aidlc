@@ -11,8 +11,10 @@ from typing import Any, Mapping, Sequence
 
 try:
     from intake_response import intake_reply_token
+    from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
     from scripts.intake_response import intake_reply_token
+    from scripts.fastlane_stdio import configure_utf8_standard_streams
 
 
 class PresentationError(RuntimeError):
@@ -32,6 +34,29 @@ STATUS_TEXT = {
     "CONSTRUCTION_SINGLE": "Approved local construction can continue.",
     "CONSTRUCTION_AUTONOMOUS": "Approved local construction is in progress.",
     "RELEASE_REVIEW": "Local construction is ready for release review.",
+    "AWS_GUIDANCE_REQUIRED": "Current AWS guidance is needed before deployment planning.",
+    "AWS_READ_SCOPE_REQUIRED": "Read-only AWS preflight needs your authorization.",
+    "AWS_PREFLIGHT_RUNNING": "Authorized read-only AWS preflight is in progress.",
+    "AWS_PREFLIGHT_READY": "Read-only AWS preflight is complete.",
+    "WAITING_AWS_MUTATION_AUTH": (
+        "Read-only AWS preflight is complete; deployment needs separate authorization."
+    ),
+    "AWS_RESIDUAL_REVIEW": "Authorized read-only AWS residual review is in progress.",
+    "WAITING_AWS_TEARDOWN_AUTH": (
+        "Read-only residual review is complete; teardown needs separate authorization."
+    ),
+    "AWS_RESIDUAL_REVIEW_COMPLETE": (
+        "Read-only AWS residual review is complete; no unexpected resources remain."
+    ),
+    "AWS_RESIDUALS_REMAIN": (
+        "Read-only AWS review found residual resources that need your decision."
+    ),
+    "AWS_RESIDUAL_REVIEW_BLOCKED": (
+        "Read-only AWS residual review stopped at a safety boundary."
+    ),
+    "AWS_TEARDOWN_COMPLETE": (
+        "Authorized AWS teardown and read-only reconciliation are complete."
+    ),
     "AWS_PREFLIGHT_REQUIRED": "Deployment planning needs current AWS evidence.",
     "RELEASE_VERIFIED": "The approved local workflow is complete.",
     "BLOCKED": "Fastlane stopped at a validation boundary.",
@@ -45,7 +70,19 @@ ACTION_TEXT = {
     "APPROVE_GATE_A": "Review and decide the Gate A requirements receipt.",
     "ENABLE_AWS_CORE": "Enable official AWS Core, then continue the affected AWS step.",
     "APPROVE_GATE_B": "Review and decide the Gate B design and construction receipt.",
-    "AUTHORIZE_AWS_OPERATION": "Review the exact AWS authority receipt before any AWS action.",
+    "AUTHORIZE_AWS_READ_PREFLIGHT": (
+        "Review the exact read-only AWS preflight receipt. It grants no mutation."
+    ),
+    "AUTHORIZE_AWS_OPERATION": (
+        "Review the exact AWS deployment receipt before any AWS mutation."
+    ),
+    "AUTHORIZE_AWS_TEARDOWN": (
+        "Review the exact AWS teardown receipt before any resource is removed."
+    ),
+    "REVIEW_AWS_RESIDUALS": (
+        "Review the remaining AWS resources and decide which to retain, remove, "
+        "or investigate."
+    ),
     "FIX_VALIDATION_FAILURE": "Resolve the listed validation failure, then continue Fastlane.",
     "REVIEW_SAFETY_BLOCKER": "Review the reported safety blocker before Fastlane changes anything.",
     "NONE_CONTINUE_AUTOMATICALLY": "Nothing.",
@@ -67,6 +104,42 @@ NEXT_TEXT = {
     "CONSTRUCTION_AUTONOMOUS": "Codex will continue approved local tasks.",
     "RELEASE_REVIEW": "Codex will validate evidence and release readiness.",
     "AWS_PREFLIGHT_REQUIRED": "Codex will collect documentation evidence without accessing an AWS account.",
+    "AWS_GUIDANCE_REQUIRED": (
+        "Codex will collect current AWS guidance without accessing an AWS account."
+    ),
+    "AWS_READ_SCOPE_REQUIRED": (
+        "After authorization, Codex will inspect only the named AWS account scope "
+        "read-only."
+    ),
+    "AWS_PREFLIGHT_RUNNING": (
+        "Codex will complete the authorized named-account read-only checks and "
+        "record what it observes."
+    ),
+    "AWS_PREFLIGHT_READY": (
+        "Codex will route the observed preflight result without changing AWS resources."
+    ),
+    "WAITING_AWS_MUTATION_AUTH": (
+        "After authorization, Codex may perform only the exact approved AWS mutation."
+    ),
+    "AWS_RESIDUAL_REVIEW": (
+        "Codex will complete only the authorized read-only residual checks and record "
+        "what it observes."
+    ),
+    "WAITING_AWS_TEARDOWN_AUTH": (
+        "After authorization, Codex may remove only the exact approved resources."
+    ),
+    "AWS_RESIDUAL_REVIEW_COMPLETE": (
+        "No teardown is required; the verified release remains unchanged."
+    ),
+    "AWS_RESIDUALS_REMAIN": (
+        "Codex will continue only after you decide how the listed residuals should "
+        "be handled."
+    ),
+    "AWS_RESIDUAL_REVIEW_BLOCKED": (
+        "Codex will not inspect further or mutate resources until the safety blocker "
+        "is resolved."
+    ),
+    "AWS_TEARDOWN_COMPLETE": "No further AWS action is required.",
     "RELEASE_VERIFIED": "No further action is required.",
     "BLOCKED": "Codex will resume only after the named blocker is resolved.",
 }
@@ -75,6 +148,10 @@ COPYABLE_REPLIES = {
     "ANSWER_OPEN_DECISIONS": "Reply with your answers to the questions below.",
     "ENABLE_AWS_CORE": "CONTINUE FASTLANE",
     "FIX_VALIDATION_FAILURE": "CONTINUE FASTLANE",
+    "REVIEW_AWS_RESIDUALS": (
+        "For each listed residual: RETAIN, REMOVE under new authorization, or "
+        "INVESTIGATE."
+    ),
 }
 
 
@@ -83,6 +160,175 @@ def _interaction(report: Mapping[str, Any]) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise PresentationError("doctor report is missing interaction state")
     return value
+
+AWS_PROGRESS_STATES = {
+    "AWS_GUIDANCE_REQUIRED",
+    "AWS_READ_SCOPE_REQUIRED",
+    "AWS_PREFLIGHT_RUNNING",
+    "AWS_PREFLIGHT_READY",
+    "WAITING_AWS_MUTATION_AUTH",
+}
+
+AWS_TEARDOWN_STATES = {
+    "AWS_RESIDUAL_REVIEW",
+    "WAITING_AWS_TEARDOWN_AUTH",
+    "AWS_RESIDUAL_REVIEW_COMPLETE",
+    "AWS_RESIDUALS_REMAIN",
+    "AWS_RESIDUAL_REVIEW_BLOCKED",
+    "AWS_TEARDOWN_COMPLETE",
+}
+
+
+def _teardown_blocker_reason(report: Mapping[str, Any]) -> str:
+    """Return one safe, exact blocker from the validated teardown projection."""
+
+    teardown = report.get("aws_teardown")
+    if not isinstance(teardown, Mapping):
+        raise PresentationError("blocked AWS residual review is missing teardown state")
+    raw = teardown.get("blocker_or_stale_reason")
+    if not isinstance(raw, str):
+        raise PresentationError("blocked AWS residual review is missing its exact reason")
+    reason = raw.strip()
+    if (
+        reason in {"", "NONE"}
+        or len(reason) > 500
+        or re.search(r"[\r\n\x00-\x1f\x7f]", reason) is not None
+    ):
+        raise PresentationError("blocked AWS residual review has an unsafe reason")
+    return reason
+
+
+def _validate_aws_teardown_interaction(
+    interaction: Mapping[str, Any],
+) -> bool:
+    """Validate teardown states before deployment-progress compatibility checks."""
+
+    reason = str(interaction.get("route_reason_code", ""))
+    action = str(interaction.get("owner_action_kind", ""))
+    if reason not in AWS_TEARDOWN_STATES:
+        if action in {"AUTHORIZE_AWS_TEARDOWN", "REVIEW_AWS_RESIDUALS"}:
+            raise PresentationError("AWS teardown action is requested in the wrong state")
+        return False
+
+    required = interaction.get("owner_action_required") is True
+    automatic = interaction.get("automatic_continuation_allowed") is True
+    formal = interaction.get("formal_receipt_required") is True
+
+    if reason == "AWS_RESIDUAL_REVIEW":
+        awaiting = action == "AUTHORIZE_AWS_READ_PREFLIGHT"
+        continuing = action == "NONE_CONTINUE_AUTOMATICALLY"
+        if awaiting:
+            if not required or automatic or not formal:
+                raise PresentationError("AWS residual read authority state is inconsistent")
+        elif continuing:
+            if required or not automatic or formal:
+                raise PresentationError("automatic AWS residual review state is inconsistent")
+        else:
+            raise PresentationError("invalid AWS residual-review action")
+    elif reason == "WAITING_AWS_TEARDOWN_AUTH":
+        awaiting = action == "AUTHORIZE_AWS_TEARDOWN"
+        continuing = action == "NONE_CONTINUE_AUTOMATICALLY"
+        if awaiting:
+            if not required or automatic or not formal:
+                raise PresentationError("AWS teardown authority state is inconsistent")
+        elif continuing:
+            if required or not automatic or formal:
+                raise PresentationError("authorized AWS teardown state is inconsistent")
+        else:
+            raise PresentationError("invalid AWS teardown-wait action")
+    elif reason in {"AWS_RESIDUAL_REVIEW_COMPLETE", "AWS_TEARDOWN_COMPLETE"}:
+        if action != "NONE_CONTINUE_AUTOMATICALLY" or required or automatic or formal:
+            raise PresentationError("terminal AWS teardown state is inconsistent")
+    elif reason == "AWS_RESIDUALS_REMAIN":
+        if action != "REVIEW_AWS_RESIDUALS" or not required or automatic or formal:
+            raise PresentationError("AWS residual disposition state is inconsistent")
+    elif reason == "AWS_RESIDUAL_REVIEW_BLOCKED":
+        if action != "REVIEW_SAFETY_BLOCKER" or not required or automatic or formal:
+            raise PresentationError("blocked AWS residual review state is inconsistent")
+    return True
+
+
+
+def _validate_aws_progress_interaction(
+    report: Mapping[str, Any], interaction: Mapping[str, Any]
+) -> None:
+    """Fail closed when AWS guidance, read, and mutation boundaries conflict."""
+
+    reason = str(interaction.get("route_reason_code", ""))
+    action = str(interaction.get("owner_action_kind", ""))
+    required = interaction.get("owner_action_required") is True
+    automatic = interaction.get("automatic_continuation_allowed") is True
+    formal = interaction.get("formal_receipt_required") is True
+    if _validate_aws_teardown_interaction(interaction):
+        return
+
+    execution = report.get("aws_execution")
+    progress = (
+        str(execution.get("progress_state", ""))
+        if isinstance(execution, Mapping)
+        else ""
+    )
+    lane = (
+        str(execution.get("lane", ""))
+        if isinstance(execution, Mapping)
+        else ""
+    )
+
+    if reason in AWS_PROGRESS_STATES:
+        if not isinstance(execution, Mapping) or progress != reason:
+            raise PresentationError("AWS progress state conflicts with interaction route")
+    elif progress in AWS_PROGRESS_STATES:
+        if (
+            interaction.get("response_mode") == "BLOCKER"
+            and action in {"FIX_VALIDATION_FAILURE", "REVIEW_SAFETY_BLOCKER"}
+            and required
+            and not automatic
+            and not formal
+        ):
+            return
+        raise PresentationError("AWS interaction route conflicts with progress state")
+
+    if action == "AUTHORIZE_AWS_READ_PREFLIGHT" and reason != "AWS_READ_SCOPE_REQUIRED":
+        raise PresentationError("read-only AWS authority is requested in the wrong state")
+    if action == "AUTHORIZE_AWS_OPERATION" and reason != "WAITING_AWS_MUTATION_AUTH":
+        raise PresentationError("AWS mutation authority is requested before preflight readiness")
+
+    if reason == "AWS_READ_SCOPE_REQUIRED":
+        if (
+            action != "AUTHORIZE_AWS_READ_PREFLIGHT"
+            or not required
+            or automatic
+            or not formal
+        ):
+            raise PresentationError("read-only AWS authority state is inconsistent")
+    elif reason in {"AWS_GUIDANCE_REQUIRED", "AWS_PREFLIGHT_RUNNING"}:
+        if action != "NONE_CONTINUE_AUTOMATICALLY" or required or not automatic or formal:
+            raise PresentationError("automatic AWS progress state is inconsistent")
+    elif reason == "AWS_PREFLIGHT_READY":
+        if lane == "fast-dev":
+            expected_automatic = True
+        elif lane in {"documentation-only", "read-only"}:
+            expected_automatic = False
+        else:
+            raise PresentationError("AWS preflight readiness has an unsupported lane")
+        if (
+            action != "NONE_CONTINUE_AUTOMATICALLY"
+            or required
+            or formal
+            or automatic is not expected_automatic
+        ):
+            raise PresentationError("terminal AWS preflight state is inconsistent")
+    elif reason == "WAITING_AWS_MUTATION_AUTH":
+        awaiting = action == "AUTHORIZE_AWS_OPERATION"
+        continuing = action == "NONE_CONTINUE_AUTOMATICALLY"
+        if awaiting:
+            if not required or automatic or not formal:
+                raise PresentationError("AWS mutation authority state is inconsistent")
+        elif continuing:
+            if required or not automatic or formal:
+                raise PresentationError("authorized AWS continuation state is inconsistent")
+        else:
+            raise PresentationError("invalid AWS mutation-wait action")
 
 
 def _remediation_text(report: Mapping[str, Any]) -> tuple[str | None, str | None]:
@@ -112,7 +358,10 @@ def _remediation_text(report: Mapping[str, Any]) -> tuple[str | None, str | None
         "ANSWER_OPEN_DECISIONS",
         "APPROVE_GATE_A",
         "APPROVE_GATE_B",
+        "AUTHORIZE_AWS_READ_PREFLIGHT",
         "AUTHORIZE_AWS_OPERATION",
+        "AUTHORIZE_AWS_TEARDOWN",
+        "REVIEW_AWS_RESIDUALS",
         "COMPLETE_PREREQUISITE_CHECKLIST",
         "CONTINUE_CURRENT_ROUTE",
         "ENABLE_AWS_CORE",
@@ -303,6 +552,96 @@ def _aws_core_audit(
 
 
 
+def _aws_preflight_audit(
+    report: Mapping[str, Any], interaction: Mapping[str, Any]
+) -> str | None:
+    """Describe account access only from the validated AWS execution projection."""
+
+    reason = str(interaction.get("route_reason_code", ""))
+    if reason not in {
+        "AWS_PREFLIGHT_RUNNING",
+        "AWS_PREFLIGHT_READY",
+        "WAITING_AWS_MUTATION_AUTH",
+    }:
+        return None
+    execution = report.get("aws_execution")
+    if not isinstance(execution, Mapping):
+        raise PresentationError("AWS preflight state is missing its execution projection")
+    preflight = execution.get("preflight")
+    if not isinstance(preflight, Mapping):
+        raise PresentationError("AWS preflight state is missing its evidence projection")
+    status = str(preflight.get("status", ""))
+    account_access = str(preflight.get("account_access", ""))
+    lane = str(execution.get("lane", ""))
+    if reason == "AWS_PREFLIGHT_READY" and lane == "documentation-only":
+        if (
+            status != "NOT_APPLICABLE"
+            or account_access != "NOT_USED"
+            or any(
+                preflight.get(field) != "NONE"
+                for field in ("account", "region", "environment")
+            )
+        ):
+            raise PresentationError(
+                "documentation-only readiness conflicts with its no-account boundary"
+            )
+        return "Documentation-only AWS guidance is complete. No AWS account was accessed."
+
+    for field in ("account", "region", "environment"):
+        value = preflight.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise PresentationError("AWS preflight scope is incomplete")
+
+    if reason == "AWS_PREFLIGHT_RUNNING":
+        if status == "NOT_STARTED" and account_access == "NOT_OBSERVED":
+            return (
+                "The authorized preflight will access only the owner-approved named "
+                "AWS account scope read-only. No mutation is authorized."
+            )
+        if status == "RUNNING" and account_access == "READ_ONLY_OBSERVED":
+            return (
+                "Authenticated preflight accessed the owner-approved named AWS account "
+                "scope read-only and is still running. No mutation was performed."
+            )
+        raise PresentationError("AWS preflight running state is not safely attributable")
+
+    if status != "READY" or account_access != "READ_ONLY_OBSERVED":
+        raise PresentationError("AWS preflight readiness is not supported by observed access")
+    return (
+        "Authenticated preflight accessed the owner-approved named AWS account scope "
+        "read-only. No mutation was performed."
+    )
+
+
+def _aws_ready_owner_copy(
+    report: Mapping[str, Any], reason: str
+) -> tuple[str, str] | None:
+    """Return lane-specific terminal copy without changing authority."""
+
+    if reason != "AWS_PREFLIGHT_READY":
+        return None
+    execution = report.get("aws_execution")
+    if not isinstance(execution, Mapping):
+        raise PresentationError("AWS readiness is missing its execution projection")
+    lane = str(execution.get("lane", ""))
+    if lane == "documentation-only":
+        return (
+            "Documentation-only AWS guidance is complete.",
+            "No AWS account or resource action will occur.",
+        )
+    if lane == "read-only":
+        return (
+            "The authorized read-only AWS inspection is complete.",
+            "No AWS resource mutation will occur.",
+        )
+    if lane == "fast-dev":
+        return (
+            "Read-only AWS preflight and the bounded Gate B authority are current.",
+            "Codex will perform only the exact Gate-B-authorized non-production mutation.",
+        )
+    raise PresentationError("AWS preflight readiness has an unsupported lane")
+
+
 def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
     foundation = report.get("intake_foundation")
     if foundation is None:
@@ -477,6 +816,7 @@ def render_owner_update(
         raise PresentationError("unknown route reason code")
     if action_kind not in ACTION_TEXT:
         raise PresentationError("unknown owner action kind")
+    _validate_aws_progress_interaction(report, interaction)
     required = interaction.get("owner_action_required") is True
     if required == (action_kind == "NONE_CONTINUE_AUTOMATICALLY"):
         raise PresentationError("owner action requirement conflicts with action kind")
@@ -497,6 +837,26 @@ def render_owner_update(
         remediation_next or _delivery_next(report, reason)
         or _coverage_next(report, reason) or NEXT_TEXT[reason]
     )
+    ready_copy = _aws_ready_owner_copy(report, reason)
+    if ready_copy is not None:
+        status_text, next_text = ready_copy
+    if reason == "WAITING_AWS_MUTATION_AUTH" and action_kind == "NONE_CONTINUE_AUTOMATICALLY":
+        status_text = (
+            "Read-only AWS preflight and the exact deployment authorization are current."
+        )
+        next_text = "Codex will perform only the exact authorized AWS mutation."
+    if reason == "WAITING_AWS_TEARDOWN_AUTH" and action_kind == "NONE_CONTINUE_AUTOMATICALLY":
+        status_text = (
+            "Read-only residual review and the exact teardown authorization are "
+            "current."
+        )
+        next_text = (
+            "Codex will remove only the exact resources authorized for teardown."
+        )
+    if reason == "AWS_RESIDUAL_REVIEW_BLOCKED":
+        blocker = _teardown_blocker_reason(report)
+        status_text = f"Read-only AWS residual review stopped: {blocker}"
+
     lines = [
         f"FASTLANE · {stage}",
         "",
@@ -506,8 +866,10 @@ def render_owner_update(
         f"Next: {next_text}",
     ]
     audit = _aws_core_audit(report, interaction)
-    if audit is not None:
-        lines.append(f"Audit: {audit}")
+    preflight_audit = _aws_preflight_audit(report, interaction)
+    audit_parts = [item for item in (audit, preflight_audit) if item is not None]
+    if audit_parts:
+        lines.append("Audit: " + " ".join(audit_parts))
     reply = COPYABLE_REPLIES.get(action_kind)
     if required and reply:
         lines.extend(("", "Copyable reply:", reply))
@@ -526,6 +888,7 @@ def render_side_question_response(
     if not cleaned_answer:
         raise PresentationError("side-question answer must not be empty")
     interaction = _interaction(report)
+    _validate_aws_progress_interaction(report, interaction)
     _remediation_status, remediation_next = _remediation_text(report)
     action_kind = str(interaction.get("owner_action_kind", ""))
     if action_kind not in ACTION_TEXT:
@@ -539,6 +902,9 @@ def render_side_question_response(
         "Project state changed: " + ("Yes." if project_state_changed else "No."),
         f"Pending next action: {ACTION_TEXT[action_kind]}",
     ]
+    reason = str(interaction.get("route_reason_code", ""))
+    if reason == "AWS_RESIDUAL_REVIEW_BLOCKED":
+        lines.append(f"Safety blocker: {_teardown_blocker_reason(report)}")
     if required and action_kind == "ANSWER_OPEN_DECISIONS":
         card = _pending_intake_card(report)
         if card is not None:
@@ -548,10 +914,23 @@ def render_side_question_response(
                 lines.append(f"You may also reply `{card['reply_token']}; Accept all recommendations.`")
             lines.extend(("", "Copyable reply:", str(card["exact_reply"])))
     if not required:
-        reason = str(interaction.get("route_reason_code", ""))
         if reason not in NEXT_TEXT:
             raise PresentationError("unknown route reason code")
-        lines.append(f"Next: {remediation_next or NEXT_TEXT[reason]}")
+        next_text = remediation_next or NEXT_TEXT[reason]
+        ready_copy = _aws_ready_owner_copy(report, reason)
+        if ready_copy is not None:
+            _status_text, next_text = ready_copy
+        elif (
+            reason == "WAITING_AWS_MUTATION_AUTH"
+            and action_kind == "NONE_CONTINUE_AUTOMATICALLY"
+        ):
+            next_text = "Codex will perform only the exact authorized AWS mutation."
+        elif (
+            reason == "WAITING_AWS_TEARDOWN_AUTH"
+            and action_kind == "NONE_CONTINUE_AUTOMATICALLY"
+        ):
+            next_text = "Codex will remove only the exact resources authorized for teardown."
+        lines.append(f"Next: {next_text}")
     return "\n".join(lines)
 
 
@@ -617,6 +996,7 @@ def render_prerequisite_update(report: Mapping[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(
         description="Render Fastlane owner conversation from JSON on stdin"
     )

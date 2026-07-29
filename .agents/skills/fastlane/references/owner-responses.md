@@ -14,6 +14,12 @@
   state that no AWS account was accessed. If those calls are unavailable or
   unobservable, omit `Audit:` rather than claiming AWS Core use. Persist no raw
   skill content, transcript, credential, session identifier, or machine detail.
+- Keep the AWS delivery states distinct. Guidance needs nothing from the owner
+  and accesses no account. Read-scope authorization tells the owner the named
+  account will be accessed read-only. Running preflight needs no further owner
+  action. Observed readiness leads to the separate mutation decision only when
+  the lane can mutate. Never describe documentation guidance as authenticated
+  preflight or a read receipt as deployment authority.
 - Answer side questions directly, state whether project state changed, and
   restore the pending next action with `python scripts/fastlane_presenter.py
   side-question --input-stdin` after rerunning the doctor.
@@ -73,8 +79,8 @@ may resolve it.
 
 ## Material decision card
 
-Before an exact Gate A, Gate B, AWS deployment, or teardown receipt, give one
-short decision card with exactly these labels:
+Before an exact Gate A, Gate B, AWS read-only preflight, deployment, or teardown
+receipt, give one short decision card with exactly these labels:
 
 - `Decision:` what the owner is deciding now;
 - `Recommendation:` Codex's evidence-backed recommendation;

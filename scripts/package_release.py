@@ -35,6 +35,7 @@ REQUIRED_CONTROL_FILES = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
 }

@@ -93,3 +93,10 @@ Use for DESIGN-10 and Gate B.
   envelope digest, selected architecture, complete traceability, current
   material AWS evidence, complete Harness Profile and change impact, and exact
   owner Gate B receipt.
+- For every authenticated AWS lane, author the Gate B `AWS allowed operations`
+  row as the deduplicated maximum union of exact operations needed across the
+  applicable AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 phases. Later execution
+  may use only the intersection of that maximum, the current phase mode, and
+  current phase-specific authority. An explicit-gate
+  `MUTATE_LISTED_RESOURCES` maximum never authorizes deployment or teardown by
+  itself.

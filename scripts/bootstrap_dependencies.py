@@ -8,6 +8,11 @@ import json
 import re
 import sys
 from pathlib import Path
+try:
+    from fastlane_stdio import configure_utf8_standard_streams
+except ModuleNotFoundError:  # pragma: no cover - package-style test import
+    from scripts.fastlane_stdio import configure_utf8_standard_streams
+
 from typing import Any
 
 
@@ -210,6 +215,7 @@ def print_human(report: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--json", action="store_true")
