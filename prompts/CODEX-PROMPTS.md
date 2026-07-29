@@ -201,13 +201,31 @@ new Gate B approval.
 ### Exact conditional AWS action receipts
 
 These receipts authorize one bounded external action; they are not additional
-routine lifecycle gates. A deployment receipt is required for an
-`explicit-gate` mutation. A fast-dev mutation instead must fit the current Gate
-B envelope exactly; a mismatch makes Gate B stale and cannot be repaired by an
-action receipt. Teardown always requires its own receipt. After trimming
-surrounding whitespace, accept only the complete block with actual values,
-exact current IDs, no placeholders, and no extra, missing, duplicate,
-reordered, commented, or fenced lines.
+routine lifecycle gates. Authenticated AWS-10 preflight first requires the
+read-only receipt below; it permits only the named reads and grants no mutation.
+A deployment receipt is required for an `explicit-gate` mutation. A fast-dev
+mutation instead must fit the current Gate B envelope exactly and have a
+current observed preflight; a mismatch makes Gate B stale and cannot be
+repaired by an action receipt. Teardown always requires its own receipt. After
+trimming surrounding whitespace, accept only the complete applicable block
+with actual values, exact current IDs, no placeholders, and no extra, missing,
+duplicate, reordered, commented, or fenced lines.
+
+~~~text
+AUTHORIZE AWS READ-ONLY PREFLIGHT
+Read authorization: AWS-READ-AUTH-0001
+Construction authorization: AUTH-0001
+Profile or role: <allowlisted profile or role>
+Account: <12-digit account ID or approved alias>
+Region: <AWS Region>
+Environment: <environment>
+Stack, application, and resources: <exact boundary>
+Allowed read-only operations: <exact read-only operations>
+Artifact digest: <immutable digest>
+Prohibited operations: ALL_MUTATIONS
+Valid until: <ISO 8601 time or exact one-operation condition>
+Approver: <name/handle>
+~~~
 
 ~~~text
 AUTHORIZE AWS DEPLOYMENT
@@ -246,14 +264,16 @@ Approver: <name/handle>
 ~~~
 
 Record a supplied receipt verbatim in the action journal or durable evidence
-location named by the active envelope, plus its observed time and source. It
+location named by the active envelope, plus its observed time and source. The
+read-only receipt activates only exact preflight reads. A deployment receipt
 activates only the exact AWS mutation contemplated by the current
-`explicit-gate` envelope; it never widens construction scope, local or GitHub
-writes, resource boundaries, or platform authority. A deployment receipt never
-authorizes teardown. The durable copy is the uniquely marked deployment or
-teardown receipt block in docs/project/VERIFY.md. Recompute its SHA-256 from the exact
-normalized receipt and require its `Profile or role` and `Approver` to match
-the action-authorization row and current approved boundary. A row, digest, or
+`explicit-gate` envelope. Neither widens construction scope, local or GitHub
+writes, resource boundaries, or platform authority. A read-only or deployment
+receipt never authorizes teardown. The durable copy is the uniquely marked
+read-preflight, deployment, or teardown receipt block in
+docs/project/VERIFY.md. Recompute its SHA-256 from the exact normalized receipt
+and require its `Profile or role` and `Approver` to match the
+action-authorization row and current approved boundary. A row, digest, or
 agent-authored copy cannot substitute for the owner's exact message.
 
 ### Construction envelope
@@ -275,9 +295,10 @@ paths, exact external-state targets, literal allowed command prefixes, and the
 canonical complete-envelope SHA-256. Use docs/project/PRD.md's exact row grammars; do not
 replace them with prose or synonyms.
 
-If a fast development deployment is proposed, the envelope must also include
-the complete AWS mutation boundary listed below. Otherwise Gate B does not
-authorize AWS mutation.
+If any AWS mutation is proposed for `fast-dev` or `explicit-gate`, the envelope
+must include the complete AWS mutation boundary listed below. For
+`explicit-gate`, that boundary is maximum planned scope only; the separate
+exact action receipt remains mandatory.
 
 ### Canonical AWS mode mapping
 
@@ -289,7 +310,7 @@ different fields. Use this mapping and no synonyms:
 | `documentation-only` | `DOCS_ONLY` | `DOCS_ONLY` |
 | `read-only` | `READ_ONLY` | `READ_ONLY` |
 | `fast-dev` | `MUTATION` only after AWS-10 preflight | `MUTATE_LISTED_RESOURCES` |
-| `explicit-gate` | `DOCS_ONLY` or `READ_ONLY` | `DOCS_ONLY` or `READ_ONLY`; AWS-20 also requires a separate action-specific mutation receipt |
+| `explicit-gate` | `DOCS_ONLY` or `READ_ONLY` until AWS-20 | `DOCS_ONLY`, `READ_ONLY`, or `MUTATE_LISTED_RESOURCES` for a planned mutation; AWS-20 still requires a separate action-specific receipt |
 
 `NONE` means no AWS access in the current prompt. An IaC synth or local plan
 does not itself require authenticated AWS mutation.
@@ -376,8 +397,8 @@ use `/plugins`; register a missing marketplace only with the owner-run command
 with `CONTINUE AWS DESIGN`. Fastlane does not inspect private plugin state,
 compare hook hashes, request
 screenshots, run synthetic hook probes, or create a hook-trust receipt. For
-material decisions, require attributable live AWS Core `retrieve_skill` and
-`search_documentation` results rather than generic connectors, cached prose, or
+material decisions, require attributable live AWS Core `search_documentation`
+followed by matching `retrieve_skill` results rather than generic connectors, cached prose, or
 model memory. Installation or explicit `@AWS-Core` selection proves
 availability, not use. Only a validated search-then-matching-retrieve chain may
 produce concise owner audit attribution; unavailable or unobservable calls
@@ -519,7 +540,7 @@ direct evidence.
 | AWS-20 | Execute an authorized deployment | AWS-30 |
 | AWS-30 | Reconcile deployed evidence | RELEASE-10 |
 | AWS-40 | Read-only residual and teardown review | AWS-50 or STOP |
-| AWS-50 | Execute an authorized teardown | STOP |
+| AWS-50 | Execute an authorized teardown mutation | AWS-40 |
 
 ---
 
@@ -900,12 +921,25 @@ more than 60 seconds. If it fails, stalls, or is unavailable, stop it, record
 in the current Gate A Recommendation rationale, perform the checklist as the
 coordinator, rerun the doctor and deterministic presenter, and continue. Never
 expose reviewer timing or orchestration or turn its availability into an owner
-action. When AWS feasibility, Region, identity, data
-protection, recovery, or cost materially affects readiness, the coordinator
-uses official AWS Core directly with current primary AWS documentation. If AWS
-Core is unavailable, continue ordinary
-requirements work and mark only the unresolved material AWS fact as open. The coordinator evaluates any challenger
-findings and remains the only writer. A challenger cannot approve Gate A.
+action. Classify REQ-10 AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
+`NOT_MATERIAL`. Use `REQUIRED` when Gate A depends on current AWS facts for
+service/Region feasibility, identity/authorization, sensitive data/uploads,
+public exposure, encryption, deletion/recovery, quotas, availability, or
+material cost. `OPTIONAL` improves confidence without deciding readiness.
+`NOT_MATERIAL` needs a reason; missing evidence does not prove it.
+
+For `REQUIRED`, the coordinator first calls `search_documentation`, selects the
+smallest relevant returned identifiers, then calls `retrieve_skill` with those
+exact IDs. Record one current REQ-10 `AWS-DISC-*` chain. Basis IDs include the
+current REQ and affected requirements; Evidence binding is that REQ; Design
+binding is `NOT_APPLICABLE — requirements feasibility only; no architecture
+selected`. Record credentials/account access as `NO`. If AWS Core is unavailable,
+continue ordinary
+requirements work; only the material fact blocks. Missing/stale discovery is
+Codex work, not owner setup.
+
+The coordinator evaluates challenger findings and remains the only writer. A
+challenger cannot satisfy AWS evidence or approve Gate A.
 
 Translate only normative requirement rows into the Fastlane EARS Contract in
 the current PRD table and select exactly one `GHERKIN` or `MEASURABLE`
@@ -1057,25 +1091,21 @@ receipt last after a concise readiness summary.
 
 **Preconditions:** Current Gate A receipt.
 
-**Authoritative inputs:** Applicable AGENTS.md, PRD, VERIFY, relevant brownfield
-artifacts/history, current official AWS Core/docs, and read-only findings.
+**Authoritative inputs:** AGENTS.md, PRD, VERIFY, relevant brownfield evidence,
+current AWS Core/docs, and read-only findings.
 
-**Permitted writes:** PRD Parts III/IV, envelope, and DES/AUTH/Gate B status;
-one ADR if needed; VERIFY evidence; TASKS snapshot; and bootstrap.yaml mirror,
-as one coordinator checkpoint. Do not generate tasks; reconcile active work.
+**Permitted writes:** PRD Parts III/IV, envelope/status, one needed ADR, VERIFY,
+TASKS snapshot, and bootstrap.yaml as one checkpoint. No task generation.
 
-**GitHub mode:** READ_ONLY only when authorized for design facts.
+**GitHub mode:** READ_ONLY only when authorized.
 
-**AWS mode:** DOCS_ONLY by default; authenticated READ_ONLY only when explicitly
-authorized for a brownfield environment.
+**AWS mode:** DOCS_ONLY; authenticated READ_ONLY requires exact authorization.
 
-**Required authorization:** Design writes only; no implementation, GitHub
-writes, or AWS mutation.
+**Required authorization:** Design writes only; no implementation or external writes.
 
-**Stop conditions:** Missing/invalid Gate A; requirements/design conflict;
-incomplete/stale architecture, traceability, TECH, or property contract;
-wrong/unavailable AWS Core; missing/failed/stale DESIGN-10
-`search_documentation`/`retrieve_skill` evidence; or unverified AWS claim.
+**Stop conditions:** Invalid Gate A; requirements/design conflict; incomplete or
+stale design; unavailable AWS Core; unverified AWS claim. Stop on missing,
+failed, stale, or wrong DESIGN-10 evidence.
 
 **Receipt:** Routine status with REQ, DES, and proposed AUTH IDs.
 
@@ -1092,13 +1122,12 @@ the smallest relevant set, and call `retrieve_skill` with exact returned
 identifiers. Follow the retrieved procedure and current official references.
 
 Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md. Search precedes
-retrieve; basis, identity, actor, results, privacy, time, binding, and exact
-returned/selected IDs match. Bind every `AWS-EV-*` to its chain and use
+retrieve and every required field and returned/selected ID must match. Bind
+each `AWS-EV-*` to its chain and use
 `DES-0001; TECH: TECH-0001, TECH-0002` or
-`DES-0001; TECH: NONE — no technology/toolchain impact`; observed AWS Core version is metadata, never a pin.
-Persist no raw skill content or transcripts;
-installation, BOOT metadata, cache, connectors, and memory are insufficient.
-Codex is the only writer and selects the design.
+`DES-0001; TECH: NONE — no technology/toolchain impact`;
+observed AWS Core version is metadata, never a pin. Persist no raw skill content/transcripts;
+installation, cache, connectors, and memory are insufficient. Codex is the only writer and selects the design.
 
 After completing the proposed design, use `fastlane-architecture-challenger`
 only when conditionally triggered; it cannot select, write, approve,
@@ -1110,16 +1139,14 @@ affected drivers/alternatives; `PRESERVE` proves architecture, technology,
 trust, data, recovery, Region, and Harness boundaries unchanged.
 
 Apply the compatibility boundary first. An unchanged approved schema 4 Gate B
-remains current for its exact design/envelope. New, unapproved, or
-design-controlled work requires schema 5, new digests, and fresh Gate B.
-With a current approved legacy schema 1.2 Gate A, Codex may migrate schema 5
-without changing Part I. Generated migration is Codex-owned: report
-`Need from you: Nothing` unless an owner fact is missing; never invent it,
-change requirements, expand authority, or bypass task/Harness/evidence checks.
+remains current for its exact design/envelope. New, unapproved, or changed
+designs require schema 5, new digests, and fresh Gate B. Codex may migrate a
+current legacy schema 1.2 Gate A without changing Part I. Report `Need from
+you: Nothing` unless an owner fact is missing; never invent facts or widen authority.
 
 - For SELECT, evaluate a secure managed-serverless baseline. Complete `DRV-*`,
   `CAND-*`, selected `ARCH-*`, traceability, and `AWS-EV-*`; apply
-  hard constraints before preferences and select only an eligible candidate.
+  hard constraints before preferences; select only an eligible candidate.
 - Record rejected alternatives, risks/mitigations, Security impact,
   Reliability impact, Operational burden, cost/breakpoints, Migration path,
   revisit triggers, and validation across required whole-system domains.
@@ -1127,17 +1154,20 @@ change requirements, expand authority, or bypass task/Harness/evidence checks.
   `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
 - classify every measurable Gate A requirement exactly once. Each applicable
   `PROP-*` has one bounded local command without shell-control
-  chaining; its replay format must explicitly declare a seed or deterministic reproduction and VERIFY target.
+  chaining; its replay format must explicitly declare a seed or deterministic
+  reproduction and VERIFY target.
 - Complete the Gate B Harness Profile and Change impact record. Uncertain
   impact uses `FULL_REVALIDATION`; resolve brownfield compatibility,
   migration, and protected behavior.
 
-- Complete material interface and layer-boundary contracts, every applicable state model, and the NEW_BUILD first-wave/spike record. Bind them into the current design digest before Gate B.
+- Complete material interfaces/layers, applicable state models, and the
+  NEW_BUILD first-wave/spike record; bind them into the design digest.
 
 Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as the
-shared basis, and not append by default. Route material Part I flow changes through REQ-10. Preserve least-privilege IAM, encryption, secrets, validation,
-safe failures, telemetry, low-usage cost, billing dimensions, scaling
-breakpoints, and measurable expansion or migration
+shared basis, and not append by default. Route material
+Part I flow changes through REQ-10. Preserve least-privilege IAM, encryption, secrets, validation,
+safe failures, telemetry, cost/billing, scaling breakpoints, and
+measurable expansion or migration
 triggers. Never weaken one of those required controls to lower cost.
 
 Fill the Gate B readiness card with these exact fields: Design basis IDs;
@@ -1150,14 +1180,22 @@ compatibility/migration; Outstanding gaps. Use explicit stable IDs.
 
 Propose every construction-envelope row with the PRD's exact grammar. GitHub
 merge/branch deletion remain unauthorized unless listed; AWS defaults
-DOCS_ONLY. Fast-dev mutation requires non-production, exact
-resources/operations, a finite positive ceiling within the owner's cap and
-currency, feasible rollback/teardown, authorized SHA-256 provenance, future
-expiry, and the exact
+DOCS_ONLY. For authenticated AWS lanes, `AWS allowed operations` is the
+deduplicated maximum union across applicable AWS-10, AWS-20, AWS-30, AWS-40,
+and AWS-50 phases.
+Execution is limited to its intersection with current phase mode, evidence,
+and phase-specific authority.
+
+A planned `fast-dev` or `explicit-gate` mutation requires a
+`MUTATE_LISTED_RESOURCES` maximum with exact resources/operations, finite
+positive cost within the owner's cap/currency, feasible rollback/teardown,
+authorized SHA-256 provenance, future expiry, and exact
 `ENVIRONMENT: <exact>; CLASS: NON_PRODUCTION`,
 `EXACT_DIGEST: sha256:<64 lowercase hex>` or
 `DERIVED_FROM_AUTHORIZED_SOURCE: SHA-256 from baseline <full authorized commit>; <deterministic rule>`,
 and `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>` grammars.
+Fast-dev requires non-production. An explicit-gate maximum grants no
+mutation by itself; AWS-20 and AWS-50 still require separate exact receipts.
 
 Require local Git and a baseline. Hash Architecture driver, Candidate,
 Selection, Traceability, Material AWS evidence, Harness, Change impact,
@@ -1171,11 +1209,11 @@ is `READY_FOR_CONSTRUCTION_APPROVAL`, atomically set the
 Document status DES/AUTH/design/Gate B fields and owner Gate B state to
 `PENDING_OWNER_APPROVAL`; copy current REQ/DES/AUTH, Gate B state, and authorized maximum
 workers, baseline, and protected dirty paths into docs/project/TASKS.md's Active
-execution snapshot and bootstrap.yaml. Keep old tasks stale until approved and TASK-10
-replaces them. Reset the owner decision to `PENDING`, clear old approval
-provenance/receipts, never carry an old receipt into a new design or AUTH, and
-render the current proposed receipt. Do not implement,
-generate tasks, approve, or perform GitHub/AWS writes. Return routine status.
+execution snapshot and
+bootstrap.yaml. Keep old tasks stale until TASK-10 replaces them. Reset the
+owner decision to `PENDING`, clear old approval provenance/receipts, and never
+reuse a receipt for a new design/AUTH. Render the proposal; do not implement,
+generate tasks, approve, or write GitHub/AWS. Return routine status.
 ~~~
 ## DESIGN-20 — PRD and Construction Gate B
 
@@ -1740,8 +1778,13 @@ rollback; evidence gap; scope/revision drift; unauthorized merge/release.
 **Receipt:** Routine status with READY or BLOCKED and the exact release
 state `NOT_READY`, `READY_TO_DEPLOY`, or `RELEASE_VERIFIED` in Validation.
 
-**Next:** AWS-10 only from READY_TO_DEPLOY; AWS-40 after verified deployment
-when residual review is in scope; otherwise STOP.
+When release state is `RELEASE_VERIFIED`, record optional `AWS lifecycle
+intent` as exactly `NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`. It selects a
+follow-up route but grants no AWS access or mutation.
+
+**Next:** AWS-10 only from `READY_TO_DEPLOY`. From `RELEASE_VERIFIED`, `NONE`
+stops; `RESIDUAL_REVIEW` and `TEARDOWN` route to AWS-40. No other value or
+state may enter the residual/teardown path.
 
 ~~~text
 [RELEASE-10]
@@ -1777,36 +1820,54 @@ publish a release, delete a branch, or deploy. Return the routine status.
 
 ## AWS-10 — Read-Only Deployment Preflight
 
-**Preconditions:** RELEASE-10 recorded `READY_TO_DEPLOY` for the intended immutable artifact; target account,
-Region, environment, and stack are named; authenticated read access is
-explicitly authorized.
+**Preconditions:** RELEASE-10 recorded `READY_TO_DEPLOY` for the intended
+immutable artifact, and the target account, Region, environment, and resources
+are named. Documentation guidance precedes any authenticated account access.
 
 **Authoritative inputs:** docs/project/PRD.md; docs/project/VERIFY.md;
 docs/project/RUNBOOK.md; IaC; deployment artifact; official
 `aws-core@agent-toolkit-for-aws` skills/docs; read-only AWS identity,
 configuration, quotas, target state, and the current DES/TECH validation contract.
 
-**Permitted writes:** docs/project/VERIFY.md preflight evidence only.
+**Permitted writes:** docs/project/VERIFY.md AWS-10 guidance, read-authority
+provenance, and preflight evidence only.
 
 **GitHub mode:** NONE or authorized READ_ONLY for artifact/check identity.
 
-**AWS mode:** READ_ONLY. Documentation grounding may accompany it; no mutation.
+**AWS mode:** DOCS_ONLY until the exact read receipt is current, then READ_ONLY
+for that named account scope. No mutation.
 
-**Required authorization:** Exact read-only account/profile/Region/environment scope.
+**Required authorization:** The exact `AUTHORIZE AWS READ-ONLY PREFLIGHT`
+receipt before authenticated AWS access. It names the current AUTH, profile or
+role, account, Region, environment, resources, reads, artifact, expiry, and
+human approver, and prohibits every mutation.
+The Gate B `AWS allowed operations` row is the maximum union of exact
+preflight/reconciliation reads and any later mutation or teardown operations;
+AWS-10 may use only the read-only subset named in its exact receipt.
 
 **Stop conditions:** Identity mismatch; missing or wrong-source plugin/tool;
-missing, failed, cached, generic, or stale AWS-10 `retrieve_skill` or
-`search_documentation` evidence; unavailable Region or quota; drift; unreviewed
+missing, failed, cached, generic, or stale AWS-10 `search_documentation` or
+matching `retrieve_skill` evidence; unavailable Region or quota; drift; unreviewed
 change set; cost/rollback uncertainty; or any mutation.
 
-**Receipt:** AWS authority/evidence receipt with READY or BLOCKED and observed identity.
+**Receipt:** AWS authority/evidence receipt: the exact read-only block when scope
+is required; otherwise routine status with observed `RUNNING`, `READY`,
+`BLOCKED`, or `STALE` preflight.
 
-**Next:** AWS-20 only with valid mutation authorization; otherwise STOP.
+**Next:** After observed READY, AWS-20 only with a current fast-dev envelope or
+exact deployment authorization; otherwise wait for that separate authority.
 
 ~~~text
 [AWS-10]
-Perform a read-only AWS deployment preflight. Confirm current official AWS
-Core, then create fresh artifact-bound `AWS-DISC-*` chains for the material
+Perform a read-only AWS deployment preflight in five deterministic states:
+`AWS_GUIDANCE_REQUIRED`, `AWS_READ_SCOPE_REQUIRED`,
+`AWS_PREFLIGHT_RUNNING`, the observed `AWS_PREFLIGHT_READY` milestone, and
+`WAITING_AWS_MUTATION_AUTH` when a mutation-capable lane needs separate owner
+authority. Do not collapse these states or use the legacy compatibility boolean
+as the authoritative route.
+
+During `AWS_GUIDANCE_REQUIRED`, access no AWS account. Confirm current official
+AWS Core, then create fresh artifact-bound `AWS-DISC-*` chains for the material
 operational, deployment, IAM, service, Region, quota, security, reliability,
 rollback, teardown, and cost questions. Search first, select the smallest
 relevant returned skill set, retrieve those exact identifiers, and follow the
@@ -1821,8 +1882,26 @@ Search must precede retrieval; selected and returned identifiers must match and
 appear in search results. Bind each chain to `ARTIFACT: sha256:<64 lowercase
 hex>; DES: DES-nnnn; TECH: TECH-nnnn, TECH-nnnn` or the defined no-impact
 form. Missing, stale, mismatched, unattributed, or wrong-binding evidence
-blocks AWS execution planning. Do not persist raw skill content, transcripts,
-credentials, local paths, usernames, trust data, or machine information.
+blocks guidance readiness. Do not persist raw skill content, transcripts,
+credentials, local paths, usernames, trust data, or machine information. Every
+AWS Core row records `AWS account accessed: NO` because documentation evidence
+is not authenticated preflight.
+
+When guidance is current but no read scope exists, enter
+`AWS_READ_SCOPE_REQUIRED`. Present the exact current read-only receipt and end
+the turn. Do not infer, paraphrase, self-author, or reuse deployment authority.
+After the owner supplies an exact current receipt, record it verbatim and its
+stable source, observed time, recomputed digest, and matching provenance row.
+Project only its exact reads as external authority.
+
+Before the first authenticated call, record preflight `RUNNING` and state
+plainly that the named account will now be accessed read-only. Execute only the
+receipt's exact reads and record observed caller identity, account, Region,
+environment, artifact, resources, operations, AWS evidence IDs, boundary and
+drift evidence, timestamps, and result in `## Read-only AWS preflight
+evidence`. `READY` requires a current matching unexpired receipt and complete
+identity/boundary match. Documentation evidence alone can never produce it.
+`BLOCKED` and `STALE` are preserved and stop affected work.
 
 Confirm without exposing secrets:
 - caller identity, allowlisted profile/role, account, Region, and environment;
@@ -1843,8 +1922,13 @@ Confirm without exposing secrets:
 Do not create a CloudFormation change set here; `CreateChangeSet` creates
 account-side state and belongs to AWS-20 under exact mutation authority. Do not
 create, update, delete, deploy, rotate, migrate, or mutate data. Record
-only observed facts in docs/project/VERIFY.md. Return READY only when the complete mutation
-boundary can be authorized; otherwise BLOCKED. Return the AWS authority/evidence receipt.
+only observed facts in docs/project/VERIFY.md. After current observed READY,
+set the legacy `aws_execution_planning_ready` compatibility field true. For an
+explicit-gate lane without deployment authority, enter
+`WAITING_AWS_MUTATION_AUTH` and present the separate exact deployment receipt.
+For fast-dev, continue only when the proposed action remains wholly inside Gate
+B and the observed preflight. A read receipt never authorizes mutation or
+teardown.
 ~~~
 
 ## AWS-20 — Authorized Deployment
@@ -1969,7 +2053,9 @@ release state here. Return the AWS authority/evidence receipt whose Next is RELE
 ## AWS-40 — Residual Resource and Teardown Review
 
 **Preconditions:** Deployment, test, rollback, or environment lifecycle creates
-a need to assess residual resources; read-only target access is authorized.
+a need to assess residual resources; `AWS lifecycle intent` is
+`RESIDUAL_REVIEW` or `TEARDOWN`; and exact read-only target access is
+authorized for this AWS-40 observation.
 
 **Authoritative inputs:** docs/project/PRD.md retention requirements; docs/project/VERIFY.md; docs/project/RUNBOOK.md; IaC state;
 live read-only inventory, dependencies, backups, retention, and billing signals.
@@ -1989,7 +2075,11 @@ dependency; identity mismatch; teardown would cross the named boundary.
 **Receipt:** AWS authority/evidence receipt with residual inventory and authorization
 requirements.
 
-**Next:** AWS-50 only with explicit teardown authorization; otherwise STOP.
+**Next:** From current `READY_FOR_TEARDOWN` evidence and lifecycle intent
+`TEARDOWN`, present the exact teardown receipt and enter AWS-50 only after its
+acceptance. A residual-only review, `VERIFIED_CLEAN`, `RESIDUALS_REMAIN`, or
+`BLOCKED` stops with that explicit outcome. Any AWS-50 attempt returns here for
+post-action read-only reconciliation.
 
 ~~~text
 [AWS-40]
@@ -2010,9 +2100,16 @@ Record inventory/discovery scope and blind spots, including unsupported resource
 types, permission limits, account/Region boundaries, and eventual consistency.
 An empty query does not prove absence outside that observed boundary.
 
+Before mutation, record `Teardown authorization` and `Teardown receipt digest`
+as `NONE`. After AWS-50, bind the terminal AWS-40 row to the exact teardown
+authorization ID and receipt SHA-256, and reconcile operation history, removed
+and retained resources, snapshots/backups, residuals, discovery limits, and
+continuing cost. Only AWS-40 may make these authenticated read calls.
+
 Compare live inventory to IaC and docs/project/RUNBOOK.md. Do not delete, disable, detach,
 empty, rotate, or mutate anything. Produce the exact proposed teardown boundary
-and required authorization fields. Return the AWS authority/evidence receipt.
+and required authorization fields, or the explicit terminal clean, residual, or
+blocked result. Return the AWS authority/evidence receipt.
 ~~~
 
 ## AWS-50 — Authorized Teardown
@@ -2021,8 +2118,9 @@ and required authorization fields. Return the AWS authority/evidence receipt.
 the resources/stack, retained data, destructive operations, account, Region,
 profile/role, cost effect, and validity window.
 
-**Authoritative inputs:** AWS-40 inventory; docs/project/PRD.md retention rules; docs/project/VERIFY.md; docs/project/RUNBOOK.md; live
-read-only identity and target state.
+**Authoritative inputs:** Current AWS-40 `READY_FOR_TEARDOWN` evidence;
+docs/project/PRD.md retention rules; docs/project/VERIFY.md;
+docs/project/RUNBOOK.md; and the exact current teardown receipt.
 
 **Permitted writes:** Authorized AWS deletions/mutations; docs/project/VERIFY.md; docs/project/TASKS.md; docs/project/RUNBOOK.md
 only for observed procedural correction.
@@ -2039,10 +2137,12 @@ the complete `AUTHORIZE AWS TEARDOWN` block in the common contract.
 unexpected data; scope expansion; protection requiring an unauthorized change;
 partial failure that changes the safe order.
 
-**Receipt:** AWS authority/evidence receipt with removed, retained, failed, and
-post-teardown observed resources.
+**Receipt:** AWS authority/evidence receipt with the direct mutation-attempt
+status and exact teardown authorization ID and receipt digest. Do not claim
+post-teardown read observations here.
 
-**Next:** STOP, or AWS-40 for residual read-only review.
+**Next:** Always AWS-40 for read-only reconciliation, regardless of whether the
+AWS-50 mutation attempt is `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`.
 
 ~~~text
 [AWS-50]
@@ -2057,17 +2157,24 @@ match its role/profile and approver. Gate B fast-dev, a deployment receipt,
 credentials, and prior cleanup
 discussion never substitute for this receipt.
 
-Reconfirm identity and exact resource inventory immediately before mutation.
+Before invoking mutation, compare the execution tool's observable caller or
+profile, target, and request shape to the current AWS-40 evidence and exact
+receipt. Do not make an authenticated read call in AWS-50.
 Preserve every resource/data class marked retained. Use the documented order
 and least-privileged approved profile. Do not disable safeguards or force
 deletion unless that exact action is authorized.
 
-After each bounded step, inspect results and stop on mismatch. Perform
-post-teardown read-only verification. Reconcile the expected manifest, stack
-events/terminal status, removed and retained resources, snapshots/backups,
-residuals, and inventory/discovery limits in `Teardown reconciliation evidence`.
-Never claim deletion from a submitted request
-alone. Return the AWS authority/evidence receipt.
+After each bounded mutation, inspect the direct service/request result and stop
+on mismatch. Record the exact `TEARDOWN-AUTH-*` ID, exact receipt digest, and
+direct `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN` attempt status in
+`Teardown reconciliation evidence`. Perform no authenticated read-only
+verification in AWS-50 and never claim deletion from a submitted request alone.
+Use a canonical evidence ID and bind the attempt to its preceding current
+`READY_FOR_TEARDOWN` evidence; never omit, relabel, or replay a failed or partial
+attempt to make teardown eligible again.
+Return the AWS authority/evidence receipt and route immediately to AWS-40 for
+all terminal inventory, operation-history, retention, backup, residual, and
+billing reconciliation.
 ~~~
 
 ## Suggested model selection

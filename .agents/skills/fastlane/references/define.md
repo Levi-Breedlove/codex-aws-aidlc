@@ -87,6 +87,14 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   timeout, or unavailability, record that independent review was unavailable in
   the existing recommendation rationale, run the checklist as coordinator, and
   continue without exposing reviewer orchestration or adding an owner action.
-- Use AWS Core only when a current AWS fact materially affects feasibility.
+- Classify REQ-10 AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
+  `NOT_MATERIAL`. Use `REQUIRED` when Gate A depends on a current AWS fact about
+  Region/service feasibility, identity/authorization, sensitive data/uploads,
+  public exposure, encryption, deletion/recovery, quotas, availability, or
+  material cost. The coordinator must search current documentation, select a
+  returned identifier, and retrieve that exact identifier in one linked chain
+  bound to the current REQ and affected requirements. This is documentation-only
+  evidence: inspect no credentials, access no account, and select no final
+  architecture before Gate A.
 - The coordinator writes analysis and the readiness card; only the owner may
   approve the exact Gate A receipt.

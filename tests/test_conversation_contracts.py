@@ -157,7 +157,14 @@ class ConversationContractTests(unittest.TestCase):
         self.assertEqual(report["aws_authorization"], "NONE")
         self.assertFalse(report["user_state_persisted_in_repository"])
 
-    def test_missing_design_evidence_stays_in_design_with_one_aws_core_action(self) -> None:
+    def test_missing_design_evidence_stays_in_design_for_codex_correction(self) -> None:
+        remediation = {
+            "next_action": {
+                "action_kind": "CORRECT_AND_REVALIDATE",
+                "responsible_party": "CODEX",
+                "automatic_continuation_allowed": True,
+            }
+        }
         interaction = doctor.derive_interaction(
             "BLOCKED",
             "STOP",
@@ -165,13 +172,21 @@ class ConversationContractTests(unittest.TestCase):
             diagnostic_codes=["AWS_CORE_EVIDENCE_REQUIRED"],
             design_aws_core_ready=False,
             aws_execution_planning_ready=False,
+            remediation=remediation,
+            owner_stage_hint="DESIGN",
         )
-        rendered = presenter.render_owner_update({"interaction": interaction})
+        rendered = presenter.render_owner_update({
+            "interaction": interaction,
+            "remediation": remediation,
+        })
         self.assertEqual(interaction["owner_stage"], "DESIGN")
-        self.assertEqual(interaction["owner_action_kind"], "ENABLE_AWS_CORE")
+        self.assertEqual(
+            interaction["owner_action_kind"], "NONE_CONTINUE_AUTOMATICALLY"
+        )
         self.assertEqual(rendered.count("Need from you:"), 1)
-        self.assertIn("Enable official AWS Core", rendered)
-        self.assertFalse(interaction["automatic_continuation_allowed"])
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("Codex will correct", rendered)
+        self.assertTrue(interaction["automatic_continuation_allowed"])
         self.assertFalse(interaction["formal_receipt_required"])
 
     def test_golden_define_design_deliver_route_has_only_two_product_stops(self) -> None:

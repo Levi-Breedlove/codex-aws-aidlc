@@ -28,7 +28,7 @@ files may narrow but never widen this guide.
 
 ## Invariants
 
-- Fastlane has exactly two routine owner gates: Gate A for requirements and
+- Fastlane has exactly two owner gates: Gate A for requirements and
   Gate B for the PRD plus construction boundary.
 - Only the owner may accept assumptions, approve gates, or authorize external
   actions. Reject `Codex`, `agent`, `automation`, `system`, `AI`, or a
@@ -37,9 +37,9 @@ files may narrow but never widen this guide.
   never widens filesystem, GitHub, Codex, or AWS boundaries.
 - Requirements changes stale both gates; design or envelope changes stale Gate
   B. A stale Gate B with a current Gate A routes to `DESIGN-10`.
-- The coordinator is the only writer. Challengers are read-only and cannot
-  choose scope or architecture, edit files, approve gates, satisfy AWS
-  evidence, or authorize actions.
+- Every descendant subagent is read-only and cannot spawn a writer, change scope,
+  edit files/state, claim tasks, approve, authorize, provide AWS evidence, or
+  operate AWS. Only the coordinator writes.
 - Deterministic scripts decide routes, receipt validity, task readiness, stale
   approvals, evidence completeness, and package integrity.
 - Never claim a test, AWS fact, deployment, or recovery result not observed.

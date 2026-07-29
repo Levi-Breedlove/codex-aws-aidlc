@@ -92,7 +92,8 @@ evidence-ID formats.
 This ledger proves current runtime skill discovery through official
 `aws-core@agent-toolkit-for-aws`; installation metadata, bundled or local
 skills, generic connectors, cache, prior conversation, and prose are not proof.
-DESIGN-10 and AWS-10 each require at least one current `AWS-DISC-*` chain:
+REQ-10 when its materiality is `REQUIRED`, DESIGN-10, and AWS-10 each require
+at least one current `AWS-DISC-*` chain:
 `search_documentation` records returned canonical skill identifiers, then
 `retrieve_skill` records the selected and returned matching identifier.
 Multiple chains are allowed only for materially different AWS domains.
@@ -102,13 +103,19 @@ observations are ephemeral and never enter this ledger.
 Both rows in a chain use the same phase, Discovery ID, Basis IDs, official
 source `aws/agent-toolkit-for-aws`, invoked identity, observed semantic plugin
 version, actor `CODEX_LIVE_TOOL_CALL`, discovered identifier set, advisory
-Design binding, privacy declarations, and current evidence binding. Retrieval
+binding, privacy declarations, and current evidence binding. Retrieval
 must not precede search. The selected identifier must be in the search results,
 and the returned identifier must equal it. Every material `AWS-EV-*` row in
 the PRD cites the `AWS-DISC-*` chain that informed it.
 
-`Basis IDs` are comma-space-separated current stable IDs and include the
-current `DES-*`. For DESIGN-10, bind findings to the design and influenced
+`Basis IDs` are comma-space-separated current stable IDs. REQ-10 includes the
+current `REQ-*` plus every affected requirement ID, uses
+`NOT_APPLICABLE — requirements feasibility only; no architecture selected` as
+its advisory Design binding, and binds Evidence to the current REQ revision.
+Its rows always record `Credentials inspected: NO` and `AWS account accessed:
+NO`; documentation discovery is not authenticated account preflight.
+
+DESIGN-10 includes the current `DES-*` and binds findings to the design and influenced
 technology rows using `DES-0001; TECH: TECH-0001, TECH-0002` or
 `DES-0001; TECH: NONE — no technology/toolchain impact`. This trace never
 selects a technology, approves Gate B, or authorizes AWS.
@@ -122,10 +129,27 @@ TECH: TECH-0001, TECH-0002` or the defined no-impact form.
 
 | Phase | Discovery ID | Basis IDs | Plugin source | Invoked plugin identity | Observed plugin version | Capability | Observation actor | Requested skill | Returned skill identifier | Documentation query | Discovered skill identifiers | Source references | Advisory Design binding | Credentials inspected | AWS account accessed | Observed at | Evidence binding | Observed status |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `DESIGN-10` | `AWS-DISC-0001` | TODO | TODO | TODO | TODO | `search_documentation` | TODO | — | — | `AWS skills for the current design question` | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
-| `DESIGN-10` | `AWS-DISC-0001` | TODO | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | TODO | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
-| `AWS-10` | `AWS-DISC-0002` | TODO | TODO | TODO | TODO | `search_documentation` | TODO | — | — | `AWS skills for the current operational question` | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
-| `AWS-10` | `AWS-DISC-0002` | TODO | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | TODO | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `REQ-10` | `AWS-DISC-0001` | TODO | TODO | TODO | TODO | `search_documentation` | TODO | — | — | `AWS skills for the current requirements-feasibility question` | TODO | TODO | `NOT_APPLICABLE — requirements feasibility only; no architecture selected` | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `REQ-10` | `AWS-DISC-0001` | TODO | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | TODO | — | `NOT_APPLICABLE — requirements feasibility only; no architecture selected` | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `DESIGN-10` | `AWS-DISC-0002` | TODO | TODO | TODO | TODO | `search_documentation` | TODO | — | — | `AWS skills for the current design question` | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `DESIGN-10` | `AWS-DISC-0002` | TODO | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | TODO | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `AWS-10` | `AWS-DISC-0003` | TODO | TODO | TODO | TODO | `search_documentation` | TODO | — | — | `AWS skills for the current operational question` | TODO | TODO | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+| `AWS-10` | `AWS-DISC-0003` | TODO | TODO | TODO | TODO | `retrieve_skill` | TODO | TODO | TODO | — | TODO | — | TODO | `NO` | `NO` | TODO | TODO | `NOT_STARTED` |
+
+## Read-only AWS preflight evidence
+
+This table records authenticated AWS-10 observations separately from
+documentation evidence. A current read receipt must exist before `RUNNING`.
+`Account access` is exactly `READ_ONLY` for an attempted authenticated
+preflight and `NOT_STARTED` before one. `READY` requires a current unexpired
+receipt plus exact matching REQ/DES/AUTH, artifact, profile or role, account,
+Region, environment, resources, allowed read operations, caller identity, and
+boundary evidence. It grants no mutation. Preserve `BLOCKED` and `STALE`
+observations rather than rewriting them as not run.
+
+| Preflight ID | Read authorization | REQ / DES / AUTH | Artifact digest | Role or profile | Account | Region | Environment | Resources | Operations observed | AWS evidence IDs | Account access | Caller identity evidence | Boundary and drift evidence | Started at | Completed at | Identity and boundary match | Result |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `AWS-PREFLIGHT-0001` | TODO | `REQ-0001 / DES-0001 / AUTH-0001` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
 
 ## IaC validation evidence
 
@@ -319,18 +343,21 @@ not prove script contents.
 
 ## Action authorization provenance
 
-This table proves which exact owner message was checked before an external
-mutation; it does not itself authorize an action or widen Gate B. The stable
+This table proves which exact owner message was checked before authenticated
+read-only preflight or external mutation; it does not itself authorize an
+action or widen Gate B. The stable
 source must resolve to the applicable complete verbatim receipt in the uniquely
 marked block below, and that receipt must equal the owner's exact message after
 trimming only surrounding whitespace. `Role or profile` and `Approver` must
 match the receipt and current approved boundary. Recompute `Verbatim receipt
 SHA-256` from the exact normalized marked receipt every time any receipt value
-changes; a copied, stale, self-authored, or independently typed digest is not
-authorization.
+changes. A copied, stale, self-authored, or independently typed digest is not
+authorization. Read-only preflight authority permits only exact reads; it never
+authorizes deployment or teardown.
 
 | Action | Authorization ID | Construction AUTH | Role or profile | Artifact digest | IaC plan/change-set binding | Account / Region / environment | Resources and operations | Cost ceiling and validity | Rollback boundary | Stable owner-message source | Approver | Observed at | Verbatim receipt SHA-256 | Preflight evidence | Identity and boundary match | Result |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Read-only preflight | TODO | `AUTH-0001` | TODO | TODO | `NOT_APPLICABLE — read-only preflight creates no plan` | TODO | TODO | `COST: TODO; BOUNDED_BY: TODO; VALID_UNTIL: TODO` | `NOT_APPLICABLE — no mutation` | TODO | TODO | TODO (ISO 8601 with timezone) | TODO | `NONE` | TODO | `NOT_STARTED` |
 | Deployment | TODO | `AUTH-0001` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO (ISO 8601 with timezone) | TODO | TODO / `NONE` | TODO | `NOT_STARTED` |
 | Teardown | TODO | `AUTH-0001` | TODO | `NOT_APPLICABLE — teardown binds the observed inventory` | `NOT_APPLICABLE — teardown uses its removal/retention manifest` | TODO | TODO | TODO | TODO | TODO | TODO | TODO (ISO 8601 with timezone) | TODO | TODO / `NONE` | TODO | `NOT_STARTED` |
 
@@ -348,6 +375,37 @@ that complete owner message. Preserve its line order and punctuation, then
 recompute the table digest from the exact text between the fence lines. A
 deployment receipt never authorizes teardown, and the teardown receipt remains
 separate even when a deployment used `fast-dev`.
+
+For a read-only preflight row, use `sha256:<64 lowercase hex>` for Artifact
+digest; `ACCOUNT: <value>; REGION: <value>; ENVIRONMENT: <value>`; `RESOURCES:
+<comma-separated exact list>; OPERATIONS: <comma-separated exact read-only
+list>`; and `COST: <explicit expected read-only billing effect>; BOUNDED_BY:
+<exact approved cost posture or explicit monetary ceiling>; VALID_UNTIL: <exact
+receipt Valid until value>`. Read-only does not imply zero cost. The receipt
+must prohibit all mutation and must match the observed preflight before the
+result becomes `READY`.
+
+Replace every placeholder in the read-only block only after receiving that
+complete owner message. Preserve its line order and punctuation, then recompute
+the table digest from the exact text between the fence lines.
+
+<!-- bootstrap:aws-read-preflight-receipt:start -->
+```text
+AUTHORIZE AWS READ-ONLY PREFLIGHT
+Read authorization: AWS-READ-AUTH-0001
+Construction authorization: AUTH-0001
+Profile or role: <allowlisted profile or role>
+Account: <12-digit account ID or approved alias>
+Region: <AWS Region>
+Environment: <environment>
+Stack, application, and resources: <exact boundary>
+Allowed read-only operations: <exact read-only operations>
+Artifact digest: <immutable digest>
+Prohibited operations: ALL_MUTATIONS
+Valid until: <ISO 8601 time or exact one-operation condition>
+Approver: <name/handle>
+```
+<!-- bootstrap:aws-read-preflight-receipt:end -->
 
 <!-- bootstrap:aws-deployment-receipt:start -->
 ```text
@@ -392,7 +450,8 @@ Approver: <name/handle>
 For an AWS mutation, record the authorization source and receipt digest before
 execution, then link the AWS-10 or AWS-40 identity/boundary evidence. Record
 `FAILED` or `BLOCKED` on any mismatch. Deployment evidence is reconciled by
-AWS-30; residual and teardown evidence is reconciled read-only after AWS-50.
+AWS-30; residual and teardown evidence is reconciled read-only through AWS-40
+both before a teardown decision and after every AWS-50 attempt.
 
 ## Teardown reconciliation evidence
 
@@ -401,9 +460,38 @@ history and live inventory. An empty inventory result proves only the named
 account, Region, resource types, discovery methods, permissions, and cutoff;
 record every known blind spot rather than claiming global absence.
 
-| Evidence ID | Phase | Expected manifest or stack | Stack events and terminal status | Resources removed | Resources retained | Snapshots and backups | Residual resources | Inventory or discovery limits | Account / Region / environment | Observed at | Durable source | Status |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EV-0301 | `AWS-40` / `AWS-50` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
+| Evidence ID | Phase | REQ / DES / AUTH | Read authorization | Teardown authorization | Teardown receipt digest | Role or profile | Expected manifest or stack | Resources proposed to remove | Allowed deletion operations | Resources retained | Shared dependencies | Cost effect | Post-teardown verification | Stack events and terminal status | Resources removed | Snapshots and backups | Residual resources | Inventory or discovery limits | Account / Region / environment | Observed at | Durable source | Identity and boundary match | Blocker or stale reason | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
+
+Each concrete row has one phase. `AWS-40` uses `RUNNING`,
+`READY_FOR_TEARDOWN`, `VERIFIED_CLEAN`, `RESIDUALS_REMAIN`, `BLOCKED`, or
+`STALE`. `AWS-50` uses `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`; every
+AWS-50 attempt returns to AWS-40 for read-only reconciliation.
+
+A pre-teardown AWS-40 row records `NONE` for both teardown fields. A current
+`READY_FOR_TEARDOWN` row binds the exact REQ/DES/AUTH, current read
+authorization, role, account, Region, environment, removal and retention sets,
+deletion operations, shared dependencies, cost effect, and post-action checks.
+It proposes a teardown boundary but grants no authority. Only the separate
+exact teardown receipt can authorize AWS-50.
+
+An AWS-50 row records only the directly observed mutation attempt. It must bind
+the exact `TEARDOWN-AUTH-*` ID and SHA-256 of the current owner-authored receipt,
+plus its exact scope and provenance. It does not satisfy terminal read-only
+reconciliation. The later AWS-40 terminal row repeats that authorization ID and
+digest and must follow exactly one matching AWS-50 attempt.
+
+`VERIFIED_CLEAN` requires terminal operation history, complete removal and
+retention reconciliation, snapshots/backups, `Residual resources = NONE`, an
+explicit discovery boundary, and continuing-cost disposition.
+`RESIDUALS_REMAIN` requires an exact residual list and follow-up. A
+`READY_FOR_TEARDOWN` result under residual-review-only intent is presented as
+an owner-visible residual outcome; it is never summarized as a clean review.
+`BLOCKED` records the exact safety blocker and `STALE` records the exact basis,
+identity, read-authority, teardown-digest, or evidence-cutoff mismatch in
+`Blocker or stale reason`. Every other concrete row records `NONE` in that
+field. Malformed IDs and partially populated placeholder rows fail closed.
 
 ## Known gaps and accepted risks
 
@@ -418,6 +506,7 @@ applicable Gate A or Gate B owner decision.
 ## Current release decision
 
 - Release state: `NOT_READY`
+- AWS lifecycle intent: `NONE`
 - Active evidence cutoff: TODO
 - Blocking or stale evidence IDs: TODO
 - Pending AWS evidence IDs: TODO / `NONE`
@@ -434,6 +523,16 @@ Release state is exactly one of:
 - `RELEASE_VERIFIED`: every required local and deployed acceptance item is
   VERIFIED for the identified artifact/environment, or deployed evidence is
   explicitly not applicable.
+
+AWS lifecycle intent is exactly `NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`.
+It records the owner's requested follow-up route but grants no AWS access,
+mutation, cleanup, or spending authority.
+`NONE` stops after release verification. `RESIDUAL_REVIEW` requests one AWS-40
+read-only review and stops with its explicit result. `TEARDOWN` requests an
+AWS-40 proposal, permits AWS-50 only after the exact current teardown receipt,
+and always returns to AWS-40 for terminal reconciliation. A direct plain-language
+owner request for residual review or teardown may update this field through
+RELEASE-10; it is not itself an AWS authorization.
 
 Only RELEASE-10 changes release state. AWS-10 requires `READY_TO_DEPLOY`.
 AWS-30 records observed deployment evidence and returns to RELEASE-10, which

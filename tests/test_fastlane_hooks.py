@@ -122,6 +122,69 @@ def authority(
     }
 
 
+def read_preflight_document(
+    *,
+    receipt_artifact: str | None = None,
+    row_artifact: str | None = None,
+    valid_until: str = "ONE_OPERATION",
+) -> str:
+    receipt_artifact = receipt_artifact or "sha256:" + "a" * 64
+    row_artifact = row_artifact or receipt_artifact
+    receipt = "\n".join(
+        (
+            "AUTHORIZE AWS READ-ONLY PREFLIGHT",
+            "Read authorization: AWS-READ-AUTH-0001",
+            "Construction authorization: AUTH-0001",
+            "Profile or role: fastlane-role",
+            "Account: 111122223333",
+            "Region: us-west-2",
+            "Environment: development",
+            "Stack, application, and resources: fastlane-stack",
+            "Allowed read-only operations: cloudformation:DescribeStacks",
+            f"Artifact digest: {receipt_artifact}",
+            "Prohibited operations: ALL_MUTATIONS",
+            f"Valid until: {valid_until}",
+            "Approver: owner-handle",
+        )
+    )
+    digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
+    headers = (
+        "Action", "Authorization ID", "Construction AUTH", "Role or profile",
+        "Artifact digest", "IaC plan/change-set binding",
+        "Account / Region / environment", "Resources and operations",
+        "Cost ceiling and validity", "Rollback boundary",
+        "Stable owner-message source", "Approver", "Observed at",
+        "Verbatim receipt SHA-256", "Preflight evidence",
+        "Identity and boundary match", "Result",
+    )
+    row = (
+        "Read-only preflight", "AWS-READ-AUTH-0001", "AUTH-0001",
+        "fastlane-role", row_artifact,
+        "NOT_APPLICABLE — read-only preflight creates no plan",
+        "ACCOUNT: 111122223333; REGION: us-west-2; ENVIRONMENT: development",
+        "RESOURCES: fastlane-stack; OPERATIONS: cloudformation:DescribeStacks",
+        "COST: expected low-volume request charges under USD 0.01; "
+        "BOUNDED_BY: MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00; "
+        f"VALID_UNTIL: {valid_until}",
+        "NOT_APPLICABLE — no mutation", "owner-message-1", "owner-handle",
+        "2026-07-20T12:00:00+00:00", digest, "NONE", "PASS", "AUTHORIZED",
+    )
+    return "\n".join(
+        (
+            "<!-- bootstrap:aws-read-preflight-receipt:start -->",
+            "```text",
+            receipt,
+            "```",
+            "<!-- bootstrap:aws-read-preflight-receipt:end -->",
+            "## Action authorization provenance",
+            "| " + " | ".join(headers) + " |",
+            "|" + "|".join("---" for _ in headers) + "|",
+            "| " + " | ".join(row) + " |",
+            "| Deployment | " + " | ".join("TODO" for _ in headers[1:]) + " |",
+        )
+    )
+
+
 def aws_request(operation: str, stack: str = "fastlane-stack") -> dict[str, object]:
     return {
         "service_name": "cloudformation",
@@ -650,6 +713,133 @@ class FastlaneHookTests(unittest.TestCase):
                         },
                     )
                 )
+
+    def test_exact_read_preflight_receipt_is_required_and_cannot_mutate(self) -> None:
+        active_artifact = "sha256:" + "a" * 64
+        cost_posture = "MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00"
+        envelope = {
+            "AWS boundary": "READ_ONLY",
+            "AWS role or profile": "ROLE: fastlane-role",
+            "AWS account": "ACCOUNT: 111122223333",
+            "AWS Region": "REGION: us-west-2",
+            "AWS environment": "ENVIRONMENT: development; CLASS: NON_PRODUCTION",
+            "AWS resource allowlist": "RESOURCES: fastlane-stack",
+            "AWS allowed operations": "OPERATIONS: cloudformation:DescribeStacks",
+            "AWS cost ceiling": "USD: 20.00",
+            "AWS artifact authorization and provenance": (
+                f"EXACT_DIGEST: {active_artifact}"
+            ),
+            "AWS authorization validity": "NOT_APPLICABLE — exact read receipt required",
+            "Authorization expiry or completion condition": (
+                "Expires at 2099-12-31T23:59:59Z; earlier completion: release review"
+            ),
+            "GitHub boundary": "NONE",
+        }
+        context = doctor.Context(REPOSITORY_ROOT)
+        context.texts[doctor.VERIFY_FILE] = (
+            REPOSITORY_ROOT / doctor.VERIFY_FILE
+        ).read_text(encoding="utf-8")
+        gate_b_only = doctor.derive_external_authority(
+            context,
+            envelope,
+            "read-only",
+            "AUTH-0001",
+            cost_posture=cost_posture,
+            active_artifact=active_artifact,
+            aws_action_phase="AWS-10",
+            aws_progress_state=None,
+        )
+        self.assertEqual(gate_b_only["kind"], "NONE")
+        denied = fastlane_hook.handle_event(
+            "pre-tool-use",
+            payload(
+                "PreToolUse",
+                self.root,
+                tool_name="aws___call_aws",
+                tool_input=aws_request("DescribeStacks"),
+            ),
+            root=self.root,
+            doctor_report=report(
+                aws="AUTH-0001", external_authority=gate_b_only
+            ),
+            envelope=envelope,
+        )
+        self.assertIn(
+            "normalized current external authority is absent",
+            denied["hookSpecificOutput"]["permissionDecisionReason"],
+        )
+
+        context.texts[doctor.VERIFY_FILE] = read_preflight_document()
+        read_authority = doctor.derive_external_authority(
+            context,
+            envelope,
+            "read-only",
+            "AUTH-0001",
+            cost_posture=cost_posture,
+            active_artifact=active_artifact,
+            aws_action_phase="AWS-10",
+            aws_progress_state="AWS_PREFLIGHT_RUNNING",
+        )
+        self.assertEqual(read_authority["kind"], "AWS_READ_ONLY")
+        current_report = report(
+            aws="AUTH-0001", external_authority=read_authority
+        )
+        self.assertIsNone(
+            fastlane_hook.handle_event(
+                "pre-tool-use",
+                payload(
+                    "PreToolUse",
+                    self.root,
+                    tool_name="aws___call_aws",
+                    tool_input=aws_request("DescribeStacks"),
+                ),
+                root=self.root,
+                doctor_report=current_report,
+                envelope=envelope,
+            )
+        )
+        for operation in ("CreateStack", "DeleteStack"):
+            with self.subTest(operation=operation):
+                blocked = fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    payload(
+                        "PreToolUse",
+                        self.root,
+                        tool_name="aws___call_aws",
+                        tool_input=aws_request(operation),
+                    ),
+                    root=self.root,
+                    doctor_report=current_report,
+                    envelope=envelope,
+                )
+                self.assertEqual(
+                    blocked["hookSpecificOutput"]["permissionDecision"], "deny"
+                )
+
+        invalid_documents = (
+            read_preflight_document(
+                receipt_artifact="sha256:" + "a" * 64,
+                row_artifact="sha256:" + "b" * 64,
+            ),
+            read_preflight_document(valid_until="2000-01-01T00:00:00+00:00"),
+        )
+        for invalid_document in invalid_documents:
+            with self.subTest(case="stale-or-mismatched"):
+                context.texts[doctor.VERIFY_FILE] = invalid_document
+                invalid = doctor.derive_external_authority(
+                    context,
+                    envelope,
+                    "read-only",
+                    "AUTH-0001",
+                    cost_posture=cost_posture,
+                    active_artifact=active_artifact,
+                    aws_action_phase="AWS-10",
+                    aws_progress_state="AWS_PREFLIGHT_RUNNING",
+                )
+                self.assertEqual(
+                    invalid["kind"], "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
+                )
+                self.assertEqual(invalid["validity"], "REQUIRED")
 
         fast_dev = authority(
             "FAST_DEV_GATE_B", ["cloudformation:CreateStack"]

@@ -16,6 +16,11 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+try:
+    from fastlane_stdio import configure_utf8_standard_streams
+except ModuleNotFoundError:  # pragma: no cover - package-style test import
+    from scripts.fastlane_stdio import configure_utf8_standard_streams
+
 from pathlib import Path, PurePosixPath
 from typing import Iterator
 
@@ -3690,6 +3695,7 @@ def validate_cli_contract(args: argparse.Namespace) -> None:
 
 
 def main() -> int:
+    configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(
         description="Validate TASKS.md and perform coordinator-owned atomic updates."
     )

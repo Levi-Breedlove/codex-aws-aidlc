@@ -50,9 +50,9 @@ authority.
 | Project lane | Permitted operation | Required readiness and authorization |
 |---|---|---|
 | `documentation-only` | AWS documentation and repository-only planning; no authenticated AWS access | Current AUTH boundary `DOCS_ONLY` |
-| `read-only` | Authenticated observation inside the named account, Region, environment, and resource scope | Current AUTH boundary `READ_ONLY`; no mutation |
+| `read-only` | Authenticated observation inside the named account, Region, environment, and resource scope | Current Gate B `READ_ONLY` maximum boundary plus the exact current owner-authored read-only preflight receipt; no mutation |
 | `fast-dev` | Listed mutations in a non-production development target | Current Gate B `MUTATE_LISTED_RESOURCES` envelope plus successful AWS-10 read-only preflight and an exact final match |
-| `explicit-gate` | Documentation or read-only work by default; one separately authorized mutation | Current action-specific AWS-20 authorization containing every mutation-boundary field |
+| `explicit-gate` | Documentation or read-only work by default; one separately authorized mutation | Current Gate B `MUTATE_LISTED_RESOURCES` maximum for a planned mutation, successful AWS-10 preflight, and the current action-specific AWS-20 authorization |
 
 `NONE`, `DOCS_ONLY`, `READ_ONLY`, and `MUTATION` are prompt access modes; they
 are not interchangeable with project lane names. Every AWS mutation is
@@ -71,16 +71,41 @@ always requires its own exact deletion and retention authorization.
 ## Conditional AWS action receipts
 
 These are action-specific safety authorizations, not routine lifecycle gates.
-An `explicit-gate` deployment needs the exact first receipt. A `fast-dev`
-deployment may instead use the current Gate B envelope only when AWS-10 proves
+Authenticated AWS-10 preflight needs the exact first receipt. It permits only
+the named reads and grants no mutation. An `explicit-gate` deployment needs the
+exact second receipt. A `fast-dev` deployment may instead use the current Gate
+B envelope only when AWS-10 records an observed current preflight and proves
 the final operation is fully contained in it. Every teardown needs the exact
-second receipt, including under `fast-dev`.
+third receipt, including under `fast-dev`.
+
+For every authenticated lane, Gate B's `AWS allowed operations` is the
+deduplicated maximum union of exact operations needed across applicable
+AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 phases. Execution uses only the
+intersection of that maximum, the current phase mode, current evidence, and
+current phase-specific authority. Neither the union nor an action receipt may
+broaden Gate B.
 
 Accept a receipt only when the owner's message equals the applicable complete
 block after trimming surrounding whitespace. Replace every placeholder; reject
 extra, missing, duplicate, reordered, commented, or fenced lines and any value
 that differs from the current PRD, artifact, AWS-10/AWS-40 observation, or
 caller identity.
+
+```text
+AUTHORIZE AWS READ-ONLY PREFLIGHT
+Read authorization: AWS-READ-AUTH-0001
+Construction authorization: AUTH-0001
+Profile or role: <allowlisted profile or role>
+Account: <12-digit account ID or approved alias>
+Region: <AWS Region>
+Environment: <environment>
+Stack, application, and resources: <exact boundary>
+Allowed read-only operations: <exact read-only operations>
+Artifact digest: <immutable digest>
+Prohibited operations: ALL_MUTATIONS
+Valid until: <ISO 8601 time or exact one-operation condition>
+Approver: <name/handle>
+```
 
 ```text
 AUTHORIZE AWS DEPLOYMENT
@@ -118,15 +143,16 @@ Valid until: <ISO 8601 time or exact one-operation condition>
 Approver: <name/handle>
 ```
 
-The owner's exact message remains the authorization source. Before mutation,
-copy it verbatim into the matching uniquely marked deployment or teardown
-receipt block in docs/project/VERIFY.md and the protected external-operation journal named
-by the construction envelope. Recompute SHA-256 from the exact normalized
-marked receipt; do not copy or self-assert a digest. Record the same `Role or
-profile`, `Approver`, stable source, observed ISO 8601 time, and recomputed
-digest in docs/project/VERIFY.md's action-authorization evidence table. The copy and
+The owner's exact message remains the authorization source. Before
+authenticated read-only account access or mutation, copy it verbatim into the
+matching uniquely marked read-preflight, deployment, or teardown receipt block
+in docs/project/VERIFY.md and the protected external-operation journal named by
+the construction envelope. Recompute SHA-256 from the exact normalized marked
+receipt; do not copy or self-assert a digest. Record the same `Role or profile`,
+`Approver`, stable source, observed ISO 8601 time, and recomputed digest in
+docs/project/VERIFY.md's action-authorization evidence table. The copy and
 mirror do not create or widen authority. A missing durable source, mismatched
-role/profile or approver, or non-resolving receipt blocks mutation.
+role/profile or approver, or non-resolving receipt blocks the affected action.
 
 ## 1. Environments
 
@@ -154,8 +180,17 @@ Never place secret values in this document.
 
 ## 3. Read-only AWS preflight
 
-AWS-10 runs only when docs/project/VERIFY.md release state is `READY_TO_DEPLOY`. Before any
-mutation:
+AWS-10 runs only when docs/project/VERIFY.md release state is `READY_TO_DEPLOY`.
+First collect current documentation guidance without credentials or AWS account
+access. Then present the exact read-only receipt. Only after the owner supplies
+a current matching receipt may AWS-10 access its named account, profile or role,
+Region, environment, resources, and read operations. State plainly that this is
+authenticated read-only account access. Record `RUNNING`, then `READY`,
+`BLOCKED`, or `STALE` in the read-only preflight evidence table. Never infer a
+result from AWS Core documentation rows.
+
+Under the exact read scope, confirm identity and Region using attributable
+read-only operations such as:
 
 ```bash
 aws sts get-caller-identity
@@ -173,7 +208,8 @@ Confirm:
 - current budget and cost exposure;
 - change reversibility;
 - current matching REQ/DES/AUTH IDs and Gate B state;
-- current lane and complete action authorization when required;
+- current lane, exact read authorization, and separate mutation authorization
+  only after the observed preflight becomes ready;
 - no protected brownfield ownership, drift, or preservation conflict.
 
 Run IAM Access Analyzer `ValidatePolicy` only here, after current Gate B, as an
@@ -314,7 +350,7 @@ upload/download operation, positive expiration, and observable profile to that
 authority. Tool availability grants nothing.
 
 Both lanes remain subject to normal Codex owner approval, IAM, the exact
-deployment or teardown boundary, and AWS-30/AWS-50 evidence reconciliation.
+deployment or teardown boundary, and AWS-30/AWS-40 evidence reconciliation.
 An execution contract grants no authority, and deployment authority never
 authorizes teardown.
 
@@ -491,13 +527,26 @@ shared dependencies, cost effect, approver, and validity window. A deployment,
 rollback, Gate B fast-dev, or tool authorization does not substitute for this
 teardown authorization.
 
-Before execution, derive the expected removal/retention manifest from the
-approved IaC, observed stack state, and retention rules. After each bounded
-action, reconcile that manifest against stack events or equivalent operation
-history, retained resources, created or retained snapshots/backups, and live
-inventory. State the discovery limits explicitly: resource inventory can lag,
-omit unsupported or cross-account/cross-Region resources, and cannot prove
-absence outside the authorized search boundary.
+The optional release field `AWS lifecycle intent` selects one non-authorizing
+route: `NONE` stops, `RESIDUAL_REVIEW` runs AWS-40 and stops with the observed
+result, and `TEARDOWN` runs AWS-40 before any receipt is presented. AWS-50 is
+reachable only from a current `READY_FOR_TEARDOWN` AWS-40 row and the exact
+current teardown receipt.
+
+Before execution, AWS-40 derives the expected removal/retention manifest from
+the approved IaC, observed stack state, and retention rules. AWS-50 executes
+only the exact authorized mutation operations and records their direct service
+or request outcomes, including the exact `TEARDOWN-AUTH-*` ID and receipt
+SHA-256. It performs no authenticated inventory or other read-only
+reconciliation.
+
+After every AWS-50 attempt—`SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`—return
+to AWS-40 under current read authority. AWS-40 reconciles the manifest against
+operation history, retained resources, created or retained snapshots/backups,
+live inventory, residuals, and continuing billing signals. State the discovery
+limits explicitly: resource inventory can lag, omit unsupported or
+cross-account/cross-Region resources, and cannot prove absence outside the
+authorized search boundary.
 
 ```bash
 # Dry run or inventory
@@ -527,7 +576,8 @@ and recompute the safe deletion order before any further mutation.
 
 ## 14. Residual-resource and billing verification
 
-After teardown:
+Before a teardown decision and after every AWS-50 attempt, AWS-40 performs the
+authenticated read-only verification:
 
 ```bash
 # Resource inventory checks
@@ -547,7 +597,12 @@ Record:
 - inventory/discovery services, account/Region scope, cutoff, and known limits;
 - expected delayed billing records;
 - follow-up date;
-- owner.
+- owner;
+- an exact `Blocker or stale reason` when AWS-40 cannot complete or its evidence
+  is no longer current; all non-blocked, non-stale rows use `NONE`.
+
+Post-AWS-50 rows repeat the exact teardown authorization ID and receipt digest
+so terminal evidence cannot be attributed to a different destructive request.
 
 ## 15. Evidence capture
 
@@ -569,3 +624,9 @@ expiry, changed resources, billable residuals, and whether the observed operatio
 state is `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`. GitHub status
 or comment updates are written only when AUTH permits those exact operations;
 otherwise record `PENDING_SYNC` locally.
+
+A terminal teardown claim is valid only from AWS-40 evidence that reconciles
+the expected manifest, operation history, removed and retained resources,
+backups, residuals, discovery limits, and continuing cost. A post-mutation row
+also binds the exact teardown authorization and receipt digest. An AWS-50
+request result alone never proves clean teardown.

@@ -79,14 +79,17 @@ Generated projects should prove:
 - failures are safe and telemetry is observable;
 - DESIGN-10 records current AWS Core evidence for consequential architecture,
   IAM, Region, security, reliability, cost, and quota decisions;
-- AWS-10 records fresh operational and deployment evidence before AWS execution
-  planning; and
+- AWS-10 first records current documentation guidance without account access,
+  then requires the exact owner-approved read scope before authenticated
+  preflight, and records observed readiness before any mutation authorization;
+  and
 - deployment and teardown stay inside the named account, Region, environment,
   resources, operations, finite cost ceiling, rollback plan, and expiration.
 
-Use no AWS identity or a read-only identity by default. When mutation is
-approved, prefer a separate short-lived role scoped to the exact authorization.
-Gate A and Gate B do not substitute for AWS authorization.
+Use no AWS identity for documentation discovery. Use only the exact approved
+read-only identity for authenticated preflight. When mutation is separately
+approved, prefer a short-lived role scoped to that exact authorization. The
+read-only receipt, Gate A, and Gate B do not substitute for mutation authority.
 
 Do not hide a discovered defect. Record it in `docs/project/BUGFIX.md` or an
 authorized private issue while keeping sensitive evidence private.
