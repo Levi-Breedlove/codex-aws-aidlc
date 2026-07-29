@@ -4,14 +4,57 @@ on:
   pull_request:
   push:
     branches:
-      - main
       - fast-lane-maint
+      - Legacy
 
 permissions:
   contents: read
 
 jobs:
+  repository-precheck:
+    runs-on: ubuntu-latest
+    env:
+      FASTLANE_BASE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+    steps:
+      - name: Check out repository with comparison history
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python syntax and indentation
+        run: |
+          python -m compileall -q bootstrap.py scripts tests .codex/hooks
+          python -m tabnanny bootstrap.py scripts tests .codex/hooks
+
+      - name: Run repository governance monitors
+        run: >-
+          python -m unittest
+          tests.test_repository_hygiene
+          tests.test_markdown_integrity
+          tests.test_package_release.PackageReleaseTests.test_ci_workflow_is_read_only_hosted_and_immutably_pinned
+          tests.test_package_release.PackageReleaseTests.test_ci_push_branches_and_precheck_order_are_exact
+          -v
+
+      - name: Verify template manifest hashes
+        run: python scripts/update_manifest.py --check
+
+      - name: Enforce customer package version identity
+        if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'fast-lane-maint') || (github.event_name == 'push' && github.ref_name == 'fast-lane-maint') }}
+        run: python scripts/package_release.py --check --base-commit "${FASTLANE_BASE_COMMIT}"
+
+      - name: Verify deterministic release package
+        run: python scripts/package_release.py --check
+
   safety-tests:
+    needs: repository-precheck
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -19,6 +62,12 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
+      - name: Require successful repository precheck
+        if: ${{ needs.repository-precheck.result != 'success' }}
+        run: |
+          echo "Repository precheck did not pass."
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -42,9 +91,18 @@ jobs:
         run: python scripts/package_release.py --check
 
   windows-smoke:
+    needs: repository-precheck
+    if: ${{ always() }}
     runs-on: windows-latest
 
     steps:
+      - name: Require successful repository precheck
+        if: ${{ needs.repository-precheck.result != 'success' }}
+        shell: pwsh
+        run: |
+          Write-Error "Repository precheck did not pass."
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -83,9 +141,17 @@ jobs:
           python .\scripts\package_release.py --check
 
   macos-setup-smoke:
+    needs: repository-precheck
+    if: ${{ always() }}
     runs-on: macos-latest
 
     steps:
+      - name: Require successful repository precheck
+        if: ${{ needs.repository-precheck.result != 'success' }}
+        run: |
+          echo "Repository precheck did not pass."
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:

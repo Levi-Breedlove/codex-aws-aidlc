@@ -66,6 +66,14 @@ change budget.
 6. Refresh `bootstrap.manifest.json` only after source edits are final. Run
    focused tests, the full suite, manifest and deterministic package checks,
    and `git diff --check` before any authorized publication.
+7. For canonical customer-package maintenance, compare current package bytes
+   and inventory with one exact existing ancestor by running `python
+   scripts/package_release.py --check --base-commit <exact-base-commit>`.
+   Package changes require a strictly greater semantic version in
+   `bootstrap.manifest.json` and synchronized mirrors. The guard is read-only,
+   never fetches or publishes, and fails closed without the exact history. It
+   does not apply Fastlane framework-version rules to initialized adopter
+   application changes.
 
 ## Live customer publication
 

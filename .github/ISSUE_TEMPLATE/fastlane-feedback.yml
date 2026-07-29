@@ -1,0 +1,164 @@
+name: Fastlane controlled-preview feedback
+description: Share onboarding, gate, architecture, continuation, and resume feedback without private data.
+title: "[Fastlane Feedback] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing Fastlane.
+
+        **Privacy:** Use synthetic or non-sensitive project details. Do not include credentials, access tokens, real AWS account IDs or ARNs, employer or client data, home-directory paths, usernames, hostnames, email addresses, screenshots, attachments, or full/private Codex transcripts. Replace identifiers with `[REDACTED]` and describe behavior instead of pasting raw output.
+
+  - type: input
+    id: baseline
+    attributes:
+      label: Public Fastlane baseline
+      description: Enter the public version, commit SHA, or release checksum only. Do not paste a local path.
+      placeholder: "Example: 1.0.2 or a public commit SHA"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform category
+      options:
+        - Windows
+        - Windows with WSL
+        - macOS
+        - Linux
+        - Other or prefer not to say
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scenario
+    attributes:
+      label: Scenario tested
+      options:
+        - Complete MVP brief
+        - Vague greenfield idea
+        - Bounded bug fix
+        - Architecture-affecting feature
+        - Resume and side question
+        - Validation recovery
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: setup_retries
+    attributes:
+      label: Prerequisite retries before intake
+      options:
+        - "0"
+        - "1"
+        - "2"
+        - "3 or more"
+        - Intake was not reached
+    validations:
+      required: true
+
+  - type: dropdown
+    id: setup_resume
+    attributes:
+      label: Setup and resume behavior
+      options:
+        - Setup completed once and resume restored the correct stage
+        - Setup completed but repeated later
+        - Resume lost or changed the current stage
+        - Setup was blocked
+        - Resume was not tested
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gate_a
+    attributes:
+      label: Gate A clarity
+      options:
+        - Clear
+        - Mostly clear
+        - Unclear
+        - Not reached
+    validations:
+      required: true
+
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: Architecture recommendation
+      options:
+        - Clearly connected to the requirements
+        - Mostly understandable
+        - Unclear or insufficiently justified
+        - Asked me to choose technical services unnecessarily
+        - Not reached
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gate_b
+    attributes:
+      label: Gate B clarity
+      options:
+        - Clear
+        - Mostly clear
+        - Unclear
+        - Not reached
+    validations:
+      required: true
+
+  - type: dropdown
+    id: continuation
+    attributes:
+      label: Automatic continuation
+      options:
+        - Continued correctly
+        - Stopped when no human action was needed
+        - Continued across a real human decision
+        - Behavior was inconsistent
+        - Not reached
+    validations:
+      required: true
+
+  - type: dropdown
+    id: correction
+    attributes:
+      label: Correction behavior
+      options:
+        - Codex corrected a problem it created
+        - Codex asked me to fix a problem it created
+        - No correction occurred
+        - Unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: confusing
+    attributes:
+      label: Most confusing moment
+      description: Summarize the behavior without raw logs, screenshots, local paths, identifiers, or transcripts. Leave blank if nothing was confusing.
+      placeholder: Describe what happened, what you expected, and what Fastlane asked you to do.
+
+  - type: textarea
+    id: valuable
+    attributes:
+      label: Most useful behavior
+      description: What helped you understand, approve, or complete the project?
+
+  - type: textarea
+    id: blocker
+    attributes:
+      label: Barrier to real use
+      description: Describe the product or workflow barrier using sanitized, non-sensitive details.
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I used synthetic or non-sensitive project information.
+          required: true
+        - label: I removed credentials, tokens, real AWS identifiers, employer/client data, personal system information, attachments, and private transcripts.
+          required: true

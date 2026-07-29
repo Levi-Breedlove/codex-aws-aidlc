@@ -375,7 +375,7 @@ external mutation, before handing work to another session, and whenever work
 pauses or stops. Gate B requires a local Git repository and resolvable baseline
 commit. After each validated wave, the coordinator inspects the integrated
 diff, records EV evidence, commits only authorized wave changes, updates Last
-known-green commit and the checkpoint row to that commit, and then runs doctor.
+known-green commit and the checkpoint row to that commit, and then runs the Fastlane Engine.
 Only after those steps may the run pause or start another wave. Never absorb a
 protected dirty path into the checkpoint commit.
 

@@ -109,6 +109,27 @@ class FastlaneCliUtf8Tests(unittest.TestCase):
         self.assertIn("--unknown—option", stderr)
         self.assertEqual(completed.stdout, b"")
 
+    def test_engine_help_is_utf8_and_uses_public_terminology(self) -> None:
+        completed = run_cli("scripts/bootstrap_doctor.py", "--help")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        stdout = self.assert_utf8_without_local_root(completed.stdout)
+        self.assertIn("Read-only AWS Codex Fastlane Engine", stdout)
+        self.assertNotIn("project doctor", stdout.casefold())
+        self.assertEqual(completed.stderr, b"")
+
+
+    def test_engine_human_banner_is_utf8_and_public(self) -> None:
+        completed = run_cli(
+            "scripts/bootstrap_doctor.py",
+            "--root",
+            ".",
+            "--template-source",
+        )
+        self.assertIn(completed.returncode, (0, 1), completed.stderr)
+        stdout = self.assert_utf8_without_local_root(completed.stdout)
+        self.assertIn("AWS Codex Fastlane Engine:", stdout)
+        self.assertNotIn("Fastlane Doctor:", stdout)
+
     def test_presenter_output_is_utf8_under_legacy_windows_encoding(self) -> None:
         payload = {
             "report": {

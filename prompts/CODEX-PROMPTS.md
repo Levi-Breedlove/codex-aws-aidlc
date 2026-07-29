@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.0.1
+**Pack version:** 1.0.2
 
 This pack turns a rough idea or an existing repository into a reviewed,
 executable AWS delivery plan, then lets Codex run the approved work for long
@@ -51,7 +51,7 @@ THIS_REPOSITORY`, and the safely detected local-Git choice. For brownfield
 adoption, use
 `Setup: ADOPT_EXISTING_REPOSITORY` and an exact absolute target. BOOT-00 safely
 initializes or resumes the project, explains the workflow, and immediately
-begins the doctor-selected prompt. A new project proceeds directly into its
+begins the Fastlane Engine-selected prompt. A new project proceeds directly into its
 first guided-intake questions.
 
 For an initialized repository, use the prompt matching the current state. Do
@@ -60,7 +60,7 @@ not skip a missing Gate A or Gate B.
 ## Codex-native skill routing
 
 The implicit `fastlane` skill is the sole application coordinator and writer.
-It progressively loads the phase procedure selected by the doctor.
+It progressively loads the phase procedure selected by the Engine.
 `launch-fastlane`, `plan-fastlane`, and `build-fastlane` are explicit
 compatibility aliases that delegate to `fastlane`; they never run separate
 lifecycles. `explain-fastlane` and `operate-fastlane-aws` are explicit-only.
@@ -193,7 +193,7 @@ UTF-8 bytes; SHA-256 lowercase hex. The agent review, owner record, proposed
 receipt, and returned receipt must all contain the same digest. Any envelope
 change increments AUTH, makes Gate B stale, and requires a new digest and owner
 receipt. Before hashing, set the envelope's `Design contract SHA-256` to the
-doctor-derived current value. A changed Technology decision, Property
+Engine-derived current value. A changed Technology decision, Property
 applicability, Property definition, or Property execution table therefore
 invalidates that row; correcting it changes the envelope digest and requires
 new Gate B approval.
@@ -367,7 +367,7 @@ least-privileged write profile only for an authorized operation.
 AWS Core selects a currently supported account-operation tool; never make a
 tool name a product dependency or infer a lane from prose. `STRUCTURED_API` is
 one attributable operation whose observable service, operation, context,
-parameters, and resources fit current doctor-derived authority.
+parameters, and resources fit current Engine-derived authority.
 `REVIEWED_SCRIPT` is a legitimate multi-step workflow bound by one current
 `AWS-EXEC-*` record in `docs/project/VERIFY.md` to the exact authority and one
 script or immutable artifact SHA-256. The record grants nothing. Stale,
@@ -441,7 +441,7 @@ gate, and AWS receipts into one wall of metadata.
 #### Routine status
 
 Use this for BOOT-00, intake, requirements, design work, tasks, construction,
-GitHub synchronization, and release review. Pass the current doctor report as
+GitHub synchronization, and release review. Pass the current Engine report as
 JSON on stdin to `python scripts/fastlane_presenter.py owner --input-stdin`.
 Do not hand-compose lifecycle routing. The presenter uses exactly these owner
 fields:
@@ -464,13 +464,13 @@ it adds no decision value. Never expose prompt IDs as owner instructions, or
 include internal hashes, file counts, repetitive `NONE` values, implementation
 narration, or exhaustive AWS authority fields.
 
-The doctor's additive `remediation` object classifies each error with a stable
+The Engine's additive `remediation` object classifies each error with a stable
 `DGN-*` ID, responsible party, category, and automatic-correction decision,
 then derives one `next_action`. Any `MANUAL_SAFETY_REVIEW` item blocks automatic
 correction. Unknown codes fail closed to `HUMAN_REVIEWER`. Safe Codex and owner
 items may coexist: correct only independent Codex-owned defects first, preserve
 owner-controlled requirements, architecture, technologies, gates, receipts,
-and authority, then validate and rerun the doctor. Never infer that manifest
+and authority, then validate and rerun the Engine. Never infer that manifest
 drift followed an authorized maintenance change; only a passing scoped
 `maintain-fastlane` preflight permits regeneration.
 
@@ -479,7 +479,7 @@ reported in-scope defect inside the current write boundary and attempt budget,
 reruns validation, and continues. `REVIEW_SAFETY_BLOCKER` is reserved for a
 genuine human safety review.
 
-For a side question, answer directly, rerun the doctor, and pass the unchanged
+For a side question, answer directly, rerun the Engine, and pass the unchanged
 report plus the answer to `python scripts/fastlane_presenter.py side-question
 --input-stdin`. State whether project state changed and restore the current next
 action. Do not repeat a formal Gate A, Gate B, or AWS receipt merely
@@ -560,7 +560,7 @@ command.
 
 **Authoritative inputs:** Canonical repository and optional adoption-target
 paths; manifest and source hashes; bootstrap dry-run; prerequisite,
-dependency-check, and doctor JSON; applicable `AGENTS.md` files; Git state;
+dependency-check, and Engine JSON; applicable `AGENTS.md` files; Git state;
 project source records; and allowlisted, ephemeral capability observations
 attributable to official AWS Core in the current Codex session.
 
@@ -584,13 +584,13 @@ mutation.
 
 **Stop conditions:** Fresh prerequisite failure; unsafe or ambiguous roots;
 source/target containment; maintainer-source, manifest, hash, symlink,
-dirty-template, collision, adoption-record, partial-write, dependency, doctor,
+dirty-template, collision, adoption-record, partial-write, dependency, Engine,
 or source-of-truth failure.
 
 **Receipt:** One prerequisite checklist when blocked; otherwise one routine
-owner update followed by the questions or work selected by the doctor.
+owner update followed by the questions or work selected by the Engine.
 
-**Next:** Welcome and setup questions after prerequisites, or the exact doctor
+**Next:** Welcome and setup questions after prerequisites, or the exact Engine
 route for an initialized project.
 
 ~~~text
@@ -611,7 +611,7 @@ previous local blocker.
 
    If the project is already initialized, do not print the welcome, ask setup
    questions, rerun prerequisites, rerun initialization, or narrate repository
-   checks. Run the dependency check and doctor, then resume its `interaction`
+   checks. Run the dependency check and the Engine, then resume its `interaction`
    state.
 
 2. Only for an unconfigured template, first run:
@@ -694,7 +694,7 @@ previous local blocker.
 
    python scripts/bootstrap_doctor.py --root <target> --json
 
-   The doctor is the lifecycle router. Its `interaction` object is the only
+   The Fastlane Engine is the lifecycle router. Its `interaction` object is the only
    owner stage, response mode, action, continuation, receipt, and AWS Core
    materiality state. Prompt IDs remain internal metadata.
 
@@ -702,7 +702,7 @@ previous local blocker.
    owner facts are missing and otherwise REQ-10; a current Gate A receipt
    awaiting approval goes to INTAKE-20; a stale Gate B with current Gate A goes
    to DESIGN-10; approved Gate B with an uninitialized or stale task plan goes
-   to TASK-10. Otherwise use the doctor state or stop on conflict. Never restart
+   to TASK-10. Otherwise use the Engine state or stop on conflict. Never restart
    BOOT-00 or prerequisites after initialization.
 
    Contract migration is Codex-owned generated work, not owner setup. Preserve an unchanged approved schema 1.2 Gate A as the design-only bridge to schema 5, and preserve an unchanged approved schema 4 Gate B for its exact design and envelope.
@@ -718,7 +718,7 @@ previous local blocker.
 8. Execute the selected action immediately when
    `automatic_continuation_allowed` is true. At first intake, ask one to three
    plain-language questions below the Define update. At later stages, resume
-   the selected phase. After each phase checkpoint, rerun the doctor in the
+   the selected phase. After each phase checkpoint, rerun the Engine in the
    same turn and repeat this loop until a declared stop condition. A changed
    internal prompt ID is never itself a reason to pause.
    Never ask an initialized project for another `init template` or completed
@@ -919,7 +919,7 @@ open owner decision. Make one attempt per requirements revision and wait no
 more than 60 seconds. If it fails, stalls, or is unavailable, stop it, record
 `Independent requirements challenge: UNAVAILABLE — coordinator checklist completed`
 in the current Gate A Recommendation rationale, perform the checklist as the
-coordinator, rerun the doctor and deterministic presenter, and continue. Never
+coordinator, rerun the Engine and deterministic presenter, and continue. Never
 expose reviewer timing or orchestration or turn its availability into an owner
 action. Classify REQ-10 AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
 `NOT_MATERIAL`. Use `REQUIRED` when Gate A depends on current AWS facts for
@@ -1081,7 +1081,7 @@ mirror to APPROVED_FOR_DESIGN. Record the
 observed ISO 8601 authorization time and exact message/issue/meeting-record
 source as structured provenance without adding either value to the receipt.
 Do not invent a source. After acceptance, return the exact recorded Gate A
-receipt and do not combine it with a routine response. Then rerun the doctor in
+receipt and do not combine it with a routine response. Then rerun the Engine in
 the same turn and begin Design without requesting another owner message merely
 to cross the internal route. Before acceptance, put the exact proposed Gate A
 receipt last after a concise readiness summary.
@@ -1301,7 +1301,7 @@ paths, and `TASK-10` as the next safe action while the plan state is
 UNINITIALIZED or STALE.
 After acceptance, return the exact recorded Gate B receipt. Before acceptance,
 put the exact proposed Gate B receipt last after a concise readiness summary.
-After recording an accepted receipt, rerun the doctor in the same turn and
+After recording an accepted receipt, rerun the Engine in the same turn and
 continue through task generation and permitted local construction without
 requesting another owner message merely to cross the internal route.
 ~~~
@@ -1356,7 +1356,7 @@ return the routine status.
 authorization; or a defect fully covered by that authorization.
 
 **Authoritative inputs:** AGENTS.md; docs/project/PRD.md; docs/project/BUGFIX.md when applicable; current code/tests/IaC;
-docs/project/TASKS.md; docs/project/VERIFY.md; docs/project/RUNBOOK.md; bootstrap.yaml; passing bootstrap doctor output.
+docs/project/TASKS.md; docs/project/VERIFY.md; docs/project/RUNBOOK.md; bootstrap.yaml; passing Fastlane Engine output.
 
 **Permitted writes:** docs/project/TASKS.md and its matching `bootstrap.yaml` task-plan mirror
 as one checkpoint; no implementation.
@@ -1396,7 +1396,7 @@ evidence, approved boundaries, current execution log and checkpoint, no
 unresolved blocker or placeholder, and complete required documentation and
 runbook changes. Do not repeat these method labels as new task metadata.
 
-Run the read-only bootstrap doctor first. Task-plan state is exactly
+Run the read-only Fastlane Engine first. Task-plan state is exactly
 UNINITIALIZED, CURRENT, or STALE. Set the next monotonic Task-plan revision such
 as PLAN-0001 and change state to CURRENT only after the complete replacement
 graph validates. If the old state is STALE, first reconcile every IN_PROGRESS
@@ -1474,7 +1474,7 @@ GitHub objects, implement code, or access AWS. Validate task graph consistency
 with `python scripts/task_waves.py docs/project/TASKS.md`, inspect candidates with
 `python scripts/task_waves.py docs/project/TASKS.md --ready --json`, commit the validated
 current plan locally within the Gate B command/write boundary, update Last
-known-green and the checkpoint registry, and rerun the doctor. Never push or
+known-green and the checkpoint registry, and rerun the Engine. Never push or
 touch a remote unless separately authorized. Return the routine status.
 
 `Maximum workers: 1` limits task claims and mutable execution. A conditional
@@ -1490,7 +1490,7 @@ dependencies complete; write and external-state sets are available; local Git
 baseline resolves.
 
 **Authoritative inputs:** Applicable AGENTS.md; task-linked PRD/BUGFIX sections; task entry;
-relevant code, tests, IaC, docs/project/VERIFY.md, docs/project/RUNBOOK.md, bootstrap.yaml, and doctor output.
+relevant code, tests, IaC, docs/project/VERIFY.md, docs/project/RUNBOOK.md, bootstrap.yaml, and Engine output.
 
 **Permitted writes:** Named task write set; coordinator-serialized updates to
 docs/project/TASKS.md, docs/project/VERIFY.md, and bootstrap.yaml; docs/project/RUNBOOK.md only when repeatable
@@ -1518,7 +1518,7 @@ hypothesis.
 [BUILD-10]
 Execute task <TASK-ID> and no unrelated task.
 
-Before editing, run doctor and verify its READY state, dependencies (DONE or an
+Before editing, run the Engine and verify its READY state, dependencies (DONE or an
 explicitly waived SKIPPED prerequisite), exact write set, active REQ/DES/AUTH
 IDs, and external authorization. Use the coordinator tool rather than hand
 editing run or claim fields. Allocate the next unused monotonic IDs and replace
@@ -1601,7 +1601,7 @@ Run start and issue synchronization do not invent checkpoints; never reuse one.
 
 Before pausing, inspect the final diff, record `EV-0001`-style evidence, commit
 only the authorized validated task changes, and update Last known-green commit
-and the checkpoint row to that commit. Run doctor after those updates. Do not
+and the checkpoint row to that commit. Run the Engine after those updates. Do not
 commit a protected dirty path or use a remote Git operation unless separately
 authorized.
 
@@ -1619,7 +1619,7 @@ execution; docs/project/TASKS.md plan is CURRENT and its graph is valid; at leas
 task; local Git baseline resolves.
 
 **Authoritative inputs:** All sources required by eligible tasks; bootstrap.yaml;
-passing doctor output; last clean coordinator checkpoint.
+passing Engine output; last clean coordinator checkpoint.
 
 **Permitted writes:** Eligible task write sets; coordinator-only serialized writes to
 docs/project/TASKS.md, docs/project/VERIFY.md, docs/project/RUNBOOK.md, bootstrap.yaml, shared manifests, lockfiles, schemas,
@@ -1671,7 +1671,7 @@ framework, toolchain, command, run target, or replay method. Block the task and
 route to DESIGN-10 on any mismatch or unavailable selection.
 
 Use this loop:
-1. run doctor and reconcile PRD, docs/project/TASKS.md, bootstrap.yaml,
+1. run the Engine and reconcile PRD, docs/project/TASKS.md, bootstrap.yaml,
    REQ/DES/AUTH, baseline, protected dirty paths, task states, and the external
    operation journal;
 2. atomically acquire one durable coordinator run ID; a pre-existing RUNNING
@@ -1693,8 +1693,8 @@ Use this loop:
 7. when all tasks are terminal, run
    `--complete-run RUN-0001 --coordinator codex-coordinator --checkpoint CP-0002`.
    Otherwise run `--pause-run RUN-0001 --coordinator codex-coordinator
-   --checkpoint CP-0002`, run doctor and aggregate tests, then resume the
-   same run and coordinator. Never run doctor against a persisted RUNNING
+   --checkpoint CP-0002`, run the Engine and aggregate tests, then resume the
+   same run and coordinator. Never run the Engine against a persisted RUNNING
    snapshot or commit protected dirty paths.
 
 No subagent may edit implementation files, shared controls, protected or dirty
@@ -1704,7 +1704,7 @@ completion. Journal every external operation before execution. Reconcile
 UNKNOWN or partial results read-only before retrying. Keep GitHub operations
 within AUTH. Route AWS mutation through AWS-10/AWS-20.
 
-After every reconciled task or wave, rerun the doctor, derive progress only
+After every reconciled task or wave, rerun the Engine, derive progress only
 from its task totals and task-ID fields through `fastlane_presenter.py`, and
 continue the next READY task in the same turn when the owner action is
 `NONE_CONTINUE_AUTOMATICALLY`. Continue through safe waves without asking

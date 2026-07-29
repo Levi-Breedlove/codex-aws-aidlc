@@ -1473,7 +1473,7 @@ decision, property, or defect ID. It must include every current `TECH-*` row and
 every applicable `PROP-*` execution row plus the selected `ARCH-*`; omission
 makes Gate B non-runnable. `Architecture/components` on the readiness card is
 exactly that selected `ARCH-*`.
-`Design contract SHA-256` must exactly equal the doctor's current derived hash
+`Design contract SHA-256` must exactly equal the Engine's current derived hash
 of the Architecture driver, Candidate, Selection, Traceability, Material AWS
 evidence, Harness, Change impact, Technology decision, Property applicability,
 Property definition, and Property execution tables in that order. The baseline

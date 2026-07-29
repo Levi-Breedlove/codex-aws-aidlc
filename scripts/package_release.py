@@ -10,6 +10,7 @@ import json
 import os
 import re
 import stat
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -22,8 +23,9 @@ ARCHIVE_NAME = "aws-codex-fastlane-bootstrap.zip"
 ARCHIVE_ROOT = "aws-codex-fastlane-bootstrap"
 DEFAULT_OUTPUT_DIRECTORY = "dist"
 FIXED_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
-SEMVER_PATTERN = re.compile(r"\d+\.\d+\.\d+")
+SEMVER_PATTERN = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+COMMIT_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 REQUIRED_SETUP_ASSETS = {
     "docs/DEPENDENCY-POLICY.md",
     "docs/SETUP.md",
@@ -137,6 +139,131 @@ def validate_manifest_hashes(
             )
 
 
+def validate_historical_manifest_hashes(
+    manifest: dict[str, object],
+    files: list[tuple[str, bytes]],
+) -> None:
+    """Validate the source and controls declared by one historical package."""
+
+    contents = dict(files)
+    expected_sources = set(contents) - {MANIFEST_FILE}
+    source_hashes = manifest.get("source_sha256")
+    control_hashes = manifest.get("control_sha256")
+    if not isinstance(source_hashes, dict):
+        raise PackagingError("Base manifest source_sha256 must be an object")
+    if not isinstance(control_hashes, dict):
+        raise PackagingError("Base manifest control_sha256 must be an object")
+    if set(source_hashes) != expected_sources:
+        raise PackagingError("Base manifest source inventory is incorrect")
+    if not set(control_hashes).issubset(expected_sources):
+        raise PackagingError("Base manifest control inventory is incorrect")
+    for relative in sorted(expected_sources):
+        stored = source_hashes[relative]
+        if not isinstance(stored, str) or SHA256_PATTERN.fullmatch(stored) is None:
+            raise PackagingError(f"Base manifest source hash is invalid: {relative}")
+        if hashlib.sha256(contents[relative]).hexdigest() != stored:
+            raise PackagingError(f"Base manifest source hash mismatch: {relative}")
+    for relative in sorted(control_hashes):
+        stored = control_hashes[relative]
+        if not isinstance(stored, str) or SHA256_PATTERN.fullmatch(stored) is None:
+            raise PackagingError(f"Base manifest control hash is invalid: {relative}")
+        if hashlib.sha256(contents[relative]).hexdigest() != stored:
+            raise PackagingError(f"Base manifest control hash mismatch: {relative}")
+        if stored != source_hashes[relative]:
+            raise PackagingError(
+                f"Base manifest source and control hashes disagree: {relative}"
+            )
+
+
+def release_manifest_values(manifest: object) -> tuple[str, list[str]]:
+    """Return the validated version and canonical package inventory."""
+
+    if not isinstance(manifest, dict):
+        raise PackagingError("Release manifest must be a JSON object")
+    version = manifest.get("bootstrap_version")
+    if not isinstance(version, str) or SEMVER_PATTERN.fullmatch(version) is None:
+        raise PackagingError(
+            "bootstrap.manifest.json bootstrap_version must contain one semantic version"
+        )
+    raw_files = manifest.get("required_files")
+    if not isinstance(raw_files, list) or not raw_files:
+        raise PackagingError("Manifest required_files must be a non-empty array")
+
+    paths: list[str] = []
+    seen: set[str] = set()
+    folded: set[str] = set()
+    for raw in raw_files:
+        relative = validate_relative_path(raw)
+        if relative in seen or relative.casefold() in folded:
+            raise PackagingError(
+                f"Duplicate or case-colliding manifest path: {relative}"
+            )
+        paths.append(relative)
+        seen.add(relative)
+        folded.add(relative.casefold())
+    if paths != sorted(seen):
+        raise PackagingError("Manifest required_files must be sorted canonically")
+    if MANIFEST_FILE not in seen:
+        raise PackagingError(
+            f"Manifest required_files must include {MANIFEST_FILE}"
+        )
+    if tuple(int(part) for part in version.split(".")) >= (1, 1, 0):
+        missing_setup = sorted(REQUIRED_SETUP_ASSETS - set(paths))
+        if missing_setup:
+            raise PackagingError(
+                "Manifest omits official AWS Core setup assets: "
+                + ", ".join(missing_setup)
+            )
+    return version, paths
+
+
+def _git_bytes(repo_root: Path, *arguments: str) -> bytes:
+    """Run one read-only Git query and return its exact stdout bytes."""
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), *arguments],
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise PackagingError("Git is unavailable for read-only package comparison") from exc
+    if result.returncode != 0:
+        raise PackagingError(
+            "Exact base commit is unavailable in this checkout; provide sufficient "
+            "read-only history"
+        )
+    return result.stdout
+
+
+def load_release_files_from_commit(
+    repo_root: Path,
+    commit: str,
+) -> tuple[str, list[tuple[str, bytes]]]:
+    """Load and validate exact release bytes from one existing Git commit."""
+
+    if COMMIT_PATTERN.fullmatch(commit) is None:
+        raise PackagingError("Base commit must be one exact lowercase Git object ID")
+    repo_root = repo_root.resolve()
+    resolved = _git_bytes(repo_root, "rev-parse", "--verify", f"{commit}^{{commit}}")
+    if resolved.decode("ascii", errors="strict").strip() != commit:
+        raise PackagingError("Base commit does not resolve to the exact supplied object ID")
+    _git_bytes(repo_root, "merge-base", "--is-ancestor", commit, "HEAD")
+    manifest_bytes = _git_bytes(repo_root, "show", f"{commit}:{MANIFEST_FILE}")
+    try:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PackagingError(f"Base release manifest is invalid: {exc}") from exc
+    version, paths = release_manifest_values(manifest)
+    files = [
+        (relative, _git_bytes(repo_root, "show", f"{commit}:{relative}"))
+        for relative in paths
+    ]
+    validate_historical_manifest_hashes(manifest, files)
+    return version, files
+
+
 def load_release_files(repo_root: Path = REPOSITORY_ROOT) -> tuple[str, list[tuple[str, bytes]]]:
     """Load the manifest version and exact release file bytes."""
 
@@ -152,40 +279,14 @@ def load_release_files(repo_root: Path = REPOSITORY_ROOT) -> tuple[str, list[tup
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise PackagingError(f"Unable to read release manifest: {exc}") from exc
-    if not isinstance(manifest, dict):
-        raise PackagingError("Release manifest must be a JSON object")
-    version = manifest.get("bootstrap_version")
-    if not isinstance(version, str) or SEMVER_PATTERN.fullmatch(version) is None:
-        raise PackagingError(
-            "bootstrap.manifest.json bootstrap_version must contain one semantic version"
-        )
-    raw_files = manifest.get("required_files")
-    if not isinstance(raw_files, list) or not raw_files:
-        raise PackagingError("Manifest required_files must be a non-empty array")
-    if tuple(int(part) for part in version.split(".")) >= (1, 1, 0):
-        inventory = {item for item in raw_files if isinstance(item, str)}
-        missing_setup = sorted(REQUIRED_SETUP_ASSETS - inventory)
-        if missing_setup:
-            raise PackagingError(
-                "Manifest omits official AWS Core setup assets: "
-                + ", ".join(missing_setup)
-            )
+    version, paths = release_manifest_values(manifest)
     files: list[tuple[str, bytes]] = []
-    seen: set[str] = set()
-    folded: set[str] = set()
-    for raw in raw_files:
-        relative = validate_relative_path(raw)
-        if relative in seen or relative.casefold() in folded:
-            raise PackagingError(f"Duplicate or case-colliding manifest path: {relative}")
-        seen.add(relative)
-        folded.add(relative.casefold())
+    for relative in paths:
         source = template_root.joinpath(*PurePosixPath(relative).parts)
         if has_symlink_component(template_root, relative) or not source.is_file():
             raise PackagingError(f"Release file is missing or unsafe: {relative}")
         files.append((relative, source.read_bytes()))
 
-    if [path for path, _ in files] != sorted(seen):
-        raise PackagingError("Manifest required_files must be sorted canonically")
     validate_manifest_hashes(manifest, files)
     return version, files
 
@@ -301,6 +402,27 @@ def check_release(repo_root: Path = REPOSITORY_ROOT) -> str:
     return hashlib.sha256(first).hexdigest()
 
 
+def check_versioned_package_change(repo_root: Path, base_commit: str) -> bool:
+    """Require a strict version bump whenever package bytes or inventory change."""
+
+    base_version, base_files = load_release_files_from_commit(repo_root, base_commit)
+    current_version, current_files = load_release_files(repo_root)
+    base_semver = tuple(int(part) for part in base_version.split("."))
+    current_semver = tuple(int(part) for part in current_version.split("."))
+    changed = base_files != current_files
+    if current_semver < base_semver:
+        raise PackagingError(
+            f"Customer package version regressed from {base_version} to {current_version}"
+        )
+    if changed and current_semver <= base_semver:
+        raise PackagingError(
+            "Customer package bytes or inventory changed without a strictly greater "
+            "semantic "
+            f"version (base {base_version}; current {current_version})"
+        )
+    return changed
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Build or verify the deterministic Fastlane release package."
@@ -309,6 +431,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--check",
         action="store_true",
         help="Validate the manifest and deterministic archive bytes without writing files",
+    )
+    parser.add_argument(
+        "--base-commit",
+        help=("Exact existing ancestor commit used to enforce package version identity"),
     )
     parser.add_argument(
         "--output",
@@ -320,11 +446,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+    if args.base_commit and not args.check:
+        parser.error("--base-commit requires --check")
     archive_path = args.output.expanduser().resolve()
     try:
         if args.check:
             digest = check_release(REPOSITORY_ROOT)
+            changed = None
+            if args.base_commit:
+                changed = check_versioned_package_change(
+                    REPOSITORY_ROOT,
+                    args.base_commit,
+                )
             print("Release package verified in memory")
+            if changed is not None:
+                print(
+                    "Package version guard: "
+                    + ("version increment verified" if changed else "package unchanged")
+                )
             print(f"SHA-256: {digest}")
             return 0
         else:

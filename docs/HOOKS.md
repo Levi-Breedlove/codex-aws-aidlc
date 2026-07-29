@@ -27,21 +27,21 @@ Remove the copied `.codex/hooks.json` to disable the pack.
 
 | Event | Behavior |
 |---|---|
-| `SessionStart` | Runs the doctor read-only; an untouched template gets prerequisite context, while an initialized project gets short current-state context. |
-| `PreToolUse` | Uses the doctor's current write and external-authority projections to deny only clearly out-of-bound requests. |
+| `SessionStart` | Runs the Fastlane Engine read-only; an untouched template gets prerequisite context, while an initialized project gets short current-state context. |
+| `PreToolUse` | Uses the Engine's current write and external-authority projections to deny only clearly out-of-bound requests. |
 | `PermissionRequest` | Never auto-allows escalation; otherwise preserves the normal owner approval flow. |
 | `PostToolUse` | Runs the smallest relevant validation and returns bounded corrective context without creating evidence. |
-| `Stop` | Continues only when the doctor permits automatic continuation, no owner action is required, and no formal receipt is pending. |
+| `Stop` | Continues only when the Engine permits automatic continuation, no owner action is required, and no formal receipt is pending. |
 
 AWS documentation tools remain available without account access or mutation
 authority. Authenticated AWS preflight tools require the exact current
 `AUTHORIZE AWS READ-ONLY PREFLIGHT` receipt and may perform only its named reads
-against its named identity and boundary. The doctor projects this bounded scope
+against its named identity and boundary. The Engine projects this bounded scope
 as `AWS_READ_ONLY`; the receipt never authorizes mutation. Fast Dev mutations
 must fit a current Gate B `MUTATE_LISTED_RESOURCES` envelope and follow an
 observed ready preflight. Explicit-gate mutations additionally require current
 exact AWS-20 authority, and teardown requires its distinct receipt. The handler
-consumes only the doctor's derived, normalized
+consumes only the Engine's derived, normalized
 `external_authority.request_match`; it never reparses a receipt.
 
 The example matches generic `aws___*` and `mcp__server__tool` families.
@@ -54,7 +54,7 @@ regular, non-symlink artifact whose SHA-256 matches its current `AWS-EXEC-*`
 contract. Opaque, unbound, stale, wrong-kind, and teardown-conflicting account
 scripts are denied. A description never proves script content.
 
-Task polling requires an exact task identifier already present in the doctor's
+Task polling requires an exact task identifier already present in the Engine's
 derived authority; otherwise the optional adapter denies it. Presigned URL
 requests must expose the S3 object, upload/download direction, positive
 expiration, and matching profile when present. Their operation, resource, and
