@@ -13458,7 +13458,7 @@ def build_report(
 def print_human(report: dict[str, Any]) -> None:
     status = "PASS" if report["ok"] else "BLOCKED"
     basis = report["basis"]
-    print(f"AWS Codex Fastlane Doctor: {status}")
+    print(f"AWS Codex Fastlane Engine: {status}")
     print(f"Classification: {report['classification']}")
     print(f"Lifecycle: {report['lifecycle_state']}")
     print(
@@ -13532,7 +13532,7 @@ def _parse_current_intake_response(args: argparse.Namespace) -> tuple[dict[str, 
 
 def main(argv: list[str] | None = None) -> int:
     configure_utf8_standard_streams()
-    parser = argparse.ArgumentParser(description="Read-only AWS Codex Fastlane project doctor")
+    parser = argparse.ArgumentParser(description="Read-only AWS Codex Fastlane Engine")
     parser.add_argument(
         "--root",
         type=Path,

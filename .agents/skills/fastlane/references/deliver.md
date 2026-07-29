@@ -52,9 +52,9 @@ Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10.
   pause only the affected AWS-specific task with one recovery action; never
   guess or restart intake.
 - Continue autonomously while work remains current, ready, safe, and inside
-  Gate B. After each reconciled task or wave, rerun the doctor and continue in
+  Gate B. After each reconciled task or wave, rerun the Engine and continue in
   the same turn when it returns `NONE_CONTINUE_AUTOMATICALLY`.
-- Derive owner-visible task progress only from the doctor's task totals and
+- Derive owner-visible task progress only from the Engine's task totals and
   task-ID fields through `fastlane_presenter.py`; never estimate progress from
   narration.
 - At READY_TO_DEPLOY, keep AWS documentation guidance, authenticated read-only

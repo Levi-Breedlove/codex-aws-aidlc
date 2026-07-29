@@ -464,7 +464,7 @@ class FastlaneHookTests(unittest.TestCase):
             ({"aws_profile": "fastlane-role"}, "exact task identifier"),
             (
                 {"task_id": "task-123", "aws_profile": "fastlane-role"},
-                "not bound in current doctor-derived authority",
+                "not bound by the current Fastlane Engine authority",
             ),
         ):
             with self.subTest(reason=reason):

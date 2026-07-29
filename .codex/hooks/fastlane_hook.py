@@ -169,9 +169,9 @@ def run_doctor(root: Path) -> dict[str, Any]:
     try:
         report = json.loads(completed.stdout)
     except json.JSONDecodeError as exc:
-        raise HookInputError("Fastlane doctor did not return JSON") from exc
+        raise HookInputError("Fastlane Engine did not return JSON") from exc
     if not isinstance(report, dict):
-        raise HookInputError("Fastlane doctor returned an invalid report")
+        raise HookInputError("Fastlane Engine returned an invalid report")
     return report
 
 
@@ -742,7 +742,7 @@ def _task_poll_denial(
     if not isinstance(allowed, list) and isinstance(contract, Mapping):
         allowed = contract.get("task_ids")
     if not isinstance(allowed, list) or not allowed:
-        return "Fastlane blocked AWS task polling because the task is not bound in current doctor-derived authority."
+        return "Fastlane blocked AWS task polling because the task is not bound by the current Fastlane Engine authority."
     if any(not _exact_value_allowed(str(task_id), allowed) for task_id in task_ids):
         return "Fastlane blocked AWS task polling because a task identifier is outside current authority."
     expected_profile = match.get("role_or_profile")
@@ -1082,8 +1082,8 @@ def handle_event(
     return {
         "decision": "block",
         "reason": (
-            "Fastlane doctor permits automatic continuation. Continue the current "
-            "lifecycle phase, run its required validation, checkpoint, and rerun the doctor."
+            "The Fastlane Engine permits automatic continuation. Continue the current "
+            "lifecycle phase, run its required validation, checkpoint, and rerun the Engine."
         ),
     }
 

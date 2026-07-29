@@ -17,6 +17,8 @@ from pathlib import Path
 from unittest import mock
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+PREVIOUS_PACKAGE_VERSION = "1" + ".0.1"
+
 SCRIPT_PATH = REPOSITORY_ROOT / "scripts" / "package_release.py"
 TEMPLATE_SOURCE_MODE = "{{SETUP_STATUS}}" in (
     REPOSITORY_ROOT / "bootstrap.yaml"
@@ -33,6 +35,75 @@ SPEC.loader.exec_module(package_release)
 
 
 class PackageReleaseTests(unittest.TestCase):
+    @staticmethod
+    def _git(root: Path, *arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    def _write_synthetic_package(
+        self,
+        root: Path,
+        version: str,
+        marker: str,
+        *,
+        historical_controls: bool = False,
+        extra_path: str | None = None,
+    ) -> None:
+        controls = set(package_release.REQUIRED_CONTROL_FILES)
+        if historical_controls:
+            controls.remove("scripts/fastlane_stdio.py")
+        contents = {
+            relative: f"{relative}: {marker}\n".encode("utf-8")
+            for relative in controls
+        }
+        contents["README.md"] = f"synthetic package: {marker}\n".encode("utf-8")
+        if extra_path:
+            contents[extra_path] = f"extra: {marker}\n".encode("utf-8")
+        for relative, payload in contents.items():
+            path = root.joinpath(*relative.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+        expected = {"bootstrap.manifest.json", *contents}
+        manifest = {
+            "schema_version": 1,
+            "bootstrap_version": version,
+            "python_requires": ">=3.11",
+            "control_sha256": {
+                relative: hashlib.sha256(contents[relative]).hexdigest()
+                for relative in sorted(controls)
+            },
+            "source_sha256": {
+                relative: hashlib.sha256(contents[relative]).hexdigest()
+                for relative in sorted(contents)
+            },
+            "required_files": sorted(expected),
+        }
+        (root / "bootstrap.manifest.json").write_bytes(
+            (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+        )
+
+    def _synthetic_repository(self, *, historical_controls: bool = False) -> tuple[Path, tempfile.TemporaryDirectory[str], str]:
+        temporary = tempfile.TemporaryDirectory()
+        root = Path(temporary.name)
+        self._git(root, "init", "-b", "maintenance")
+        self._git(root, "config", "user.name", "Synthetic Test")
+        self._git(root, "config", "user.email", "test@example.invalid")
+        self._write_synthetic_package(
+            root,
+            PREVIOUS_PACKAGE_VERSION,
+            "base",
+            historical_controls=historical_controls,
+        )
+        self._git(root, "add", ".")
+        self._git(root, "commit", "-m", "base package")
+        return root, temporary, self._git(root, "rev-parse", "HEAD")
+
     def test_ci_workflow_is_read_only_hosted_and_immutably_pinned(self) -> None:
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(
             encoding="utf-8"
@@ -53,9 +124,9 @@ class PackageReleaseTests(unittest.TestCase):
 
         self.assertEqual(
             action_uses,
-            [checkout, setup_python, checkout, setup_python, checkout, setup_python],
+            [checkout, setup_python] * 4,
         )
-        self.assertEqual(workflow.count("persist-credentials: false"), 3)
+        self.assertEqual(workflow.count("persist-credentials: false"), 4)
         self.assertIn("permissions:\n  contents: read\n", workflow)
         for forbidden in (
             "self-hosted",
@@ -65,6 +136,58 @@ class PackageReleaseTests(unittest.TestCase):
             "contents: write",
             "actions: write",
             "id-token: write",
+        ):
+            self.assertNotIn(forbidden, workflow)
+
+    def test_ci_push_branches_and_precheck_order_are_exact(self) -> None:
+        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "push:\n    branches:\n      - fast-lane-maint\n      - Legacy\n",
+            workflow,
+        )
+        self.assertNotIn("      - main\n", workflow)
+        self.assertEqual(workflow.count("needs: repository-precheck"), 3)
+        self.assertEqual(workflow.count("if: ${{ always() }}"), 3)
+        self.assertEqual(
+            workflow.count("name: Require successful repository precheck"), 3
+        )
+        self.assertEqual(
+            workflow.count("needs.repository-precheck.result != 'success'"), 3
+        )
+        self.assertIn("fetch-depth: 0", workflow)
+        self.assertIn(
+            "FASTLANE_BASE_COMMIT: "
+            "${{ github.event.pull_request.base.sha || github.event.before }}",
+            workflow,
+        )
+        self.assertNotIn("github.event.repository.is_template", workflow)
+        self.assertIn(
+            "(github.event_name == 'pull_request' && github.base_ref == "
+            "'fast-lane-maint') || (github.event_name == 'push' && "
+            "github.ref_name == 'fast-lane-maint')",
+            workflow,
+        )
+        self.assertIn(
+            'package_release.py --check --base-commit "${FASTLANE_BASE_COMMIT}"',
+            workflow,
+        )
+        ordered_steps = (
+            "Validate Python syntax and indentation",
+            "Run repository governance monitors",
+            "Verify template manifest hashes",
+            "Enforce customer package version identity",
+            "Verify deterministic release package",
+        )
+        positions = [workflow.index(f"name: {name}") for name in ordered_steps]
+        self.assertEqual(positions, sorted(positions))
+        for forbidden in (
+            "git fetch",
+            "git tag",
+            "git push",
+            "gh release",
+            "upload-artifact",
         ):
             self.assertNotIn(forbidden, workflow)
 
@@ -85,7 +208,7 @@ class PackageReleaseTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.0.1")
+        self.assertEqual(manifest["bootstrap_version"], "1.0.2")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -136,6 +259,17 @@ class PackageReleaseTests(unittest.TestCase):
         expected = set(manifest["required_files"])
         self.assertEqual(actual, expected)
         self.assertEqual(manifest["required_files"], sorted(expected))
+
+    def test_release_manifest_inventory_must_include_itself(self) -> None:
+        manifest = {
+            "bootstrap_version": "1.0.2",
+            "required_files": ["README.md"],
+        }
+        with self.assertRaisesRegex(
+            package_release.PackagingError,
+            "must include bootstrap.manifest.json",
+        ):
+            package_release.release_manifest_values(manifest)
 
     def test_archive_is_an_exact_deterministic_projection(self) -> None:
         first = package_release.build_release_bytes(REPOSITORY_ROOT)
@@ -425,7 +559,10 @@ class PackageReleaseTests(unittest.TestCase):
                 json.dumps(
                     {
                         "bootstrap_version": "1.0.0",
-                        "required_files": ["README.md"],
+                        "required_files": [
+                            "README.md",
+                            "bootstrap.manifest.json",
+                        ],
                     }
                 ),
                 encoding="utf-8",
@@ -449,9 +586,71 @@ class PackageReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(package_release.PackagingError, "semantic version"):
                 package_release.load_release_files(root)
 
+    def test_package_version_guard_requires_a_strict_bump_for_changed_bytes(self) -> None:
+        root, temporary, base = self._synthetic_repository()
+        self.addCleanup(temporary.cleanup)
+        self.assertFalse(package_release.check_versioned_package_change(root, base))
+
+        self._write_synthetic_package(root, PREVIOUS_PACKAGE_VERSION, "changed")
+        with self.assertRaisesRegex(
+            package_release.PackagingError,
+            "without a strictly greater",
+        ):
+            package_release.check_versioned_package_change(root, base)
+
+        self._write_synthetic_package(root, "1.0.2", "changed")
+        self.assertTrue(package_release.check_versioned_package_change(root, base))
+
+    def test_package_version_guard_detects_inventory_changes_and_regression(self) -> None:
+        root, temporary, base = self._synthetic_repository()
+        self.addCleanup(temporary.cleanup)
+        self._write_synthetic_package(
+            root,
+            PREVIOUS_PACKAGE_VERSION,
+            "base",
+            extra_path="docs/new-contract.md",
+        )
+        with self.assertRaisesRegex(
+            package_release.PackagingError,
+            "without a strictly greater",
+        ):
+            package_release.check_versioned_package_change(root, base)
+
+        self._write_synthetic_package(root, "1" + ".0.0", "regressed")
+        with self.assertRaisesRegex(
+            package_release.PackagingError,
+            "version regressed",
+        ):
+            package_release.check_versioned_package_change(root, base)
+
+    def test_package_version_guard_accepts_historical_control_inventory(self) -> None:
+        root, temporary, base = self._synthetic_repository(historical_controls=True)
+        self.addCleanup(temporary.cleanup)
+        self._write_synthetic_package(root, "1.0.2", "current")
+        self.assertTrue(package_release.check_versioned_package_change(root, base))
+
+    def test_package_version_guard_fails_closed_for_unavailable_base(self) -> None:
+        root, temporary, _base = self._synthetic_repository()
+        self.addCleanup(temporary.cleanup)
+        with self.assertRaisesRegex(
+            package_release.PackagingError,
+            "exact lowercase Git object ID",
+        ):
+            package_release.check_versioned_package_change(root, "main")
+        with self.assertRaisesRegex(
+            package_release.PackagingError,
+            "unavailable in this checkout",
+        ):
+            package_release.check_versioned_package_change(root, "0" * 40)
+
+    def test_package_version_guard_cli_requires_check_mode(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            package_release.main(["--base-commit", "0" * 40])
+        self.assertEqual(raised.exception.code, 2)
+
     def test_current_release_text_rejects_stale_versions_except_fixtures(self) -> None:
         stale_product_version = "1" + ".2.0"
-        stale_versions = ("1" + ".0.0", "2" + ".0.0", stale_product_version)
+        stale_versions = ("1" + ".0.0", PREVIOUS_PACKAGE_VERSION, "2" + ".0.0", stale_product_version)
         negative_fixture_marker = f'"bootstrap_version": "{stale_versions[0]}"'
         text_suffixes = {".md", ".json", ".yaml", ".yml", ".py", ".txt"}
         allowed_negative_fixtures = 0

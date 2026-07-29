@@ -1,4 +1,5 @@
 # AWS Codex Fastlane 1.0
+Current customer build: **1.0.2**.
 
 Fastlane 1.0 gives Codex a disciplined way to design and build your AWS application.
 You explain the outcome in plain language. Codex turns it into clear requirements,
@@ -73,7 +74,8 @@ Codex chooses the architecture. AWS Core supplies current expertise; it cannot a
 - `AGENTS.md` contains the always-on operating rules.
 - `.agents/skills/` contains workflows; `.codex/agents/` contains optional read-only challengers.
 - `prompts/CODEX-PROMPTS.md` contains exact lifecycle and receipt contracts.
-- `bootstrap.yaml` mirrors lifecycle state; `scripts/` validates and packages it.
+- `bootstrap.yaml` mirrors lifecycle state; the bundled **Fastlane Engine**
+  validates and routes it through the compatibility file `scripts/bootstrap_doctor.py`.
 
 ## Safety
 
@@ -85,4 +87,4 @@ Setup, login, plugin, trust, credential, and machine state stay outside the repo
 ## Agent reference
 
 Detailed references: [setup](docs/SETUP.md) · [workflow](docs/WORKFLOW.md) ·
-[security](SECURITY.md) · [agent rules](AGENTS.md).
+[security](SECURITY.md) · [feedback](https://github.com/Levi-Breedlove/aws-bootstrap/issues/new?template=fastlane-feedback.yml) · [agent rules](AGENTS.md).

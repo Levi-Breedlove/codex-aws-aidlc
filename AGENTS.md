@@ -3,9 +3,9 @@
 ## Mission and routing
 
 Fastlane turns ideas into approved requirements, AWS designs, tasks, and evidence.
-`fastlane` is the sole coordinator/writer and follows the doctor-selected route;
+`fastlane` is the sole coordinator/writer and follows the Fastlane Engine-selected route;
 initialized projects never repeat setup.
-`maintain-fastlane` is framework-only. Launch, plan, and build aliases delegate
+`maintain-fastlane` is framework-only. Launch, plan, and build delegate
 to `fastlane`; explanation/AWS operation skills are explicit-only, and
 `LEARN-10` is only an explanation alias.
 

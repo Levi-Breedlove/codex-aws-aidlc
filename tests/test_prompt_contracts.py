@@ -95,6 +95,42 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIsNotNone(match, f"Missing section for {prompt_id}")
         return match.group(0) if match else ""
 
+    def test_public_surfaces_use_fastlane_engine_terminology(self) -> None:
+        public_surfaces = (
+            "AGENTS.md",
+            "SECURITY.md",
+            "README.md",
+            "docs/HOOKS.md",
+            "docs/TROUBLESHOOTING.md",
+            "docs/WORKFLOW.md",
+            "docs/project/PRD.md",
+            "docs/project/RUNBOOK.md",
+            "docs/project/TASKS.md",
+            "prompts/CODEX-PROMPTS.md",
+            "scripts/AGENTS.md",
+            ".agents/skills/build-fastlane/SKILL.md",
+            ".agents/skills/fastlane/SKILL.md",
+            ".agents/skills/fastlane/references/deliver.md",
+            ".agents/skills/fastlane/references/owner-responses.md",
+            ".agents/skills/maintain-fastlane/SKILL.md",
+        )
+        for relative in public_surfaces:
+            with self.subTest(relative=relative):
+                text = PROJECT_ROOT.joinpath(*relative.split("/")).read_text(
+                    encoding="utf-8"
+                )
+                self.assertIsNone(
+                    re.search(r"\bdoctor\b", text, re.IGNORECASE),
+                    relative,
+                )
+        self.assertIn("Fastlane Engine", self.root_readme)
+        self.assertIn(
+            "scripts/bootstrap_doctor.py",
+            (PROJECT_ROOT / "docs/TROUBLESHOOTING.md").read_text(
+                encoding="utf-8"
+            ),
+        )
+
     def test_repository_instruction_chains_leave_default_context_headroom(
         self,
     ) -> None:
@@ -718,11 +754,11 @@ class PromptPackContractTests(unittest.TestCase):
 
     def test_launchpad_routes_from_existing_lifecycle_state(self) -> None:
         boot = self.prompt_section("BOOT-00")
-        self.assertIn("The doctor is the lifecycle router", boot)
+        self.assertIn("The Fastlane Engine is the lifecycle router", boot)
         self.assertIn("Never restart\n   BOOT-00 or prerequisites after initialization", boot)
         self.assertRegex(boot, r"current Gate A receipt\s+awaiting approval goes to INTAKE-20")
         self.assertIn("approved Gate B with an uninitialized or stale task plan", boot)
-        self.assertIn("Otherwise use the doctor state or stop on conflict", boot)
+        self.assertIn("Otherwise use the Engine state or stop on conflict", boot)
 
     def test_launchpad_and_build_use_executable_safety_controls(self) -> None:
         boot = self.prompt_section("BOOT-00")
@@ -765,7 +801,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertNotIn("bounded parallelism", self.prd)
         self.assertRegex(
             autonomous,
-            r"Never run doctor against a persisted RUNNING\s+snapshot",
+            r"Never run the Engine against a persisted RUNNING\s+snapshot",
         )
     def test_aws_mutations_use_canonical_prompts_and_exact_action_receipts(self) -> None:
         build_single = self.prompt_section("BUILD-10")
@@ -1032,7 +1068,7 @@ Approver: <name/handle>"""
             r"Only after `PREREQUISITES_READY`",
         )
         self.assertIn("never repeat setup", self.agents)
-        self.assertIn("follows the doctor-selected route", self.agents)
+        self.assertIn("follows the Fastlane Engine-selected route", self.agents)
         self.assertIn(
             "does not compare hook hashes, request screenshots,\nrun synthetic probes",
             boot,
@@ -1369,7 +1405,7 @@ Approver: <name/handle>"""
         self.assertIn("header, separator, and every boundary row", self.prd)
         self.assertIn("append one final LF", self.prd)
         self.assertIn("| Design contract SHA-256 |", self.prd)
-        self.assertIn("doctor-derived current value", self.prompts)
+        self.assertIn("Engine-derived current value", self.prompts)
         for table_name in (
             "Architecture driver",
             "Candidate",
@@ -1524,9 +1560,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.0.1")
+        self.assertEqual(manifest["bootstrap_version"], "1.0.2")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.0.1", self.prompts)
+        self.assertIn("**Pack version:** 1.0.2", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -1544,7 +1580,7 @@ Approver: <name/handle>"""
             self.prompts,
         )
         boot = self.prompt_section("BOOT-00")
-        self.assertIn("After each phase checkpoint, rerun the doctor", boot)
+        self.assertIn("After each phase checkpoint, rerun the Engine", boot)
         self.assertIn("internal prompt ID is never itself a reason to pause", boot)
 
         gate_a = self.prompt_section("INTAKE-20")
@@ -1552,7 +1588,7 @@ Approver: <name/handle>"""
         self.assertIn("do not combine it with a routine response", gate_a)
 
         gate_b = self.prompt_section("DESIGN-20")
-        self.assertIn("rerun the doctor in the same turn", gate_b)
+        self.assertIn("rerun the Engine in the same turn", gate_b)
         self.assertIn("task generation and permitted local construction", gate_b)
 
         build = self.prompt_section("BUILD-20")

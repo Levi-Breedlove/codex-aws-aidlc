@@ -21,7 +21,7 @@ the owner and asks once for:
 3. development budget posture.
 
 Use a finite cap with currency when one exists, or answer
-`minimize cost; no hard cap`. Codex initializes the project, runs the doctor,
+`minimize cost; no hard cap`. Codex initializes the project, runs the Fastlane Engine,
 and immediately begins the next lifecycle prompt. A configured project skips
 fresh prerequisites and resumes its derived stage.
 
@@ -158,6 +158,15 @@ Use `python scripts/maintenance_preflight.py --contract <contract.json> --root .
 to verify the exact baseline, allowlist, change budget, and distinct publication
 authority before maintenance work. The contract is ephemeral and untracked.
 
+For canonical customer-package maintenance, compare the current manifest
+inventory and bytes with one exact existing ancestor using `python
+scripts/package_release.py --check --base-commit <exact-base-commit>`. When the
+package differs, `bootstrap.manifest.json` must contain a strictly greater
+semantic version and its mirrors must match. The guard is read-only, never
+fetches or publishes, and fails closed when the exact history is unavailable.
+It does not require initialized adopter applications to change Fastlane's
+framework version.
+
 The live `fast-lane-maint` customer branch uses short-lived maintenance branches
 and pull requests targeting only that customer branch. The PR branch must be
 current before merge, and these checks must pass: `safety-tests (3.11)`,
@@ -289,7 +298,7 @@ read-scope authority.
 
 ## Measured context packets
 
-The doctor resolves its compatibility selectors into exact, one-based inclusive
+The Engine resolves its compatibility selectors into exact, one-based inclusive
 source ranges. It normalizes selected repository text to LF, ends it with one
 LF, hashes those UTF-8 bytes, and reports the actual initial source-byte total
 against the 12,000-byte source budget. This measures selected repository
@@ -313,11 +322,11 @@ approval, authorization, protected-boundary decision, or human safety review.
 Routine responses do not expose internal methodology, Harness, or context terms.
 These expectations add no gate and never override an authority boundary.
 
-The doctor classifies validation diagnostics individually. A safe Codex-owned
+The Engine classifies validation diagnostics individually. A safe Codex-owned
 defect continues through correction and revalidation inside the current write
 boundary and attempt budget. Manual-safety findings stop all automatic repair.
 When safe Codex and owner findings coexist, Codex may repair only independent
-agent-owned defects before rerunning the doctor and presenting the remaining
+agent-owned defects before rerunning the Engine and presenting the remaining
 owner action. Unknown diagnostics fail closed to human review.
 
 During framework maintenance, a stale manifest is regenerated only after the
@@ -330,8 +339,8 @@ protected-file changes always require human safety review.
 
 Fastlane requires no project hooks. Owners who want an additional native Codex
 guardrail may manually review and enable the opt-in pack described in
-[HOOKS.md](HOOKS.md). It adds read-only doctor context, uses doctor-derived write and external boundaries to deny only clearly unauthorized external or out-of-scope file actions, preserves normal approval
-prompts, runs bounded validation, and follows the doctor's automatic-
+[HOOKS.md](HOOKS.md). It adds read-only Fastlane Engine context, uses Engine-derived write and external boundaries to deny only clearly unauthorized external or out-of-scope file actions, preserves normal approval
+prompts, runs bounded validation, and follows the Engine's automatic-
 continuation result.
 
 Hooks never approve a gate or external action. The Fastlane receipts,
@@ -352,11 +361,11 @@ no customer setup step, scorer, lifecycle stage, gate, or routine owner action.
 
 ## Resume behavior
 
-The doctor selects the next prompt. Fresh templates require current official
+The Engine selects the next prompt. Fresh templates require current official
 AWS Core before initialization. Initialized projects skip that prerequisite
 during normal resume; missing or stale AWS Core evidence later pauses only the
 affected material AWS step. Follow the derived remediation action, rerun the
-doctor, and resume the selected route.
+Engine, and resume the selected route.
 
 Maintainers can run the optional, credential-free-to-validate
 [model role-play review](EVALUATION.md) before a release. Its schema-4 manifest

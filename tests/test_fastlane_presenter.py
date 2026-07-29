@@ -980,7 +980,7 @@ class FastlanePresenterTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn(
-            "audit text is derived from the doctor report, not caller prose",
+            "audit text is derived from the Fastlane Engine report, not caller prose",
             result.stderr,
         )
         self.assertNotIn("Audit:", result.stdout)

@@ -13,7 +13,7 @@ credential availability never grants authority.
 
 Construction starts from the Gate B-authorized local Git baseline. Every
 validated wave is committed locally before pause, its commit becomes the
-docs/project/TASKS.md Last known-green/checkpoint commit, and doctor runs against that
+docs/project/TASKS.md Last known-green/checkpoint commit, and the Fastlane Engine runs against that
 checkpoint. Never commit protected dirty paths or infer remote/push authority
 from local Git authorization.
 
@@ -332,7 +332,7 @@ product dependency nor authority.
 
 Use `STRUCTURED_API` for one attributable operation whose service, operation,
 parameters, Region/profile when exposed, and target resource can be compared
-with the doctor's current `external_authority.request_match` object. Missing or
+with the Engine's current `external_authority.request_match` object. Missing or
 ambiguous observable fields stop mutation.
 
 Use `REVIEWED_SCRIPT` only for a legitimate multi-step, cross-service,

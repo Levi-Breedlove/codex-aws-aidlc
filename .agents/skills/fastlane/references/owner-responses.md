@@ -22,7 +22,7 @@
   preflight or a read receipt as deployment authority.
 - Answer side questions directly, state whether project state changed, and
   restore the pending next action with `python scripts/fastlane_presenter.py
-  side-question --input-stdin` after rerunning the doctor.
+  side-question --input-stdin` after rerunning the Engine.
 - A side question never repeats a formal Gate A, Gate B, or AWS receipt. It
   restores the current deterministic next action, including an existing owner
   approval when one is pending.
@@ -74,7 +74,7 @@ may resolve it.
   recommendation that requires no detail. A factual question, missing
   recommendation, required detail, stale token, or altered phrase makes it unavailable.
 - “Explain these questions” is a clarification, not learning mode. Explain each
-  pending choice directly, state `Project state changed: No.`, rerun the doctor,
+  pending choice directly, state `Project state changed: No.`, rerun the Engine,
   and restore the same pending decision through the side-question presenter.
 
 ## Material decision card

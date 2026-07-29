@@ -21,7 +21,7 @@ cross-platform, fail-closed, and free of hidden external actions.
   brownfield files, and use atomic writes for tracked lifecycle state.
 - Keep manifest inventory, source hashes, package bytes, and checksums
   deterministic. A stale or unexpected source file fails closed.
-- Derive doctor and setup status from repository evidence. Never infer human
+- Derive Fastlane Engine and setup status from repository evidence. Never infer human
   approval, AWS authority, plugin trust, or deployed success.
 - `task_waves.py` may return or claim only `READY` tasks with satisfied
   dependencies. Preserve legal transitions, bounded attempts, monotonic IDs,
@@ -30,7 +30,7 @@ cross-platform, fail-closed, and free of hidden external actions.
   `RUNNING` state before resuming; never blindly repeat an external action.
 - After a validated task or wave, record the observed command, result, actor,
   time, tested revision or artifact, durable source, and evidence status in
-  `../docs/project/VERIFY.md`. Run the doctor before the next wave.
+  `../docs/project/VERIFY.md`. Run the Engine before the next wave.
 
 ## Required validation
 
@@ -42,6 +42,11 @@ python scripts/update_manifest.py --check
 python scripts/package_release.py --check
 git diff --check
 ```
+
+For canonical customer-package maintenance, also run `python
+scripts/package_release.py --check --base-commit <exact-base-commit>`. The
+comparison is read-only and requires a strict version increase when package
+bytes or inventory change; it never grants tag, release, or publication authority.
 
 When source files intentionally change, update the manifest with
 `python scripts/update_manifest.py --write` before running the checks.

@@ -218,7 +218,7 @@ class BootstrapSafetyTests(unittest.TestCase):
                 "run_generated_doctor",
                 return_value=(False, "forced doctor failure"),
             ):
-                with self.assertRaisesRegex(ValueError, "doctor failed"):
+                with self.assertRaisesRegex(ValueError, "Fastlane Engine validation failed"):
                     bootstrap.initialize_template_in_place(project, values)
 
             self.assertEqual((project / "bootstrap.yaml").read_bytes(), original)

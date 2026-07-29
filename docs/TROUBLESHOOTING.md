@@ -7,11 +7,15 @@ python scripts/setup_assistant.py prerequisites --root . --json
 python scripts/bootstrap_dependencies.py --root . --json
 python scripts/bootstrap_doctor.py --root . --json
 ```
+The Fastlane Engine is the bundled read-only validator and lifecycle router.
+Its compatibility filename remains `scripts/bootstrap_doctor.py`; it is not
+another service or installation.
+
 
 ## `init template` keeps repeating setup
 
 For a fresh template, complete the prerequisite checker's single checklist,
-then send `init template` again. After configuration, use the doctor's
+then send `init template` again. After configuration, use the Fastlane Engine's
 interaction state; initialized projects do not rerun prerequisites or setup
 questions.
 
@@ -44,8 +48,8 @@ only the affected design or AWS operating step. Confirm the capability is from
 Do not regenerate an initialized project, request hook screenshots, compare
 hook hashes, or run synthetic probes.
 
-## Doctor reports another blocker
+## Fastlane Engine reports another blocker
 
-Follow the single diagnostic named by the doctor. Preserve the repository,
+Follow the single diagnostic named by the Engine. Preserve the repository,
 dirty files, approved gates, and project ledgers; do not regenerate an active
 project to clear an error.

@@ -581,7 +581,7 @@ def initialize_template_in_place(
     if not remaining:
         ok, output = run_generated_doctor(source)
         if not ok:
-            raise ValueError(f"Configured template doctor failed: {output}")
+            raise ValueError(f"Configured template Fastlane Engine validation failed: {output}")
         return CopyReport(unchanged=len(required))
 
     validate_in_place_repository(source)
@@ -612,7 +612,7 @@ def initialize_template_in_place(
             print(f"CONFIGURED {relative} sha256={sha256_bytes(rendered)}")
         ok, output = run_generated_doctor(source)
         if not ok:
-            raise ValueError(f"Configured template doctor failed: {output}")
+            raise ValueError(f"Configured template Fastlane Engine validation failed: {output}")
     except Exception:
         for path, original in reversed(written):
             atomic_write_bytes(path, original, path)
@@ -1225,7 +1225,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif report.unresolved:
         print("Bootstrap stopped with unresolved, preserved target collisions.")
     elif report.partial_adoption:
-        print("Bootstrap partially adopted; merge staged/preserved control files and run doctor.")
+        print("Bootstrap partially adopted; merge staged/preserved control files and run the Fastlane Engine.")
     else:
         print("Bootstrap complete.")
     print(f"Project root: {target}")
@@ -1249,7 +1249,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print()
     print("Next steps:")
-    print("1. Run: python scripts/bootstrap_doctor.py --root .")
+    print("1. Run the Fastlane Engine: python scripts/bootstrap_doctor.py --root .")
     print("2. If setup was run manually, open this repository in Codex and send: init template")
     print("3. Answer the project name, Region, and budget questions; Codex begins intake.")
     print(

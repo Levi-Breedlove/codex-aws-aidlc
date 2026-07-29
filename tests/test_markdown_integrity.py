@@ -7,12 +7,17 @@ from urllib.parse import unquote
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
+MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 MAX_AGENT_CONTEXT_BYTES = 28 * 1024
 NESTED_AGENT_SCOPE_MARKER = (
     "This guide narrows the root rules and never widens approval or authorization."
 )
 MERMAID_BLOCK = re.compile(r"```mermaid\s*\n(.*?)```", re.DOTALL)
+MERMAID_DECLARATION = re.compile(
+    r"^(?:flowchart\s+(?:TB|TD|BT|RL|LR)|sequenceDiagram|"
+    r"stateDiagram(?:-v2)?|classDiagram|erDiagram|journey|gantt|pie|mindmap|"
+    r"timeline|quadrantChart|requirementDiagram)\b"
+)
 AUTHORIZATION_STEP = "Authorize, validate, and apply idempotency"
 PERSISTENCE_STEP = "Persist approved data"
 QUEUE_ACK_STEP = "Durable enqueue acknowledged"
@@ -48,6 +53,26 @@ def persistence_order_failures(markdown: str) -> list[str]:
             continue
         if block.index(AUTHORIZATION_STEP) > block.index(PERSISTENCE_STEP):
             failures.append(f"Mermaid block {index} persists before authorization")
+    return failures
+
+
+def mermaid_structure_failures(markdown: str) -> list[str]:
+    """Return block-local failures for empty or unsupported Mermaid structures."""
+
+    failures: list[str] = []
+    for index, block in enumerate(MERMAID_BLOCK.findall(markdown), 1):
+        declaration = next(
+            (
+                line.strip()
+                for line in block.splitlines()
+                if line.strip() and not line.strip().startswith("%%")
+            ),
+            None,
+        )
+        if declaration is None:
+            failures.append(f"Mermaid block {index} is empty")
+        elif MERMAID_DECLARATION.match(declaration) is None:
+            failures.append(f"Mermaid block {index} has an unsupported declaration")
     return failures
 
 
@@ -102,6 +127,40 @@ class MarkdownIntegrityTests(unittest.TestCase):
             if active is not None:
                 failures.append(str(path.relative_to(REPOSITORY_ROOT)))
         self.assertEqual(failures, [])
+
+    def test_mermaid_blocks_have_supported_structural_declarations(self) -> None:
+        failures: list[str] = []
+        for path in self.markdown_files():
+            for failure in mermaid_structure_failures(
+                path.read_text(encoding="utf-8")
+            ):
+                failures.append(f"{path.relative_to(REPOSITORY_ROOT)}: {failure}")
+        self.assertEqual(failures, [])
+
+    def test_mermaid_structure_fixtures_are_block_local(self) -> None:
+        fixture = """
+```mermaid
+```
+```mermaid
+unknownDiagram
+```
+```mermaid
+%% structural comment
+flowchart TD
+    A --> B
+```
+```mermaid
+sequenceDiagram
+    A->>B: Request
+```
+"""
+        self.assertEqual(
+            mermaid_structure_failures(fixture),
+            [
+                "Mermaid block 1 is empty",
+                "Mermaid block 2 has an unsupported declaration",
+            ],
+        )
 
     def test_project_documents_are_canonical_and_removed_surfaces_stay_removed(self) -> None:
         required = ("BUGFIX.md", "PRD.md", "RUNBOOK.md", "TASKS.md", "VERIFY.md")

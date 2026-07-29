@@ -158,7 +158,7 @@ COPYABLE_REPLIES = {
 def _interaction(report: Mapping[str, Any]) -> Mapping[str, Any]:
     value = report.get("interaction")
     if not isinstance(value, Mapping):
-        raise PresentationError("doctor report is missing interaction state")
+        raise PresentationError("Fastlane Engine report is missing interaction state")
     return value
 
 AWS_PROGRESS_STATES = {
@@ -336,10 +336,10 @@ def _remediation_text(report: Mapping[str, Any]) -> tuple[str | None, str | None
     if value is None:
         return None, None
     if not isinstance(value, Mapping):
-        raise PresentationError("doctor report has invalid remediation state")
+        raise PresentationError("Fastlane Engine report has invalid remediation state")
     next_action = value.get("next_action")
     if not isinstance(next_action, Mapping):
-        raise PresentationError("doctor report has invalid remediation next action")
+        raise PresentationError("Fastlane Engine report has invalid remediation next action")
     action_kind = str(next_action.get("action_kind", ""))
     party = str(next_action.get("responsible_party", ""))
     automatic = next_action.get("automatic_continuation_allowed") is True
@@ -1019,7 +1019,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode == "owner":
             if "audit" in payload:
                 raise PresentationError(
-                    "audit text is derived from the doctor report, not caller prose"
+                    "audit text is derived from the Fastlane Engine report, not caller prose"
                 )
             output = render_owner_update(
                 report,
