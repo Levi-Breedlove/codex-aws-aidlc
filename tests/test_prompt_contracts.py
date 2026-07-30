@@ -52,7 +52,7 @@ MAX_SKILL_DESCRIPTION_CHARACTERS = 320
 MAX_REPOSITORY_SKILL_INDEX_CHARACTERS = 1_200
 MAX_BOOT_PROMPT_BYTES = 32 * 1024
 MAX_PHASE_PROMPT_BYTES = 8 * 1024
-MAX_DESIGN_PROMPT_BYTES = 7_000
+MAX_DESIGN_PROMPT_BYTES = 6_300
 
 
 class PromptPackContractTests(unittest.TestCase):
@@ -136,7 +136,15 @@ class PromptPackContractTests(unittest.TestCase):
     ) -> None:
         agent_files = sorted(PROJECT_ROOT.rglob("AGENTS.md"))
         self.assertGreater(len(agent_files), 0)
-        self.assertLessEqual(len((PROJECT_ROOT / "AGENTS.md").read_bytes()), 6_500)
+        self.assertLessEqual(len((PROJECT_ROOT / "AGENTS.md").read_bytes()), 5_900)
+        self.assertLessEqual(
+            len((PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_bytes()),
+            8_500,
+        )
+        self.assertLessEqual(
+            len((PROJECT_ROOT / "docs/WORKFLOW.md").read_bytes()), 32_000
+        )
+        self.assertLessEqual(len(self.root_readme.splitlines()), 80)
 
         for agent_file in agent_files:
             chain: list[Path] = []
