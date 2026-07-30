@@ -1396,7 +1396,9 @@ def _render_intake_card(
     if question_count == 1:
         lines.append("Need from you: Answer this remaining question.")
     else:
-        lines.append(f"Need from you: Answer these {question_count} remaining questions.")
+        lines.append(
+            f"Need from you: Answer these {question_count} remaining questions."
+        )
     lines.extend(_intake_question_lines(card))
     lines.extend(
         (

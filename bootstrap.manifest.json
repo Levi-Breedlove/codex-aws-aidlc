@@ -71,7 +71,7 @@
     "scripts/bootstrap_dependencies.py": "edfc0162e365ec203017988e8da1efd8a34ef961d9a6ad068873ebc02d7c7146",
     "scripts/bootstrap_doctor.py": "ef51e01441537e668699256a246c68c5af7941a1314c242e7e68f2c1f02d3179",
     "scripts/fastlane_context.py": "f2fe0ce148b010080386954db0e5667fd0ef855aa6ec62dab72f5f9719b17cbd",
-    "scripts/fastlane_presenter.py": "82062bc859f6f3c3af18f7ab762b3ea327d00d5c682abb9a65fb126feea99769",
+    "scripts/fastlane_presenter.py": "e87e48c5a7a42e62403050d789e7c7373b6444786862e5a371fcc76f9f7bede0",
     "scripts/fastlane_process.py": "21d97beecfefdade67a0ed7ee69ef3818926a4291c21987b53c25601548ac115",
     "scripts/fastlane_project_identity.py": "b4829cb524fe5171b65ddd6c1d970f67d1d8a771a63c9236a8ab473719c46af5",
     "scripts/fastlane_stdio.py": "06ab89a37c32842db40936b4d364dd54ef8cd626f69e20549c506fe852f594d1",
