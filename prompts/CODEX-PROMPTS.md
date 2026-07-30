@@ -64,7 +64,9 @@ It progressively loads the phase procedure selected by the Engine.
 `launch-fastlane`, `plan-fastlane`, and `build-fastlane` are explicit
 compatibility aliases that delegate to `fastlane`; they never run separate
 lifecycles. `explain-fastlane` and `operate-fastlane-aws` are explicit-only.
-`LEARN-10` remains only as a backward-compatible alias for
+When the Engine reaches AWS preflight, verification, or teardown preparation,
+Fastlane preserves state and tells the owner to explicitly invoke `$operate-fastlane-aws`;
+the handoff grants no authority. `LEARN-10` remains only as a backward-compatible alias for
 `explain-fastlane`, never an automatic route. `maintain-fastlane` applies only
 to the reusable framework and must not start project intake.
 

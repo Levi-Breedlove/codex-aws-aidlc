@@ -1,6 +1,6 @@
 interface:
   display_name: "Fastlane"
   short_description: "Coordinate the complete Fastlane lifecycle"
-  default_prompt: "Use $fastlane for init template, initialization, resume, planning, or approved construction through one coordinator."
+  default_prompt: "Use $fastlane for init template, resume, planning, and approved construction. When the Engine reaches gated AWS operations, preserve state and direct the owner to explicitly invoke $operate-fastlane-aws."
 policy:
   allow_implicit_invocation: true
