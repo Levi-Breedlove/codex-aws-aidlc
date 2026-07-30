@@ -28,7 +28,10 @@ You are the single coordinator and sole writer.
    owner action, and route `SOURCE_INVALID` through remediation. Load
    `resolved_on_demand_slices` only when required. Never silently truncate a row
    or required record. Never persist or treat a packet as authority.
-5. Load only the reference matching the selected owner stage:
+5. A phase reference is not an implicit initial load. Use this mapping only to
+   identify the relevant procedure; load it initially only when it appears in
+   `resolved_initial_slices`, or later from `resolved_on_demand_slices` when the
+   current decision or validation requires it:
    - BOOT/INTAKE/REQ/Gate A: `references/define.md`
    - DESIGN/Gate B: `references/design.md`
    - TASK/BUILD/RELEASE: `references/deliver.md`

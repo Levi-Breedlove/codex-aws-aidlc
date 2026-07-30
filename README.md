@@ -1,9 +1,7 @@
 # AWS Codex Fastlane 1.0
-Current customer build: **1.0.3**.
+Current customer build: **1.0.4**.
 
-Fastlane 1.0 gives Codex a disciplined way to design and build your AWS application.
-You explain the outcome in plain language. Codex turns it into clear requirements,
-consults current AWS guidance, recommends a complete design, and builds it after you approve the plan.
+Fastlane 1.0 gives Codex a disciplined way to design and build your AWS application. You explain the outcome in plain language. Codex turns it into clear requirements, consults current AWS guidance, recommends a complete design, and builds it after you approve the plan.
 
 Think of Fastlane as the cockpit:
 
@@ -13,9 +11,8 @@ Think of Fastlane as the cockpit:
 - **Fastlane governs:** it records decisions, enforces boundaries, and proves results.
 
 Fastlane prefers secure pay-per-use
-serverless options when they fit and seeks the lowest practical total cost without
-weakening required safeguards. It never jumps directly to production: two checkpoints
-keep you in control, and it asks before anything changes in AWS.
+serverless options when they fit and seeks the lowest practical total cost without weakening required safeguards.
+It never jumps directly to production: two checkpoints keep you in control, and it asks before anything changes in AWS.
 
 ## What to expect
 
@@ -60,11 +57,11 @@ instructions are in [SETUP.md](docs/SETUP.md).
 
 ## AWS Core
 
-Fastlane requires the official AWS Core plugin `aws-core@agent-toolkit-for-aws` from the
-[AWS Agent Toolkit](https://github.com/aws/agent-toolkit-for-aws). It does not pin a plugin version or commit. During AWS work,
-Codex discovers and loads only the runtime skills relevant to the current decision.
+Fastlane requires the official AWS Core plugin `aws-core@agent-toolkit-for-aws` from the [AWS Agent Toolkit](https://github.com/aws/agent-toolkit-for-aws).
+It does not pin a plugin version or commit. During AWS work, Codex discovers and loads only the runtime skills relevant to the current decision.
 Fastlane does not copy AWS skills into the
-repository or require separate skill installation. Ordinary requirements and
+repository or require separate skill installation.
+Ordinary requirements and
 design need no AWS credentials or AWS account.
 
 Codex chooses the architecture. AWS Core supplies current expertise; it cannot approve or authorize.
@@ -79,12 +76,10 @@ Codex chooses the architecture. AWS Core supplies current expertise; it cannot a
 
 ## Safety
 
-Tool availability never grants authority. `fast-dev` may use only a current Gate B
-non-production mutation envelope after observed preflight; `explicit-gate` requires a separate exact authorization receipt.
-Authenticated AWS reads need current read authority, and teardown remains separately approved.
+Tool availability never grants authority. `fast-dev` may use only a current Gate B non-production mutation envelope after observed preflight;
+`explicit-gate` requires a separate exact authorization receipt. Authenticated AWS reads need current read authority, and teardown stays separately approved.
 Setup, login, plugin, trust, credential, and machine state stay outside the repo.
 
 ## Agent reference
 
-Detailed references: [setup](docs/SETUP.md) · [workflow](docs/WORKFLOW.md) ·
-[security](SECURITY.md) · [feedback](https://github.com/Levi-Breedlove/aws-bootstrap/issues/new?template=fastlane-feedback.yml) · [agent rules](AGENTS.md).
+Detailed references: [setup](docs/SETUP.md) · [workflow](docs/WORKFLOW.md) · [security](SECURITY.md) · [feedback](https://github.com/Levi-Breedlove/aws-bootstrap/issues/new?template=fastlane-feedback.yml) · [agent rules](AGENTS.md).

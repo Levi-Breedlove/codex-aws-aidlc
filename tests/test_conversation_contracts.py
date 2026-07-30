@@ -421,7 +421,7 @@ class ConversationContractTests(unittest.TestCase):
             "at least 95 out of every 100 requests",
             "hidden location and device details",
             "Project state changed: No.",
-            "Pending next action: Answer the next one to three project questions.",
+            "Pending next action: Answer the pending project questions.",
         ):
             self.assertIn(phrase, explanation)
 

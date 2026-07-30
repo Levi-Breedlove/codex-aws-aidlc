@@ -16,6 +16,8 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from scripts import setup_assistant
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PREVIOUS_PACKAGE_VERSION = "1" + ".0.1"
 
@@ -138,23 +140,39 @@ class PackageReleaseTests(unittest.TestCase):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(
             encoding="utf-8"
         )
-        checkout = "actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1"
-        setup_python = (
-            "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0"
-        )
-        ruff_action = (
-            "astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0"
-        )
-        action_uses = [
-            line.split("uses:", 1)[1].strip()
-            for line in workflow.splitlines()
-            if "uses:" in line
-        ]
 
-        self.assertEqual(
-            action_uses,
-            [checkout, setup_python, ruff_action] + [checkout, setup_python] * 3,
+        def action_identities(document: str) -> list[str]:
+            uses = [
+                line.split("uses:", 1)[1].strip()
+                for line in document.splitlines()
+                if "uses:" in line
+            ]
+            immutable_pin = re.compile(
+                r"^(?P<identity>[a-z0-9_.-]+/[a-z0-9_.-]+)"
+                r"@(?P<sha>[0-9a-f]{40}) # v[0-9][0-9A-Za-z.-]*$"
+            )
+            matches = [immutable_pin.fullmatch(value) for value in uses]
+            self.assertTrue(all(match is not None for match in matches))
+            return [match.group("identity") for match in matches if match is not None]
+
+        expected_identities = [
+            "actions/checkout",
+            "actions/setup-python",
+            "astral-sh/ruff-action",
+        ] + ["actions/checkout", "actions/setup-python"] * 3
+        self.assertEqual(action_identities(workflow), expected_identities)
+
+        current_checkout = re.search(r"actions/checkout@([0-9a-f]{40})", workflow)
+        self.assertIsNotNone(current_checkout)
+        assert current_checkout is not None
+        synthetic_update = workflow.replace(
+            current_checkout.group(0),
+            "actions/checkout@" + "1" * 40,
+            1,
         )
+        self.assertEqual(action_identities(synthetic_update), expected_identities)
+        for job in ("safety-tests:", "windows-smoke:", "macos-setup-smoke:"):
+            self.assertIn(job, synthetic_update)
         self.assertEqual(workflow.count("persist-credentials: false"), 4)
         self.assertIn("permissions:\n  contents: read\n", workflow)
         for forbidden in (
@@ -251,7 +269,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.0.3")
+        self.assertEqual(manifest["bootstrap_version"], "1.0.4")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -364,8 +382,10 @@ class PackageReleaseTests(unittest.TestCase):
                     "--cost-posture",
                     "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                     "--in-place-template-instance",
+                    "--prerequisite-report-stdin",
                 ],
                 cwd=project,
+                input=json.dumps(setup_assistant.READY_PREREQUISITE_REPORT),
                 check=False,
                 capture_output=True,
                 text=True,

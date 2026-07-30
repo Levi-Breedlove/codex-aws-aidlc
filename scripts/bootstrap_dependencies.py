@@ -23,7 +23,7 @@ AWS_CORE_PLUGIN_ID = "aws-core@agent-toolkit-for-aws"
 AWS_CORE_MANAGEMENT_COMMAND = "/plugins"
 AWS_CORE_RUNTIME_COMMAND = "uvx"
 AWS_CORE_RUNTIME_PACKAGE = "uv"
-AWS_CORE_REQUIRED_CAPABILITIES = ("retrieve_skill", "search_documentation")
+AWS_CORE_REQUIRED_CAPABILITIES = ("search_documentation", "retrieve_skill")
 SETUP_ASSISTANT_SCRIPT = "scripts/setup_assistant.py"
 SETUP_STATES = (
     "PREREQUISITES_REQUIRED",

@@ -30,6 +30,10 @@ surface.
    and an optional budget exactly once. Ordinary punctuation and international
    project names are supported; AWS Core verifies current Region availability later.
 7. Fastlane configures the template dry-run-first and begins Define.
+   The setup assistant passes its exact ready report to each bootstrap command
+   through standard input. The report is never written to the repository, and a
+   direct fresh bootstrap without this current handoff fails before any write.
+
 
 If you do not have a hard budget, answer:
 

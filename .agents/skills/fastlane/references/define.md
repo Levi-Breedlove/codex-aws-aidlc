@@ -6,8 +6,9 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   `PREREQUISITES_READY`. Render all missing dependencies in one owner checklist;
   never install or persist client state.
 - Then ask project name, preferred Region, and optional budget once; initialize
-  dry-run-first. Initialized projects skip prerequisites and resume without
-  repeated setup.
+  dry-run-first using the exact ephemeral ready report on stdin for both
+  bootstrap calls. Never persist the report. Initialized projects skip
+  prerequisites and resume without repeated setup.
 - Keep repository mode separate from owner work context. A greenfield or empty
   repository does not prove a new application. Ground `INTAKE-*` rows in the
   owner's users, problem, observable outcome, first-release boundary, success
@@ -30,7 +31,7 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
 - Never synthesize owner provenance for unapproved legacy intake. Keep prior
   values as unconfirmed context, reopen affected facts, and present the smallest
   current card. Grandfather only an unchanged approved Gate A.
-- `Accept all recommendations.` applies only with the current reply token when
+- `Accept all recommendations.` applies only to the exact current card when
   every question is a decision with a complete recommendation and no supporting
   detail. Never apply it to factual, partly recommended, stale, or changed cards.
 - Normalize lowercase decision letters to uppercase. For the initial work
@@ -44,7 +45,7 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   metadata, and methodology labels internal unless the owner used them or asks
   for technical detail. Translate via the Owner responses reference; give one
   justified recommendation with its main tradeoff and a short copyable reply.
-  Permit token-bound `R-*; Accept all recommendations.` only when every question
+  Permit plain `Accept all recommendations.` only when every question
   is a decision with a complete recommendation and no supporting detail.
 - Separate owner facts, repository facts, recommendations, proposed
   assumptions, and unresolved decisions.

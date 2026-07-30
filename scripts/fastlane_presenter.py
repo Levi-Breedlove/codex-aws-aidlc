@@ -82,7 +82,7 @@ ACTION_TEXT = {
     "COMPLETE_PREREQUISITE_CHECKLIST": (
         "Complete the prerequisite checklist, then send `init template` again."
     ),
-    "ANSWER_OPEN_DECISIONS": "Answer the next one to three project questions.",
+    "ANSWER_OPEN_DECISIONS": "Answer the pending project questions.",
     "APPROVE_GATE_A": "Review and decide the Gate A requirements receipt.",
     "ENABLE_AWS_CORE": "Enable official AWS Core, then continue the affected AWS step.",
     "APPROVE_GATE_B": "Review and decide the Gate B design and construction receipt.",
@@ -1227,6 +1227,7 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
     card_id = card.get("card_id")
     revision = card.get("revision")
     questions = card.get("questions")
+    owner_reply = card.get("owner_reply")
     exact_reply = card.get("exact_reply")
     reply_token = card.get("reply_token")
     digest = card.get("canonical_sha256")
@@ -1239,6 +1240,8 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
         or not isinstance(questions, Sequence)
         or isinstance(questions, (str, bytes))
         or not 1 <= len(questions) <= 3
+        or not isinstance(owner_reply, str)
+        or not owner_reply.strip()
         or not isinstance(exact_reply, str)
         or not exact_reply.strip()
         or not isinstance(digest, str)
@@ -1248,9 +1251,10 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
         or not isinstance(card.get("accept_all_allowed"), bool)
     ):
         raise PresentationError("invalid deterministic intake card")
-    if reply_token != intake_reply_token(
-        card_id, revision, digest
-    ) or not exact_reply.startswith(reply_token + "; "):
+    if (
+        reply_token != intake_reply_token(card_id, revision, digest)
+        or exact_reply != reply_token + "; " + owner_reply
+    ):
         raise PresentationError(
             "intake copyable reply is not bound to its current card"
         )
@@ -1389,7 +1393,12 @@ def _render_intake_card(
     if current_understanding:
         lines.append("Current understanding:")
         lines.extend(f"- {item}" for item in current_understanding)
-    lines.append("Need from you: Answer the questions below.")
+    if question_count == 1:
+        lines.append("Need from you: Answer this remaining question.")
+    else:
+        lines.append(
+            f"Need from you: Answer these {question_count} remaining questions."
+        )
     lines.extend(_intake_question_lines(card))
     lines.extend(
         (
@@ -1399,13 +1408,8 @@ def _render_intake_card(
         )
     )
     if card["accept_all_allowed"]:
-        lines.append(
-            f"You may also reply `{card['reply_token']}; Accept all recommendations.`"
-        )
-    lines.append(
-        "Keep the reply token at the start so your answers stay tied to these questions."
-    )
-    lines.extend(("", "Copyable reply:", str(card["exact_reply"])))
+        lines.append("You may also reply `Accept all recommendations.`")
+    lines.extend(("", "Copyable reply:", str(card["owner_reply"])))
     return "\n".join(lines)
 
 
@@ -1542,7 +1546,17 @@ def render_side_question_response(
     if current_understanding:
         lines.append("Current understanding:")
         lines.extend(f"- {item}" for item in current_understanding)
-    lines.append(f"Pending next action: {ACTION_TEXT[action_kind]}")
+    pending_action = ACTION_TEXT[action_kind]
+    if required and action_kind == "ANSWER_OPEN_DECISIONS":
+        card = _pending_intake_card(report)
+        if card is not None:
+            count = len(card["questions"])
+            pending_action = (
+                "Answer the remaining project question."
+                if count == 1
+                else f"Answer the {count} remaining project questions."
+            )
+    lines.append(f"Pending next action: {pending_action}")
     reason = str(interaction.get("route_reason_code", ""))
     lifecycle_intent_audit = _aws_lifecycle_intent_audit(report, interaction)
     if reason == "AWS_RESIDUAL_REVIEW_BLOCKED":
@@ -1553,10 +1567,8 @@ def render_side_question_response(
             lines.extend(("", "The pending questions are unchanged:"))
             lines.extend(_intake_question_lines(card))
             if card["accept_all_allowed"]:
-                lines.append(
-                    f"You may also reply `{card['reply_token']}; Accept all recommendations.`"
-                )
-            lines.extend(("", "Copyable reply:", str(card["exact_reply"])))
+                lines.append("You may also reply `Accept all recommendations.`")
+            lines.extend(("", "Copyable reply:", str(card["owner_reply"])))
     if required and action_kind == "CHOOSE_AWS_RESIDUAL_DISPOSITION":
         lines.extend(("", "Copyable reply:", COPYABLE_REPLIES[action_kind]))
     if not required:

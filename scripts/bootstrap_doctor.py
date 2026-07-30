@@ -1001,6 +1001,7 @@ class IntakeCard:
     revision: int
     questions: tuple[IntakeQuestion, ...]
     accept_all_allowed: bool
+    owner_reply: str
     exact_reply: str
     canonical_sha256: str
     reply_token: str
@@ -1011,6 +1012,7 @@ class IntakeCard:
             "revision": self.revision,
             "questions": [question.to_dict() for question in self.questions],
             "accept_all_allowed": self.accept_all_allowed,
+            "owner_reply": self.owner_reply,
             "exact_reply": self.exact_reply,
             "canonical_sha256": self.canonical_sha256,
             "reply_token": self.reply_token,
@@ -5813,7 +5815,7 @@ def _intake_required_detail(value: str, kind: str) -> tuple[str, ...]:
     return tuple(keys)
 
 
-def _intake_reply_example(questions: list[IntakeQuestion], reply_token: str) -> str:
+def _intake_owner_reply_example(questions: list[IntakeQuestion]) -> str:
     replies: list[str] = []
     for question in questions:
         if question.kind == "FACT":
@@ -5827,7 +5829,13 @@ def _intake_reply_example(questions: list[IntakeQuestion], reply_token: str) -> 
         if choice in question.required_detail_for:
             reply += ": <required detail>"
         replies.append(reply)
-    return reply_token + "; " + "; ".join(replies)
+    return "; ".join(replies)
+
+
+def _intake_reply_example(questions: list[IntakeQuestion], reply_token: str) -> str:
+    """Return the internal legacy token-bound reply for 1.0.x consumers."""
+
+    return reply_token + "; " + _intake_owner_reply_example(questions)
 
 
 def _parse_intake_response_register(
@@ -6611,6 +6619,7 @@ def derive_intake_foundation_contract(
             revision=revision,
             questions=tuple(pending_questions),
             accept_all_allowed=accept_all,
+            owner_reply=_intake_owner_reply_example(pending_questions),
             exact_reply=_intake_reply_example(pending_questions, reply_token),
             canonical_sha256=canonical_sha256,
             reply_token=reply_token,
@@ -10241,13 +10250,10 @@ def validate_construction_envelope(
             else str(exc)
         )
         ctx.error(code, message, PRD_FILE)
-    if (
-        numeric.get("Maximum parallel workers", 1) > 1
-        and "isolated worktree" not in envelope.get("Parallelism rule", "").lower()
-    ):
+    if numeric.get("Maximum parallel workers") != 1:
         ctx.error(
             "GATE_B_ENVELOPE",
-            "More than one worker requires disjoint work in isolated worktrees",
+            "Maximum parallel workers must be exactly 1",
             PRD_FILE,
         )
 
@@ -11295,13 +11301,10 @@ def validate_tasks_against_envelope(
         ctx.error(
             "WORKER_LIMIT_EXCEEDED", "TASKS Maximum workers exceeds AUTH", TASKS_FILE
         )
-    if (
-        maximum_workers > 1
-        and "isolated worktree" not in envelope.get("Parallelism rule", "").lower()
-    ):
+    if maximum_workers != 1:
         ctx.error(
             "GATE_B_ENVELOPE",
-            "Parallel AUTH above one worker must require isolated worktrees",
+            "Current AUTH must permit exactly one parallel worker",
             PRD_FILE,
         )
     if snapshot.get("Baseline commit") != envelope.get("Authorized baseline commit"):
@@ -14309,9 +14312,9 @@ def _context_request(
     }
     # A phase procedure is complete guidance, not one atomic lifecycle record.
     # It may move on demand as a whole when current required state needs the
-    # initial budget; the coordinator contract still requires loading the
-    # selected phase reference before acting. Task blocks and controlling
-    # state records remain atomic and required.
+    # initial budget; the coordinator loads it later only when the current
+    # decision requires it. Task blocks and controlling state records remain
+    # atomic and required.
     required = initial and (
         selector_kind == "TASK_ID" or selector in required_selectors
     )

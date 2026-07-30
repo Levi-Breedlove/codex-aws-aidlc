@@ -80,6 +80,7 @@ SETUP_STATES = (
 )
 MAX_EVIDENCE_BYTES = 1_000_000
 MAX_OUTPUT_BYTES = 16_384
+MAX_PREREQUISITE_REPORT_BYTES = 16_384
 CAPABILITY_RESULTS = {"PASS", "FAIL", "UNAVAILABLE"}
 RUNTIME_DISCOVERY_FIELD = "aws_core_runtime_discovery"
 RUNTIME_DISCOVERY_KEYS = frozenset(
@@ -135,6 +136,53 @@ Runner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 
 class SetupError(RuntimeError):
     """Raised when setup input is missing, malformed, or unsafe."""
+
+
+READY_PREREQUISITE_REPORT: dict[str, Any] = {
+    "schema_version": 4,
+    "mode": "INSTRUCTIONS_ONLY",
+    "state": "PREREQUISITES_READY",
+    "owner_action_id": "ANSWER_PROJECT_SETUP_QUESTIONS",
+    "owner_action_required": True,
+    "checklist": [],
+    "aws_core_status": "AVAILABLE",
+    "aws_core_runtime_discovery": "CURRENT",
+    "aws_credentials": "NOT_INSPECTED",
+    "aws_access": "NOT_USED",
+    "aws_authorization": "NONE",
+    "executed_external_commands": "READ_ONLY_VERSION_AND_LOGIN_STATUS_ONLY",
+    "repository_writes": "NONE",
+    "user_state_persisted_in_repository": False,
+}
+
+
+def validate_ready_prerequisite_report(value: object) -> dict[str, Any]:
+    """Validate the exact credential-free setup reduction accepted by bootstrap."""
+
+    if not isinstance(value, dict) or set(value) != set(READY_PREREQUISITE_REPORT):
+        raise SetupError("prerequisite report must use the exact current ready schema")
+    for key, expected in READY_PREREQUISITE_REPORT.items():
+        observed = value[key]
+        if type(observed) is not type(expected) or observed != expected:
+            raise SetupError(
+                f"prerequisite report field {key!r} does not prove current readiness"
+            )
+    return dict(value)
+
+
+def read_ready_prerequisite_report(stream: Any) -> dict[str, Any]:
+    """Read one bounded ready report without persisting session observations."""
+
+    payload = stream.read(MAX_PREREQUISITE_REPORT_BYTES + 1)
+    if not isinstance(payload, str) or not payload.strip():
+        raise SetupError("--prerequisite-report-stdin requires one JSON object")
+    if len(payload.encode("utf-8")) > MAX_PREREQUISITE_REPORT_BYTES:
+        raise SetupError("prerequisite report exceeds the 16 KB limit")
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise SetupError("prerequisite report is not valid JSON") from exc
+    return validate_ready_prerequisite_report(parsed)
 
 
 def _safe_text(value: str, label: str, *, maximum: int = 500) -> str:
