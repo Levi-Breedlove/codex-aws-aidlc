@@ -1141,9 +1141,12 @@ Approver: <name/handle>"""
         self.assertIn(handoff, " ".join(self.workflow.split()))
         self.assertIn("explicitly invoke `$operate-fastlane-aws`", self.prompts)
         workflow_words = " ".join(self.workflow.split())
-        self.assertIn("exact current card ID, revision, and canonical digest", workflow_words)
+        self.assertIn(
+            "exact current card ID, revision, and canonical digest", workflow_words
+        )
         self.assertIn("requires no visible reply token", workflow_words)
         self.assertNotIn("safe only after the current reply token", workflow_words)
+
     def test_aws_lifecycle_map_and_lane_authority_are_plain_and_ordered(self) -> None:
         phase_positions = [
             self.workflow.index(f"| {phase} |")
@@ -1351,8 +1354,7 @@ Approver: <name/handle>"""
         ).read_text(encoding="utf-8")
         self.assertIn("explicitly invoke $operate-fastlane-aws", fastlane_config)
         operator_config = (
-            REPOSITORY_ROOT
-            / ".agents/skills/operate-fastlane-aws/agents/openai.yaml"
+            REPOSITORY_ROOT / ".agents/skills/operate-fastlane-aws/agents/openai.yaml"
         ).read_text(encoding="utf-8")
         self.assertIn("allow_implicit_invocation: false", operator_config)
         explain_skill = (
@@ -2580,6 +2582,7 @@ Approver: <name/handle>"""
             'STATE_APPLICABILITY_HEADING = "### State-model applicability"',
             doctor_source,
         )
+
 
 if __name__ == "__main__":
     unittest.main()

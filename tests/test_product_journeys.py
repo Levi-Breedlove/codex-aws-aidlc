@@ -573,9 +573,7 @@ class ProductJourneyTests(unittest.TestCase):
                 self.assertIsNone(
                     hook_fixtures.fastlane_hook._load_transition(REPOSITORY_ROOT)
                 )
-                hook_fixtures.fastlane_hook._store_transition(
-                    REPOSITORY_ROOT, state
-                )
+                hook_fixtures.fastlane_hook._store_transition(REPOSITORY_ROOT, state)
                 pre_allowed = hook_fixtures.fastlane_hook.handle_event(
                     "pre-tool-use",
                     pre_event,

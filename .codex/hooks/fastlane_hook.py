@@ -529,11 +529,7 @@ def _turn_identity(payload: Mapping[str, Any]) -> dict[str, str] | None:
 def _tool_identity(payload: Mapping[str, Any]) -> dict[str, str] | None:
     result = _turn_identity(payload)
     tool_use_id = payload.get("tool_use_id")
-    if (
-        result is None
-        or not isinstance(tool_use_id, str)
-        or not tool_use_id.strip()
-    ):
+    if result is None or not isinstance(tool_use_id, str) or not tool_use_id.strip():
         return None
     result["tool_sha256"] = _value_digest(tool_use_id.strip())
     return result
@@ -1118,7 +1114,9 @@ def _transition_pre_decision(
     if recognized:
         if reason is not None or candidate is None:
             return "START", reason
-        return "START", _start_transition_decision(event_key, payload, tool_name, candidate, root)
+        return "START", _start_transition_decision(
+            event_key, payload, tool_name, candidate, root
+        )
     return "NONE", None
 
 

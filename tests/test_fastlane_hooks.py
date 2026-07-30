@@ -3241,9 +3241,7 @@ class AwsActionTransitionHookTests(unittest.TestCase):
                     changed["tool_input"] = aws_request("UpdateStack")
                 else:
                     current = json.loads(json.dumps(current))
-                    current["aws_action_transition"]["attempt_id"] = (
-                        "AWS-DEPLOY-9999"
-                    )
+                    current["aws_action_transition"]["attempt_id"] = "AWS-DEPLOY-9999"
                 denied = fastlane_hook.handle_event(
                     "permission-request",
                     changed,
@@ -3357,7 +3355,9 @@ class AwsActionTransitionHookTests(unittest.TestCase):
                 self._active_structured_transition(root)
             )
             path = fastlane_hook._transition_path(root)
-            expired = path.stat().st_mtime - fastlane_hook.TRANSITION_MAX_AGE_SECONDS - 1
+            expired = (
+                path.stat().st_mtime - fastlane_hook.TRANSITION_MAX_AGE_SECONDS - 1
+            )
             os.utime(path, (expired, expired))
             self.assertIsNone(fastlane_hook._load_transition(root))
 
