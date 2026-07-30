@@ -52,6 +52,9 @@ def intake_foundation() -> dict[str, object]:
             "card_id": "INTAKE-CARD-0001",
             "revision": 1,
             "accept_all_allowed": False,
+            "owner_reply": (
+                "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>"
+            ),
             "exact_reply": (
                 f"{token}; 1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>"
             ),
@@ -1485,7 +1488,7 @@ class FastlanePresenterTests(unittest.TestCase):
         output = result.stdout.decode("utf-8", errors="strict")
         self.assertIn("FASTLANE \u00b7 DESIGN", output)
 
-    def test_grounded_intake_card_uses_uppercase_choices_and_exact_reply(self) -> None:
+    def test_grounded_intake_card_uses_uppercase_choices_and_plain_reply(self) -> None:
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = intake_foundation()
 
@@ -1510,11 +1513,11 @@ class FastlanePresenterTests(unittest.TestCase):
         card = foundation["pending_card"]
         assert isinstance(card, dict)
         self.assertIn(
-            f"Copyable reply:\n{card['reply_token']}; 1: <choose A, B, or C>; "
+            "Copyable reply:\n1: <choose A, B, or C>; "
             "2: <your answer>; 3: <your answer>",
             rendered,
         )
-        self.assertIn("Keep the reply token at the start", rendered)
+        self.assertNotIn(str(card["reply_token"]), rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("INTAKE-CARD", rendered)
         self.assertNotIn("sha256:", rendered)
@@ -1529,6 +1532,7 @@ class FastlanePresenterTests(unittest.TestCase):
         question["detail_prompt"] = None
         card["questions"] = [question]
         card["accept_all_allowed"] = True
+        card["owner_reply"] = "1A"
         card["exact_reply"] = f"{card['reply_token']}; 1A"
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = foundation
@@ -1537,13 +1541,11 @@ class FastlanePresenterTests(unittest.TestCase):
 
         self.assertEqual(rendered.count("Accept all recommendations."), 1)
         self.assertIn("A. Recommended \u2014 A new application.", rendered)
-        self.assertIn(
-            f"You may also reply `{card['reply_token']}; Accept all recommendations.`",
-            rendered,
-        )
-        self.assertIn(f"Copyable reply:\n{card['reply_token']}; 1A", rendered)
+        self.assertIn("You may also reply `Accept all recommendations.`", rendered)
+        self.assertIn("Copyable reply:\n1A", rendered)
+        self.assertNotIn(str(card["reply_token"]), rendered)
         accepted = intake_response.parse_intake_owner_response(
-            f"{card['reply_token']}; Accept all recommendations.",
+            "Accept all recommendations.",
             card,
             expected_card_id=str(card["card_id"]),
             expected_revision=int(card["revision"]),
@@ -1552,9 +1554,23 @@ class FastlanePresenterTests(unittest.TestCase):
         )
         self.assertEqual(accepted.status, "PASS", accepted.to_dict())
         self.assertEqual(accepted.answers[0].selection, "A")
+        legacy = intake_response.parse_intake_owner_response(
+            f"{card['reply_token']}; Accept all recommendations.",
+            card,
+            expected_card_id=str(card["card_id"]),
+            expected_revision=int(card["revision"]),
+            expected_sha256=str(card["canonical_sha256"]),
+            owner_response_id="OWNER-MSG-0002",
+        )
+        self.assertEqual(legacy.status, "PASS", legacy.to_dict())
+        self.assertEqual(legacy.answers[0].selection, "A")
 
-    def test_presenter_rejects_tokenless_or_mismatched_copyable_reply(self) -> None:
-        for field, value in (("reply_token", None), ("exact_reply", "1A")):
+    def test_presenter_rejects_mismatched_internal_reply_contract(self) -> None:
+        for field, value in (
+            ("reply_token", None),
+            ("owner_reply", ""),
+            ("exact_reply", "1A"),
+        ):
             foundation = intake_foundation()
             card = foundation["pending_card"]
             assert isinstance(card, dict)
@@ -1661,6 +1677,7 @@ class FastlanePresenterTests(unittest.TestCase):
         card = foundation["pending_card"]
         assert isinstance(card, dict)
         card["questions"] = [card["questions"][1]]
+        card["owner_reply"] = "2: <your answer>"
         card["exact_reply"] = f"{card['reply_token']}; 2: <your answer>"
         singular = presenter.render_owner_update(current)
         self.assertIn(
@@ -1674,6 +1691,7 @@ class FastlanePresenterTests(unittest.TestCase):
         assert isinstance(card, dict)
         fact = card["questions"][1]
         card["questions"] = [fact]
+        card["owner_reply"] = "2: <your answer>"
         card["exact_reply"] = f"{card['reply_token']}; 2: <your answer>"
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = foundation
@@ -1693,6 +1711,7 @@ class FastlanePresenterTests(unittest.TestCase):
         assert isinstance(card, dict)
         decision = card["questions"][0]
         card["questions"] = [decision]
+        card["owner_reply"] = "1: <choose A, B, or C>"
         card["exact_reply"] = f"{card['reply_token']}; 1: <choose A, B, or C>"
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = foundation

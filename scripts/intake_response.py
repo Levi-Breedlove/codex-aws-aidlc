@@ -157,7 +157,7 @@ def _contains_record_unsafe_detail(value: str) -> bool:
 
 
 def intake_reply_token(card_id: str, revision: int, card_sha256: str) -> str:
-    """Return the opaque token that binds a copyable reply to one card."""
+    """Return the legacy internal token derived from one exact card."""
     identity = f"{card_id}\n{revision}\n{card_sha256}".encode("ascii")
     return "R-" + hashlib.sha256(identity).hexdigest()[:12].upper()
 
@@ -480,21 +480,22 @@ def parse_intake_owner_response(
     assert isinstance(reply_token, str)
     normalized = _ascii_strip(raw_response)
     token_prefix = reply_token + ";"
-    if not normalized.startswith(token_prefix):
-        return IntakeResponseParse(
-            status="FAIL",
-            owner_response_id=owner_response_id,
-            card_id=card_id,
-            card_revision=card_revision,
-            card_sha256=card_sha256,
-            errors=(
-                _error(
-                    "INTAKE_CARD_STALE",
-                    "This reply is not bound to the latest intake card; use its copyable reply",
+    if normalized.startswith("R-"):
+        if not normalized.startswith(token_prefix):
+            return IntakeResponseParse(
+                status="FAIL",
+                owner_response_id=owner_response_id,
+                card_id=card_id,
+                card_revision=card_revision,
+                card_sha256=card_sha256,
+                errors=(
+                    _error(
+                        "INTAKE_CARD_STALE",
+                        "This legacy reply targets a different intake card; use the latest copyable reply",
+                    ),
                 ),
-            ),
-        )
-    normalized = _ascii_strip(normalized[len(token_prefix) :])
+            )
+        normalized = _ascii_strip(normalized[len(token_prefix) :])
     if not normalized:
         errors.append(_error("INTAKE_RESPONSE_EMPTY", "Owner response is empty"))
     selected: dict[str, tuple[str, str | None]] = {}

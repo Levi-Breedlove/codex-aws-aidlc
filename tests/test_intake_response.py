@@ -103,10 +103,6 @@ def parse(
         "owner_response_id": OWNER_RESPONSE_ID,
     }
     arguments.update(overrides)
-    if isinstance(raw_response, str) and raw_response.strip():
-        token = current.get("reply_token", "R-INVALID")
-        if not raw_response.startswith("R-"):
-            raw_response = f"{token}; {raw_response}"
     return intake.parse_intake_owner_response(raw_response, current, **arguments)
 
 
@@ -115,6 +111,18 @@ def error_codes(result: Any) -> set[str]:
 
 
 class IntakeResponseAcceptanceTests(unittest.TestCase):
+    def test_plain_and_matching_legacy_replies_use_the_same_current_card(self) -> None:
+        card = base_card()
+        plain = parse("1A", card)
+        legacy = parse(f"{card['reply_token']}; 1A", card)
+
+        self.assertEqual(plain.status, "PASS", plain.to_dict())
+        self.assertEqual(legacy.status, "PASS", legacy.to_dict())
+        self.assertEqual(
+            [answer.to_dict() for answer in plain.answers],
+            [answer.to_dict() for answer in legacy.answers],
+        )
+
     def test_decision_forms_are_case_insensitive_and_normalized(self) -> None:
         cases = (
             ("1A", "A"),

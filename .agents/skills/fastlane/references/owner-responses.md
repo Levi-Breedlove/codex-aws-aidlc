@@ -41,11 +41,11 @@
 ## Plain-language decisions
 For guided intake, render only the current Engine-validated
 `INTAKE-CARD-*`. Use its stable reply keys, uppercase A/B/C decision choices,
-required-detail prompts, and exact copyable reply. Do not expose its internal
-IDs or digest. The copyable reply begins with the Engine-generated opaque
-`R-*` reply token; retain it unchanged so delayed replies cannot bind to a
-newer card. Describe it only as a reply token, never as an identifier or hash.
-Factual questions remain short free text. Recommend a choice
+required-detail prompts, and plain `owner_reply`. Do not expose its internal
+ID, revision, digest, or legacy reply token. The parser receives the exact card
+identity separately before any write; retain `R-*` only as an internal 1.0.x
+compatibility input for that same current card. Factual questions remain short
+free text. Recommend a choice
 only when current evidence justifies it; there is no universal default. If no
 recommendation is justified, render exactly
 `No recommendation—choose the option that matches your situation.` and use
@@ -67,8 +67,8 @@ may resolve it.
   label factual questions as decisions. Use `1 question remains before
   requirements analysis.` when only one question is pending.
 - End input requests with one short copyable reply. When every recommendation
-  is independently safe and complete, allow the current token-bound
-  `R-*; Accept all recommendations.` alternative and clarify that it records
+  is independently safe and complete, allow plain
+  `Accept all recommendations.` and clarify that it records
   planning decisions only, not AWS access or spending.
 - On a new message that may answer the pending card, parse before any project
   write and use the parser's deterministic owner-safe status. If parsing fails,
@@ -78,9 +78,9 @@ may resolve it.
   with only some answers, acknowledge only those answers and present the
   still-pending questions using their original stable reply keys.
 - The `Accept all recommendations.` payload is available only after the current
-  reply token and only when every question is a decision with a complete
+  card is presented and only when every question is a decision with a complete
   recommendation that requires no detail. A factual question, missing
-  recommendation, required detail, stale token, or altered phrase makes it unavailable.
+  recommendation, required detail, stale card, or altered phrase makes it unavailable.
 - “Explain these questions” is a clarification, not learning mode. Explain each
   pending choice directly, state `Project state changed: No.`, rerun the Engine,
   and restore the same pending decision through the side-question presenter.

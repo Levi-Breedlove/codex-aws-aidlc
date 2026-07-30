@@ -69,8 +69,9 @@ different claims, and never turn a design recommendation into deployed proof.
   behavior.
 - Every evidence item identifies its requirement/task, command or observation,
   actor, timestamp, commit or digest, environment, result, and durable source.
-- Worker receipts are evidence candidates. The coordinator reconciles them
-  against changed paths and observed outputs before recording them here.
+- Coordinator-owned command outputs and attributable observations are evidence
+  candidates. Read-only challengers do not claim tasks or satisfy AWS evidence.
+  The coordinator reconciles evidence against changed paths before recording it.
 - Manual evidence says who observed what, when, where, and by which identity,
   without exposing secrets.
 - Mark evidence `STALE` when REQ/DES/AUTH, the tested code or artifact, relevant
@@ -297,7 +298,7 @@ evidence-based readiness check performed within the active authorization.
 | Requirements identity | Gate A remains current for the active REQ revision | `NOT_STARTED` |
 | Construction identity | Gate B remains current for matching REQ/DES/AUTH IDs | `NOT_STARTED` |
 | Architecture | Selected architecture, alternatives, impacts, and traceability remain current | `NOT_STARTED` |
-| AWS design grounding | Current DESIGN-10 has fresh successful official AWS Core `retrieve_skill` and `search_documentation` evidence | `NOT_STARTED` |
+| AWS design grounding | Current DESIGN-10 has fresh successful official AWS Core `search_documentation` then matching `retrieve_skill` evidence | `NOT_STARTED` |
 | Task graph | Dependencies validate, waivers are explicit, every modern approved requirement has one valid derived disposition, and required tasks are complete | `NOT_STARTED` |
 | Harness | Every required Harness row has current attributable PASS evidence | `NOT_STARTED` |
 | Local evidence | Required local evidence is current, attributable, and at least `E2_LOCALLY_VALIDATED` | `NOT_STARTED` |

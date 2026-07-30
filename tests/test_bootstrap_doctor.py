@@ -45,6 +45,7 @@ bootstrap_runtime = load_module(
     "bootstrap_runtime_for_doctor_tests",
     PROJECT_ROOT / "bootstrap.py",
 )
+setup_runtime = sys.modules["scripts.setup_assistant"]
 
 
 def codes(report: dict[str, object]) -> set[str]:
@@ -727,8 +728,8 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
         "Task boundary": "`DERIVED_FROM_AUTHORIZED_IDS_AND_WRITE_SET`",
         "Autonomous construction": "`ALLOWED`",
         "Maximum generated tasks": "`8`",
-        "Maximum parallel workers": "`2`",
-        "Parallelism rule": "`Disjoint changes in isolated worktrees; otherwise serialize`",
+        "Maximum parallel workers": "`1`",
+        "Parallelism rule": "`One coordinator; serialize all mutable execution`",
         "Attempt budget": "`3`",
         "Checkpoint cadence": "`COMMIT_AFTER_EACH_VALIDATED_WAVE_BEFORE_PAUSE`",
         "Local command boundary": "`ALLOW_PREFIXES: python -m unittest`",
@@ -1798,7 +1799,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         context = doctor.Context(PROJECT_ROOT)
         manifest = {
             "schema_version": 1,
-            "bootstrap_version": "1.0.3",
+            "bootstrap_version": "1.0.4",
             "python_requires": ">=3.11",
             "required_files": [
                 f"docs/record-{index}.md"
@@ -2476,7 +2477,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.0.3")
+        self.assertEqual(report["bootstrap_version"], "1.0.4")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         self.assertEqual(report["next_prompt"], "INTAKE-10")
         self.assertEqual(
@@ -6851,6 +6852,10 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "Authorization expiry or completion condition",
                 "`Expires at 2020-01-01T00:00:00Z`",
             ),
+            "parallel workers above one": (
+                "Maximum parallel workers",
+                "`2`",
+            ),
         }
         for label, (field, value) in cases.items():
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
@@ -6886,8 +6891,10 @@ class BootstrapDoctorTests(unittest.TestCase):
                     "--cost-posture",
                     "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                     "--in-place-template-instance",
+                    "--prerequisite-report-stdin",
                 ],
                 cwd=project,
+                input=json.dumps(setup_runtime.READY_PREREQUISITE_REPORT),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -7394,7 +7401,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         remaining_digest = contract.pending_card.canonical_sha256
         parsed = doctor.parse_intake_owner_response(
-            f"{contract.pending_card.reply_token}; 2: Users; 3: First useful result",
+            "2: Users; 3: First useful result",
             contract.pending_card.to_dict(),
             expected_card_id="INTAKE-CARD-0001",
             expected_revision=1,
@@ -7524,7 +7531,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 completed = subprocess.run(
                     current,
                     cwd=project,
-                    input=f"{card['reply_token']}; {reply}",
+                    input=reply,
                     capture_output=True,
                     text=True,
                     check=False,

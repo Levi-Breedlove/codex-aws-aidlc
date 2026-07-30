@@ -4077,7 +4077,7 @@ Not started.
                         "--claim",
                         "TASK-001",
                         "--owner",
-                        "worker-a",
+                        "coordinator-a",
                         "--run-id",
                         "RUN-0001",
                         "--checkpoint",
@@ -4086,7 +4086,7 @@ Not started.
                     "one mutating action",
                 ),
                 (
-                    ["task_waves.py", str(path), "--ready", "--owner", "worker-a"],
+                    ["task_waves.py", str(path), "--ready", "--owner", "coordinator-a"],
                     "not valid for this action",
                 ),
                 (

@@ -55,8 +55,12 @@ class ProductJourneyTests(unittest.TestCase):
                 "--cost-posture",
                 "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                 "--in-place-template-instance",
+                "--prerequisite-report-stdin",
             ],
             cwd=project,
+            input=json.dumps(
+                setup.reduce_prerequisites(setup_fixtures.local_ready())
+            ),
             check=False,
             capture_output=True,
             text=True,
@@ -253,8 +257,12 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(len(card["questions"]), 3)
             self.assertFalse(card["accept_all_allowed"])
             self.assertEqual(
+                card["owner_reply"],
+                "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
+            )
+            self.assertEqual(
                 card["exact_reply"],
-                f"{card['reply_token']}; 1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
+                f"{card['reply_token']}; {card['owner_reply']}",
             )
             resumed = presenter.render_owner_update(first_resume)
             self.assertNotIn("Current understanding:", resumed)
@@ -268,10 +276,9 @@ class ProductJourneyTests(unittest.TestCase):
             )
             self.assertNotIn("Accept all recommendations.", resumed)
             self.assertNotIn("INTAKE-CARD", resumed)
-            self.assertIn(str(card["reply_token"]), resumed)
+            self.assertNotIn(str(card["reply_token"]), resumed)
             parsed = doctor.parse_intake_owner_response(
-                f"{card['reply_token']}; 1A; 2: Development team; "
-                "3: Show the first useful result",
+                "1A; 2: Development team; 3: Show the first useful result",
                 card,
                 expected_card_id=str(card["card_id"]),
                 expected_revision=int(card["revision"]),
