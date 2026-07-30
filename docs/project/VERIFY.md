@@ -1,4 +1,4 @@
-# My AWS Project — Verification and Release Evidence
+# {{PROJECT_NAME}} — Verification and Release Evidence
 
 `docs/project/VERIFY.md` records observed proof, not plans or authorization. Gate A and Gate B
 remain the only routine human gates. The checks below determine construction and
@@ -9,7 +9,7 @@ human gates.
 
 | Field | Value |
 |---|---|
-| Workload | My AWS Project |
+| Workload | {{PROJECT_NAME}} |
 | Release | TODO |
 | Release state | `NOT_READY` |
 | Requirements revision | `REQ-0001` |
@@ -86,6 +86,29 @@ Assign every recorded evidence item one monotonic `EV-nnnn` ID, beginning with
 `EV-0001`. Task Evidence fields cite these exact IDs. Requirement, property,
 baseline, authorization, and task IDs remain traceability fields, not alternate
 evidence-ID formats.
+
+### No-task requirement disposition evidence
+
+A modern approved first-release requirement may avoid a task only through a
+current Verification matrix row that satisfies all of these conditions:
+
+- the Active evidence scope exactly matches the task plan's current
+  requirements revision, design revision, and construction authorization;
+- `Evidence ID` is one unique monotonic `EV-nnnn` value and `Task IDs` is
+  exactly `NONE`;
+- `PRD / property IDs` contains exactly the requirement ID followed by its
+  canonical acceptance ID;
+- `Requirement or invariant` and `Artifact/environment` are concrete, and at
+  least one of `Automated evidence` or `AWS/manual evidence` records the exact
+  observation; and
+- status `LOCAL_PASS` or `VERIFIED` means `ALREADY_SATISFIED`; status
+  `NOT_APPLICABLE` is allowed only for an `OPTIONAL_FEATURE` requirement and
+  means `NOT_APPLICABLE`.
+
+A plan, placeholder, URL alone, unscoped statement, stale observation, or
+task-linked evidence cannot supply a no-task disposition. These rows remain
+observed evidence, not owner approval. Task-covered requirements use their task
+evidence normally and do not need a duplicate no-task row.
 
 ## AWS Core evidence
 
@@ -213,7 +236,9 @@ preserve both states.
 | EV-0105 | TODO | TODO | Performance target is met | TODO | TODO | TODO | `NOT_STARTED` |
 | EV-0106 | TODO | TODO | Budget and cleanup controls are effective | TODO | TODO | TODO | `NOT_STARTED` |
 
-Add rows for material workload risks, not every individual test.
+Add rows for material workload risks and every no-task requirement
+disposition, not every individual test. A no-task row uses the exact current
+requirement/acceptance pair and `Task IDs: NONE` as defined above.
 
 ## Harness execution evidence
 
@@ -273,7 +298,7 @@ evidence-based readiness check performed within the active authorization.
 | Construction identity | Gate B remains current for matching REQ/DES/AUTH IDs | `NOT_STARTED` |
 | Architecture | Selected architecture, alternatives, impacts, and traceability remain current | `NOT_STARTED` |
 | AWS design grounding | Current DESIGN-10 has fresh successful official AWS Core `retrieve_skill` and `search_documentation` evidence | `NOT_STARTED` |
-| Task graph | Dependencies validate, waivers are explicit, and required tasks are complete | `NOT_STARTED` |
+| Task graph | Dependencies validate, waivers are explicit, every modern approved requirement has one valid derived disposition, and required tasks are complete | `NOT_STARTED` |
 | Harness | Every required Harness row has current attributable PASS evidence | `NOT_STARTED` |
 | Local evidence | Required local evidence is current, attributable, and at least `E2_LOCALLY_VALIDATED` | `NOT_STARTED` |
 | Build | Formatting, linting, typing, tests, and packaging pass | `NOT_STARTED` |
@@ -318,7 +343,8 @@ or unknown state before continuing.
 
 ## Reviewed AWS execution contracts
 
-AWS Core selects a currently supported account-operation tool. Use
+Codex follows current AWS Core guidance to select a currently supported
+account-operation tool. Use
 `STRUCTURED_API` when one attributable operation exposes exact service,
 operation, parameters, context, and resources; it needs no execution-contract
 row. Use `REVIEWED_SCRIPT` and `AWS-EXEC-*` only for a multi-step workflow
@@ -453,6 +479,103 @@ execution, then link the AWS-10 or AWS-40 identity/boundary evidence. Record
 AWS-30; residual and teardown evidence is reconciled read-only through AWS-40
 both before a teardown decision and after every AWS-50 attempt.
 
+## AWS deployment action and reconciliation evidence
+
+This is the canonical append-only journal for AWS-20 deployment attempts and
+AWS-30 read-only reconciliation. Rows are evidence, never authority. Do not
+edit, replace, reorder, or delete an earlier concrete row.
+
+| Evidence ID | Attempt ID | Phase | REQ / DES / AUTH | Deployment authorization | Deployment receipt digest | Deployment valid until | Deployment authority source | Read authorization | Deployment role or profile | Read role or profile | Read receipt digest | Read valid until | Read authority source | Artifact digest | Plan/change-set binding | Resources | Mutation operations | Read operations observed | Account / Region / environment | Operation identifiers and direct result | Rollback result | Acceptance evidence IDs | Observed at | Durable source | Identity and boundary match | Blocker or stale reason | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
+
+The placeholder row is not evidence. For each unused `AWS-DEPLOY-nnnn`
+Attempt ID, append rows in this order:
+
+1. Before any external mutation call, append an `AWS-20` `STARTED` row. Bind
+   the exact deployment authorization, receipt digest, valid-until value,
+   stable authority source, deployment role/profile, artifact, plan, target,
+   resources, mutation operations, time, and durable source. For
+   `explicit-gate`, derive those provenance fields from the current marked
+   deployment receipt and its recorded source. For `fast-dev`, record the exact
+   current construction `AUTH-*`, receipt digest `NONE`, the exact expiry
+   timestamp parsed from Gate B `AWS authorization validity`, and the Gate B
+   owner-authorization source. Copy the
+   deployment authorization, its three provenance fields, and deployment
+   role/profile unchanged into every later row for the Attempt ID. Use
+   `NONE` for read authorization, read role/profile, read receipt digest, read
+   valid until, read authority source, read operations, rollback, and acceptance
+   evidence. The combined Operation identifiers and direct result field is
+   exactly `NOT_OBSERVED — pre-call journal only`. STARTED proves only that
+   intent was journaled; it does not prove AWS received a call.
+2. After the call resolves or its outcome becomes ambiguous, append one
+   terminal `AWS-20` row for the same Attempt ID with `SUCCEEDED`, `FAILED`,
+   `PARTIAL`, or `UNKNOWN`. Copy the immutable deployment-authority provenance
+   and append the observed operation field using exactly
+   `IDENTIFIERS: <unique exact list or NONE — concrete reason>; RESULT: <concrete direct result>`.
+   Also record rollback result, observation time, and durable source. This
+   grammar structures the observation but does not prove execution by itself.
+   Never change the STARTED row. An interrupted STARTED row receives an appended
+   UNKNOWN terminal row before reconciliation. This is a Codex-owned repair with
+   owner action `NONE`; rerun the Engine before requesting AWS-30 read authority.
+   Never replay the mutation merely to learn what happened.
+3. Under independently current exact read authority, append an `AWS-30` row
+   for that Attempt ID when no terminal non-STALE reconciliation exists. Copy
+   the immutable deployment-authority provenance. Populate Read authorization,
+   Read role or profile, the exact SHA-256 Read receipt digest, Read valid until,
+   and Read authority source exactly as `SOURCE: <stable owner-message source>;
+   AUTHORIZED_AT: <ISO 8601 with timezone>; RESOURCES: <exact canonical list>;
+   OPERATIONS: <exact canonical list>`. `AUTHORIZED_AT` is the `Observed at`
+   timestamp of the matching Read-only preflight row in Action authorization
+   provenance, not the owner-message creation time or the AWS-30 evidence-row
+   observation time. Require `AUTHORIZED_AT <= Observed at <= Read valid until`, journal
+   Resources exactly equal the envelope Resources, and Read operations observed
+   be a subset of envelope Operations. Populate objective operation history,
+   rollback observation, acceptance evidence IDs, identity/boundary match, and
+   the exact blocker or stale reason. The combined operation field uses the same
+   non-STARTED grammar. Deployment authorization cannot supply those reads.
+   A current terminal AWS-30 row must match the current marked read receipt and
+   all four envelope values. COMPLETE Acceptance evidence IDs must each
+   resolve exactly once in the `Verification matrix` to a `VERIFIED` row with a
+   concrete Requirement or invariant, concrete AWS/manual evidence, and
+   Artifact/environment exactly `ARTIFACT: sha256:<64 lowercase>; ACCOUNT: <exact>; REGION: <exact>; ENVIRONMENT: <exact>`.
+   After RELEASE-10 acknowledges it, validate the historical read boundary only
+   from its stored envelope; never infer allowed operations from observed reads.
+   Stored deployment and read provenance keep the row auditable even when either
+   marked receipt is replaced.
+
+Authority loss after STARTED has one narrow closure path. When STARTED occurred
+while its recorded mutation authority was current and the attempt remains
+structurally valid, later Gate B expiry or legitimate REQ/DES/Gate B staleness
+does not erase the row and does not reactivate Gate B. The Engine exposes a
+separate `deployment_journal_closure_authority` with exact allowed path
+`docs/project/VERIFY.md` and one route-specific bounded operation: append an
+UNKNOWN terminal row; record the canonical marked read receipt/provenance and
+append its AWS-30 reconciliation row; or update the RELEASE-10 Active evidence
+cutoff. Only deployment journal rows are append-only; the marked receipt and
+cutoff use their canonical update contracts. During this path, standard write
+authority is invalid, construction authorization is `NONE`, and AWS mutation
+authority is `NONE`. A fresh read receipt may cover the immutable historical
+attempt's exact reconciliation boundary even though the earlier mutation
+authority has expired or become stale. No closure exception applies to a
+STARTED row created after expiry, a malformed or tampered attempt, invalid
+evidence, or a consumed attempt presented for retry.
+
+Every terminal AWS-20 result requires AWS-30. A FAILED, PARTIAL, or UNKNOWN
+attempt cannot be retried before reconciliation and the following RELEASE-10
+decision. AWS-30 uses `COMPLETE`, `BLOCKED`, or `STALE`. COMPLETE or
+BLOCKED returns to RELEASE-10; STALE remains at AWS-30 until current read
+authority and evidence are restored. The deployment authority binds exactly
+one Attempt ID and cannot be carried over or replayed.
+
+An Attempt ID may have one first STALE reconciliation and then exactly one
+later COMPLETE or BLOCKED reconciliation under a different current read
+authorization. COMPLETE or BLOCKED is the only terminal non-STALE reconciliation;
+nothing follows it. Do not append a second STALE. Repeated staleness is a
+safety-review blocker rather than an automatic AWS-30 loop. A COMPLETE or
+BLOCKED row's Evidence ID remains pending RELEASE-10 acknowledgment until the
+Current release decision stores that exact ID as Active evidence cutoff.
+
 ## Teardown reconciliation evidence
 
 Separate the expected removal/retention manifest from observed operation
@@ -460,27 +583,81 @@ history and live inventory. An empty inventory result proves only the named
 account, Region, resource types, discovery methods, permissions, and cutoff;
 record every known blind spot rather than claiming global absence.
 
-| Evidence ID | Phase | REQ / DES / AUTH | Read authorization | Teardown authorization | Teardown receipt digest | Role or profile | Expected manifest or stack | Resources proposed to remove | Allowed deletion operations | Resources retained | Shared dependencies | Cost effect | Post-teardown verification | Stack events and terminal status | Resources removed | Snapshots and backups | Residual resources | Inventory or discovery limits | Account / Region / environment | Observed at | Durable source | Identity and boundary match | Blocker or stale reason | Status |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
+| Evidence ID | Attempt ID | Phase | REQ / DES / AUTH | Read authorization | Read role or profile | Read receipt digest | Read valid until | Read authority source | Teardown authorization | Teardown receipt digest | Role or profile | Expected manifest or stack | Resources proposed to remove | Allowed deletion operations | Resources retained | Shared dependencies | Cost effect | Post-teardown verification | Stack events and terminal status | Resources removed | Snapshots and backups | Residual resources | Inventory or discovery limits | Account / Region / environment | Observed at | Durable source | Identity and boundary match | Blocker or stale reason | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
 
 Each concrete row has one phase. `AWS-40` uses `RUNNING`,
 `READY_FOR_TEARDOWN`, `VERIFIED_CLEAN`, `RESIDUALS_REMAIN`, `BLOCKED`, or
-`STALE`. `AWS-50` uses `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`; every
-AWS-50 attempt returns to AWS-40 for read-only reconciliation.
+`STALE`. `AWS-50` uses one `STARTED` row followed by exactly one `SUCCEEDED`,
+`FAILED`, `PARTIAL`, or `UNKNOWN` terminal row. Every AWS-50 attempt returns to
+AWS-40 for read-only reconciliation.
 
-A pre-teardown AWS-40 row records `NONE` for both teardown fields. A current
-`READY_FOR_TEARDOWN` row binds the exact REQ/DES/AUTH, current read
-authorization, role, account, Region, environment, removal and retention sets,
-deletion operations, shared dependencies, cost effect, and post-action checks.
-It proposes a teardown boundary but grants no authority. Only the separate
-exact teardown receipt can authorize AWS-50.
+Every concrete AWS-40 row records its read authorization, read role, receipt
+digest, reusable validity boundary, observed scope, and durable authority source.
+`Read authority source` uses the exact form `SOURCE: <stable owner-message
+source>; AUTHORIZED_AT: <ISO 8601 with timezone>`. `AUTHORIZED_AT` is the
+`Observed at` timestamp of the matching Read-only preflight row in Action
+authorization provenance. Current observations must fall between that time and
+`Read valid until` and never exceed the receipt's resources or operations.
+Exact resource/operation equality is required only when the Engine applies
+exact-scope post-action reconciliation; other current rows may observe a subset.
+`STALE` records a stale basis and cannot claim fresh reads. These read fields are
+distinct from `Role or profile`, which is the teardown mutation role copied into
+AWS-50 evidence. A post-action review must use current read authority when it is
+appended; a `STALE` review may be followed once by a terminal review only under
+a fresh read-receipt tuple. Later expiry or replacement does not invalidate a
+terminal row whose complete durable tuple was proven at append time.
 
-An AWS-50 row records only the directly observed mutation attempt. It must bind
-the exact `TEARDOWN-AUTH-*` ID and SHA-256 of the current owner-authored receipt,
-plus its exact scope and provenance. It does not satisfy terminal read-only
-reconciliation. The later AWS-40 terminal row repeats that authorization ID and
-digest and must follow exactly one matching AWS-50 attempt.
+Every pre-teardown AWS-40 row records `Attempt ID = NONE` and `NONE` for both
+teardown fields. The latest append-ordered standalone AWS-40 row is the current
+review epoch; an older READY row never survives a newer RUNNING, STALE, or
+BLOCKED row. A fresh standalone AWS-40 row may begin a new review epoch after a
+closed attempt. A current `READY_FOR_TEARDOWN` row binds the exact REQ/DES/AUTH,
+current read-receipt tuple, teardown role, account, Region, environment, removal
+and retention sets, deletion operations, shared dependencies, cost effect, and
+post-action checks. It proposes a teardown boundary but grants no authority.
+Only the separate exact teardown receipt can authorize AWS-50.
+
+Each AWS-50 operation uses a new canonical `AWS-TEARDOWN-nnnn` Attempt ID. Its
+first row is `STARTED`, appended before the AWS call and immediately after the
+standalone READY row it consumes. That row binds the exact
+current `READY_FOR_TEARDOWN` evidence, `TEARDOWN-AUTH-*` ID, SHA-256 of the
+owner-authored receipt, role, scope, retention boundary, cost effect, and
+post-teardown verification. Appending `STARTED` consumes that mutation authority;
+it cannot authorize a second call or another Attempt ID.
+
+The `STARTED` row uses `NOT_OBSERVED — pre-call journal only` for both
+`Stack events and terminal status` and `Inventory or discovery limits`, and
+uses `NONE` for `Resources removed`, `Snapshots and backups`, and `Residual
+resources`. Its durable source identifies the pre-call journal action. No
+direct-result claim appears before the AWS call.
+
+After the hook binds `STARTED`, exactly one identical structured AWS request may
+run in the same session and turn. The terminal AWS-50 row immediately follows
+under the same Attempt ID and records one of `SUCCEEDED`, `FAILED`, `PARTIAL`,
+or `UNKNOWN`. It binds the hook-observed tool-use and response hashes, preserves
+all immutable authorization and READY fields, and replaces every pre-call
+sentinel with directly observed or explicitly bounded results.
+
+If the session ends after `STARTED` and before terminal evidence is bound, no
+AWS call may be replayed. Resume permits only one local `UNKNOWN` terminal row
+whose exact closure source states that the result was unobserved. That row uses
+`UNKNOWN — result unavailable after interrupted attempt` for both `Stack events
+and terminal status` and `Inventory or discovery limits`, `NONE` for `Resources
+removed` and `Snapshots and backups`, and `UNKNOWN — no post-call inventory
+observed` for `Residual resources`. It preserves the STARTED authorization,
+READY binding, cost, post-verification, and account/Region/environment fields.
+The workflow
+then proceeds to AWS-40; new mutation authority cannot be issued until the
+attempt is reconciled.
+
+The later AWS-40 row repeats the same Attempt ID, teardown authorization ID, and
+teardown receipt digest. It performs read-only residual reconciliation, must
+follow exactly one terminal AWS-50 row, and durably binds the read authorization
+ID, role, receipt digest, account/Region/environment plus exact resource and
+operation scope, stable source, authorization time, and validity boundary used
+for that observation. Missing or mismatched read proof blocks reconciliation.
 
 `VERIFIED_CLEAN` requires terminal operation history, complete removal and
 retention reconciliation, snapshots/backups, `Residual resources = NONE`, an
@@ -507,6 +684,8 @@ applicable Gate A or Gate B owner decision.
 
 - Release state: `NOT_READY`
 - AWS lifecycle intent: `NONE`
+- AWS lifecycle intent source: `NONE`
+- AWS lifecycle intent recorded at: `NONE`
 - Active evidence cutoff: TODO
 - Blocking or stale evidence IDs: TODO
 - Pending AWS evidence IDs: TODO / `NONE`
@@ -524,16 +703,40 @@ Release state is exactly one of:
   VERIFIED for the identified artifact/environment, or deployed evidence is
   explicitly not applicable.
 
-AWS lifecycle intent is exactly `NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`.
-It records the owner's requested follow-up route but grants no AWS access,
-mutation, cleanup, or spending authority.
-`NONE` stops after release verification. `RESIDUAL_REVIEW` requests one AWS-40
-read-only review and stops with its explicit result. `TEARDOWN` requests an
-AWS-40 proposal, permits AWS-50 only after the exact current teardown receipt,
-and always returns to AWS-40 for terminal reconciliation. A direct plain-language
-owner request for residual review or teardown may update this field through
-RELEASE-10; it is not itself an AWS authorization.
+AWS lifecycle intent is one atomic three-field owner record. `AWS lifecycle
+intent` uses the normal exact profile `NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`.
+When current `READY_FOR_TEARDOWN` or `RESIDUALS_REMAIN` evidence requires a
+set-level choice, the exact profile is `RETAIN`, `RESIDUAL_REVIEW`, or
+`TEARDOWN`, shown to the owner as RETAIN, INVESTIGATE, or REMOVE. `NONE`
+requires both source and recorded-at to be exactly `NONE`. Every other value
+requires source exactly `owner-message MSG-AWS-LIFECYCLE-nnnn` and a
+timezone-aware ISO 8601 recorded-at value. Codex must not invent, infer, or
+relabel that owner message. Follow `aws_residual_disposition`, not the raw value,
+for residual routing. The record selects a follow-up route but grants no AWS
+access, mutation, cleanup, or spending authority.
+
+RETAIN stores `RETAIN`, stops at an explicit retained-resources result, and
+does not claim the environment is clean. INVESTIGATE stores `RESIDUAL_REVIEW`
+and requires separate current read authority for AWS-40. REMOVE stores
+`TEARDOWN`; current READY evidence may present AWS-50's exact teardown receipt,
+while a choice after `RESIDUALS_REMAIN` first returns to AWS-40 to refresh the
+proposal. Every AWS-50 attempt returns to AWS-40 for terminal reconciliation.
+Every choice after `RESIDUALS_REMAIN` must be strictly newer than that row.
+After READY, RETAIN and INVESTIGATE must be strictly newer. An earlier
+owner-provenanced `TEARDOWN` may carry forward as REMOVE. New residual
+evidence reopens the choice. RETAIN without current READY or residual evidence
+is invalid. No choice substitutes for read or teardown authority. A direct
+plain-language owner request atomically updates all three fields through the
+bounded capability. The normal record may return to `NONE` before an elective
+authenticated route begins; an active residual-choice boundary does not expose
+`NONE`. Legacy records are compatible
+only when their effective intent is `NONE`; a legacy non-`NONE` value without
+owner provenance fails closed.
 
 Only RELEASE-10 changes release state. AWS-10 requires `READY_TO_DEPLOY`.
-AWS-30 records observed deployment evidence and returns to RELEASE-10, which
-sets `RELEASE_VERIFIED` only when the complete release matrix supports it.
+Before a terminal AWS-30 row, Active evidence cutoff may be `TODO` or `NONE`.
+After COMPLETE or BLOCKED, RELEASE-10 stores that exact terminal AWS-30
+Evidence ID as Active evidence cutoff in the same checkpoint that decides
+`NOT_READY`, `RELEASE_VERIFIED`, or records a separately authorized correction
+path. A matching cutoff acknowledges the attempt and prevents it from rerouting.
+Retry requires distinct current mutation authority (a new exact deployment receipt for explicit-gate, or a freshly approved construction authorization for fast-dev) and a new Attempt ID. No prior deployment authority may be replayed.

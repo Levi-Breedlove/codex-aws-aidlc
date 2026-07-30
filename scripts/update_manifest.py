@@ -17,6 +17,8 @@ CONTROL_FILES = (
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_process.py",
+    "scripts/fastlane_project_identity.py",
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
@@ -40,7 +42,11 @@ def load_manifest() -> dict[str, object]:
 
 def required_paths(manifest: dict[str, object]) -> list[str]:
     raw = manifest.get("required_files")
-    if not isinstance(raw, list) or not raw or not all(isinstance(item, str) for item in raw):
+    if (
+        not isinstance(raw, list)
+        or not raw
+        or not all(isinstance(item, str) for item in raw)
+    ):
         raise ValueError("required_files must be a non-empty list of strings")
     required = list(raw)
     if required != sorted(set(required)):
@@ -55,11 +61,15 @@ def required_paths(manifest: dict[str, object]) -> list[str]:
     return required
 
 
-def expected_hashes(manifest: dict[str, object]) -> tuple[dict[str, str], dict[str, str]]:
+def expected_hashes(
+    manifest: dict[str, object],
+) -> tuple[dict[str, str], dict[str, str]]:
     required = required_paths(manifest)
     missing_controls = sorted(set(CONTROL_FILES) - set(required))
     if missing_controls:
-        raise ValueError("control files missing from required_files: " + ", ".join(missing_controls))
+        raise ValueError(
+            "control files missing from required_files: " + ", ".join(missing_controls)
+        )
     controls = {
         relative: sha256(ROOT.joinpath(*PurePosixPath(relative).parts))
         for relative in CONTROL_FILES
@@ -101,8 +111,12 @@ def write_atomic(text: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check", action="store_true", help="Fail if stored hashes differ")
-    mode.add_argument("--write", action="store_true", help="Atomically write current hashes")
+    mode.add_argument(
+        "--check", action="store_true", help="Fail if stored hashes differ"
+    )
+    mode.add_argument(
+        "--write", action="store_true", help="Atomically write current hashes"
+    )
     args = parser.parse_args()
     try:
         manifest = load_manifest()

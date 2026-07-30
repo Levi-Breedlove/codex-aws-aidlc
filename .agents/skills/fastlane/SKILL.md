@@ -36,7 +36,14 @@ You are the single coordinator and sole writer.
    Load `references/authorization-receipts.md` only at a formal gate or
    external-authorization boundary.
 7. Read only the canonical prompt section selected by the Engine. Stable prompt
-   IDs are routing metadata, not owner instructions.
+   IDs are routing metadata, not owner instructions. BUG-10 and SYNC-10 are the
+   only current-request-scoped adjunct prompts: invoke one only when the current
+   owner message explicitly requests its bounded analysis or named GitHub
+   reconciliation and current authority permits every write. Preserve the
+   Engine-derived route and pending owner action, run only the adjunct's allowed
+   work, rerun the Engine, and return to its derived route. An adjunct cannot
+   replace a lifecycle phase, cross a gate, create authority, or become a
+   persisted next prompt.
 8. Render routine updates with `python scripts/fastlane_presenter.py owner
    --input-stdin`. Run the selected phase, validate and checkpoint, rerun the
    Engine in the same turn, and continue while
@@ -66,12 +73,40 @@ You are the single coordinator and sole writer.
    Codex and owner items coexist, repair only independent Codex items first,
    then rerun the Engine to derive the remaining next action.
    Plugin installation or selecting `@AWS-Core` proves availability, not use.
-   For an immediate safe correction, pass the report's remediation fingerprint
-   back only to the next Engine invocation. Never persist it. If the same
-   fingerprint remains, stop automatic repair and route the resulting human
+   For an immediate safe correction, rerun exactly once with
+   `python scripts/bootstrap_doctor.py --root . --json --prior-remediation-fingerprint
+   <report.remediation.fingerprint>`. Pass that value only to this immediate
+   next Engine invocation and never persist it. If the same fingerprint
+   remains, stop automatic repair and route the resulting human
    safety review. During AWS delivery, obey the Engine's authoritative
    `aws_execution.progress_state`; documentation guidance, read-only authority,
-   observed preflight, and mutation authority are separate states.
+   observed preflight, mutation authority, a pre-call STARTED journal, the
+   terminal direct result, and AWS-30 reconciliation are separate states. If a
+   STARTED row has no terminal, keep owner action NONE, append UNKNOWN, and rerun
+   the Engine before requesting AWS-30 read authority.
+   Deployment authority binds exactly one Attempt ID and cannot be replayed;
+   AWS-30 requires independently current read authority. RELEASE-10 records the
+   terminal AWS-30 Evidence ID as VERIFY's Active evidence cutoff so an
+   acknowledged attempt cannot reroute. Post-AWS-30 release context includes the
+   deployment journal and Current release decision. Every AWS-30 row stores
+   `Read authority source` exactly as `SOURCE: <stable owner-message source>;
+   AUTHORIZED_AT: <ISO 8601 with timezone>; RESOURCES: <exact canonical list>;
+   OPERATIONS: <exact canonical list>`. `AUTHORIZED_AT` is the `Observed at`
+   timestamp of the matching Read-only preflight row in Action authorization
+   provenance, not the owner-message creation time or the AWS-30 evidence-row
+   observation time. The AWS-30 observation stays within that authorization
+   window, journal Resources exactly match the stored authorized resources, and
+   observed reads are a subset of the stored operations. Current terminal
+   evidence matches the current read tuple; the stored tuple keeps acknowledged
+   history auditable after expiry or replacement. Every AWS-40 row
+   uses `SOURCE: <stable owner-message source>; AUTHORIZED_AT: <ISO 8601 with
+   timezone>` and remains read-only. Residual results require one set-level owner
+   choice: RETAIN, INVESTIGATE, or REMOVE; none of those choices grants AWS access
+   or mutation.
+   Retry requires distinct current mutation authority: a new exact deployment
+   receipt for explicit-gate or freshly approved construction authorization for
+   fast-dev, plus a new Attempt ID.
+
    Mention AWS Core in `Audit:` only when the current Engine report projects a
    validated `search_documentation` then matching `retrieve_skill` chain; never
    supply audit prose to the presenter.

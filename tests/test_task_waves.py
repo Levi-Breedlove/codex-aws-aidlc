@@ -40,7 +40,7 @@ def snapshot(
     run_state: str = "NOT_STARTED",
     run_id: str = "NONE",
     coordinator: str = "UNASSIGNED",
-    maximum_workers: int = 2,
+    maximum_workers: int = 1,
     current_wave: str = "1",
     protected_dirty_paths: str = "NONE",
     baseline_commit: str = "abc1234",
@@ -97,16 +97,16 @@ def task_block(
 ) -> str:
     owner = owner or ("worker-1" if status == "IN_PROGRESS" else "UNASSIGNED")
     run_id = run_id or ("RUN-0001" if status == "IN_PROGRESS" else "NONE")
-    attempts_used = attempts_used if attempts_used is not None else (
-        1 if status == "IN_PROGRESS" else 0
+    attempts_used = (
+        attempts_used
+        if attempts_used is not None
+        else (1 if status == "IN_PROGRESS" else 0)
     )
     evidence = evidence or ("EV-0001" if status == "DONE" else "NONE")
     blocker = blocker or (
         "Dependency unavailable; obtain fixture" if status == "BLOCKED" else "NONE"
     )
-    skip_record = skip_record or (
-        "SKIP-001" if status == "SKIPPED" else "NONE"
-    )
+    skip_record = skip_record or ("SKIP-001" if status == "SKIPPED" else "NONE")
     checkpoint = checkpoint or ("CP-0001" if status == "IN_PROGRESS" else "NONE")
     write_set = write_set or f"app/{task_id.lower()}.py"
     property_projection = ""
@@ -114,9 +114,7 @@ def task_block(
         property_projection = (
             "| Property ID | Framework TECH ID | Exact command | Run target/time bound | "
             "Seed or reproduction format | Evidence destination |\n"
-            "|---|---|---|---|---|---|\n"
-            + "\n".join(property_execution_rows)
-            + "\n\n"
+            "|---|---|---|---|---|---|\n" + "\n".join(property_execution_rows) + "\n\n"
         )
     if harness_projection_rows:
         property_projection += (
@@ -155,7 +153,7 @@ The task's bounded behavior is implemented and observable.
 
 #### Acceptance criteria
 
-- [{'x' if status == 'DONE' else ' '}] The observable task result matches its requirement.
+- [{"x" if status == "DONE" else " "}] The observable task result matches its requirement.
 
 #### Validation
 
@@ -165,7 +163,7 @@ The task's bounded behavior is implemented and observable.
 
 #### Execution log
 
-{'2026-07-17T00:00:00+00:00 coordinator observed validation pass.' if status == 'DONE' else 'Not started.'}
+{"2026-07-17T00:00:00+00:00 coordinator observed validation pass." if status == "DONE" else "Not started."}
 
 """
 
@@ -178,7 +176,10 @@ def document(
     checkpoint_rows: list[str] | None = None,
 ) -> str:
     waiver_rows = waiver_rows or []
-    rows = "\n".join(waiver_rows) or "| `NONE` | `NONE` | `NONE` | `NONE` | No waivers recorded | TODO |"
+    rows = (
+        "\n".join(waiver_rows)
+        or "| `NONE` | `NONE` | `NONE` | `NONE` | No waivers recorded | TODO |"
+    )
     checkpoint_content = "\n".join(checkpoint_rows or []) or (
         "| `NONE` | `NONE` | TODO | `REQ-0001` / `DES-0001` / `AUTH-0001` | "
         "TODO | No work started | Evidence: NONE; External: NONE | "
@@ -210,9 +211,7 @@ def parse_document(text: str):
 
 
 def write_matching_state(root: Path, tasks_text: str) -> Path:
-    state = json.loads(
-        (REPOSITORY_ROOT / "bootstrap.yaml").read_text(encoding="utf-8")
-    )
+    state = json.loads((REPOSITORY_ROOT / "bootstrap.yaml").read_text(encoding="utf-8"))
     snap = task_waves.parse_snapshot(tasks_text)
     tasks = task_waves.parse_tasks(tasks_text)
     state["lifecycle"].update(
@@ -238,7 +237,9 @@ def write_matching_state(root: Path, tasks_text: str) -> Path:
         {
             "plan_revision": None if plan == "UNINITIALIZED" else plan,
             "plan_state": snap.get("Task-plan state"),
-            "run_id": None if snap.get("Active run ID") == "NONE" else snap.get("Active run ID"),
+            "run_id": None
+            if snap.get("Active run ID") == "NONE"
+            else snap.get("Active run ID"),
             "coordinator": None
             if snap.get("Coordinator") in {"NONE", "UNASSIGNED"}
             else snap.get("Coordinator"),
@@ -300,9 +301,7 @@ def write_technology_register(
             "### Property execution contract\n\n"
             "| Property ID | Framework TECH ID | Exact command | Run target/time bound | "
             "Seed or reproduction format | Evidence destination |\n"
-            "|---|---|---|---|---|---|\n"
-            + "\n".join(property_rows)
-            + "\n\n"
+            "|---|---|---|---|---|---|\n" + "\n".join(property_rows) + "\n\n"
         )
     prd_path.write_text(
         "# PRD\n\n"
@@ -347,17 +346,20 @@ def write_gate_b_bound_project(
     tasks_path = root / "docs" / "project" / "TASKS.md"
     tasks_path.parent.mkdir(parents=True, exist_ok=True)
     tasks_path.write_text(tasks_text, encoding="utf-8")
-    prd = (REPOSITORY_ROOT / "docs" / "project" / "PRD.md").read_text(
-        encoding="utf-8"
-    )
+    prd = (REPOSITORY_ROOT / "docs" / "project" / "PRD.md").read_text(encoding="utf-8")
     # This synthetic approval fixture activates only PROP-001. Remove the
     # template's other candidate property definitions so the approved contract
     # has an exact applicability/definition/execution inverse mapping.
-    prd = "\n".join(
-        line
-        for line in prd.splitlines()
-        if not any(line.startswith(f"| PROP-{number:03d} |") for number in range(2, 6))
-    ) + "\n"
+    prd = (
+        "\n".join(
+            line
+            for line in prd.splitlines()
+            if not any(
+                line.startswith(f"| PROP-{number:03d} |") for number in range(2, 6)
+            )
+        )
+        + "\n"
+    )
     prd = doctor_fixtures.approve_gate_b(doctor_fixtures.approve_gate_a(prd))
     (tasks_path.parent / "PRD.md").write_text(prd, encoding="utf-8")
     (root / "bootstrap.manifest.json").write_text("{}\n", encoding="utf-8")
@@ -433,9 +435,7 @@ def walking_task_block(
         task_id,
         status,
         dependencies,
-        requirements=(
-            "REQ-0001, FR-001, AC-FR-001, JOURNEY-001, WAVE-001"
-        ),
+        requirements=("REQ-0001, FR-001, AC-FR-001, JOURNEY-001, WAVE-001"),
         validation_command=harness.exact_command,
         harness_projection_rows=(row,),
     )
@@ -486,9 +486,7 @@ def harness_evidence_document(*rows: str) -> str:
         "## Harness execution evidence\n\n"
         "| Evidence ID | Harness ID | Layer | Basis IDs | Exact command or API | "
         "Artifact / environment | Observed result | Observed at | Durable source | Status |\n"
-        "|---|---|---|---|---|---|---|---|---|---|\n"
-        + "\n".join(rows)
-        + "\n"
+        "|---|---|---|---|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
     )
 
 
@@ -576,9 +574,7 @@ def completion_evidence_document(*rows: str) -> str:
         "# Verification\n\n"
         "## Task completion evidence\n\n"
         "| Evidence ID | Task | Command or observation | Result | Actor | Observed at | Commit / worktree / artifact | Durable source | Status |\n"
-        "|---|---|---|---|---|---|---|---|---|\n"
-        + "\n".join(content)
-        + "\n"
+        "|---|---|---|---|---|---|---|---|---|\n" + "\n".join(content) + "\n"
     )
 
 
@@ -625,7 +621,9 @@ class TaskWaveSafetyTests(unittest.TestCase):
             observed_state_path, _state = task_waves.read_bootstrap_state(tasks_path)
 
             self.assertEqual(observed_state_path, state_path.resolve())
-            self.assertEqual(task_waves.project_root_for_tasks(tasks_path), root.resolve())
+            self.assertEqual(
+                task_waves.project_root_for_tasks(tasks_path), root.resolve()
+            )
             self.assertEqual(
                 task_waves.coordinator_ledger_paths(tasks_path),
                 {
@@ -732,26 +730,31 @@ Not started.
             approved_delivery=new_build_delivery_contract(),
         )
 
-        self.assertEqual(task_waves.compute_waves(tasks, by_id), {
-            "TASK-001": 1,
-            "TASK-002": 2,
-        })
+        self.assertEqual(
+            task_waves.compute_waves(tasks, by_id),
+            {
+                "TASK-001": 1,
+                "TASK-002": 2,
+            },
+        )
         self.assertEqual(set(tasks[0].metadata), set(task_waves.REQUIRED_METADATA))
         self.assertNotIn("Wave contract", task_waves.REQUIRED_METADATA)
         self.assertIn(row, tasks[0].block)
 
     def test_legacy_gate_a_schema_five_wave_needs_no_invented_journey(self) -> None:
         row, harness = walking_harness_values()
-        text = document([
-            task_block(
-                "TASK-001",
-                "READY",
-                requirements="REQ-0001, FR-001, AC-FR-001, WAVE-001",
-                validation_command=harness.exact_command,
-                harness_projection_rows=(row,),
-            ),
-            task_block("TASK-002", "BACKLOG", "TASK-001"),
-        ])
+        text = document(
+            [
+                task_block(
+                    "TASK-001",
+                    "READY",
+                    requirements="REQ-0001, FR-001, AC-FR-001, WAVE-001",
+                    validation_command=harness.exact_command,
+                    harness_projection_rows=(row,),
+                ),
+                task_block("TASK-002", "BACKLOG", "TASK-001"),
+            ]
+        )
         delivery = task_waves.ApprovedDeliveryContract(
             grandfathered=False,
             wave_contract_id="WAVE-001",
@@ -772,7 +775,9 @@ Not started.
         self.assertNotIn("JOURNEY-", tasks[0].metadata["Requirements"])
         self.assertNotIn("NONE", tasks[0].metadata["Requirements"])
 
-    def test_new_build_delivery_contract_rejects_missing_duplicate_and_bypassed_walk(self) -> None:
+    def test_new_build_delivery_contract_rejects_missing_duplicate_and_bypassed_walk(
+        self,
+    ) -> None:
         _row, harness = walking_harness_values()
         approved_harness = {harness.harness_id: harness}
         delivery = new_build_delivery_contract()
@@ -813,9 +818,7 @@ Not started.
                 task_block("TASK-002", "READY"),
             ]
         )
-        with self.assertRaisesRegex(
-            ValueError, "sole active structural wave 1"
-        ):
+        with self.assertRaisesRegex(ValueError, "sole active structural wave 1"):
             task_waves.validate(
                 task_waves.parse_tasks(peer_root),
                 task_waves.parse_snapshot(peer_root),
@@ -829,9 +832,7 @@ Not started.
                 task_block(
                     "TASK-001",
                     "READY",
-                    requirements=(
-                        "REQ-0001, FR-001, AC-FR-001, JOURNEY-001, WAVE-001"
-                    ),
+                    requirements=("REQ-0001, FR-001, AC-FR-001, JOURNEY-001, WAVE-001"),
                 ),
                 task_block(
                     "TASK-002",
@@ -852,7 +853,9 @@ Not started.
                 approved_delivery=delivery,
             )
 
-    def test_new_build_allows_one_bounded_spike_before_the_walking_skeleton(self) -> None:
+    def test_new_build_allows_one_bounded_spike_before_the_walking_skeleton(
+        self,
+    ) -> None:
         _row, harness = walking_harness_values()
         text = document(
             [
@@ -871,13 +874,18 @@ Not started.
             approved_delivery=new_build_delivery_contract(spike=True),
         )
 
-        self.assertEqual(task_waves.compute_waves(tasks, by_id), {
-            "TASK-001": 1,
-            "TASK-002": 2,
-            "TASK-003": 3,
-        })
+        self.assertEqual(
+            task_waves.compute_waves(tasks, by_id),
+            {
+                "TASK-001": 1,
+                "TASK-002": 2,
+                "TASK-003": 3,
+            },
+        )
 
-    def test_bounded_spike_rejects_scope_authority_and_sequence_violations(self) -> None:
+    def test_bounded_spike_rejects_scope_authority_and_sequence_violations(
+        self,
+    ) -> None:
         _row, harness = walking_harness_values()
         approved_harness = {harness.harness_id: harness}
         delivery = new_build_delivery_contract(spike=True)
@@ -959,7 +967,9 @@ Not started.
         approved_harness = {harness.harness_id: harness}
 
         skipped_walk = document([walking_task_block(status="SKIPPED")])
-        with self.assertRaisesRegex(ValueError, "walking-skeleton task cannot be SKIPPED"):
+        with self.assertRaisesRegex(
+            ValueError, "walking-skeleton task cannot be SKIPPED"
+        ):
             task_waves.validate(
                 task_waves.parse_tasks(skipped_walk),
                 task_waves.parse_snapshot(skipped_walk),
@@ -981,6 +991,102 @@ Not started.
                 approved_delivery=new_build_delivery_contract(spike=True),
             )
 
+    def test_current_plan_requires_exact_requirement_acceptance_pair(self) -> None:
+        text = document([task_block("TASK-001", "READY")])
+
+        with self.assertRaisesRegex(ValueError, "AC-FR-001"):
+            task_waves.validate(
+                task_waves.parse_tasks(text),
+                task_waves.parse_snapshot(text),
+                approved_requirement_rules={"FR-001": ("AC-FR-001", "UBIQUITOUS")},
+                approved_requirement_evidence={},
+            )
+
+    def test_current_plan_accepts_already_satisfied_requirement_evidence(
+        self,
+    ) -> None:
+        text = document([task_block("TASK-001", "READY", requirements="REQ-0001")])
+
+        task_waves.validate(
+            task_waves.parse_tasks(text),
+            task_waves.parse_snapshot(text),
+            approved_requirement_rules={"FR-001": ("AC-FR-001", "UBIQUITOUS")},
+            approved_requirement_evidence={
+                "FR-001": ("ALREADY_SATISFIED", ("EV-0001",))
+            },
+        )
+
+    def test_approved_contract_loads_current_requirement_coverage_inputs(
+        self,
+    ) -> None:
+        text = document([task_block("TASK-001", "READY")])
+
+        with tempfile.TemporaryDirectory() as directory:
+            tasks_path, _state_path = write_gate_b_bound_project(Path(directory), text)
+            contract = task_waves.approved_contract_for_tasks(tasks_path, text)
+
+        self.assertIsNotNone(contract)
+        assert contract is not None
+        self.assertIsNotNone(contract.requirement_rules)
+        assert contract.requirement_rules is not None
+        self.assertEqual(
+            contract.requirement_rules["FR-001"][0],
+            "AC-FR-001",
+        )
+        self.assertEqual(contract.requirement_evidence, {})
+        kwargs = task_waves.execution_contract_kwargs(contract)
+        self.assertIs(kwargs["approved_requirement_rules"], contract.requirement_rules)
+        self.assertIs(
+            kwargs["approved_requirement_evidence"], contract.requirement_evidence
+        )
+
+    def test_skipping_last_requirement_covering_task_is_atomic(self) -> None:
+        text = document(
+            [
+                task_block(
+                    "TASK-001",
+                    "READY",
+                    requirements="REQ-0001, FR-001, AC-FR-001",
+                )
+            ],
+            snapshot_text=snapshot(
+                run_state="RUNNING",
+                run_id="RUN-0001",
+                coordinator="lead",
+            ),
+        )
+        approved = task_waves.ApprovedTaskContract(
+            technology_ids=frozenset({"TECH-0001"}),
+            property_execution={},
+            harness={},
+            requirement_rules={"FR-001": ("AC-FR-001", "UBIQUITOUS")},
+            requirement_evidence={},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tasks_path, state_path = write_task_project(root, text)
+            original_tasks = tasks_path.read_bytes()
+            original_state = state_path.read_bytes()
+
+            with (
+                mock.patch.object(
+                    task_waves,
+                    "approved_contract_for_tasks",
+                    return_value=approved,
+                ),
+                self.assertRaisesRegex(ValueError, "FR-001"),
+            ):
+                task_waves.mutate_task_file(
+                    tasks_path,
+                    "TASK-001",
+                    {"Skip record": "SKIP-001"},
+                    coordinator="lead",
+                    new_status="SKIPPED",
+                )
+
+            self.assertEqual(tasks_path.read_bytes(), original_tasks)
+            self.assertEqual(state_path.read_bytes(), original_state)
+
     def test_invalid_delivery_graph_is_rejected_before_mutation_writes(self) -> None:
         _row, harness = walking_harness_values()
         text = document(
@@ -1001,11 +1107,14 @@ Not started.
             original_tasks = tasks_path.read_bytes()
             original_state = state_path.read_bytes()
 
-            with mock.patch.object(
-                task_waves,
-                "approved_contract_for_tasks",
-                return_value=approved,
-            ), self.assertRaisesRegex(ValueError, "sole active structural wave 1"):
+            with (
+                mock.patch.object(
+                    task_waves,
+                    "approved_contract_for_tasks",
+                    return_value=approved,
+                ),
+                self.assertRaisesRegex(ValueError, "sole active structural wave 1"),
+            ):
                 task_waves.mutate_run_snapshot(
                     tasks_path,
                     operation="start",
@@ -1017,7 +1126,9 @@ Not started.
             self.assertEqual(tasks_path.read_bytes(), original_tasks)
             self.assertEqual(state_path.read_bytes(), original_state)
 
-    def test_delivery_order_is_noop_for_non_new_build_and_grandfathered_designs(self) -> None:
+    def test_delivery_order_is_noop_for_non_new_build_and_grandfathered_designs(
+        self,
+    ) -> None:
         text = document(
             [
                 task_block("TASK-001", "READY"),
@@ -1030,9 +1141,7 @@ Not started.
         task_waves.validate(
             tasks,
             snap,
-            approved_delivery=task_waves.ApprovedDeliveryContract(
-                grandfathered=False
-            ),
+            approved_delivery=task_waves.ApprovedDeliveryContract(grandfathered=False),
         )
         task_waves.validate(
             tasks,
@@ -1069,7 +1178,9 @@ Not started.
         self.assertEqual(no_impact.technology_refs, [])
         self.assertEqual(task_waves.task_to_dict(no_impact, 1)["technology_refs"], [])
 
-    def test_executable_and_terminal_tasks_require_exact_design_trace_grammar(self) -> None:
+    def test_executable_and_terminal_tasks_require_exact_design_trace_grammar(
+        self,
+    ) -> None:
         malformed_values = (
             "DES-0001, Section 10",
             "DES-0001; TECH: TECH-0001,TECH-0002",
@@ -1079,8 +1190,9 @@ Not started.
         )
         for status in ("READY", "IN_PROGRESS", "BLOCKED", "DONE"):
             for design in malformed_values:
-                with self.subTest(status=status, design=design), self.assertRaisesRegex(
-                    ValueError, "Design must exactly match"
+                with (
+                    self.subTest(status=status, design=design),
+                    self.assertRaisesRegex(ValueError, "Design must exactly match"),
                 ):
                     task_waves.validate(
                         task_waves.parse_tasks(
@@ -1237,7 +1349,9 @@ Not started.
         )[0]
         snap = task_waves.parse_snapshot(document([task.block]))
 
-        with self.assertRaisesRegex(ValueError, "latest observation must be a current PASS"):
+        with self.assertRaisesRegex(
+            ValueError, "latest observation must be a current PASS"
+        ):
             task_waves.validate_done_harness_evidence(
                 harness_evidence_document(failed),
                 task,
@@ -1255,6 +1369,7 @@ Not started.
             harness_evidence_document(failed, passed)
         )
         self.assertEqual([item.status for item in parsed], ["FAILED", "LOCAL_PASS"])
+
     def test_property_execution_rejects_sentinels_and_prose_commands(self) -> None:
         headers = (
             "| Property ID | Framework TECH ID | Exact command | Run target/time bound | "
@@ -1318,7 +1433,9 @@ Not started.
                 approved_property_execution={"PROP-001": bad_execution},
             )
 
-    def test_property_projection_rejects_missing_altered_extra_and_duplicate_values(self) -> None:
+    def test_property_projection_rejects_missing_altered_extra_and_duplicate_values(
+        self,
+    ) -> None:
         row, execution = property_execution_values()
         approved = {execution.property_id: execution}
 
@@ -1345,12 +1462,19 @@ Not started.
                 approved_property_execution=approved_rows,
             )
 
-        with self.assertRaisesRegex(ValueError, "missing the property execution projection"):
+        with self.assertRaisesRegex(
+            ValueError, "missing the property execution projection"
+        ):
             validate_row(())
 
         alterations = (
             ("Framework TECH ID", row.replace("TECH-0007", "TECH-0008", 1)),
-            ("Exact command", row.replace(execution.exact_command, "python -m unittest tests.other", 1)),
+            (
+                "Exact command",
+                row.replace(
+                    execution.exact_command, "python -m unittest tests.other", 1
+                ),
+            ),
             (
                 "Run target/time bound",
                 row.replace(
@@ -1359,12 +1483,27 @@ Not started.
                     1,
                 ),
             ),
-            ("Seed or reproduction format", row.replace(execution.seed_or_reproduction_format, "UUID seed; record exact value", 1)),
-            ("Evidence destination", row.replace(execution.evidence_destination, "docs/project/VERIFY.md#other", 1)),
+            (
+                "Seed or reproduction format",
+                row.replace(
+                    execution.seed_or_reproduction_format,
+                    "UUID seed; record exact value",
+                    1,
+                ),
+            ),
+            (
+                "Evidence destination",
+                row.replace(
+                    execution.evidence_destination, "docs/project/VERIFY.md#other", 1
+                ),
+            ),
         )
         for label, altered in alterations:
-            with self.subTest(label=label), self.assertRaisesRegex(
-                ValueError, "does not exactly match the approved PRD row"
+            with (
+                self.subTest(label=label),
+                self.assertRaisesRegex(
+                    ValueError, "does not exactly match the approved PRD row"
+                ),
             ):
                 validate_row((altered,))
 
@@ -1372,7 +1511,9 @@ Not started.
             property_id="PROP-002",
             command="python -m unittest tests.test_other_properties",
         )
-        with self.assertRaisesRegex(ValueError, "unreferenced property execution rows: PROP-002"):
+        with self.assertRaisesRegex(
+            ValueError, "unreferenced property execution rows: PROP-002"
+        ):
             validate_row(
                 (row, extra_row),
                 command=execution.exact_command + "\n" + extra_execution.exact_command,
@@ -1382,7 +1523,9 @@ Not started.
                 },
             )
 
-        with self.assertRaisesRegex(ValueError, "duplicate property execution ID PROP-001"):
+        with self.assertRaisesRegex(
+            ValueError, "duplicate property execution ID PROP-001"
+        ):
             validate_row((row, row))
 
         with self.assertRaisesRegex(ValueError, "found 2"):
@@ -1391,7 +1534,9 @@ Not started.
                 command=execution.exact_command + "\n" + execution.exact_command,
             )
 
-        with self.assertRaisesRegex(ValueError, "Framework TECH ID is missing from Design"):
+        with self.assertRaisesRegex(
+            ValueError, "Framework TECH ID is missing from Design"
+        ):
             validate_row((row,), design="DES-0001; TECH: TECH-0001")
 
     def test_property_projection_order_matches_requirements(self) -> None:
@@ -1412,7 +1557,9 @@ Not started.
                 property_execution_rows=(row_two, row_one),
             )
         )
-        with self.assertRaisesRegex(ValueError, "order must exactly match Requirements"):
+        with self.assertRaisesRegex(
+            ValueError, "order must exactly match Requirements"
+        ):
             task_waves.validate(
                 task,
                 approved_tech_ids={"TECH-0001", "TECH-0007"},
@@ -1496,7 +1643,9 @@ Not started.
                 approved_property_execution=approved,
             )
 
-    def test_resolved_backlog_property_counts_coverage_but_is_not_runnable(self) -> None:
+    def test_resolved_backlog_property_counts_coverage_but_is_not_runnable(
+        self,
+    ) -> None:
         row, execution = property_execution_values()
         approved = {execution.property_id: execution}
         tasks_text = document(
@@ -1544,7 +1693,7 @@ Not started.
                 task_waves.claim_task_file(
                     path,
                     "TASK-002",
-                    owner="worker-b",
+                    owner="lead",
                     coordinator="lead",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
@@ -1595,7 +1744,7 @@ Not started.
             task_waves.claim_task_file(
                 path,
                 "TASK-001",
-                owner="worker-a",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0000",
@@ -1614,7 +1763,9 @@ Not started.
                 "BLOCKED",
             )
 
-    def test_gate_b_design_hash_staleness_blocks_query_start_claim_and_status(self) -> None:
+    def test_gate_b_design_hash_staleness_blocks_query_start_claim_and_status(
+        self,
+    ) -> None:
         row, execution = property_execution_values()
 
         def property_task(status: str, *, running: bool = False) -> str:
@@ -1657,8 +1808,11 @@ Not started.
                 ("--json",),
             )
             for arguments in query_arguments:
-                with self.subTest(query=arguments), mock.patch.object(
-                    sys, "argv", ["task_waves.py", str(path), *arguments]
+                with (
+                    self.subTest(query=arguments),
+                    mock.patch.object(
+                        sys, "argv", ["task_waves.py", str(path), *arguments]
+                    ),
                 ):
                     stderr = io.StringIO()
                     with redirect_stderr(stderr):
@@ -1687,7 +1841,7 @@ Not started.
                 lambda path: task_waves.claim_task_file(
                     path,
                     "TASK-001",
-                    owner="worker-a",
+                    owner="lead",
                     coordinator="lead",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
@@ -1734,11 +1888,16 @@ Not started.
             ),
         )
         for name, tasks_text, operation in operations:
-            with self.subTest(operation=name), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(operation=name),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 path, state_path = make_stale(Path(directory), tasks_text)
                 original_tasks = path.read_text(encoding="utf-8")
                 original_state = state_path.read_text(encoding="utf-8")
-                with self.assertRaisesRegex(ValueError, "design contract hash is stale"):
+                with self.assertRaisesRegex(
+                    ValueError, "design contract hash is stale"
+                ):
                     operation(path)
                 self.assertEqual(path.read_text(encoding="utf-8"), original_tasks)
                 self.assertEqual(state_path.read_text(encoding="utf-8"), original_state)
@@ -1764,9 +1923,7 @@ Not started.
             new_bound = "MIN_CASES: 250; MAX_SECONDS: 45"
             prd_path = path.with_name("PRD.md")
             prd_path.write_text(
-                prd_path.read_text(encoding="utf-8").replace(
-                    old_bound, new_bound, 1
-                ),
+                prd_path.read_text(encoding="utf-8").replace(old_bound, new_bound, 1),
                 encoding="utf-8",
             )
             path.write_text(
@@ -1781,8 +1938,10 @@ Not started.
             from tests import test_bootstrap_doctor as doctor_fixtures
 
             prd = prd_path.read_text(encoding="utf-8")
-            contract, issues = task_waves.load_bootstrap_doctor().derive_design_contract(
-                prd, "DES-0001", required=True
+            contract, issues = (
+                task_waves.load_bootstrap_doctor().derive_design_contract(
+                    prd, "DES-0001", required=True
+                )
             )
             self.assertEqual(issues, [])
             self.assertIsNotNone(contract.canonical_sha256)
@@ -1801,7 +1960,9 @@ Not started.
                     path, path.read_text(encoding="utf-8")
                 )
 
-    def test_property_done_requires_structured_evidence_and_later_pass_atomically(self) -> None:
+    def test_property_done_requires_structured_evidence_and_later_pass_atomically(
+        self,
+    ) -> None:
         row, execution = property_execution_values()
         text = observed_task_text(
             document(
@@ -1831,8 +1992,7 @@ Not started.
             )
             verify_path = path.with_name("VERIFY.md")
             property_material = (
-                "Worktree: abc1234; "
-                "artifact: tests/artifacts/property-PROP-001.json"
+                "Worktree: abc1234; artifact: tests/artifacts/property-PROP-001.json"
             )
             property_source = "tests/artifacts/property-PROP-001.json"
 
@@ -1862,9 +2022,7 @@ Not started.
             original_tasks = path.read_text(encoding="utf-8")
             original_state = state_path.read_text(encoding="utf-8")
 
-            with self.assertRaisesRegex(
-                ValueError, "Property-based test evidence"
-            ):
+            with self.assertRaisesRegex(ValueError, "Property-based test evidence"):
                 task_waves.update_task_file(
                     path,
                     "TASK-001",
@@ -1952,7 +2110,9 @@ Not started.
                 "DONE",
             )
 
-    def test_property_done_rejects_noncomparable_version_policy_atomically(self) -> None:
+    def test_property_done_rejects_noncomparable_version_policy_atomically(
+        self,
+    ) -> None:
         row, execution = property_execution_values()
         text = observed_task_text(
             document(
@@ -1975,7 +2135,10 @@ Not started.
             "CURRENT_LTS_AS_OF: 2026-07-01",
             "ORG_MANAGED: company baseline",
         ):
-            with self.subTest(policy=policy), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(policy=policy),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 path = root / "docs" / "project" / "TASKS.md"
                 path.parent.mkdir(parents=True)
@@ -2032,9 +2195,7 @@ Not started.
                         checkpoint="CP-0002",
                     )
                 self.assertEqual(path.read_text(encoding="utf-8"), original_tasks)
-                self.assertEqual(
-                    state_path.read_text(encoding="utf-8"), original_state
-                )
+                self.assertEqual(state_path.read_text(encoding="utf-8"), original_state)
 
     def test_property_projection_mutation_failure_is_atomic(self) -> None:
         row, execution = property_execution_values()
@@ -2331,7 +2492,7 @@ Not started.
             task_waves.claim_task_file(
                 path,
                 "TASK-001",
-                owner="worker-a",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0000",
@@ -2341,8 +2502,10 @@ Not started.
             self.assertEqual(task.status, "IN_PROGRESS")
             self.assertEqual(task.run_id, "RUN-0001")
             self.assertEqual(task.attempts_used, 1)
-            self.assertEqual(task_waves.clean(task.metadata["Owner"]), "worker-a")
-            self.assertEqual(task_waves.clean(task.metadata["Last checkpoint"]), "CP-0000")
+            self.assertEqual(task_waves.clean(task.metadata["Owner"]), "lead")
+            self.assertEqual(
+                task_waves.clean(task.metadata["Last checkpoint"]), "CP-0000"
+            )
             self.assertEqual(
                 task_waves.parse_snapshot(path.read_text(encoding="utf-8")).get(
                     "Last checkpoint"
@@ -2352,7 +2515,10 @@ Not started.
 
     def test_claim_requires_current_base_without_consuming_checkpoint(self) -> None:
         for checkpoint in ("CP-0004", "CP-0006"):
-            with self.subTest(checkpoint=checkpoint), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(checkpoint=checkpoint),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 tasks_text = document(
                     [task_block("TASK-001", "READY")],
@@ -2368,7 +2534,7 @@ Not started.
                     task_waves.claim_task_file(
                         path,
                         "TASK-001",
-                        owner="worker-a",
+                        owner="lead",
                         coordinator="lead",
                         run_id="RUN-0001",
                         checkpoint=checkpoint,
@@ -2389,7 +2555,7 @@ Not started.
             task_waves.claim_task_file(
                 path,
                 "TASK-001",
-                owner="worker-a",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0000",
@@ -2420,7 +2586,7 @@ Not started.
                 task_waves.claim_task_file(
                     path,
                     "TASK-001",
-                    owner="worker-a",
+                    owner="lead",
                     coordinator="lead",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
@@ -2438,9 +2604,11 @@ Not started.
             with self.subTest(status=status):
                 text = task_block("TASK-001", status)
                 text = task_waves.META_LINE.sub(
-                    lambda match: f"- {field}: `{value}`"
-                    if match.group("key") == field
-                    else match.group(0),
+                    lambda match: (
+                        f"- {field}: `{value}`"
+                        if match.group("key") == field
+                        else match.group(0)
+                    ),
                     text,
                 )
                 with self.assertRaisesRegex(ValueError, f"{status} requires"):
@@ -2451,14 +2619,36 @@ Not started.
             "#### Outcome\n\nThe task's bounded behavior is implemented and observable.\n\n",
             "",
         )
-        with self.assertRaisesRegex(ValueError, "missing required section #### Outcome"):
+        with self.assertRaisesRegex(
+            ValueError, "missing required section #### Outcome"
+        ):
             task_waves.validate(task_waves.parse_tasks(text))
 
         done = task_block("TASK-001", "DONE").replace("- [x]", "- [ ]")
         with self.assertRaisesRegex(ValueError, "incomplete acceptance criteria"):
             task_waves.validate(task_waves.parse_tasks(done))
 
-    def test_safe_groups_serialize_overlaps_and_aws_mutations(self) -> None:
+    def test_local_tasks_allow_only_none_or_docs_only_aws_modes(self) -> None:
+        for aws_mode in ("NONE", "DOCS_ONLY"):
+            with self.subTest(aws_mode=aws_mode):
+                tasks = task_waves.parse_tasks(
+                    task_block("TASK-001", "READY", aws_mode=aws_mode)
+                )
+                task_waves.validate(tasks)
+
+        for aws_mode in ("READ_ONLY", "MUTATION"):
+            with self.subTest(aws_mode=aws_mode):
+                tasks = task_waves.parse_tasks(
+                    task_block("TASK-001", "READY", aws_mode=aws_mode)
+                )
+                with self.assertRaisesRegex(
+                    ValueError, f"invalid AWS mode '{aws_mode}'"
+                ):
+                    task_waves.validate(tasks)
+
+    def test_safe_groups_serialize_overlaps_and_invalid_legacy_aws_mutations(
+        self,
+    ) -> None:
         text = document(
             [
                 task_block("TASK-001", "READY", write_set="app/**"),
@@ -2473,40 +2663,34 @@ Not started.
                 ),
             ]
         )
-        tasks, _snap, waivers, by_id = parse_document(text)
+        with self.assertRaisesRegex(ValueError, "invalid AWS mode 'MUTATION'"):
+            task_waves.validate(task_waves.parse_tasks(text))
+
+        # Keep invalid legacy metadata serialized defensively before migration.
+        tasks = task_waves.parse_tasks(text)
+        waivers = task_waves.parse_waivers(text)
+        by_id = {task.task_id: task for task in tasks}
         waves = task_waves.compute_waves(tasks, by_id)
         ready = task_waves.ready_tasks(tasks, by_id, waivers)
 
         isolated = task_waves.safe_execution_groups(
-            ready, waves, isolated_worktrees=True, maximum_workers=2
+            ready, waves, isolated_worktrees=True, maximum_workers=1
         )
         nonisolated = task_waves.safe_execution_groups(
             ready, waves, isolated_worktrees=False
         )
 
-        self.assertEqual(len(nonisolated), 4)
-        self.assertFalse(
-            any(
-                {"TASK-001", "TASK-002"}
-                <= {task.task_id for task in group}
-                for group in isolated
-            )
+        expected = [[task.task_id] for task in ready]
+        self.assertEqual(
+            [[task.task_id for task in group] for group in isolated], expected
         )
-        self.assertTrue(
-            any(
-                {"TASK-001", "TASK-003"}
-                <= {task.task_id for task in group}
-                for group in isolated
-            )
+        self.assertEqual(
+            [[task.task_id for task in group] for group in nonisolated], expected
         )
-        self.assertTrue(all(len(group) <= 2 for group in isolated))
-        self.assertTrue(
-            all(
-                len(group) == 1
-                for group in isolated
-                if any(task.task_id == "TASK-004" for task in group)
+        with self.assertRaisesRegex(ValueError, "exactly 1"):
+            task_waves.safe_execution_groups(
+                ready, waves, isolated_worktrees=True, maximum_workers=2
             )
-        )
 
     def test_unsafe_write_boundaries_are_rejected(self) -> None:
         for value in (
@@ -2572,7 +2756,7 @@ Not started.
             task_waves.claim_task_file(
                 path,
                 "TASK-001",
-                owner="worker-a",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0000",
@@ -2605,7 +2789,9 @@ Not started.
             "#### Validation\n",
             "#### Validation\n\n```text\n- Status: `DONE`\n```\n\n",
         )
-        text = document([real]).replace("## Task definitions\n\n", "## Task definitions\n\n" + fake)
+        text = document([real]).replace(
+            "## Task definitions\n\n", "## Task definitions\n\n" + fake
+        )
 
         tasks, _snap, _waivers, _by_id = parse_document(text)
 
@@ -2665,12 +2851,14 @@ Not started.
             task_waves.external_targets_overlap("aws:stack/dev", "aws:stack/prod")
         )
 
-    def test_parallel_claim_requires_isolation_and_disjoint_boundaries(self) -> None:
+    def test_second_mutable_claim_is_rejected_even_with_isolated_worktrees(
+        self,
+    ) -> None:
         base_snapshot = snapshot(
             run_state="RUNNING",
             run_id="RUN-0001",
             coordinator="lead",
-            maximum_workers=2,
+            maximum_workers=1,
         )
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -2689,31 +2877,17 @@ Not started.
             )
             path, _state_path = write_task_project(root, original)
 
-            with self.assertRaisesRegex(ValueError, "isolated-worktrees"):
+            with self.assertRaisesRegex(ValueError, "already IN_PROGRESS"):
                 task_waves.claim_task_file(
                     path,
                     "TASK-002",
-                    owner="worker-b",
+                    owner="lead",
                     coordinator="lead",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
+                    isolated_worktrees=True,
                 )
-            task_waves.claim_task_file(
-                path,
-                "TASK-002",
-                owner="worker-b",
-                coordinator="lead",
-                run_id="RUN-0001",
-                checkpoint="CP-0000",
-                isolated_worktrees=True,
-            )
-            self.assertEqual(
-                [
-                    task.status
-                    for task in task_waves.parse_tasks(path.read_text(encoding="utf-8"))
-                ],
-                ["IN_PROGRESS", "IN_PROGRESS"],
-            )
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -2730,11 +2904,11 @@ Not started.
                 snapshot_text=base_snapshot,
             )
             path, _state_path = write_task_project(root, original)
-            with self.assertRaisesRegex(ValueError, "conflicts with active"):
+            with self.assertRaisesRegex(ValueError, "already IN_PROGRESS"):
                 task_waves.claim_task_file(
                     path,
                     "TASK-002",
-                    owner="worker-b",
+                    owner="lead",
                     coordinator="lead",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
@@ -2751,9 +2925,12 @@ Not started.
                     coordinator="lead",
                     maximum_workers=1,
                 ),
-                [task_block("TASK-001", "IN_PROGRESS"), task_block("TASK-002", "READY")],
-                "worker-b",
-                "Maximum workers",
+                [
+                    task_block("TASK-001", "IN_PROGRESS"),
+                    task_block("TASK-002", "READY"),
+                ],
+                "lead",
+                "already IN_PROGRESS",
             ),
             (
                 snapshot(
@@ -2763,20 +2940,21 @@ Not started.
                     protected_dirty_paths="app/**",
                 ),
                 [task_block("TASK-002", "READY", write_set="APP/api.py")],
-                "worker-b",
+                "lead",
                 "Protected dirty paths",
             ),
             (
-                snapshot(
-                    run_state="RUNNING", run_id="RUN-0001", coordinator="lead"
-                ),
+                snapshot(run_state="RUNNING", run_id="RUN-0001", coordinator="lead"),
                 [task_block("TASK-002", "READY", write_set="TASKS.md")],
                 "worker-b",
                 "coordinator ownership",
             ),
         ]
         for snap, blocks, owner, message in cases:
-            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(message=message),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 original = document(blocks, snapshot_text=snap)
                 path, _state_path = write_task_project(root, original)
@@ -2808,7 +2986,7 @@ Not started.
             task_waves.claim_task_file(
                 path,
                 "TASK-001",
-                owner="worker-a",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0000",
@@ -2817,13 +2995,15 @@ Not started.
                 task_waves.claim_task_file(
                     path,
                     "TASK-002",
-                    owner="worker-b",
+                    owner="lead",
                     coordinator="lead",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
                     isolated_worktrees=True,
                 )
-            path.write_text(observed_task_text(path.read_text(encoding="utf-8")), encoding="utf-8")
+            path.write_text(
+                observed_task_text(path.read_text(encoding="utf-8")), encoding="utf-8"
+            )
             path.with_name("VERIFY.md").write_text(
                 completion_evidence_document(
                     completion_evidence_row(),
@@ -2855,7 +3035,7 @@ Not started.
             task_waves.claim_task_file(
                 path,
                 "TASK-002",
-                owner="worker-b",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0001",
@@ -2892,7 +3072,7 @@ Not started.
             task_waves.claim_task_file(
                 path,
                 "TASK-001",
-                owner="worker-a",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0000",
@@ -2901,9 +3081,7 @@ Not started.
                 observed_task_text(path.read_text(encoding="utf-8")),
                 encoding="utf-8",
             )
-            verify_path.write_text(
-                completion_evidence_document(), encoding="utf-8"
-            )
+            verify_path.write_text(completion_evidence_document(), encoding="utf-8")
             task_waves.update_task_file(
                 path,
                 "TASK-001",
@@ -3085,7 +3263,9 @@ Not started.
             )
             completed = task_waves.parse_tasks(path.read_text(encoding="utf-8"))[0]
             self.assertEqual(completed.status, "DONE")
-            self.assertEqual(task_waves.clean(completed.metadata["Last checkpoint"]), "CP-0002")
+            self.assertEqual(
+                task_waves.clean(completed.metadata["Last checkpoint"]), "CP-0002"
+            )
 
     def test_done_evidence_requires_exact_unique_structured_task_row(self) -> None:
         base = observed_task_text(
@@ -3179,7 +3359,10 @@ Not started.
             "ev-0001",
             "VERIFY.md#ev-0001",
         ):
-            with self.subTest(evidence=evidence), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(evidence=evidence),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 path, _state_path = write_task_project(root, base)
                 (root / "VERIFY.md").write_text(
@@ -3244,7 +3427,7 @@ Not started.
                 task_waves.claim_task_file(
                     path,
                     "TASK-001",
-                    owner="worker-a",
+                    owner="lead",
                     coordinator="other",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
@@ -3261,8 +3444,9 @@ Not started.
             root = Path(directory)
             path, _state_path = write_task_project(root, running)
             for action in ("issue", "status"):
-                with self.subTest(action=action), self.assertRaisesRegex(
-                    ValueError, "does not match"
+                with (
+                    self.subTest(action=action),
+                    self.assertRaisesRegex(ValueError, "does not match"),
                 ):
                     task_waves.update_task_file(
                         path,
@@ -3272,8 +3456,9 @@ Not started.
                         status="READY" if action == "status" else None,
                     )
             for operation in ("pause", "complete"):
-                with self.subTest(operation=operation), self.assertRaisesRegex(
-                    ValueError, "does not match"
+                with (
+                    self.subTest(operation=operation),
+                    self.assertRaisesRegex(ValueError, "does not match"),
                 ):
                     task_waves.mutate_run_snapshot(
                         path,
@@ -3358,7 +3543,7 @@ Not started.
                 task_waves.claim_task_file(
                     path,
                     "TASK-001",
-                    owner="worker-a",
+                    owner="lead",
                     coordinator="lead",
                     run_id="RUN-0001",
                     checkpoint="CP-0000",
@@ -3413,7 +3598,9 @@ Not started.
                     issue="https://example.test/1",
                 )
 
-    def test_resume_fails_closed_when_git_is_unavailable_or_dirty_set_drifts(self) -> None:
+    def test_resume_fails_closed_when_git_is_unavailable_or_dirty_set_drifts(
+        self,
+    ) -> None:
         paused = document(
             [task_block("TASK-001", "READY")],
             snapshot_text=snapshot(
@@ -3440,7 +3627,9 @@ Not started.
             with mock.patch.object(
                 task_waves.subprocess, "run", side_effect=FileNotFoundError("git")
             ):
-                with self.assertRaisesRegex(ValueError, "Git reconciliation unavailable"):
+                with self.assertRaisesRegex(
+                    ValueError, "Git reconciliation unavailable"
+                ):
                     task_waves.mutate_run_snapshot(
                         path,
                         operation="resume",
@@ -3477,7 +3666,9 @@ Not started.
                 "# Verification\n\nCP-0001\n", encoding="utf-8"
             )
             (root / "unexpected.txt").write_text("drift\n", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "unrecorded dirty paths=unexpected.txt"):
+            with self.assertRaisesRegex(
+                ValueError, "unrecorded dirty paths=unexpected.txt"
+            ):
                 task_waves.mutate_run_snapshot(
                     path,
                     operation="resume",
@@ -3528,7 +3719,9 @@ Not started.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             path, _state_path = write_task_project(root, base)
-            (root / "VERIFY.md").write_text("# Verification\n\nCP-0001\n", encoding="utf-8")
+            (root / "VERIFY.md").write_text(
+                "# Verification\n\nCP-0001\n", encoding="utf-8"
+            )
             with self.assertRaisesRegex(ValueError, "existing checkpoint row"):
                 task_waves.mutate_run_snapshot(
                     path,
@@ -3672,14 +3865,19 @@ Not started.
             )
             tasks = task_waves.parse_tasks(tasks_text)
             snap = task_waves.parse_snapshot(tasks_text)
-            with self.assertRaisesRegex(ValueError, "evidence for TASK-001 is incomplete"):
+            with self.assertRaisesRegex(
+                ValueError, "evidence for TASK-001 is incomplete"
+            ):
                 task_waves.validate_checkpoint_receipt(
                     path, tasks_text, "CP-0001", "RUN-0001", tasks, snap
                 )
 
     def test_checkpoint_receipt_requires_exact_attempt_fraction(self) -> None:
         for attempts in ("attempts=0/99", "attempts=0"):
-            with self.subTest(attempts=attempts), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(attempts=attempts),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 tasks_text = document(
                     [task_block("TASK-001", "READY", attempt_budget=3)],
@@ -3707,7 +3905,9 @@ Not started.
                         path, tasks_text, "CP-0001", "RUN-0001", tasks, snap
                     )
 
-    def test_pause_git_reconciliation_fails_closed_and_round_trips_ledgers(self) -> None:
+    def test_pause_git_reconciliation_fails_closed_and_round_trips_ledgers(
+        self,
+    ) -> None:
         def running_receipt(commit: str, *, baseline: str | None = None) -> str:
             return document(
                 [task_block("TASK-001", "READY")],
@@ -3774,7 +3974,9 @@ Not started.
                 "# Verification\n\nCP-0001\n", encoding="utf-8"
             )
             (root / "unexpected.txt").write_text("drift\n", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "unrecorded dirty paths=unexpected.txt"):
+            with self.assertRaisesRegex(
+                ValueError, "unrecorded dirty paths=unexpected.txt"
+            ):
                 task_waves.mutate_run_snapshot(
                     path,
                     operation="pause",
@@ -3910,7 +4112,10 @@ Not started.
                 ),
             ]
             for argv, message in cases:
-                with self.subTest(message=message), mock.patch.object(sys, "argv", argv):
+                with (
+                    self.subTest(message=message),
+                    mock.patch.object(sys, "argv", argv),
+                ):
                     stderr = io.StringIO()
                     with redirect_stderr(stderr):
                         result = task_waves.main()

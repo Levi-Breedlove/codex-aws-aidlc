@@ -6,6 +6,7 @@ import json
 import re
 import tabnanny
 import tokenize
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -31,7 +32,7 @@ RESERVED_EMAIL_DOMAINS = (
 SYNTHETIC_ACCOUNTS = {"111122223333", "123456789012"}
 SYNTHETIC_SECRET_LINE_HASHES = {
     "tests/test_bootstrap_doctor.py": {
-        "57f699a78ba8f1dd3e4d1cccdf8f3eb7db020fd5994d5068b9135ae8c10bb454",
+        "72393cbf3537b84ece87e2945cd2829e15257858aa8b5107f2fd76207c27681a",
     },
     "tests/test_intake_response.py": {
         "4ee793c22fe6ee7686b182fe35cfe2e55e388690fc3ba4ddb9514988861d1b39",
@@ -47,9 +48,7 @@ UNIX_HOME_DIRECTORY = "home"
 UNIX_ROOT_DIRECTORY = "root"
 IPV4_OCTET = r"(?:25[0-5]|2[0-4]\d|1?\d?\d)"
 MACHINE_PATTERNS = (
-    re.compile(
-        rf"(?i)\b[A-Z]:[\\/]{WINDOWS_USER_DIRECTORY}[\\/][^\\/\s]+"
-    ),
+    re.compile(rf"(?i)\b[A-Z]:[\\/]{WINDOWS_USER_DIRECTORY}[\\/][^\\/\s]+"),
     re.compile(
         rf"(?i)(?:/{UNIX_USER_DIRECTORY}/|/{UNIX_HOME_DIRECTORY}/)"
         rf"[^/\s]+(?:/|\b)"
@@ -59,20 +58,14 @@ MACHINE_PATTERNS = (
     re.compile(r"(?i)\b(?:AppData|OneDrive)[\\/]"),
     re.compile(r"(?i)\b(?:DESKTOP|LAPTOP)-[A-Z0-9-]+\b"),
     re.compile(r"(?i)\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b"),
-    re.compile(
-        rf"(?<!\d)10\.{IPV4_OCTET}\.{IPV4_OCTET}\.{IPV4_OCTET}(?!\d)"
-    ),
+    re.compile(rf"(?<!\d)10\.{IPV4_OCTET}\.{IPV4_OCTET}\.{IPV4_OCTET}(?!\d)"),
     re.compile(
         rf"(?<!\d)172\.(?:1[6-9]|2\d|3[01])\."
         rf"{IPV4_OCTET}\.{IPV4_OCTET}(?!\d)"
     ),
-    re.compile(
-        rf"(?<!\d)192\.168\.{IPV4_OCTET}\.{IPV4_OCTET}(?!\d)"
-    ),
+    re.compile(rf"(?<!\d)192\.168\.{IPV4_OCTET}\.{IPV4_OCTET}(?!\d)"),
 )
-EMAIL_PATTERN = re.compile(
-    r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b"
-)
+EMAIL_PATTERN = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 ACCOUNT_PATTERN = re.compile(
     r"(?i)(?:\baccount(?:\s+id)?\s*[:=]\s*|"
     r"arn:(?:aws|aws-us-gov|aws-cn):[^\s:]+:[^\s:]*:)(\d{12})\b"
@@ -119,7 +112,9 @@ def release_texts() -> list[tuple[str, str]]:
 
 
 class RepositoryHygieneTests(unittest.TestCase):
-    def test_release_python_sources_compile_and_have_unambiguous_indentation(self) -> None:
+    def test_release_python_sources_compile_and_have_unambiguous_indentation(
+        self,
+    ) -> None:
         failures: list[str] = []
         for relative in manifest_inventory():
             if not relative.endswith(".py"):
@@ -240,6 +235,55 @@ class RepositoryHygieneTests(unittest.TestCase):
         for pattern in required:
             with self.subTest(pattern=pattern):
                 self.assertIn(pattern, ignore)
+
+    def test_ruff_and_actions_monitoring_are_exact_and_read_only(self) -> None:
+        config = tomllib.loads(
+            (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        )
+        ruff = config["tool"]["ruff"]
+        self.assertEqual(ruff["required-version"], "==0.16.0")
+        self.assertEqual(ruff["target-version"], "py311")
+        self.assertEqual(ruff["line-length"], 88)
+        self.assertEqual(ruff["extend-exclude"], ["*.md"])
+        self.assertEqual(ruff["lint"]["select"], ["E4", "E7", "E9", "F"])
+        self.assertEqual(
+            ruff["lint"]["per-file-ignores"],
+            {
+                "scripts/setup_assistant.py": ["E402"],
+                "tests/test_context_packets.py": ["E402"],
+                "tests/test_fastlane_presenter.py": ["E402"],
+                "tests/test_product_journeys.py": ["E402"],
+            },
+        )
+
+        dependabot = (REPOSITORY_ROOT / ".github/dependabot.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(
+            dependabot,
+            "version: 2\n"
+            "updates:\n"
+            '  - package-ecosystem: "github-actions"\n'
+            '    directory: "/"\n'
+            '    target-branch: "fast-lane-maint"\n'
+            "    schedule:\n"
+            '      interval: "weekly"\n',
+        )
+        for forbidden in (
+            "automerge",
+            "auto-merge",
+            "registries:",
+            "token:",
+            "password:",
+            "github-actions: write",
+        ):
+            self.assertNotIn(forbidden, dependabot.casefold())
+
+        workflow = (REPOSITORY_ROOT / ".github/workflows/ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Run extracted release and Fastlane Engine smoke", workflow)
+        self.assertNotIn("Run extracted release and doctor smoke", workflow)
 
     def test_feedback_form_is_privacy_safe(self) -> None:
         form = (

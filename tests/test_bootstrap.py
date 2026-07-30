@@ -31,9 +31,7 @@ def load_module(name: str, path: Path):
     return module
 
 
-bootstrap = load_module(
-    "bootstrap_under_test", REPOSITORY_ROOT / "bootstrap.py"
-)
+bootstrap = load_module("bootstrap_under_test", REPOSITORY_ROOT / "bootstrap.py")
 
 
 def copy_manifest_template(destination: Path) -> None:
@@ -122,7 +120,7 @@ class BootstrapSafetyTests(unittest.TestCase):
             values = dict(bootstrap.PLACEHOLDERS)
             values.update(
                 {
-                    "My AWS Project": "Direct Action Project",
+                    "{{PROJECT_NAME}}": "Direct Action Project",
                     "{{AWS_REGION}}": "us-west-2",
                     "{{COST_POSTURE}}": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                 }
@@ -145,7 +143,9 @@ class BootstrapSafetyTests(unittest.TestCase):
 
             self.assertGreater(report.written, 0)
             state = json.loads((project / "bootstrap.yaml").read_text(encoding="utf-8"))
-            self.assertEqual(state["setup"], {"status": "CONFIGURED", "method": "IN_PLACE"})
+            self.assertEqual(
+                state["setup"], {"status": "CONFIGURED", "method": "IN_PLACE"}
+            )
             self.assertEqual(state["project"]["name"], "Direct Action Project")
             self.assertEqual(state["project"]["region"], "us-west-2")
             self.assertEqual(
@@ -211,14 +211,16 @@ class BootstrapSafetyTests(unittest.TestCase):
             copy_manifest_template(project)
             original = (project / "bootstrap.yaml").read_bytes()
             values = dict(bootstrap.PLACEHOLDERS)
-            values["My AWS Project"] = "Rollback Example"
+            values["{{PROJECT_NAME}}"] = "Rollback Example"
 
             with mock.patch.object(
                 bootstrap,
                 "run_generated_doctor",
                 return_value=(False, "forced doctor failure"),
             ):
-                with self.assertRaisesRegex(ValueError, "Fastlane Engine validation failed"):
+                with self.assertRaisesRegex(
+                    ValueError, "Fastlane Engine validation failed"
+                ):
                     bootstrap.initialize_template_in_place(project, values)
 
             self.assertEqual((project / "bootstrap.yaml").read_bytes(), original)
@@ -233,7 +235,9 @@ class BootstrapSafetyTests(unittest.TestCase):
                 "git_text",
                 return_value="git@github.com:Levi-Breedlove/aws-bootstrap.git",
             ):
-                with self.assertRaisesRegex(ValueError, "official maintainer repository"):
+                with self.assertRaisesRegex(
+                    ValueError, "official maintainer repository"
+                ):
                     bootstrap.validate_in_place_repository(project)
 
             with mock.patch.object(
@@ -255,6 +259,8 @@ class BootstrapSafetyTests(unittest.TestCase):
                 "bootstrap.py": b"bootstrap",
                 "scripts/bootstrap_dependencies.py": b"dependencies",
                 "scripts/bootstrap_doctor.py": b"doctor",
+                "scripts/fastlane_process.py": b"process",
+                "scripts/fastlane_project_identity.py": b"identity",
                 "scripts/fastlane_stdio.py": b"stdio",
                 "scripts/setup_assistant.py": b"setup-assistant",
                 "scripts/task_waves.py": b"tasks",
@@ -301,13 +307,14 @@ class BootstrapSafetyTests(unittest.TestCase):
             run.assert_not_called()
 
     def test_main_stops_before_setup_when_dependency_validation_fails(self) -> None:
-        with mock.patch.object(
-            bootstrap,
-            "validate_repository_dependencies",
-            side_effect=ValueError("dependency policy mismatch"),
-        ) as dependency_check, mock.patch.object(
-            bootstrap, "initialize_template_in_place"
-        ) as initialize:
+        with (
+            mock.patch.object(
+                bootstrap,
+                "validate_repository_dependencies",
+                side_effect=ValueError("dependency policy mismatch"),
+            ) as dependency_check,
+            mock.patch.object(bootstrap, "initialize_template_in_place") as initialize,
+        ):
             result = bootstrap.main(
                 [
                     "--target",
@@ -322,11 +329,12 @@ class BootstrapSafetyTests(unittest.TestCase):
         initialize.assert_not_called()
 
     def test_main_rejects_noncanonical_cost_posture_before_any_setup(self) -> None:
-        with mock.patch.object(
-            bootstrap, "validate_repository_dependencies"
-        ) as dependency_check, mock.patch.object(
-            bootstrap, "initialize_template_in_place"
-        ) as initialize:
+        with (
+            mock.patch.object(
+                bootstrap, "validate_repository_dependencies"
+            ) as dependency_check,
+            mock.patch.object(bootstrap, "initialize_template_in_place") as initialize,
+        ):
             result = bootstrap.main(
                 [
                     "--target",
@@ -343,11 +351,12 @@ class BootstrapSafetyTests(unittest.TestCase):
         initialize.assert_not_called()
 
     def test_main_rejects_non_iso_currency_before_any_setup(self) -> None:
-        with mock.patch.object(
-            bootstrap, "validate_repository_dependencies"
-        ) as dependency_check, mock.patch.object(
-            bootstrap, "initialize_template_in_place"
-        ) as initialize:
+        with (
+            mock.patch.object(
+                bootstrap, "validate_repository_dependencies"
+            ) as dependency_check,
+            mock.patch.object(bootstrap, "initialize_template_in_place") as initialize,
+        ):
             result = bootstrap.main(
                 [
                     "--target",
@@ -390,12 +399,12 @@ class BootstrapSafetyTests(unittest.TestCase):
             source = root / "source"
             target = root / "target"
             source.mkdir()
-            (source / "PRD.md").write_text("My AWS Project", encoding="utf-8")
+            (source / "PRD.md").write_text("{{PROJECT_NAME}}", encoding="utf-8")
 
             report = bootstrap.copy_template(
                 source,
                 target,
-                {"My AWS Project": "Example"},
+                {"{{PROJECT_NAME}}": "Example"},
                 force=False,
                 dry_run=True,
             )
@@ -412,14 +421,14 @@ class BootstrapSafetyTests(unittest.TestCase):
             source.mkdir()
             (source / "nested").mkdir()
             (source / "nested" / "PRD.md").write_text(
-                "My AWS Project",
+                "{{PROJECT_NAME}}",
                 encoding="utf-8",
             )
 
             report = bootstrap.copy_template(
                 source,
                 target,
-                {"My AWS Project": "Example"},
+                {"{{PROJECT_NAME}}": "Example"},
                 force=False,
             )
 
@@ -487,7 +496,9 @@ class BootstrapSafetyTests(unittest.TestCase):
 
             self.assertFalse(target.exists())
 
-    def test_git_metadata_and_generated_cache_names_are_skipped_case_insensitively(self) -> None:
+    def test_git_metadata_and_generated_cache_names_are_skipped_case_insensitively(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             source = root / "source"
@@ -505,7 +516,9 @@ class BootstrapSafetyTests(unittest.TestCase):
             self.assertFalse((target / ".GIT").exists())
             self.assertFalse((target / "__PYCACHE__").exists())
 
-    def test_case_insensitive_source_collision_fails_before_target_creation(self) -> None:
+    def test_case_insensitive_source_collision_fails_before_target_creation(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             source = root / "source"
@@ -851,7 +864,9 @@ class BootstrapSafetyTests(unittest.TestCase):
                     adoption_plan=synthetic_owner_plan,
                 )
 
-    def test_programmatic_plan_key_cannot_disagree_with_hashed_decision_path(self) -> None:
+    def test_programmatic_plan_key_cannot_disagree_with_hashed_decision_path(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             source = root / "source"
@@ -906,7 +921,9 @@ class BootstrapSafetyTests(unittest.TestCase):
                 },
             )
             with self.assertRaisesRegex(ValueError, "invalid adoption action"):
-                bootstrap.copy_template(source, target, {}, adoption_plan=invalid_action)
+                bootstrap.copy_template(
+                    source, target, {}, adoption_plan=invalid_action
+                )
 
             invalid_digest = bootstrap.AdoptionPlan(
                 source.resolve(),
@@ -921,7 +938,9 @@ class BootstrapSafetyTests(unittest.TestCase):
                 },
             )
             with self.assertRaisesRegex(ValueError, "invalid expected_target_sha256"):
-                bootstrap.copy_template(source, target, {}, adoption_plan=invalid_digest)
+                bootstrap.copy_template(
+                    source, target, {}, adoption_plan=invalid_digest
+                )
 
     def test_incomplete_adoption_preflight_writes_nothing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -970,7 +989,9 @@ class BootstrapSafetyTests(unittest.TestCase):
             source.mkdir()
             target.mkdir()
             (source / "keep.txt").write_text("template keep", encoding="utf-8")
-            (source / "replace.txt").write_text("template replacement", encoding="utf-8")
+            (source / "replace.txt").write_text(
+                "template replacement", encoding="utf-8"
+            )
             (target / "keep.txt").write_text("user keep", encoding="utf-8")
             (target / "replace.txt").write_text("old replacement", encoding="utf-8")
             decisions = [
@@ -1038,7 +1059,9 @@ class BootstrapSafetyTests(unittest.TestCase):
             plan = bootstrap.load_adoption_plan(map_path, source, target)
             collision.write_text("changed after review", encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "target changed after adoption review"):
+            with self.assertRaisesRegex(
+                ValueError, "target changed after adoption review"
+            ):
                 bootstrap.copy_template(source, target, {}, adoption_plan=plan)
 
             self.assertEqual(collision.read_bytes(), b"changed after review")
@@ -1278,7 +1301,9 @@ class BootstrapSafetyTests(unittest.TestCase):
 
             self.assertTrue(report.partial_adoption)
             self.assertEqual(report.written, 1)
-            self.assertEqual(target_agents.read_text(encoding="utf-8"), "owner instructions")
+            self.assertEqual(
+                target_agents.read_text(encoding="utf-8"), "owner instructions"
+            )
 
     def test_runtime_control_files_are_not_placeholder_rendered(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -1287,7 +1312,7 @@ class BootstrapSafetyTests(unittest.TestCase):
             target = root / "target"
             source.mkdir()
             (source / "scripts").mkdir()
-            original = b"My AWS Project {{AWS_REGION}} {{COST_POSTURE}}"
+            original = b"{{PROJECT_NAME}} {{AWS_REGION}} {{COST_POSTURE}}"
             (source / "bootstrap.py").write_bytes(original)
             (source / "bootstrap.manifest.json").write_bytes(original)
             (source / "scripts" / "bootstrap_doctor.py").write_bytes(original)
@@ -1298,7 +1323,7 @@ class BootstrapSafetyTests(unittest.TestCase):
                 source,
                 target,
                 {
-                    "My AWS Project": "Example",
+                    "{{PROJECT_NAME}}": "Example",
                     "{{AWS_REGION}}": "us-east-1",
                     "{{COST_POSTURE}}": "MINIMIZE_TOTAL_COST; HARD_CAP: USD 25.00",
                 },

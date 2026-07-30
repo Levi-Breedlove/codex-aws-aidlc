@@ -26,7 +26,9 @@ surface.
    platform choice is required, and the exact verification command. Fastlane
    never bootstraps a package manager.
 5. Complete the checklist and send `init template` again.
-6. Answer project name, preferred AWS Region, and optional budget exactly once.
+6. Answer a one-line project name, a canonical AWS Region ID such as `us-west-2`,
+   and an optional budget exactly once. Ordinary punctuation and international
+   project names are supported; AWS Core verifies current Region availability later.
 7. Fastlane configures the template dry-run-first and begins Define.
 
 If you do not have a hard budget, answer:
@@ -105,9 +107,12 @@ Always verify with `uvx --version`. See the
 Initialized projects skip the prerequisite gate during ordinary resume. Missing
 or stale AWS Core evidence later pauses only the affected material AWS phase.
 
-Fastlane never stores login data, plugin state, hook trust, usernames, machine
-paths, CLI versions, AWS credentials, or AWS account details. Prerequisite
-observations exist only for the current check.
+During prerequisite checks, Fastlane does not persist login, plugin, trust,
+machine, credential, username, or AWS-account observations. Later gated and AWS
+operations intentionally record audit metadata—including an approver handle,
+stable source reference, account or approved alias, role, Region, resources,
+and observed results—in project evidence. Review or protect those records
+before publishing the repository.
 
 AWS Core provides knowledge, procedures, and tools; it cannot approve Gate A,
 Gate B, deployment, or teardown. Prerequisite success grants no AWS access.

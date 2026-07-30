@@ -63,6 +63,82 @@ class ProductJourneyTests(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
 
+    def make_gate_a_pending(self, project: Path) -> None:
+        """Create complete requirements that still await Gate A approval."""
+
+        fixture = doctor_fixtures.BootstrapDoctorTests()
+        fixture.approve_project(project, gate_b=False)
+        fixture.set_non_material_req_evidence(project)
+        prd_path = project / "docs/project/PRD.md"
+        text = prd_path.read_text(encoding="utf-8")
+        text = doctor_fixtures.set_table_value(
+            text,
+            "## Document status",
+            "## 1. Workload profile",
+            "Gate A derived status",
+            "`PENDING_OWNER_APPROVAL`",
+        )
+        for field, value in {
+            "Approver": "TODO",
+            "Owner decision": "`PENDING`",
+            "Authorized requirements revision": "`TODO`",
+            "Authorized cost posture": "`TODO`",
+            "Explicitly accepted assumption IDs": "`TODO`",
+            "Authorization provided at": "`TODO`",
+            "Authorization source": "`TODO`",
+            "Verbatim owner receipt": "`PENDING`",
+            "Derived Gate A state": "`PENDING_OWNER_APPROVAL`",
+        }.items():
+            text = doctor_fixtures.set_table_value(
+                text,
+                "### Gate A — owner acceptance record",
+                "### Gate A validation and invalidation rules",
+                field,
+                value,
+            )
+        text = doctor_fixtures.set_receipt(
+            text,
+            "gate-a",
+            "\n".join(
+                [
+                    "APPROVE REQUIREMENTS GATE A",
+                    "Requirements revision: REQ-0001",
+                    "Cost posture: MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
+                    "Accepted assumptions: NONE",
+                    "Approver: <name/handle>",
+                ]
+            ),
+        )
+        prd_path.write_text(text, encoding="utf-8")
+        state_path = project / "bootstrap.yaml"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["lifecycle"]["gate_a"] = "PENDING_OWNER_APPROVAL"
+        state["lifecycle"]["gate_b"] = "BLOCKED"
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    def authorize_issue_sync(self, project: Path) -> dict[str, str]:
+        """Allow issue synchronization while keeping merge prohibited."""
+
+        prd_path = project / "docs/project/PRD.md"
+        text = prd_path.read_text(encoding="utf-8")
+        for field, value in {
+            "GitHub boundary": "`ISSUES`",
+            "GitHub repository, branch, and merge constraints": (
+                "`REPO: Levi-Breedlove/aws-bootstrap; "
+                "BRANCH: fast-lane-maint; MERGE: PROHIBITED`"
+            ),
+        }.items():
+            text = doctor_fixtures.set_table_value(
+                text,
+                "## 28. Construction envelope",
+                "## 29. Gate B owner authorization record",
+                field,
+                value,
+            )
+        text = doctor_fixtures.rebind_gate_b_envelope(text)
+        prd_path.write_text(text, encoding="utf-8")
+        return doctor.table_after_heading(text, "## 28. Construction envelope")
+
     def run_doctor_cli(self, project: Path) -> tuple[int, dict[str, object]]:
         completed = subprocess.run(
             [
@@ -166,6 +242,8 @@ class ProductJourneyTests(unittest.TestCase):
                 first_resume["context_plan"], second_resume["context_plan"]
             )
             foundation = first_resume["intake_foundation"]
+            self.assertEqual(foundation["schema_version"], 2)
+            self.assertEqual(foundation["current_understanding"], [])
             self.assertEqual(foundation["repository_mode"], "GREENFIELD")
             self.assertIsNone(foundation["owner_work_context"])
             self.assertEqual(foundation["status"], "FOUNDATION_REQUIRED")
@@ -179,6 +257,7 @@ class ProductJourneyTests(unittest.TestCase):
                 f"{card['reply_token']}; 1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
             )
             resumed = presenter.render_owner_update(first_resume)
+            self.assertNotIn("Current understanding:", resumed)
             self.assertIn("1. What are you starting with?", resumed)
             self.assertIn("A. A new application", resumed)
             self.assertIn("B. A change to an existing application", resumed)
@@ -224,7 +303,9 @@ class ProductJourneyTests(unittest.TestCase):
             ):
                 self.assertNotIn(forbidden, state_text)
 
-    def test_gate_evidence_and_construction_routes_use_real_project_artifacts(self) -> None:
+    def test_gate_evidence_and_construction_routes_use_real_project_artifacts(
+        self,
+    ) -> None:
         fixture = doctor_fixtures.BootstrapDoctorTests()
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
@@ -299,7 +380,9 @@ class ProductJourneyTests(unittest.TestCase):
             fixture.initialize_task_plan(
                 deliver_project,
                 doctor_fixtures.ready_task(
-                    requirements="REQ-0001; FR-001; PROP-001",
+                    requirements=(
+                        f"{doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE}; PROP-001"
+                    ),
                     design="DES-0001; TECH: TECH-0001, TECH-0007",
                     command="python -m unittest tests.test_properties",
                     property_projection=doctor_fixtures.property_execution_projection(),
@@ -335,9 +418,7 @@ class ProductJourneyTests(unittest.TestCase):
                 generated_defect["remediation"]["next_action"]["action_kind"],
                 "CORRECT_AND_REVALIDATE",
             )
-            self.assertFalse(
-                generated_defect["interaction"]["owner_action_required"]
-            )
+            self.assertFalse(generated_defect["interaction"]["owner_action_required"])
             repair_update = presenter.render_owner_update(generated_defect)
             self.assertIn("Need from you: Nothing.", repair_update)
             self.assertIn("Codex will correct", repair_update)
@@ -349,7 +430,10 @@ class ProductJourneyTests(unittest.TestCase):
                 after_repair["interaction"]["automatic_continuation_allowed"]
             )
 
-    def test_hook_preserves_documentation_and_distinct_aws_authority_lanes(self) -> None:
+    def test_hook_preserves_documentation_and_distinct_aws_authority_lanes(
+        self,
+    ) -> None:
+        hook_fixtures.fastlane_hook._clear_transition(REPOSITORY_ROOT)
         documentation = hook_fixtures.fastlane_hook.handle_event(
             "pre-tool-use",
             hook_fixtures.payload(
@@ -388,28 +472,137 @@ class ProductJourneyTests(unittest.TestCase):
         )
         for kind, operation, authorization_id in lanes:
             with self.subTest(kind=kind):
+                hook_fixtures.fastlane_hook._clear_transition(REPOSITORY_ROOT)
                 external = hook_fixtures.authority(
-                    kind, [f"cloudformation:{operation}"],
+                    kind,
+                    [f"cloudformation:{operation}"],
                     authorization_id=authorization_id,
                 )
+                current = hook_fixtures.report(
+                    aws=authorization_id, external_authority=external
+                )
+                tool_input = hook_fixtures.aws_request(operation)
+                event = hook_fixtures.payload(
+                    "PermissionRequest",
+                    REPOSITORY_ROOT,
+                    tool_name="aws___call_aws",
+                    tool_input=tool_input,
+                    session_id=f"session-{kind}",
+                    turn_id=f"turn-{kind}",
+                    tool_use_id=f"tool-{kind}",
+                )
+                pre_event = {**event, "hook_event_name": "PreToolUse"}
+                missing_started = hook_fixtures.fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    pre_event,
+                    root=REPOSITORY_ROOT,
+                    doctor_report=current,
+                    envelope={
+                        "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                        "GitHub boundary": "NONE",
+                    },
+                )
+                self.assertIn(
+                    "STARTED journal row",
+                    missing_started["hookSpecificOutput"]["permissionDecisionReason"],
+                )
+
+                identity = hook_fixtures.fastlane_hook._event_identity(event)
+                self.assertIsNotNone(identity)
+                match = current["external_authority"]["request_match"]
+                attempt_id = (
+                    "AWS-TEARDOWN-0001" if kind == "AWS_TEARDOWN" else "AWS-DEPLOY-0001"
+                )
+                authority_digest = hook_fixtures.fastlane_hook._canonical_digest(match)
+                state = hook_fixtures.fastlane_hook._empty_transition_state(
+                    stage="START_BOUND",
+                    action_kind=kind,
+                    identity=identity,
+                    attempt_sha256=hook_fixtures.fastlane_hook._value_digest(
+                        attempt_id
+                    ),
+                    authority_sha256=authority_digest,
+                    start_patch_sha256="sha256:" + "e" * 64,
+                )
+                hook_fixtures.fastlane_hook._store_transition(REPOSITORY_ROOT, state)
+                transition = {
+                    "schema_version": 1,
+                    "status": "BOUND",
+                    "attempt_id": attempt_id,
+                    "authority_kind": kind,
+                    "request_match_sha256": authority_digest,
+                    "request_match": match,
+                }
+                current["aws_action_transition"] = transition
+                mismatched = {
+                    **current,
+                    "aws_action_transition": {
+                        **transition,
+                        "attempt_id": "AWS-TEARDOWN-9999"
+                        if kind == "AWS_TEARDOWN"
+                        else "AWS-DEPLOY-9999",
+                    },
+                }
+                changed = hook_fixtures.fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    pre_event,
+                    root=REPOSITORY_ROOT,
+                    doctor_report=mismatched,
+                    envelope={
+                        "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                        "GitHub boundary": "NONE",
+                    },
+                )
+                self.assertIn(
+                    "binding is absent or changed",
+                    changed["hookSpecificOutput"]["permissionDecisionReason"],
+                )
+                pre_allowed = hook_fixtures.fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    pre_event,
+                    root=REPOSITORY_ROOT,
+                    doctor_report=current,
+                    envelope={
+                        "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                        "GitHub boundary": "NONE",
+                    },
+                )
+                self.assertIsNone(pre_allowed)
                 allowed = hook_fixtures.fastlane_hook.handle_event(
                     "permission-request",
-                    hook_fixtures.payload(
-                        "PermissionRequest",
-                        REPOSITORY_ROOT,
-                        tool_name="aws___call_aws",
-                        tool_input=hook_fixtures.aws_request(operation),
-                    ),
+                    event,
                     root=REPOSITORY_ROOT,
-                    doctor_report=hook_fixtures.report(
-                        aws=authorization_id, external_authority=external
-                    ),
+                    doctor_report=current,
                     envelope={
                         "AWS boundary": "MUTATE_LISTED_RESOURCES",
                         "GitHub boundary": "NONE",
                     },
                 )
                 self.assertIsNone(allowed)
+                replay = hook_fixtures.fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    hook_fixtures.payload(
+                        "PreToolUse",
+                        REPOSITORY_ROOT,
+                        tool_name="aws___call_aws",
+                        tool_input=tool_input,
+                        session_id=f"session-{kind}",
+                        turn_id=f"replay-{kind}",
+                        tool_use_id=f"tool-{kind}",
+                    ),
+                    root=REPOSITORY_ROOT,
+                    doctor_report=current,
+                    envelope={
+                        "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                        "GitHub boundary": "NONE",
+                    },
+                )
+                self.assertIn(
+                    "another turn or session",
+                    replay["hookSpecificOutput"]["permissionDecisionReason"],
+                )
+                hook_fixtures.fastlane_hook._clear_transition(REPOSITORY_ROOT)
+        hook_fixtures.fastlane_hook._clear_transition(REPOSITORY_ROOT)
 
         deployment = hook_fixtures.authority(
             "AWS_DEPLOYMENT",
@@ -447,7 +640,10 @@ class ProductJourneyTests(unittest.TestCase):
                     "PermissionRequest",
                     REPOSITORY_ROOT,
                     tool_name="aws___run_script",
-                    tool_input={"script": reviewed_script, "aws_profile": "fastlane-role"},
+                    tool_input={
+                        "script": reviewed_script,
+                        "aws_profile": "fastlane-role",
+                    },
                 ),
                 root=REPOSITORY_ROOT,
                 doctor_report=hook_fixtures.report(
@@ -476,9 +672,13 @@ class ProductJourneyTests(unittest.TestCase):
                 "GitHub boundary": "NONE",
             },
         )
-        self.assertIn("blocked", opaque["hookSpecificOutput"]["permissionDecisionReason"])
+        self.assertIn(
+            "blocked", opaque["hookSpecificOutput"]["permissionDecisionReason"]
+        )
 
-    def test_aws_guidance_read_scope_preflight_and_mutation_wait_are_serial(self) -> None:
+    def test_aws_guidance_read_scope_preflight_and_mutation_wait_are_serial(
+        self,
+    ) -> None:
         materiality = {"materiality": "REQUIRED", "status": "CURRENT"}
         no_preflight = {
             "status": "NOT_STARTED",
@@ -555,7 +755,10 @@ class ProductJourneyTests(unittest.TestCase):
             ],
         )
         self.assertFalse(
-            bool(guidance.get("preflight", {}).get("account_access") == "READ_ONLY_OBSERVED")
+            bool(
+                guidance.get("preflight", {}).get("account_access")
+                == "READ_ONLY_OBSERVED"
+            )
         )
         self.assertIn("AWS_PREFLIGHT_READY", mutation_wait["completed_states"])
 
@@ -627,7 +830,7 @@ class ProductJourneyTests(unittest.TestCase):
             task_waves.claim_task_file(
                 tasks_path,
                 "TASK-001",
-                owner="worker-a",
+                owner="lead",
                 coordinator="lead",
                 run_id="RUN-0001",
                 checkpoint="CP-0000",
@@ -684,12 +887,478 @@ class ProductJourneyTests(unittest.TestCase):
                 run_id="RUN-0001",
                 checkpoint="CP-0001",
             )
-            completed = task_waves.parse_tasks(
-                tasks_path.read_text(encoding="utf-8")
-            )[0]
+            completed = task_waves.parse_tasks(tasks_path.read_text(encoding="utf-8"))[
+                0
+            ]
             self.assertEqual(completed.status, "DONE")
             self.assertIn("EV-0001", verify_path.read_text(encoding="utf-8"))
 
+    def test_bug_adjunct_preserves_pending_gate_and_implicit_write_is_denied(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.extract_template(Path(directory), "bug-adjunct")
+            self.initialize(project)
+            self.make_gate_a_pending(project)
+
+            before = doctor.inspect_project(project)
+            self.assertTrue(before["ok"], before["diagnostics"])
+            self.assertEqual(before["lifecycle_state"], "WAITING_GATE_A")
+            self.assertEqual(before["next_prompt"], "INTAKE-20")
+            self.assertEqual(before["gates"]["gate_a"], "PENDING_OWNER_APPROVAL")
+            self.assertEqual(before["gates"]["gate_b"], "BLOCKED")
+            self.assertEqual(
+                before["interaction"]["owner_action_kind"], "APPROVE_GATE_A"
+            )
+            self.assertTrue(before["interaction"]["formal_receipt_required"])
+
+            side_question = presenter.render_side_question_response(
+                before,
+                answer=(
+                    "BUG-10 can analyze a bounded defect without replacing the "
+                    "requirements approval that is already waiting."
+                ),
+            )
+            self.assertIn("Project state changed: No.", side_question)
+            self.assertIn("Pending next action:", side_question)
+            self.assertNotIn("\nAPPROVE REQUIREMENTS GATE A\n", side_question)
+
+            denied = hook_fixtures.fastlane_hook.handle_event(
+                "pre-tool-use",
+                hook_fixtures.payload(
+                    "PreToolUse",
+                    project,
+                    tool_name="apply_patch",
+                    tool_input=hook_fixtures.patch_input("docs/project/BUGFIX.md"),
+                ),
+                root=project,
+                doctor_report=before,
+                envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+            )
+            decision = denied["hookSpecificOutput"]
+            self.assertEqual(decision["permissionDecision"], "deny")
+            self.assertIn(
+                "Gate B write authority is absent",
+                decision["permissionDecisionReason"],
+            )
+
+            protected_paths = (
+                "docs/project/TASKS.md",
+                "docs/project/VERIFY.md",
+                "docs/project/RUNBOOK.md",
+                "bootstrap.yaml",
+            )
+            protected = {
+                path: (project / path).read_bytes() for path in protected_paths
+            }
+            bugfix_path = project / "docs/project/BUGFIX.md"
+            bugfix_text = bugfix_path.read_text(encoding="utf-8")
+            bugfix_text = bugfix_text.replace(
+                "- Title: TODO",
+                "- Title: Gate A decision remains visible after a side question",
+                1,
+            ).replace(
+                "- Related PRD requirements: TODO",
+                "- Related PRD requirements: FR-001",
+                1,
+            )
+            bugfix_path.write_text(bugfix_text, encoding="utf-8")
+
+            after = doctor.inspect_project(project)
+            self.assertTrue(after["ok"], after["diagnostics"])
+            for field in ("lifecycle_state", "next_prompt", "gates", "authorizations"):
+                self.assertEqual(after[field], before[field])
+            self.assertEqual(after["interaction"], before["interaction"])
+            for path, expected in protected.items():
+                self.assertEqual((project / path).read_bytes(), expected)
+
+    def test_sync_adjunct_reconciles_only_named_issue_and_restores_build_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.extract_template(Path(directory), "sync-adjunct")
+            self.initialize(project)
+            fixture = doctor_fixtures.BootstrapDoctorTests()
+            fixture.approve_project(project, gate_b=True)
+            envelope = self.authorize_issue_sync(project)
+            fixture.initialize_task_plan(
+                project,
+                doctor_fixtures.ready_task(
+                    requirements=(
+                        f"{doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE}; PROP-001"
+                    ),
+                    design="DES-0001; TECH: TECH-0001, TECH-0007",
+                    command="python -m unittest tests.test_properties",
+                    property_projection=doctor_fixtures.property_execution_projection(),
+                ),
+            )
+
+            before = doctor.inspect_project(project)
+            self.assertTrue(before["ok"], before["diagnostics"])
+            self.assertEqual(before["next_prompt"], "BUILD-10")
+            self.assertEqual(
+                before["interaction"]["owner_action_kind"],
+                "NONE_CONTINUE_AUTOMATICALLY",
+            )
+            self.assertEqual(before["authorizations"]["aws"], "NONE")
+
+            implicit = dict(before)
+            implicit["authorizations"] = dict(before["authorizations"])
+            implicit["authorizations"]["construction"] = "NONE"
+            issue_input = {
+                "owner": "Levi-Breedlove",
+                "repo": "aws-bootstrap",
+                "title": "Synchronize TASK-001",
+            }
+            denied_implicit = hook_fixtures.fastlane_hook.handle_event(
+                "pre-tool-use",
+                hook_fixtures.payload(
+                    "PreToolUse",
+                    project,
+                    tool_name="mcp__github__create_issue",
+                    tool_input=issue_input,
+                ),
+                root=project,
+                doctor_report=implicit,
+                envelope=envelope,
+            )
+            self.assertIn(
+                "construction authority is absent",
+                denied_implicit["hookSpecificOutput"]["permissionDecisionReason"],
+            )
+            denied_merge = hook_fixtures.fastlane_hook.handle_event(
+                "pre-tool-use",
+                hook_fixtures.payload(
+                    "PreToolUse",
+                    project,
+                    tool_name="mcp__github__merge_pull_request",
+                    tool_input={
+                        "owner": "Levi-Breedlove",
+                        "repo": "aws-bootstrap",
+                        "number": 51,
+                    },
+                ),
+                root=project,
+                doctor_report=before,
+                envelope=envelope,
+            )
+            self.assertIn(
+                "exceeds the current GitHub boundary",
+                denied_merge["hookSpecificOutput"]["permissionDecisionReason"],
+            )
+            allowed_issue = hook_fixtures.fastlane_hook.handle_event(
+                "pre-tool-use",
+                hook_fixtures.payload(
+                    "PreToolUse",
+                    project,
+                    tool_name="mcp__github__create_issue",
+                    tool_input=issue_input,
+                ),
+                root=project,
+                doctor_report=before,
+                envelope=envelope,
+            )
+            self.assertIsNone(allowed_issue)
+
+            tasks_path = project / "docs/project/TASKS.md"
+            tasks_text = tasks_path.read_text(encoding="utf-8")
+            wrong_issue = "https://github.com/example/other/issues/51"
+            tasks_path.write_text(
+                tasks_text.replace(
+                    "- GitHub issue: `PENDING_SYNC`",
+                    f"- GitHub issue: `{wrong_issue}`",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            wrong = doctor.inspect_project(project)
+            self.assertIn(
+                "TASK_GITHUB_BOUNDARY",
+                doctor_fixtures.codes(wrong),
+            )
+            correct_issue = "https://github.com/Levi-Breedlove/aws-bootstrap/issues/51"
+            tasks_path.write_text(
+                tasks_path.read_text(encoding="utf-8").replace(
+                    f"- GitHub issue: `{wrong_issue}`",
+                    f"- GitHub issue: `{correct_issue}`",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            after = doctor.inspect_project(project)
+            self.assertTrue(after["ok"], after["diagnostics"])
+            self.assertEqual(after["lifecycle_state"], before["lifecycle_state"])
+            self.assertEqual(after["next_prompt"], before["next_prompt"])
+            self.assertEqual(after["gates"], before["gates"])
+            self.assertEqual(after["interaction"], before["interaction"])
+            self.assertEqual(after["authorizations"]["aws"], "NONE")
+
+    def test_residual_disposition_is_fresh_set_level_and_non_authorizing(
+        self,
+    ) -> None:
+        residuals = {
+            "status": "RESIDUALS_REMAIN",
+            "evidence_id": "EV-9100",
+            "observed_at": "2098-01-01T00:00:00Z",
+            "issues": [],
+        }
+        stale_remove_record = {
+            "value": "TEARDOWN",
+            "recorded_at": "2097-01-01T00:00:00Z",
+            "provenance_status": "CURRENT",
+        }
+        pending = doctor.derive_aws_residual_disposition(
+            stale_remove_record,
+            residuals,
+        )
+        self.assertEqual(pending["status"], "PENDING")
+        pending_route = doctor.derive_teardown_route(
+            "TEARDOWN",
+            residuals,
+            pending,
+        )
+        self.assertEqual(pending_route, ("AWS_RESIDUALS_REMAIN", "STOP"))
+        pending_interaction = doctor.derive_interaction(
+            *pending_route,
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=True,
+            aws_execution_planning_ready=True,
+        )
+        self.assertEqual(
+            pending_interaction["owner_action_kind"],
+            "CHOOSE_AWS_RESIDUAL_DISPOSITION",
+        )
+        self.assertTrue(pending_interaction["owner_action_required"])
+        self.assertFalse(pending_interaction["formal_receipt_required"])
+        pending_report = presenter_fixtures.aws_teardown_report(
+            "AWS_RESIDUALS_REMAIN",
+            action_kind="CHOOSE_AWS_RESIDUAL_DISPOSITION",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+        )
+        pending_report["interaction"] = pending_interaction
+        pending_report["aws_residual_disposition"] = pending
+        pending_text = presenter.render_owner_update(pending_report)
+        self.assertIn("one decision", pending_text)
+        self.assertIn(
+            "AWS residual decision: <RETAIN | INVESTIGATE | REMOVE>",
+            pending_text,
+        )
+
+        fresh_records = {
+            "RETAIN": {
+                "value": "RETAIN",
+                "recorded_at": "2098-01-01T00:00:01Z",
+                "provenance_status": "CURRENT",
+            },
+            "INVESTIGATE": {
+                "value": "RESIDUAL_REVIEW",
+                "recorded_at": "2098-01-01T00:00:01Z",
+                "provenance_status": "CURRENT",
+            },
+            "REMOVE": {
+                "value": "TEARDOWN",
+                "recorded_at": "2098-01-01T00:00:01Z",
+                "provenance_status": "CURRENT",
+            },
+        }
+        projections = {
+            choice: doctor.derive_aws_residual_disposition(record, residuals)
+            for choice, record in fresh_records.items()
+        }
+        for choice, projection in projections.items():
+            with self.subTest(choice=choice):
+                self.assertEqual(projection["status"], "CURRENT")
+                self.assertEqual(projection["value"], choice)
+                self.assertFalse(projection["authorizes_aws_access"])
+                self.assertFalse(projection["authorizes_mutation"])
+
+        retained_route = doctor.derive_teardown_route(
+            "RETAIN", residuals, projections["RETAIN"]
+        )
+        self.assertEqual(retained_route, ("AWS_RESIDUALS_RETAINED", "STOP"))
+        retained_interaction = doctor.derive_interaction(
+            *retained_route,
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=True,
+            aws_execution_planning_ready=True,
+        )
+        retained_report = presenter_fixtures.aws_teardown_report(
+            "AWS_RESIDUALS_RETAINED",
+            automatic_continuation_allowed=False,
+        )
+        retained_report["interaction"] = retained_interaction
+        retained_report["aws_lifecycle_intent"] = presenter_fixtures.lifecycle_intent(
+            "RETAIN"
+        )
+        retained_report["aws_residual_disposition"] = projections["RETAIN"]
+        retained_text = presenter.render_owner_update(retained_report)
+        self.assertIn("may continue to incur cost", retained_text)
+        self.assertIn("no AWS access or mutation was authorized", retained_text)
+        self.assertNotIn("no unexpected resources remain", retained_text)
+
+        for choice, intent in (
+            ("INVESTIGATE", "RESIDUAL_REVIEW"),
+            ("REMOVE", "TEARDOWN"),
+        ):
+            with self.subTest(choice=choice, basis="residuals"):
+                route = doctor.derive_teardown_route(
+                    intent,
+                    residuals,
+                    projections[choice],
+                )
+                self.assertEqual(route, ("AWS_RESIDUAL_REVIEW", "AWS-40"))
+                interaction = doctor.derive_interaction(
+                    *route,
+                    has_errors=False,
+                    diagnostic_codes=[],
+                    design_aws_core_ready=True,
+                    aws_execution_planning_ready=True,
+                    aws_read_authority_required=True,
+                )
+                self.assertEqual(
+                    interaction["owner_action_kind"],
+                    "AUTHORIZE_AWS_READ_PREFLIGHT",
+                )
+                self.assertTrue(interaction["formal_receipt_required"])
+
+        ready = {
+            "status": "READY_FOR_TEARDOWN",
+            "evidence_id": "EV-9101",
+            "observed_at": "2098-01-02T00:00:00Z",
+            "issues": [],
+        }
+        carried_remove = doctor.derive_aws_residual_disposition(
+            fresh_records["REMOVE"], ready
+        )
+        self.assertEqual(carried_remove["status"], "CURRENT")
+        self.assertEqual(carried_remove["value"], "REMOVE")
+        teardown_route = doctor.derive_teardown_route("TEARDOWN", ready, carried_remove)
+        self.assertEqual(teardown_route, ("WAITING_AWS_TEARDOWN_AUTH", "AWS-50"))
+        teardown_interaction = doctor.derive_interaction(
+            *teardown_route,
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=True,
+            aws_execution_planning_ready=True,
+        )
+        self.assertEqual(
+            teardown_interaction["owner_action_kind"], "AUTHORIZE_AWS_TEARDOWN"
+        )
+        self.assertTrue(teardown_interaction["formal_receipt_required"])
+
+        later_residuals = {
+            **residuals,
+            "evidence_id": "EV-9102",
+            "observed_at": "2098-01-03T00:00:00Z",
+        }
+        reopened = doctor.derive_aws_residual_disposition(
+            fresh_records["REMOVE"], later_residuals
+        )
+        self.assertEqual(reopened["status"], "PENDING")
+
+        stale_investigate = doctor.derive_aws_residual_disposition(
+            fresh_records["INVESTIGATE"], ready
+        )
+        self.assertEqual(stale_investigate["status"], "PENDING")
+        refreshed_investigate = doctor.derive_aws_residual_disposition(
+            {
+                **fresh_records["INVESTIGATE"],
+                "recorded_at": "2098-01-02T00:00:01Z",
+            },
+            ready,
+        )
+        self.assertEqual(refreshed_investigate["status"], "CURRENT")
+        self.assertEqual(refreshed_investigate["value"], "INVESTIGATE")
+
+    def test_adjuncts_cannot_replace_aws50_terminal_or_post_action_routes(
+        self,
+    ) -> None:
+        terminal = {
+            "status": "ACTION_TERMINAL_REQUIRED",
+            "attempt_id": "AWS-TEARDOWN-0001",
+            "evidence_id": "EV-9001",
+            "issues": [],
+        }
+        post_action = {"status": "POST_ACTION_REVIEW"}
+        for intent in ("NONE", "RETAIN", "RESIDUAL_REVIEW", "TEARDOWN"):
+            with self.subTest(intent=intent):
+                self.assertEqual(
+                    doctor.derive_teardown_route(intent, terminal),
+                    ("AWS_TEARDOWN_ACTION_TERMINAL", "AWS-50"),
+                )
+                self.assertEqual(
+                    doctor.derive_teardown_route(intent, post_action),
+                    ("AWS_RESIDUAL_REVIEW", "AWS-40"),
+                )
+
+        interaction = doctor.derive_interaction(
+            "AWS_TEARDOWN_ACTION_TERMINAL",
+            "AWS-50",
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=True,
+            aws_execution_planning_ready=True,
+        )
+        self.assertEqual(
+            interaction["owner_action_kind"], "NONE_CONTINUE_AUTOMATICALLY"
+        )
+        self.assertTrue(interaction["automatic_continuation_allowed"])
+        self.assertFalse(interaction["formal_receipt_required"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            report = hook_fixtures.report(
+                construction="NONE",
+                aws="NONE",
+                automatic=True,
+                owner_action=False,
+            )
+            report["interaction"] = interaction
+            report["teardown_journal_closure_authority"] = (
+                doctor.derive_teardown_journal_closure_authority(
+                    terminal,
+                    "AWS-50",
+                    restricted_closure=True,
+                )
+            )
+            for tool_name, tool_input in (
+                (
+                    "apply_patch",
+                    hook_fixtures.patch_input("docs/project/BUGFIX.md"),
+                ),
+                (
+                    "mcp__github__create_issue",
+                    {
+                        "owner": "Levi-Breedlove",
+                        "repo": "aws-bootstrap",
+                        "title": "Do not displace AWS-50",
+                    },
+                ),
+            ):
+                with self.subTest(tool_name=tool_name):
+                    denied = hook_fixtures.fastlane_hook.handle_event(
+                        "pre-tool-use",
+                        hook_fixtures.payload(
+                            "PreToolUse",
+                            project,
+                            tool_name=tool_name,
+                            tool_input=tool_input,
+                        ),
+                        root=project,
+                        doctor_report=report,
+                        envelope={
+                            "AWS boundary": "NONE",
+                            "GitHub boundary": "ISSUES",
+                        },
+                    )
+                    self.assertEqual(
+                        denied["hookSpecificOutput"]["permissionDecision"],
+                        "deny",
+                    )
 
     def test_partial_high_risk_intake_remains_a_plain_owner_consultation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -733,11 +1402,14 @@ class ProductJourneyTests(unittest.TestCase):
         )
         self.assertEqual(rendered.count("Need from you:"), 1)
         foundation = report["intake_foundation"]
+        self.assertEqual(foundation["schema_version"], 2)
+        self.assertEqual(foundation["current_understanding"], [])
         self.assertEqual(foundation["repository_mode"], "GREENFIELD")
         self.assertIsNone(foundation["owner_work_context"])
         self.assertEqual(foundation["status"], "FOUNDATION_REQUIRED")
         self.assertEqual(len(foundation["pending_card"]["questions"]), 3)
         self.assertTrue(report["interaction"]["turn_boundary_required"])
+        self.assertNotIn("Current understanding:", rendered)
         self.assertIn("1. What are you starting with?", rendered)
         self.assertIn("A. A new application", rendered)
         self.assertIn("B. A change to an existing application", rendered)
@@ -752,6 +1424,7 @@ class ProductJourneyTests(unittest.TestCase):
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)
         self.assertNotIn("Welcome to AWS Codex Fastlane", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

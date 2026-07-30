@@ -136,13 +136,18 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
                 self.assertEqual(result.answers[0].detail, None)
                 self.assertEqual(result.unresolved_reply_keys, ("2", "3"))
 
-    def test_ascii_whitespace_and_mixed_separators_are_bounded_and_normalized(self) -> None:
+    def test_ascii_whitespace_and_mixed_separators_are_bounded_and_normalized(
+        self,
+    ) -> None:
         result = parse(
             " \t1 a ;\r\n 2:\tDevelopment\t users   need a report\n3:\tc:\tPublic pilot \r\n"
         )
         self.assertEqual(result.status, "PASS")
         self.assertEqual(
-            [(answer.reply_key, answer.selection, answer.detail) for answer in result.answers],
+            [
+                (answer.reply_key, answer.selection, answer.detail)
+                for answer in result.answers
+            ],
             [
                 ("1", "A", None),
                 ("2", "RESPONSE", "Development users need a report"),
@@ -183,11 +188,11 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
         card["questions"] = card["questions"][1:]
         result = parse("2: Users; 3A", card)
         self.assertEqual(result.status, "PASS")
-        self.assertEqual(
-            [answer.reply_key for answer in result.answers], ["2", "3"]
-        )
+        self.assertEqual([answer.reply_key for answer in result.answers], ["2", "3"])
 
-    def test_accept_all_exact_phrase_uses_only_complete_current_recommendations(self) -> None:
+    def test_accept_all_exact_phrase_uses_only_complete_current_recommendations(
+        self,
+    ) -> None:
         result = parse(" \tAccept all recommendations.\r\n", recommendation_card())
         self.assertEqual(result.status, "PASS")
         self.assertEqual(
@@ -197,7 +202,9 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
         self.assertTrue(all(answer.detail is None for answer in result.answers))
         self.assertEqual(result.unresolved_reply_keys, ())
 
-    def test_normalized_result_and_provenance_bind_to_exact_card_without_raw_echo(self) -> None:
+    def test_normalized_result_and_provenance_bind_to_exact_card_without_raw_echo(
+        self,
+    ) -> None:
         raw_response = "\t2:\tUser-visible   outcome\r\n"
         result = parse(raw_response)
         self.assertEqual(
@@ -244,7 +251,11 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
         self.assertNotIn("raw_response", serialized)
         self.assertNotIn("\t", serialized)
         self.assertNotIn("User-visible   outcome", serialized)
-        for unsupported_claim in ("authenticated", "identity_verified", "cryptographic"):
+        for unsupported_claim in (
+            "authenticated",
+            "identity_verified",
+            "cryptographic",
+        ):
             self.assertNotIn(unsupported_claim, serialized.casefold())
 
     def test_maximum_detail_length_is_accepted(self) -> None:
@@ -353,7 +364,9 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             "secret: foo",
         ):
             with self.subTest(secret_like=secret_like):
-                self.assert_failed_with(parse(f"2: {secret_like}"), "INTAKE_SECRET_MATERIAL")
+                self.assert_failed_with(
+                    parse(f"2: {secret_like}"), "INTAKE_SECRET_MATERIAL"
+                )
 
     def test_ordinary_sentinel_and_password_words_remain_valid_prose(self) -> None:
         for detail in (
@@ -411,7 +424,9 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
         )
 
-    def test_accept_all_rejects_incomplete_or_detail_dependent_recommendations(self) -> None:
+    def test_accept_all_rejects_incomplete_or_detail_dependent_recommendations(
+        self,
+    ) -> None:
         no_recommendation = recommendation_card()
         no_recommendation["questions"][0]["recommended"] = None
 

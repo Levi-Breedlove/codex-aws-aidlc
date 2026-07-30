@@ -10,16 +10,17 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 try:
     from fastlane_context import (
@@ -32,6 +33,24 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
         SliceRequest,
         SourceSpan,
         resolve_context_packet,
+    )
+
+try:
+    from fastlane_process import resolve_trusted_git
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.fastlane_process import resolve_trusted_git
+
+try:
+    from fastlane_project_identity import (
+        PROJECT_NAME_TOKEN,
+        normalize_aws_region,
+        normalize_project_name,
+    )
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.fastlane_project_identity import (
+        PROJECT_NAME_TOKEN,
+        normalize_aws_region,
+        normalize_project_name,
     )
 
 try:
@@ -72,13 +91,12 @@ TASK_ID = re.compile(r"TASK-\d+")
 RUN_ID = re.compile(r"RUN-\d{4,}")
 CHECKPOINT_ID = re.compile(r"CP-\d{4,}")
 COST_AMOUNT = r"[1-9]\d*(?:\.\d{1,2})?"
-AWS_COST_CEILING = re.compile(
-    rf"(?P<currency>[A-Z]{{3}}): (?P<amount>{COST_AMOUNT})"
-)
+AWS_COST_CEILING = re.compile(rf"(?P<currency>[A-Z]{{3}}): (?P<amount>{COST_AMOUNT})")
 COST_POSTURE_WITH_CAP = re.compile(
     rf"MINIMIZE_TOTAL_COST; HARD_CAP: (?P<currency>[A-Z]{{3}}) (?P<amount>{COST_AMOUNT})"
 )
 DEFAULT_COST_POSTURE = "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED"
+MAX_GATE_RECEIPT_CHARACTERS = 4096
 # Current ISO 4217 List One currency and fund codes, excluding the testing
 # code XTS and no-currency code XXX. Keep this equal to bootstrap.py so setup
 # and machine-derived authorization enforce the same dependency-free grammar.
@@ -248,9 +266,7 @@ REQUIRED_TECHNOLOGY_CONCERNS = (
 )
 TECHNOLOGY_DECISION_ID = re.compile(r"TECH-\d{4}")
 TECHNOLOGY_CONCERN = re.compile(r"[A-Z][A-Z0-9_]*")
-STABLE_CONTRACT_ID = re.compile(
-    r"[A-Z][A-Z0-9_]*(?:-[A-Z][A-Z0-9_]*)*-\d{3,}"
-)
+STABLE_CONTRACT_ID = re.compile(r"[A-Z][A-Z0-9_]*(?:-[A-Z][A-Z0-9_]*)*-\d{3,}")
 TECHNOLOGY_SOURCES = {
     "OWNER_CONSTRAINT",
     "REPOSITORY_FACT",
@@ -306,9 +322,15 @@ ARCHITECTURE_SELECTION_HEADERS = (
     "Validation",
 )
 ARCHITECTURE_TRACEABILITY_HEADING = "### Architecture traceability"
-ARCHITECTURE_TRACEABILITY_HEADERS = (
+ARCHITECTURE_TRACEABILITY_HEADERS_V4 = (
     "Requirement ID",
     "ARCH / COMP / API / EVENT / CLI / FILE / DATA / CTRL / BOUNDARY / STATE IDs",
+    "Property/test IDs",
+    "Evidence IDs",
+)
+ARCHITECTURE_TRACEABILITY_HEADERS = (
+    "Requirement ID",
+    "ARCH / API / EVENT / CLI / FILE / BOUNDARY / STATE IDs",
     "Property/test IDs",
     "Evidence IDs",
 )
@@ -333,7 +355,9 @@ MATERIAL_AWS_EVIDENCE_HEADERS = (
 ARCHITECTURE_DRIVER_ID = re.compile(r"DRV-\d{4,}")
 ARCHITECTURE_CANDIDATE_ID = re.compile(r"CAND-\d{4,}")
 ARCHITECTURE_ID = re.compile(r"ARCH-\d{4,}")
-ARCHITECTURE_DESIGN_ID = re.compile(r"(?:ARCH|COMP|API|EVENT|CLI|FILE|DATA|CTRL|BOUNDARY|STATE)-\d{3,}")
+ARCHITECTURE_DESIGN_ID = re.compile(
+    r"(?:ARCH|COMP|API|EVENT|CLI|FILE|DATA|CTRL|BOUNDARY|STATE)-\d{3,}"
+)
 ARCHITECTURE_TEST_ID = re.compile(r"(?:PROP|EX|TEST)-\d{3,}")
 AWS_MATERIAL_EVIDENCE_ID = re.compile(r"AWS-EV-\d{4,}")
 AWS_DISCOVERY_ID = re.compile(r"AWS-DISC-\d{4,}")
@@ -343,78 +367,188 @@ ARCHITECTURE_DRIVER_CLASSES = {"HARD_CONSTRAINT", "PREFERENCE", "REVISIT_TRIGGER
 ARCHITECTURE_ELIGIBILITY = {"ELIGIBLE", "INELIGIBLE"}
 AWS_DOCUMENTATION_CAPABILITIES = {"retrieve_skill", "search_documentation"}
 NORMATIVE_REQUIREMENT_HEADERS = (
-    "ID", "Requirement", "EARS form", "Acceptance ID", "Acceptance criteria", "Acceptance form",
+    "ID",
+    "Requirement",
+    "EARS form",
+    "Acceptance ID",
+    "Acceptance criteria",
+    "Acceptance form",
 )
 LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
-    "ID", "Requirement", "EARS form", "Acceptance criteria", "Acceptance form",
+    "ID",
+    "Requirement",
+    "EARS form",
+    "Acceptance criteria",
+    "Acceptance form",
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
 PROJECT_CONTRACT_SCHEMA = "1.3"
 PROJECT_DESIGN_CONTRACT_SCHEMA = "5"
 ACTOR_HEADING = "## 4. Users and outcomes"
-ACTOR_HEADERS = ("Actor ID", "Actor or external system", "Kind",
-                 "Desired outcome or responsibility", "Permission/data boundary", "Intake basis IDs")
+ACTOR_HEADERS = (
+    "Actor ID",
+    "Actor or external system",
+    "Kind",
+    "Desired outcome or responsibility",
+    "Permission/data boundary",
+    "Intake basis IDs",
+)
 ACTOR_KINDS = {"PRIMARY_USER", "SECONDARY_USER", "OPERATOR", "EXTERNAL_SYSTEM"}
 ACTOR_ID = re.compile(r"ACT-\d{3,}")
 ACCEPTANCE_ID = re.compile(r"AC-[A-Z][A-Z0-9_]*(?:-[A-Z][A-Z0-9_]*)*-\d{3,}")
+ACCEPTANCE_TEST_BINDING_ID = re.compile(r"\b(?:TEST|PROP|EV)-\d{3,}\b")
 JOURNEY_HEADING = "### Journey register"
-JOURNEY_HEADERS = ("Journey ID", "Actor IDs", "Goal", "Trigger", "Main success outcome",
-                   "Alternate/failure behavior", "Requirement IDs", "Rich-use-case triggers")
+JOURNEY_HEADERS = (
+    "Journey ID",
+    "Actor IDs",
+    "Goal",
+    "Trigger",
+    "Main success outcome",
+    "Alternate/failure behavior",
+    "Requirement IDs",
+    "Rich-use-case triggers",
+)
 JOURNEY_ID = re.compile(r"JOURNEY-\d{3,}")
 RICH_USE_CASE_TRIGGERS = {
-    "DISTINCT_PERMISSIONED_ACTORS", "CONFIDENTIAL_OR_REGULATED_MUTATION",
-    "MONEY_OR_ENTITLEMENT", "IRREVERSIBLE_ACTION", "MIGRATION_OR_CUTOVER",
-    "ASYNCHRONOUS_WORK", "PARTIAL_FAILURE",
+    "DISTINCT_PERMISSIONED_ACTORS",
+    "CONFIDENTIAL_OR_REGULATED_MUTATION",
+    "MONEY_OR_ENTITLEMENT",
+    "IRREVERSIBLE_ACTION",
+    "MIGRATION_OR_CUTOVER",
+    "ASYNCHRONOUS_WORK",
+    "PARTIAL_FAILURE",
 }
 RICH_USE_CASE_APPLICABILITY_HEADING = "### Rich-use-case applicability"
 RICH_USE_CASE_APPLICABILITY_HEADERS = ("Applicability", "Trigger basis", "Use-case IDs")
 RICH_USE_CASE_HEADING = "### Rich use cases"
-RICH_USE_CASE_HEADERS = ("Use case ID", "Journey ID", "Primary actor ID", "Stakeholder interests",
-                         "Preconditions", "Success guarantee", "Minimum failure guarantee",
-                         "Business rule IDs", "Requirement IDs")
+RICH_USE_CASE_HEADERS = (
+    "Use case ID",
+    "Journey ID",
+    "Primary actor ID",
+    "Stakeholder interests",
+    "Preconditions",
+    "Success guarantee",
+    "Minimum failure guarantee",
+    "Business rule IDs",
+    "Requirement IDs",
+)
 USE_CASE_ID = re.compile(r"USECASE-\d{3,}")
 BUSINESS_RULE_HEADING = "### Business rules"
-BUSINESS_RULE_HEADERS = ("Rule ID", "Rule", "Basis IDs", "Journey/use-case IDs", "Validation ID")
+BUSINESS_RULE_HEADERS = (
+    "Rule ID",
+    "Rule",
+    "Basis IDs",
+    "Journey/use-case IDs",
+    "Validation ID",
+)
 BUSINESS_RULE_ID = re.compile(r"BR-\d{3,}")
 REQUIREMENT_COVERAGE_HEADING = "### Requirement coverage"
-REQUIREMENT_COVERAGE_HEADERS = ("Requirement ID", "Intake basis IDs", "Actor IDs",
-                                "Journey IDs", "Acceptance/test IDs", "Approved success measure ID")
+REQUIREMENT_COVERAGE_HEADERS = (
+    "Requirement ID",
+    "Intake basis IDs",
+    "Actor IDs",
+    "Journey IDs",
+    "Acceptance/test IDs",
+    "Approved success measure ID",
+)
 INTAKE_FOUNDATION_IDS = {f"INTAKE-{index:04d}" for index in range(1, 8)}
 INTERFACE_HEADING = "## 16. Interfaces and contracts"
-INTERFACE_HEADERS = ("Contract ID", "Kind", "Requirement basis", "Producer", "Consumer",
-                     "Schema or protocol", "Authentication", "Authorization", "Input validation",
-                     "Success output/status", "Error and recovery behavior",
-                     "Compatibility/versioning", "Idempotency/concurrency", "Timeout bound",
-                     "Rate bound", "Performance bound")
-LEGACY_INTERFACE_HEADERS_V4 = ("Contract ID", "Producer", "Consumer", "Schema or protocol",
-                               "Authentication", "Versioning", "Idempotency")
+INTERFACE_HEADERS = (
+    "Contract ID",
+    "Kind",
+    "Requirement basis",
+    "Producer",
+    "Consumer",
+    "Schema or protocol",
+    "Authentication",
+    "Authorization",
+    "Input validation",
+    "Success output/status",
+    "Error and recovery behavior",
+    "Compatibility/versioning",
+    "Idempotency/concurrency",
+    "Timeout bound",
+    "Rate bound",
+    "Performance bound",
+)
+LEGACY_INTERFACE_HEADERS_V4 = (
+    "Contract ID",
+    "Producer",
+    "Consumer",
+    "Schema or protocol",
+    "Authentication",
+    "Versioning",
+    "Idempotency",
+)
 INTERFACE_ID = re.compile(r"(?:API|EVENT|CLI|FILE)-\d{3,}")
 INTERFACE_KINDS = {"API", "EVENT", "CLI", "FILE"}
 LAYER_BOUNDARY_HEADING = "### Layer boundaries"
-LAYER_BOUNDARY_HEADERS = ("Boundary ID", "Outer adapter/layer", "Inner domain layer",
-                          "Boundary DTO/schema", "Explicit mapping", "Dependency direction",
-                          "Authorization enforcement", "External anti-corruption adapter",
-                          "Requirement IDs", "Validation IDs")
+LAYER_BOUNDARY_HEADERS = (
+    "Boundary ID",
+    "Outer adapter/layer",
+    "Inner domain layer",
+    "Boundary DTO/schema",
+    "Explicit mapping",
+    "Dependency direction",
+    "Authorization enforcement",
+    "External anti-corruption adapter",
+    "Requirement IDs",
+    "Validation IDs",
+)
 BOUNDARY_ID = re.compile(r"BOUNDARY-\d{3,}")
 STATE_APPLICABILITY_HEADING = "### State-model applicability"
-STATE_APPLICABILITY_HEADERS = ("Subject ID", "Applicability", "Trigger basis IDs", "State model IDs")
+STATE_APPLICABILITY_HEADERS = (
+    "Subject ID",
+    "Applicability",
+    "Trigger basis IDs",
+    "State model IDs",
+)
 STATE_REGISTER_HEADING = "### State register"
-STATE_REGISTER_HEADERS = ("State model ID", "Subject ID", "States", "Initial state",
-                          "Allowed transitions", "Terminal states", "Invalid-transition behavior",
-                          "Requirement IDs", "Validation IDs")
+STATE_REGISTER_HEADERS = (
+    "State model ID",
+    "Subject ID",
+    "States",
+    "Initial state",
+    "Allowed transitions",
+    "Terminal states",
+    "Invalid-transition behavior",
+    "Requirement IDs",
+    "Validation IDs",
+)
 STATE_ID = re.compile(r"STATE-\d{3,}")
-STATE_MODEL_TRIGGERS = ("LIFECYCLE_RESOURCE", "ASYNCHRONOUS_WORK", "RETRY_OR_RESUME",
-                        "APPROVAL_FLOW", "MIGRATION_OR_CUTOVER", "OTHER_MEANINGFUL_TRANSITION")
-RICH_TO_STATE_TRIGGER = {"ASYNCHRONOUS_WORK": "ASYNCHRONOUS_WORK",
-                         "MIGRATION_OR_CUTOVER": "MIGRATION_OR_CUTOVER", "PARTIAL_FAILURE": "RETRY_OR_RESUME"}
+STATE_MODEL_TRIGGERS = (
+    "LIFECYCLE_RESOURCE",
+    "ASYNCHRONOUS_WORK",
+    "RETRY_OR_RESUME",
+    "APPROVAL_FLOW",
+    "MIGRATION_OR_CUTOVER",
+    "OTHER_MEANINGFUL_TRANSITION",
+)
+RICH_TO_STATE_TRIGGER = {
+    "ASYNCHRONOUS_WORK": "ASYNCHRONOUS_WORK",
+    "MIGRATION_OR_CUTOVER": "MIGRATION_OR_CUTOVER",
+    "PARTIAL_FAILURE": "RETRY_OR_RESUME",
+}
 FIRST_WAVE_HEADING = "### First construction wave"
-FIRST_WAVE_HEADERS = ("Wave contract ID", "Work kind", "Walking-skeleton journey ID",
-                      "Requirement IDs", "Acceptance/test IDs", "End-to-end Harness ID",
-                      "Blocking spike ID")
+FIRST_WAVE_HEADERS = (
+    "Wave contract ID",
+    "Work kind",
+    "Walking-skeleton journey ID",
+    "Requirement IDs",
+    "Acceptance/test IDs",
+    "End-to-end Harness ID",
+    "Blocking spike ID",
+)
 WAVE_ID = re.compile(r"WAVE-\d{3,}")
 SPIKE_HEADING = "### Blocking spike"
-SPIKE_HEADERS = ("Spike ID", "Blocking technical unknown", "Time box",
-                 "Disposable output boundary", "Exit criterion", "Required next action")
+SPIKE_HEADERS = (
+    "Spike ID",
+    "Blocking technical unknown",
+    "Time box",
+    "Disposable output boundary",
+    "Exit criterion",
+    "Required next action",
+)
 SPIKE_ID = re.compile(r"SPIKE-\d{3,}")
 MEASURABLE_INTERFACE_BOUND = re.compile(
     r"(?:\b\d+(?:\.\d+)?\s*(?:ns|nanoseconds?|us|microseconds?|ms|"
@@ -423,7 +557,8 @@ MEASURABLE_INTERFACE_BOUND = re.compile(
     r"users?|transactions?|messages?|files?|rps|qps|tps|percent)\b|"
     r"\b\d+(?:\.\d+)?\s*%|\b\d+(?:\.\d+)?\s*/\s*(?:s|sec(?:ond)?s?|"
     r"m|min(?:ute)?s?|h|hours?)\b|\b\d+(?:\.\d+)?\s+per\s+"
-    r"(?:second|minute|hour|day)\b)", re.IGNORECASE,
+    r"(?:second|minute|hour|day)\b)",
+    re.IGNORECASE,
 )
 EARS_FORMS = {
     "UBIQUITOUS",
@@ -436,9 +571,7 @@ EARS_FORMS = {
 # The Fastlane EARS Contract is a project-local normative schema. It does not
 # redefine EARS outside this template.
 EARS_PATTERNS = {
-    "UBIQUITOUS": re.compile(
-        r"The (?P<subject>.+?) SHALL (?P<response>.+)\."
-    ),
+    "UBIQUITOUS": re.compile(r"The (?P<subject>.+?) SHALL (?P<response>.+)\."),
     "EVENT_DRIVEN": re.compile(
         r"WHEN (?P<trigger>.+), the (?P<subject>.+?) SHALL (?P<response>.+)\."
     ),
@@ -498,8 +631,14 @@ UNDEFINED_QUALITY_TERM = re.compile(
     re.IGNORECASE,
 )
 QAS_HEADERS = (
-    "QAS ID", "Requirement IDs", "Source", "Stimulus", "Environment",
-    "Artifact", "Response", "Response measure",
+    "QAS ID",
+    "Requirement IDs",
+    "Source",
+    "Stimulus",
+    "Environment",
+    "Artifact",
+    "Response",
+    "Response measure",
 )
 QAS_ID = re.compile(r"QAS-\d{3,}")
 HARNESS_HEADING = "### Gate B Harness Profile"
@@ -526,9 +665,15 @@ HARNESS_LAYERS = {
     "IaC and policy",
     "AWS environment and operations",
 }
-HARNESS_EVIDENCE_DESTINATION = (
-    "docs/project/VERIFY.md#harness-execution-evidence"
+EXAMPLE_SCENARIO_HEADING = "## 23. Example-based scenarios"
+EXAMPLE_SCENARIO_HEADERS = (
+    "Test ID",
+    "Scenario",
+    "Expected result",
+    "Layer",
 )
+EXAMPLE_SCENARIO_ID = re.compile(r"EX-\d{3,}")
+HARNESS_EVIDENCE_DESTINATION = "docs/project/VERIFY.md#harness-execution-evidence"
 MANAGED_SERVERLESS_MARKER = "MANAGED_SERVERLESS_BASELINE:"
 PROPERTY_EXECUTION_HEADING = "### Property execution contract"
 PROPERTY_EXECUTION_HEADERS = (
@@ -614,7 +759,7 @@ RUN_MODES = {"NONE", "SINGLE_TASK", "AUTONOMOUS"}
 RUN_STATES = {"IDLE", "RUNNING", "CHECKPOINTED", "BLOCKED", "COMPLETE"}
 BROWNFIELD_STATES = {"UNASSESSED", "NOT_APPLICABLE", "RECORDED", "STALE"}
 CANONICAL_PLACEHOLDERS = {
-    "My AWS Project",
+    "{{PROJECT_NAME}}",
     "{{AWS_REGION}}",
     "{{COST_POSTURE}}",
     "{{SETUP_METHOD}}",
@@ -687,6 +832,7 @@ class Context:
     template_source: bool = False
     diagnostics: list[Diagnostic] = field(default_factory=list)
     texts: dict[str, str] = field(default_factory=dict)
+    source_bytes_read: int = 0
     prior_remediation_fingerprint: str | None = None
 
     def error(self, code: str, message: str, path: str | None = None) -> None:
@@ -710,6 +856,9 @@ class TaskSummary:
     write_sets: dict[str, list[str]] = field(default_factory=dict)
     attempts_used: dict[str, int] = field(default_factory=dict)
     attempt_budgets: dict[str, int] = field(default_factory=dict)
+    requirement_coverage_complete: bool = False
+    requirement_coverage: dict[str, dict[str, Any]] = field(default_factory=dict)
+    missing_requirement_ids: list[str] = field(default_factory=list)
 
     @property
     def total(self) -> int:
@@ -741,10 +890,37 @@ class TaskSummary:
 
 
 @dataclass(frozen=True)
+class TaskRequirementCoverage:
+    requirement_id: str
+    acceptance_id: str
+    disposition: str
+    task_ids: tuple[str, ...] = ()
+    evidence_ids: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "requirement_id": self.requirement_id,
+            "acceptance_id": self.acceptance_id,
+            "disposition": self.disposition,
+            "task_ids": list(self.task_ids),
+            "evidence_ids": list(self.evidence_ids),
+        }
+
+
+@dataclass(frozen=True)
+class TaskRequirementCoverageResult:
+    records: tuple[TaskRequirementCoverage, ...] = ()
+    trace_issues: tuple[str, ...] = ()
+    evidence_issues: tuple[str, ...] = ()
+    missing_requirement_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ContractTable:
     headers: tuple[str, ...]
     rows: tuple[tuple[str, ...], ...]
     canonical_bytes: bytes
+
 
 @dataclass(frozen=True)
 class RequirementsContract:
@@ -764,15 +940,20 @@ class RequirementsContract:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": self.schema_version, "status": self.status,
-            "actor_ids": list(self.actor_ids), "requirement_ids": list(self.requirement_ids),
-            "journey_ids": list(self.journey_ids), "acceptance_ids": list(self.acceptance_ids),
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "actor_ids": list(self.actor_ids),
+            "requirement_ids": list(self.requirement_ids),
+            "journey_ids": list(self.journey_ids),
+            "acceptance_ids": list(self.acceptance_ids),
             "use_case_ids": list(self.use_case_ids),
             "business_rule_ids": list(self.business_rule_ids),
             "rich_use_case_triggers": list(self.rich_use_case_triggers),
-            "missing_records": list(self.missing_records), "canonical_sha256": self.canonical_sha256,
+            "missing_records": list(self.missing_records),
+            "canonical_sha256": self.canonical_sha256,
             "grandfathered_approved_gate_a": self.grandfathered_approved_gate_a,
         }
+
 
 @dataclass(frozen=True)
 class IntakeQuestion:
@@ -873,10 +1054,11 @@ class NormalizedOwnerResponse:
 
 @dataclass(frozen=True)
 class IntakeFoundationContract:
-    schema_version: int = 1
+    schema_version: int = 2
     status: str = "UNINITIALIZED"
     repository_mode: str | None = None
     owner_work_context: str | None = None
+    current_understanding: tuple[str, ...] = ()
     basis_ids: tuple[str, ...] = ()
     missing_fields: tuple[str, ...] = ()
     pending_card: IntakeCard | None = None
@@ -888,6 +1070,7 @@ class IntakeFoundationContract:
             "status": self.status,
             "repository_mode": self.repository_mode,
             "owner_work_context": self.owner_work_context,
+            "current_understanding": list(self.current_understanding),
             "basis_ids": list(self.basis_ids),
             "missing_fields": list(self.missing_fields),
             "pending_card": (
@@ -1218,11 +1401,13 @@ class FirstWaveContract:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "wave_contract_id": self.wave_contract_id, "work_kind": self.work_kind,
+            "wave_contract_id": self.wave_contract_id,
+            "work_kind": self.work_kind,
             "journey_id": self.journey_id,
             "requirement_ids": list(self.requirement_ids),
             "acceptance_test_ids": list(self.acceptance_test_ids),
-            "harness_id": self.harness_id, "blocking_spike_id": self.blocking_spike_id,
+            "harness_id": self.harness_id,
+            "blocking_spike_id": self.blocking_spike_id,
         }
 
 
@@ -1237,9 +1422,12 @@ class SpikeContract:
 
     def to_dict(self) -> dict[str, str]:
         return {
-            "spike_id": self.spike_id, "technical_unknown": self.technical_unknown,
-            "time_box": self.time_box, "disposable_boundary": self.disposable_boundary,
-            "exit_criterion": self.exit_criterion, "required_next_action": self.required_next_action,
+            "spike_id": self.spike_id,
+            "technical_unknown": self.technical_unknown,
+            "time_box": self.time_box,
+            "disposable_boundary": self.disposable_boundary,
+            "exit_criterion": self.exit_criterion,
+            "required_next_action": self.required_next_action,
         }
 
 
@@ -1259,12 +1447,15 @@ class ProjectDesignContract:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": self.schema_version, "status": self.status,
-            "interface_ids": list(self.interface_ids), "boundary_ids": list(self.boundary_ids),
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "interface_ids": list(self.interface_ids),
+            "boundary_ids": list(self.boundary_ids),
             "state_ids": list(self.state_ids),
             "first_wave": self.first_wave.to_dict() if self.first_wave else None,
             "spike": self.spike.to_dict() if self.spike else None,
-            "missing_records": list(self.missing_records), "canonical_sha256": self.canonical_sha256,
+            "missing_records": list(self.missing_records),
+            "canonical_sha256": self.canonical_sha256,
             "grandfathered_v4": self.grandfathered_v4,
         }
 
@@ -1280,14 +1471,18 @@ class DesignContract:
     harness: HarnessContract = field(default_factory=HarnessContract)
     change_impact: ChangeImpactContract = field(default_factory=ChangeImpactContract)
     canonical_sha256: str | None = None
-    project_contract: ProjectDesignContract = field(default_factory=ProjectDesignContract)
+    project_contract: ProjectDesignContract = field(
+        default_factory=ProjectDesignContract
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "status": self.status,
             "design_revision": self.design_revision,
-            "technology_decisions": [item.to_dict() for item in self.technology_decisions],
+            "technology_decisions": [
+                item.to_dict() for item in self.technology_decisions
+            ],
             "property_execution": [item.to_dict() for item in self.property_execution],
             "architecture": self.architecture.to_dict(),
             "harness": self.harness.to_dict(),
@@ -1326,7 +1521,7 @@ TASK_META_PATTERN = re.compile(
     re.MULTILINE,
 )
 TASK_STATUSES = {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE", "SKIPPED"}
-TASK_AWS_MODES = {"NONE", "DOCS_ONLY", "READ_ONLY", "MUTATION"}
+TASK_AWS_MODES = {"NONE", "DOCS_ONLY"}
 TASK_DESIGN_TRACE_PATTERN = re.compile(
     r"^(?P<design>DES-\d{4}); TECH: "
     r"(?:(?P<none>NONE — no technology/toolchain impact)|"
@@ -1409,6 +1604,8 @@ CONTROL_HASH_FILES = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_process.py",
+    "scripts/fastlane_project_identity.py",
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
@@ -1427,9 +1624,7 @@ AWS_ENVIRONMENT = re.compile(
     r"ENVIRONMENT: (?P<name>[^;\r\n]+); CLASS: (?P<class>NON_PRODUCTION|PRODUCTION)"
 )
 AWS_EXACT_ARTIFACT = re.compile(r"EXACT_DIGEST: sha256:[0-9a-f]{64}")
-AWS_DERIVED_ARTIFACT = re.compile(
-    r"DERIVED_FROM_AUTHORIZED_SOURCE: (?P<rule>[^\r\n]+)"
-)
+AWS_DERIVED_ARTIFACT = re.compile(r"DERIVED_FROM_AUTHORIZED_SOURCE: (?P<rule>[^\r\n]+)")
 TASK_BOUNDARY_DERIVED = "DERIVED_FROM_AUTHORIZED_IDS_AND_WRITE_SET"
 SHELL_CONTROL = re.compile(r"[;&|><`$()\\\r\n]")
 NON_HUMAN_APPROVER = re.compile(
@@ -1525,7 +1720,8 @@ AWS_CORE_EVIDENCE_HEADERS = (
     "Observed status",
 )
 AWS_CORE_EVIDENCE_HEADERS_V1 = tuple(
-    header for header in AWS_CORE_EVIDENCE_HEADERS
+    header
+    for header in AWS_CORE_EVIDENCE_HEADERS
     if header not in {"Discovery ID", "Basis IDs", "Discovered skill identifiers"}
 )
 AWS_CORE_EVIDENCE_PHASES = ("REQ-10", "DESIGN-10", "AWS-10")
@@ -1605,9 +1801,14 @@ AWS_READ_PREFLIGHT_HEADERS = (
 AWS_TEARDOWN_EVIDENCE_HEADING = "## Teardown reconciliation evidence"
 AWS_TEARDOWN_EVIDENCE_HEADERS = (
     "Evidence ID",
+    "Attempt ID",
     "Phase",
     "REQ / DES / AUTH",
     "Read authorization",
+    "Read role or profile",
+    "Read receipt digest",
+    "Read valid until",
+    "Read authority source",
     "Teardown authorization",
     "Teardown receipt digest",
     "Role or profile",
@@ -1631,10 +1832,90 @@ AWS_TEARDOWN_EVIDENCE_HEADERS = (
     "Status",
 )
 AWS_TEARDOWN_REVIEW_STATUSES = {
-    "RUNNING", "READY_FOR_TEARDOWN", "VERIFIED_CLEAN",
-    "RESIDUALS_REMAIN", "BLOCKED", "STALE",
+    "RUNNING",
+    "READY_FOR_TEARDOWN",
+    "VERIFIED_CLEAN",
+    "RESIDUALS_REMAIN",
+    "BLOCKED",
+    "STALE",
 }
-AWS_TEARDOWN_ACTION_STATUSES = {"SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN"}
+AWS_TEARDOWN_ACTION_STATUSES = {
+    "STARTED",
+    "SUCCEEDED",
+    "FAILED",
+    "PARTIAL",
+    "UNKNOWN",
+}
+AWS_TEARDOWN_TERMINAL_STATUSES = {"SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN"}
+AWS_TEARDOWN_ATTEMPT_ID = re.compile(r"AWS-TEARDOWN-\d{4,}")
+AWS_TEARDOWN_READ_PROVENANCE = re.compile(
+    r"SOURCE: (?P<source>[^;\r\n]+); "
+    r"AUTHORIZED_AT: (?P<authorized_at>[^;\r\n]+)"
+)
+AWS_DEPLOYMENT_READ_PROVENANCE = re.compile(
+    r"SOURCE: (?P<source>[^;|\r\n]+); "
+    r"AUTHORIZED_AT: (?P<authorized_at>[^;|\r\n]+); "
+    r"RESOURCES: (?P<resources>[^;|\r\n]+); "
+    r"OPERATIONS: (?P<operations>[^;|\r\n]+)"
+)
+AWS_TEARDOWN_PRECALL_RESULT = "NOT_OBSERVED — pre-call journal only"
+AWS_DEPLOYMENT_EVIDENCE_HEADING = "## AWS deployment action and reconciliation evidence"
+AWS_DEPLOYMENT_EVIDENCE_HEADERS = (
+    "Evidence ID",
+    "Attempt ID",
+    "Phase",
+    "REQ / DES / AUTH",
+    "Deployment authorization",
+    "Deployment receipt digest",
+    "Deployment valid until",
+    "Deployment authority source",
+    "Read authorization",
+    "Deployment role or profile",
+    "Read role or profile",
+    "Read receipt digest",
+    "Read valid until",
+    "Read authority source",
+    "Artifact digest",
+    "Plan/change-set binding",
+    "Resources",
+    "Mutation operations",
+    "Read operations observed",
+    "Account / Region / environment",
+    "Operation identifiers and direct result",
+    "Rollback result",
+    "Acceptance evidence IDs",
+    "Observed at",
+    "Durable source",
+    "Identity and boundary match",
+    "Blocker or stale reason",
+    "Status",
+)
+AWS_DEPLOYMENT_ATTEMPT_ID = re.compile(r"AWS-DEPLOY-\d{4,}")
+AWS_DEPLOYMENT_ACTION_STATUSES = {
+    "STARTED",
+    "SUCCEEDED",
+    "FAILED",
+    "PARTIAL",
+    "UNKNOWN",
+}
+AWS_DEPLOYMENT_TERMINAL_STATUSES = AWS_DEPLOYMENT_ACTION_STATUSES - {"STARTED"}
+AWS_DEPLOYMENT_RECONCILIATION_STATUSES = {"COMPLETE", "BLOCKED", "STALE"}
+AWS_DEPLOYMENT_PRECALL_RESULT = "NOT_OBSERVED \u2014 pre-call journal only"
+VERIFICATION_MATRIX_HEADING = "## Verification matrix"
+VERIFICATION_MATRIX_HEADERS = (
+    "Evidence ID",
+    "PRD / property IDs",
+    "Task IDs",
+    "Requirement or invariant",
+    "Automated evidence",
+    "AWS/manual evidence",
+    "Artifact/environment",
+    "Status",
+)
+AWS_READ_ONLY_OPERATION = re.compile(
+    r"(?i)^(?:[a-z0-9-]+[.:])?(?:BatchGet|Check|Describe|Detect|Estimate|Get|"
+    r"Head|List|Lookup|Preview|Search|Simulate|Validate)[A-Za-z0-9]*$"
+)
 AWS_CORE_OFFICIAL_SOURCE = "aws/agent-toolkit-for-aws"
 AWS_CORE_OFFICIAL_IDENTITY = "aws-core@agent-toolkit-for-aws"
 AWS_CORE_OBSERVATION_ACTOR = "CODEX_LIVE_TOOL_CALL"
@@ -1678,7 +1959,11 @@ class InspectedTask:
     @property
     def dependencies(self) -> list[str]:
         raw = clean_cell(self.metadata.get("Depends on", "NONE"))
-        return [] if raw in {"", "NONE", "-"} else [item.strip() for item in raw.split(",")]
+        return (
+            []
+            if raw in {"", "NONE", "-"}
+            else [item.strip() for item in raw.split(",")]
+        )
 
     @property
     def attempts_used(self) -> int:
@@ -1764,14 +2049,24 @@ def without_fenced_code(text: str) -> str:
     fence: str | None = None
     for line in text.splitlines(keepends=True):
         stripped = line.lstrip()
-        marker = "```" if stripped.startswith("```") else "~~~" if stripped.startswith("~~~") else None
+        marker = (
+            "```"
+            if stripped.startswith("```")
+            else "~~~"
+            if stripped.startswith("~~~")
+            else None
+        )
         if marker is not None:
             fence = None if fence == marker else marker if fence is None else fence
-            result.append(" " * (len(line.rstrip("\r\n"))) + line[len(line.rstrip("\r\n")) :])
+            result.append(
+                " " * (len(line.rstrip("\r\n"))) + line[len(line.rstrip("\r\n")) :]
+            )
         elif fence is None:
             result.append(line)
         else:
-            result.append(" " * (len(line.rstrip("\r\n"))) + line[len(line.rstrip("\r\n")) :])
+            result.append(
+                " " * (len(line.rstrip("\r\n"))) + line[len(line.rstrip("\r\n")) :]
+            )
     return "".join(result)
 
 
@@ -1790,7 +2085,11 @@ def inspect_task_blocks(text: str) -> list[InspectedTask]:
             if key in metadata:
                 duplicates.add(key)
             metadata[key] = found.group("value")
-        tasks.append(InspectedTask(match.group(1), match.group(2).strip(), block, metadata, duplicates))
+        tasks.append(
+            InspectedTask(
+                match.group(1), match.group(2).strip(), block, metadata, duplicates
+            )
+        )
     return tasks
 
 
@@ -1844,7 +2143,9 @@ def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]
         re.finditer(r"^## Task completion evidence[ \t]*$", structural, re.MULTILINE)
     )
     if len(headings) != 1:
-        raise ValueError("VERIFY.md requires exactly one Task completion evidence section")
+        raise ValueError(
+            "VERIFY.md requires exactly one Task completion evidence section"
+        )
     following = re.search(r"^##\s+", structural[headings[0].end() :], re.MULTILINE)
     end = headings[0].end() + following.start() if following else len(structural)
     lines = structural[headings[0].end() : end].splitlines()
@@ -1856,7 +2157,9 @@ def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]
     if len(header_indexes) != 1:
         raise ValueError("VERIFY.md requires one exact Task completion evidence table")
     header = header_indexes[0]
-    separator = split_markdown_table_row(lines[header + 1]) if header + 1 < len(lines) else None
+    separator = (
+        split_markdown_table_row(lines[header + 1]) if header + 1 < len(lines) else None
+    )
     if (
         separator is None
         or len(separator) != len(TASK_COMPLETION_EVIDENCE_HEADERS)
@@ -1875,7 +2178,9 @@ def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]
                 break
             raise ValueError("VERIFY.md Task completion evidence row is missing")
         if len(cells) != len(TASK_COMPLETION_EVIDENCE_HEADERS):
-            raise ValueError("VERIFY.md Task completion evidence row must have nine cells")
+            raise ValueError(
+                "VERIFY.md Task completion evidence row must have nine cells"
+            )
         row = TaskCompletionEvidenceRow(*(clean_cell(cell) for cell in cells))
         if re.fullmatch(r"EV-\d{4,}", row.evidence_id) is None:
             raise ValueError("VERIFY.md Task completion Evidence ID must be EV-nnnn")
@@ -1894,7 +2199,9 @@ def parse_aws_core_evidence(
     """Parse linked runtime skill-discovery evidence chains."""
 
     structural = without_fenced_code(text)
-    headings = list(re.finditer(r"^## AWS Core evidence[ \t]*$", structural, re.MULTILINE))
+    headings = list(
+        re.finditer(r"^## AWS Core evidence[ \t]*$", structural, re.MULTILINE)
+    )
     if len(headings) != 1:
         raise ValueError("VERIFY.md requires exactly one AWS Core evidence section")
     following = re.search(r"^##\s+", structural[headings[0].end() :], re.MULTILINE)
@@ -1919,7 +2226,9 @@ def parse_aws_core_evidence(
     if len(header_indexes) != 1:
         raise ValueError("VERIFY.md requires one exact AWS Core evidence table")
     header = header_indexes[0]
-    separator = split_markdown_table_row(lines[header + 1]) if header + 1 < len(lines) else None
+    separator = (
+        split_markdown_table_row(lines[header + 1]) if header + 1 < len(lines) else None
+    )
     if (
         separator is None
         or len(separator) != len(headers)
@@ -1956,7 +2265,9 @@ def parse_aws_core_evidence(
         else:
             row = AwsCoreEvidenceRow(*cleaned)
         if row.phase not in AWS_CORE_EVIDENCE_PHASES:
-            raise ValueError(f"VERIFY.md AWS Core evidence has unknown phase {row.phase!r}")
+            raise ValueError(
+                f"VERIFY.md AWS Core evidence has unknown phase {row.phase!r}"
+            )
         capability = row.capability.replace("`", "").strip()
         if capability not in AWS_CORE_REQUIRED_CAPABILITIES:
             raise ValueError(
@@ -1997,14 +2308,13 @@ def parse_aws_core_evidence(
         for discovery_id in discovery_ids:
             for capability in AWS_CORE_REQUIRED_CAPABILITIES:
                 if (phase, discovery_id, capability) not in rows:
-                    missing.append(
-                        f"{phase} {discovery_id or 'legacy'} {capability}"
-                    )
+                    missing.append(f"{phase} {discovery_id or 'legacy'} {capability}")
     if missing:
         raise ValueError(
             "VERIFY.md AWS Core evidence is missing linked rows: " + ", ".join(missing)
         )
     return rows
+
 
 def validate_advisory_design_binding(
     value: str,
@@ -2093,9 +2403,7 @@ def _unlinked_aws_core_phase_evidence_issues(
             issues.append(f"{label} requires fresh PASS evidence")
             continue
         if row.plugin_source != AWS_CORE_OFFICIAL_SOURCE:
-            issues.append(
-                f"{label} plugin source must be {AWS_CORE_OFFICIAL_SOURCE}"
-            )
+            issues.append(f"{label} plugin source must be {AWS_CORE_OFFICIAL_SOURCE}")
         if row.invoked_plugin_identity != AWS_CORE_OFFICIAL_IDENTITY:
             issues.append(
                 f"{label} invoked plugin identity must be {AWS_CORE_OFFICIAL_IDENTITY}"
@@ -2126,7 +2434,7 @@ def _unlinked_aws_core_phase_evidence_issues(
             issues.append(str(exc))
         if capability == "retrieve_skill":
             try:
-                requested_skill = require_explicit_evidence_value(
+                require_explicit_evidence_value(
                     row.requested_skill, f"{label} Requested skill"
                 )
             except ValueError as exc:
@@ -2150,7 +2458,7 @@ def _unlinked_aws_core_phase_evidence_issues(
                     )
         else:
             try:
-                documentation_query = require_explicit_evidence_value(
+                require_explicit_evidence_value(
                     row.documentation_query, f"{label} Documentation query"
                 )
             except ValueError as exc:
@@ -2245,7 +2553,9 @@ def aws_core_phase_evidence_issues(
         search = chain.get((phase, "search_documentation"))
         retrieve = chain.get((phase, "retrieve_skill"))
         if search is None or retrieve is None:
-            issues.append(f"{phase} {discovery_id} requires linked search and retrieve rows")
+            issues.append(
+                f"{phase} {discovery_id} requires linked search and retrieve rows"
+            )
             continue
 
         try:
@@ -2291,9 +2601,7 @@ def aws_core_phase_evidence_issues(
         )
         for field_name in shared:
             if getattr(search, field_name) != getattr(retrieve, field_name):
-                issues.append(
-                    f"{phase} {discovery_id} rows must share {field_name}"
-                )
+                issues.append(f"{phase} {discovery_id} rows must share {field_name}")
         if retrieve.requested_skill != retrieve.returned_skill_identifier:
             issues.append(
                 f"{phase} {discovery_id} retrieved identifier must equal the selected identifier"
@@ -2303,9 +2611,15 @@ def aws_core_phase_evidence_issues(
                 f"{phase} {discovery_id} retrieved identifier was not returned by search"
             )
 
-        if explicit_timestamp(search.observed_at) and explicit_timestamp(retrieve.observed_at):
-            searched_at = datetime.fromisoformat(search.observed_at.replace("Z", "+00:00"))
-            retrieved_at = datetime.fromisoformat(retrieve.observed_at.replace("Z", "+00:00"))
+        if explicit_timestamp(search.observed_at) and explicit_timestamp(
+            retrieve.observed_at
+        ):
+            searched_at = datetime.fromisoformat(
+                search.observed_at.replace("Z", "+00:00")
+            )
+            retrieved_at = datetime.fromisoformat(
+                retrieve.observed_at.replace("Z", "+00:00")
+            )
             if retrieved_at < searched_at:
                 issues.append(
                     f"{phase} {discovery_id} retrieve timestamp precedes search"
@@ -2435,8 +2749,7 @@ def require_durable_evidence_source(value: str, label: str) -> str:
     )
     if (
         re.fullmatch(r"VERIFY\.md#[A-Za-z0-9._-]+", source) is None
-        and re.fullmatch(r"git:[0-9a-fA-F]{7,64}", source, re.IGNORECASE)
-        is None
+        and re.fullmatch(r"git:[0-9a-fA-F]{7,64}", source, re.IGNORECASE) is None
         and re.fullmatch(r"(?:https?|s3)://\S+", source, re.IGNORECASE) is None
         and not path_source
     ):
@@ -2447,7 +2760,9 @@ def require_durable_evidence_source(value: str, label: str) -> str:
 def validate_done_evidence(verify_text: str | None, task: InspectedTask) -> None:
     evidence = clean_cell(task.metadata.get("Evidence", ""))
     references = [match.group(0) for match in EVIDENCE_PATTERN.finditer(evidence)]
-    local = [reference for reference in references if re.fullmatch(r"EV-\d{4,}", reference)]
+    local = [
+        reference for reference in references if re.fullmatch(r"EV-\d{4,}", reference)
+    ]
     invalid_local = [
         reference
         for reference in references
@@ -2459,7 +2774,9 @@ def validate_done_evidence(verify_text: str | None, task: InspectedTask) -> None
             f"{task.task_id}: invalid local Evidence ID: {', '.join(invalid_local)}"
         )
     if not local:
-        raise ValueError(f"{task.task_id}: DONE requires at least one local Evidence reference")
+        raise ValueError(
+            f"{task.task_id}: DONE requires at least one local Evidence reference"
+        )
     if len(local) != len(set(local)):
         raise ValueError(f"{task.task_id}: local Evidence references must be unique")
     if verify_text is None:
@@ -2492,10 +2809,10 @@ def validate_done_evidence(verify_text: str | None, task: InspectedTask) -> None
             )
             is None
         ):
-            raise ValueError(f"{label} requires an explicit commit, worktree, or artifact")
-        require_durable_evidence_source(
-            row.durable_source, f"{label} durable source"
-        )
+            raise ValueError(
+                f"{label} requires an explicit commit, worktree, or artifact"
+            )
+        require_durable_evidence_source(row.durable_source, f"{label} durable source")
         if row.status not in TASK_COMPLETION_EVIDENCE_STATUSES:
             raise ValueError(f"{label} status must be LOCAL_PASS or VERIFIED")
 
@@ -2533,7 +2850,9 @@ def parse_task_external_state(value: str, task_id: str) -> list[str]:
     if value == "NONE":
         return []
     values = [item.strip() for item in value.split(",")]
-    if any(not item or any(character in item for character in "*?[]{}") for item in values):
+    if any(
+        not item or any(character in item for character in "*?[]{}") for item in values
+    ):
         raise ValueError(f"{task_id}: ambiguous External state")
     if len(values) != len({item.casefold() for item in values}):
         raise ValueError(f"{task_id}: duplicate External state entry")
@@ -2567,9 +2886,11 @@ def declared_task_waivers(task: InspectedTask) -> dict[str, str]:
     result: dict[str, str] = {}
     for entry in raw.split(","):
         pair = [item.strip() for item in entry.split("=", 1)]
-        if len(pair) != 2 or re.fullmatch(r"TASK-\d+", pair[0]) is None or re.fullmatch(
-            r"WAIVER-\d+", pair[1]
-        ) is None:
+        if (
+            len(pair) != 2
+            or re.fullmatch(r"TASK-\d+", pair[0]) is None
+            or re.fullmatch(r"WAIVER-\d+", pair[1]) is None
+        ):
             raise ValueError(f"{task.task_id}: invalid dependency waiver {entry!r}")
         result[pair[0]] = pair[1]
     return result
@@ -2618,7 +2939,9 @@ def validate_task_records(
     )
     if done_property_ids or observed_property_evidence:
         if verify_text is None:
-            errors.append("DONE property tasks require VERIFY.md property-test evidence")
+            errors.append(
+                "DONE property tasks require VERIFY.md property-test evidence"
+            )
         elif not property_section_present:
             errors.append(
                 "VERIFY.md requires exactly one Property-based test evidence section"
@@ -2635,10 +2958,7 @@ def validate_task_records(
             "IN_PROGRESS",
             "BLOCKED",
             "DONE",
-        } or (
-            task.status == "BACKLOG"
-            and snapshot.get("Task-plan state") == "CURRENT"
-        )
+        } or (task.status == "BACKLOG" and snapshot.get("Task-plan state") == "CURRENT")
         if task.task_id in by_id:
             errors.append(f"Duplicate task ID: {task.task_id}")
         by_id[task.task_id] = task
@@ -2661,13 +2981,15 @@ def validate_task_records(
         aws_mode = clean_cell(task.metadata.get("AWS mode", "")).upper()
         if aws_mode not in TASK_AWS_MODES:
             errors.append(f"{task.task_id}: invalid AWS mode {aws_mode!r}")
-        for field, expected, pattern in (
+        for field_name, expected, pattern in (
             ("Requirements", current_req, REQ_ID),
             ("Authorization", current_auth, AUTH_ID),
         ):
-            match = pattern.search(clean_cell(task.metadata.get(field, "")))
+            match = pattern.search(clean_cell(task.metadata.get(field_name, "")))
             if match is None or match.group(0) != expected:
-                errors.append(f"{task.task_id}: {field} does not match current execution basis")
+                errors.append(
+                    f"{task.task_id}: {field_name} does not match current execution basis"
+                )
         design_value = clean_cell(task.metadata.get("Design", ""))
         technology_refs: list[str] = []
         if execution_contract_required:
@@ -2704,13 +3026,21 @@ def validate_task_records(
                 errors.append(
                     f"{task.task_id}: Design does not match current execution basis"
                 )
-        if task.status in {"READY", "IN_PROGRESS"} and snapshot.get("Gate B state") != "APPROVED_FOR_CONSTRUCTION":
+        if (
+            task.status in {"READY", "IN_PROGRESS"}
+            and snapshot.get("Gate B state") != "APPROVED_FOR_CONSTRUCTION"
+        ):
             errors.append(f"{task.task_id}: Gate B is not approved for construction")
-        if task.status in {"READY", "IN_PROGRESS"} and snapshot.get("Task-plan state") != "CURRENT":
+        if (
+            task.status in {"READY", "IN_PROGRESS"}
+            and snapshot.get("Task-plan state") != "CURRENT"
+        ):
             errors.append(f"{task.task_id}: task plan is not CURRENT")
         try:
             parse_task_write_set(task.metadata.get("Write set", ""), task.task_id)
-            parse_task_external_state(task.metadata.get("External state", ""), task.task_id)
+            parse_task_external_state(
+                task.metadata.get("External state", ""), task.task_id
+            )
         except ValueError as exc:
             errors.append(str(exc))
         run_id = clean_cell(task.metadata.get("Run ID", "NONE"))
@@ -2718,9 +3048,13 @@ def validate_task_records(
             if (
                 run_id != snapshot.get("Active run ID")
                 or snapshot.get("Run state") != "RUNNING"
-                or clean_cell(task.metadata.get("Owner", "")) in {"", "NONE", "UNASSIGNED"}
+                or clean_cell(task.metadata.get("Owner", ""))
+                in {"", "NONE", "UNASSIGNED"}
                 or used < 1
-                or CHECKPOINT_ID.fullmatch(clean_cell(task.metadata.get("Last checkpoint", ""))) is None
+                or CHECKPOINT_ID.fullmatch(
+                    clean_cell(task.metadata.get("Last checkpoint", ""))
+                )
+                is None
             ):
                 errors.append(f"{task.task_id}: invalid IN_PROGRESS claim")
         elif run_id != "NONE":
@@ -2729,45 +3063,69 @@ def validate_task_records(
             errors.append(f"{task.task_id}: attempt budget exhausted")
         if task.status == "DONE":
             evidence = clean_cell(task.metadata.get("Evidence", ""))
-            if evidence in {"", "NONE", "TODO"} or EVIDENCE_PATTERN.search(evidence) is None:
+            if (
+                evidence in {"", "NONE", "TODO"}
+                or EVIDENCE_PATTERN.search(evidence) is None
+            ):
                 errors.append(f"{task.task_id}: DONE requires Evidence")
             try:
                 validate_done_evidence(verify_text, task)
             except ValueError as exc:
                 errors.append(str(exc))
-        if task.status == "BLOCKED" and clean_cell(task.metadata.get("Blocker", "")) in {"", "NONE", "TODO"}:
+        if task.status == "BLOCKED" and clean_cell(
+            task.metadata.get("Blocker", "")
+        ) in {"", "NONE", "TODO"}:
             errors.append(f"{task.task_id}: BLOCKED requires a blocker")
-        if task.status == "SKIPPED" and clean_cell(task.metadata.get("Skip record", "")) in {"", "NONE", "TODO"}:
+        if task.status == "SKIPPED" and clean_cell(
+            task.metadata.get("Skip record", "")
+        ) in {"", "NONE", "TODO"}:
             errors.append(f"{task.task_id}: SKIPPED requires a skip record")
         updated = clean_cell(task.metadata.get("Last updated", ""))
         if updated not in {"", "TODO"} and not explicit_timestamp(updated):
-            errors.append(f"{task.task_id}: Last updated must be ISO 8601 with timezone")
+            errors.append(
+                f"{task.task_id}: Last updated must be ISO 8601 with timezone"
+            )
         try:
             declared = declared_task_waivers(task)
             for dependency_id, waiver_id in declared.items():
                 waiver = waivers.get(waiver_id)
                 if waiver is None:
-                    errors.append(f"{task.task_id}: unknown dependency waiver {waiver_id}")
+                    errors.append(
+                        f"{task.task_id}: unknown dependency waiver {waiver_id}"
+                    )
                 elif waiver[0] != dependency_id or waiver[1] != task.task_id:
-                    errors.append(f"{task.task_id}: waiver {waiver_id} does not match its task pair")
+                    errors.append(
+                        f"{task.task_id}: waiver {waiver_id} does not match its task pair"
+                    )
         except ValueError as exc:
             errors.append(str(exc))
         if execution_contract_required:
             sections, duplicate_sections = inspect_task_sections(task.block)
             for name in sorted(duplicate_sections):
                 errors.append(f"{task.task_id}: duplicate required section #### {name}")
-            for name in ("Outcome", "Acceptance criteria", "Validation", "Execution log"):
+            for name in (
+                "Outcome",
+                "Acceptance criteria",
+                "Validation",
+                "Execution log",
+            ):
                 if name not in sections:
-                    errors.append(f"{task.task_id}: missing required section #### {name}")
+                    errors.append(
+                        f"{task.task_id}: missing required section #### {name}"
+                    )
             outcome = sections.get("Outcome", "")
             if not outcome.strip() or "TODO" in outcome.upper():
                 errors.append(f"{task.task_id}: unresolved Outcome")
             acceptance = sections.get("Acceptance criteria", "")
             if "- [" not in acceptance or "TODO" in acceptance.upper():
-                errors.append(f"{task.task_id}: objective acceptance criteria are required")
+                errors.append(
+                    f"{task.task_id}: objective acceptance criteria are required"
+                )
             validation = sections.get("Validation", "")
             if "```" not in validation or "TODO" in validation.upper():
-                errors.append(f"{task.task_id}: executable validation commands are required")
+                errors.append(
+                    f"{task.task_id}: executable validation commands are required"
+                )
             try:
                 validate_task_property_execution_projection(
                     validation,
@@ -2791,9 +3149,13 @@ def validate_task_records(
                     "NO EXECUTION HAS BEEN RECORDED",
                 )
             ):
-                errors.append(f"{task.task_id}: DONE requires an observed Execution log")
+                errors.append(
+                    f"{task.task_id}: DONE requires an observed Execution log"
+                )
             if task.status == "DONE" and "- [ ]" in acceptance:
-                errors.append(f"{task.task_id}: DONE has incomplete acceptance criteria")
+                errors.append(
+                    f"{task.task_id}: DONE has incomplete acceptance criteria"
+                )
 
     observed_property_pairs = {
         (row.task_id, row.property_id)
@@ -2808,9 +3170,7 @@ def validate_task_records(
             clean_cell(task.metadata.get("Requirements", ""))
         )
     }
-    for task_id, property_id in sorted(
-        observed_property_pairs | done_property_pairs
-    ):
+    for task_id, property_id in sorted(observed_property_pairs | done_property_pairs):
         task = by_id.get(task_id)
         if task is None:
             errors.append(
@@ -2840,9 +3200,7 @@ def validate_task_records(
                 "references an unknown current property contract"
             )
             continue
-        technology = (technology_decisions_by_id or {}).get(
-            expected.framework_tech_id
-        )
+        technology = (technology_decisions_by_id or {}).get(expected.framework_tech_id)
         if technology is None:
             errors.append(
                 f"{task_id}: {property_id} requires its current PROPERTY_TESTING "
@@ -2872,12 +3230,15 @@ def validate_task_records(
     visiting: set[str] = set()
     visited: set[str] = set()
     stack: list[str] = []
+
     def visit(task_id: str) -> None:
         if task_id in visited:
             return
         if task_id in visiting:
             start = stack.index(task_id)
-            raise ValueError("Dependency cycle detected: " + " -> ".join([*stack[start:], task_id]))
+            raise ValueError(
+                "Dependency cycle detected: " + " -> ".join([*stack[start:], task_id])
+            )
         visiting.add(task_id)
         stack.append(task_id)
         for dependency in by_id[task_id].dependencies:
@@ -2886,6 +3247,7 @@ def validate_task_records(
         stack.pop()
         visiting.remove(task_id)
         visited.add(task_id)
+
     try:
         for task_id in sorted(by_id):
             visit(task_id)
@@ -2902,7 +3264,10 @@ def validate_task_records(
         if skipped_id not in by_id[applies_to].dependencies:
             errors.append(f"{waiver_id}: skipped task is not a dependency")
         authority_is_current = bool(
-            re.fullmatch(rf"{re.escape(current_auth)}(?:\s+clause\s+[A-Za-z0-9._:-]+)?", authority)
+            re.fullmatch(
+                rf"{re.escape(current_auth)}(?:\s+clause\s+[A-Za-z0-9._:-]+)?",
+                authority,
+            )
             or re.fullmatch(r"OWNER-DECISION-\d+", authority)
         )
         if not authority_is_current:
@@ -2927,7 +3292,11 @@ def validate_task_records(
             elif dependency.status == "SKIPPED":
                 waiver_id = declared.get(dependency_id)
                 waiver = waivers.get(waiver_id or "")
-                if waiver is None or waiver[0] != dependency_id or waiver[1] != task.task_id:
+                if (
+                    waiver is None
+                    or waiver[0] != dependency_id
+                    or waiver[1] != task.task_id
+                ):
                     satisfied = False
                 else:
                     authority, rationale, recorded_at = waiver[2], waiver[3], waiver[4]
@@ -2969,6 +3338,284 @@ def missing_current_property_task_coverage(
         )
     }
     return sorted(set(property_execution_by_id) - covered_property_ids)
+
+
+def task_requirement_rules(
+    prd_text: str,
+    requirements_contract: RequirementsContract,
+) -> dict[str, tuple[str, str]]:
+    """Return current requirement ID to acceptance ID and EARS form."""
+
+    if requirements_contract.grandfathered_approved_gate_a:
+        return {}
+    rows, acceptance_by_requirement, _legacy_ids = _schema_13_requirement_rows(prd_text)
+    row_by_id = {row[0]: row for row in rows}
+    expected_requirements = set(requirements_contract.requirement_ids)
+    if set(row_by_id) != expected_requirements:
+        raise ValueError(
+            "Task requirement rules do not match the current requirements contract"
+        )
+    expected_acceptance = set(requirements_contract.acceptance_ids)
+    observed_acceptance = {
+        acceptance_by_requirement.get(requirement_id, "")
+        for requirement_id in expected_requirements
+    }
+    if observed_acceptance != expected_acceptance:
+        raise ValueError(
+            "Task acceptance rules do not match the current requirements contract"
+        )
+    return {
+        requirement_id: (
+            acceptance_by_requirement[requirement_id],
+            row_by_id[requirement_id][2],
+        )
+        for requirement_id in sorted(expected_requirements)
+    }
+
+
+def task_requirement_evidence_dispositions(
+    verify_text: str | None,
+    expected_basis: Mapping[str, str],
+    rules: Mapping[str, tuple[str, str]],
+) -> tuple[
+    dict[str, tuple[str, tuple[str, ...]]],
+    tuple[str, ...],
+]:
+    """Resolve current no-task requirement dispositions from VERIFY.md."""
+
+    if verify_text is None or not rules:
+        return {}, ()
+    try:
+        active_scope = table_after_heading(verify_text, "## Active evidence scope")
+        rows = parse_verification_matrix(verify_text)
+    except ValueError as exc:
+        return {}, (str(exc),)
+    for key in (
+        "Requirements revision",
+        "Design revision",
+        "Construction authorization",
+    ):
+        if clean_cell(active_scope.get(key, "")) != clean_cell(
+            expected_basis.get(key, "")
+        ):
+            return {}, ()
+
+    issues: list[str] = []
+    by_requirement: dict[str, dict[str, list[str]]] = {}
+    seen_evidence_ids: set[str] = set()
+    for row in rows:
+        status = clean_cell(row.get("Status", "")).upper()
+        if status not in {"LOCAL_PASS", "VERIFIED", "NOT_APPLICABLE"}:
+            continue
+        if clean_cell(row.get("Task IDs", "")).upper() != "NONE":
+            continue
+        evidence_id = clean_cell(row.get("Evidence ID", ""))
+        if re.fullmatch(r"EV-\d{4,}", evidence_id) is None:
+            issues.append(
+                "No-task requirement evidence requires an EV-nnnn Evidence ID"
+            )
+            continue
+        if evidence_id in seen_evidence_ids:
+            issues.append(f"Duplicate no-task requirement evidence ID {evidence_id}")
+            continue
+        seen_evidence_ids.add(evidence_id)
+        try:
+            basis_ids = _canonical_id_list(
+                row.get("PRD / property IDs", ""),
+                STABLE_CONTRACT_ID,
+                f"{evidence_id} PRD / property IDs",
+            )
+        except ValueError as exc:
+            issues.append(str(exc))
+            continue
+        matching_requirements = [
+            requirement_id
+            for requirement_id, (acceptance_id, _ears_form) in rules.items()
+            if basis_ids == [requirement_id, acceptance_id]
+        ]
+        if len(matching_requirements) != 1:
+            issues.append(
+                f"{evidence_id}: no-task evidence must bind exactly one current "
+                "requirement and its canonical acceptance ID"
+            )
+            continue
+        requirement_id = matching_requirements[0]
+        acceptance_id, ears_form = rules[requirement_id]
+        requirement_or_invariant = clean_cell(row.get("Requirement or invariant", ""))
+        artifact = clean_cell(row.get("Artifact/environment", ""))
+        automated = clean_cell(row.get("Automated evidence", ""))
+        manual = clean_cell(row.get("AWS/manual evidence", ""))
+        if not explicit_value(requirement_or_invariant, allow_none=False):
+            issues.append(
+                f"{evidence_id}: no-task evidence requires a concrete requirement or invariant"
+            )
+        if not explicit_value(artifact, allow_none=False):
+            issues.append(
+                f"{evidence_id}: no-task evidence requires a concrete artifact/environment"
+            )
+        if not (
+            explicit_value(automated, allow_none=False)
+            or explicit_value(manual, allow_none=False)
+        ):
+            issues.append(
+                f"{evidence_id}: no-task evidence requires automated or AWS/manual evidence"
+            )
+        disposition = (
+            "NOT_APPLICABLE" if status == "NOT_APPLICABLE" else "ALREADY_SATISFIED"
+        )
+        if disposition == "NOT_APPLICABLE" and ears_form != "OPTIONAL_FEATURE":
+            issues.append(
+                f"{evidence_id}: NOT_APPLICABLE is allowed only for OPTIONAL_FEATURE requirements"
+            )
+            continue
+        by_requirement.setdefault(requirement_id, {}).setdefault(
+            disposition, []
+        ).append(evidence_id)
+        if acceptance_id not in basis_ids:
+            issues.append(
+                f"{evidence_id}: missing canonical acceptance ID {acceptance_id}"
+            )
+
+    dispositions: dict[str, tuple[str, tuple[str, ...]]] = {}
+    for requirement_id, observed in sorted(by_requirement.items()):
+        if len(observed) != 1:
+            issues.append(
+                f"{requirement_id}: conflicting no-task evidence dispositions"
+            )
+            continue
+        disposition, evidence_ids = next(iter(observed.items()))
+        dispositions[requirement_id] = (
+            disposition,
+            tuple(sorted(evidence_ids)),
+        )
+    return dispositions, tuple(issues)
+
+
+def derive_task_requirement_coverage(
+    tasks: Sequence[Any],
+    plan_state: str,
+    rules: Mapping[str, tuple[str, str]],
+    evidence_dispositions: Mapping[str, tuple[str, tuple[str, ...]]],
+) -> TaskRequirementCoverageResult:
+    """Derive one complete disposition for every approved requirement."""
+
+    if plan_state != "CURRENT" or not rules:
+        return TaskRequirementCoverageResult()
+    counted_statuses = {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE"}
+    acceptance_owner = {
+        acceptance_id: requirement_id
+        for requirement_id, (acceptance_id, _ears_form) in rules.items()
+    }
+    requirement_families = {
+        requirement_id.rsplit("-", 1)[0] for requirement_id in rules
+    }
+    covered_by_task: dict[str, set[str]] = {
+        requirement_id: set() for requirement_id in rules
+    }
+    trace_issues: list[str] = []
+    evidence_issues: list[str] = []
+    for task in tasks:
+        task_id = str(getattr(task, "task_id", "TASK-UNKNOWN"))
+        status = clean_cell(getattr(task, "status", "")).upper()
+        metadata = getattr(task, "metadata", {})
+        requirements_value = clean_cell(metadata.get("Requirements", ""))
+        tokens = STABLE_CONTRACT_ID.findall(requirements_value)
+        relevant_tokens = [
+            token
+            for token in tokens
+            if token in rules
+            or token in acceptance_owner
+            or ACCEPTANCE_ID.fullmatch(token) is not None
+            or token.rsplit("-", 1)[0] in requirement_families
+        ]
+        duplicates = sorted(
+            token for token in set(relevant_tokens) if relevant_tokens.count(token) > 1
+        )
+        if duplicates:
+            trace_issues.append(
+                f"{task_id}: duplicate requirement/acceptance IDs: "
+                + ", ".join(duplicates)
+            )
+        unknown_acceptance = sorted(
+            {
+                token
+                for token in relevant_tokens
+                if ACCEPTANCE_ID.fullmatch(token) is not None
+                and token not in acceptance_owner
+            }
+        )
+        if unknown_acceptance:
+            trace_issues.append(
+                f"{task_id}: unknown acceptance IDs: " + ", ".join(unknown_acceptance)
+            )
+        unknown_requirements = sorted(
+            {
+                token
+                for token in relevant_tokens
+                if ACCEPTANCE_ID.fullmatch(token) is None
+                and token not in rules
+                and token.rsplit("-", 1)[0] in requirement_families
+            }
+        )
+        if unknown_requirements:
+            trace_issues.append(
+                f"{task_id}: unknown approved-requirement references: "
+                + ", ".join(unknown_requirements)
+            )
+        token_set = set(relevant_tokens)
+        valid_pairs: set[str] = set()
+        for requirement_id, (acceptance_id, _ears_form) in rules.items():
+            has_requirement = requirement_id in token_set
+            has_acceptance = acceptance_id in token_set
+            if has_requirement and not has_acceptance:
+                trace_issues.append(
+                    f"{task_id}: {requirement_id} requires {acceptance_id}"
+                )
+            if has_acceptance and not has_requirement:
+                trace_issues.append(
+                    f"{task_id}: {acceptance_id} requires owning requirement {requirement_id}"
+                )
+            if has_requirement and has_acceptance:
+                valid_pairs.add(requirement_id)
+        if status in counted_statuses:
+            for requirement_id in valid_pairs:
+                covered_by_task[requirement_id].add(task_id)
+
+    records: list[TaskRequirementCoverage] = []
+    missing: list[str] = []
+    for requirement_id, (acceptance_id, _ears_form) in sorted(rules.items()):
+        task_ids = tuple(sorted(covered_by_task[requirement_id]))
+        evidence = evidence_dispositions.get(requirement_id)
+        if task_ids:
+            if evidence is not None and evidence[0] == "NOT_APPLICABLE":
+                evidence_issues.append(
+                    f"{requirement_id}: task coverage conflicts with NOT_APPLICABLE evidence"
+                )
+            records.append(
+                TaskRequirementCoverage(
+                    requirement_id,
+                    acceptance_id,
+                    "TASK_COVERED",
+                    task_ids=task_ids,
+                )
+            )
+        elif evidence is not None:
+            records.append(
+                TaskRequirementCoverage(
+                    requirement_id,
+                    acceptance_id,
+                    evidence[0],
+                    evidence_ids=evidence[1],
+                )
+            )
+        else:
+            missing.append(requirement_id)
+    return TaskRequirementCoverageResult(
+        records=tuple(records),
+        trace_issues=tuple(trace_issues),
+        evidence_issues=tuple(evidence_issues),
+        missing_requirement_ids=tuple(missing),
+    )
 
 
 def clean_cell(value: Any) -> str:
@@ -3081,7 +3728,9 @@ def explicit_human_approver(value: str) -> bool:
     return explicit_value(cleaned) and NON_HUMAN_APPROVER.search(cleaned) is None
 
 
-def parse_exact_id_list(value: str, pattern: re.Pattern[str], field_name: str) -> list[str]:
+def parse_exact_id_list(
+    value: str, pattern: re.Pattern[str], field_name: str
+) -> list[str]:
     cleaned = clean_cell(value)
     if cleaned == "NONE":
         return []
@@ -3089,7 +3738,9 @@ def parse_exact_id_list(value: str, pattern: re.Pattern[str], field_name: str) -
         raise ValueError(f"{field_name} is unresolved")
     items = [item.strip() for item in cleaned.split(",")]
     if any(pattern.fullmatch(item) is None for item in items):
-        raise ValueError(f"{field_name} must contain comma-separated {pattern.pattern} IDs or NONE")
+        raise ValueError(
+            f"{field_name} must contain comma-separated {pattern.pattern} IDs or NONE"
+        )
     if len(items) != len(set(items)):
         raise ValueError(f"{field_name} contains duplicate IDs")
     return items
@@ -3128,7 +3779,9 @@ def task_property_execution_table(
             index += 1
             continue
         raw_lines: list[str] = []
-        while index < len(source_lines) and structural_lines[index].strip().startswith("|"):
+        while index < len(source_lines) and structural_lines[index].strip().startswith(
+            "|"
+        ):
             raw_lines.append(source_lines[index])
             index += 1
         header = split_markdown_table_row(raw_lines[0])
@@ -3139,9 +3792,7 @@ def task_property_execution_table(
                 _parse_contract_table_lines(raw_lines, PROPERTY_EXECUTION_HEADERS)
             )
         except ValueError as exc:
-            raise ValueError(
-                f"{task_id}: property execution projection {exc}"
-            ) from exc
+            raise ValueError(f"{task_id}: property execution projection {exc}") from exc
     if len(matches) > 1:
         raise ValueError(
             f"{task_id}: Validation must contain exactly one property execution projection"
@@ -3175,7 +3826,8 @@ def validate_task_property_execution_projection(
     unknown = [item for item in property_ids if item not in property_execution_by_id]
     if unknown:
         raise ValueError(
-            f"{task_id}: Requirements references unknown PROP IDs: " + ", ".join(unknown)
+            f"{task_id}: Requirements references unknown PROP IDs: "
+            + ", ".join(unknown)
         )
     if table is None:
         raise ValueError(
@@ -3258,9 +3910,7 @@ def _parse_contract_table_lines(
     )
 
 
-def _heading_section_offsets(
-    text: str, heading: str
-) -> tuple[int, int, int] | None:
+def _heading_section_offsets(text: str, heading: str) -> tuple[int, int, int] | None:
     """Return heading start, body start, and section end using canonical rules."""
 
     structural = without_fenced_code(text)
@@ -3270,7 +3920,9 @@ def _heading_section_offsets(
     if not matches:
         return None
     if len(matches) != 1:
-        raise ValueError(f"Expected exactly one heading {heading!r}; found {len(matches)}")
+        raise ValueError(
+            f"Expected exactly one heading {heading!r}; found {len(matches)}"
+        )
     level = len(heading) - len(heading.lstrip("#"))
     following = re.search(
         rf"^#{{1,{level}}}[ \t]+", structural[matches[0].end() :], re.MULTILINE
@@ -3302,7 +3954,9 @@ def _heading_title_span(text: str, title: str) -> SourceSpan:
         )
     )
     if len(matches) != 1:
-        raise ValueError(f"expected exactly one heading title {title!r}; found {len(matches)}")
+        raise ValueError(
+            f"expected exactly one heading title {title!r}; found {len(matches)}"
+        )
     level = len(matches[0].group("marks"))
     following = re.search(
         rf"^#{{1,{level}}}[ \t]+", structural[matches[0].end() :], re.MULTILINE
@@ -3354,7 +4008,10 @@ def contract_table_in_section(
             raw_lines.append(lines[index])
             index += 1
         header = split_markdown_table_row(raw_lines[0])
-        if header is None or tuple(clean_cell(cell) for cell in header) != expected_headers:
+        if (
+            header is None
+            or tuple(clean_cell(cell) for cell in header) != expected_headers
+        ):
             continue
         matches.append(_parse_contract_table_lines(raw_lines, expected_headers))
     if len(matches) > 1:
@@ -3713,7 +4370,8 @@ def validate_done_property_evidence(
         if counterexample == "NONE":
             raise ValueError(f"{label} FAIL requires a minimized counterexample")
         failure_match = re.fullmatch(
-            "(?P<class>" + "|".join(sorted(PROPERTY_TEST_FAILURE_CLASSES))
+            "(?P<class>"
+            + "|".join(sorted(PROPERTY_TEST_FAILURE_CLASSES))
             + r") — (?P<resolution>.+)",
             row.failure_class_resolution,
         )
@@ -3773,9 +4431,7 @@ def valid_technology_version_policy(value: str) -> bool:
             and parsed_numeric_version(minimum) is not None
         )
     if cleaned.startswith("ORG_MANAGED: "):
-        return explicit_value(
-            cleaned.removeprefix("ORG_MANAGED: "), allow_none=False
-        )
+        return explicit_value(cleaned.removeprefix("ORG_MANAGED: "), allow_none=False)
     prefix = "NOT_APPLICABLE — "
     return cleaned.startswith(prefix) and explicit_value(
         cleaned[len(prefix) :], allow_none=False
@@ -3805,7 +4461,9 @@ def technology_contract_value_is_unresolved(value: str) -> bool:
     """Reject the complete contract sentinel vocabulary in technology cells."""
 
     cleaned = clean_cell(value)
-    return unresolved(cleaned) or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
+    return (
+        unresolved(cleaned) or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
+    )
 
 
 def valid_technology_selection(value: str) -> bool:
@@ -3839,10 +4497,14 @@ def valid_technology_basis_ids(value: str) -> bool:
     if unresolved(cleaned):
         return False
     identifiers = cleaned.split(", ")
-    return bool(identifiers) and all(
-        STABLE_CONTRACT_ID.fullmatch(identifier) is not None
-        for identifier in identifiers
-    ) and len(identifiers) == len(set(identifiers))
+    return (
+        bool(identifiers)
+        and all(
+            STABLE_CONTRACT_ID.fullmatch(identifier) is not None
+            for identifier in identifiers
+        )
+        and len(identifiers) == len(set(identifiers))
+    )
 
 
 def authoritative_requirement_ids(text: str) -> set[str]:
@@ -3993,11 +4655,9 @@ def quality_attribute_scenario_issues(
     )
     if heading is None:
         return ["QAS-SECTION: Quality attribute scenarios section is missing"]
-    following = re.search(
-        r"^#{1,3}\s+", structural[heading.end():], re.MULTILINE
-    )
+    following = re.search(r"^#{1,3}\s+", structural[heading.end() :], re.MULTILINE)
     end = heading.end() + following.start() if following else len(structural)
-    section = structural[heading.end():end]
+    section = structural[heading.end() : end]
     tables = [
         table
         for table in markdown_tables(section)
@@ -4014,7 +4674,9 @@ def quality_attribute_scenario_issues(
             ]
         return []
     if len(tables) != 1:
-        return ["QAS-SECTION: exactly one Quality attribute scenarios table is required"]
+        return [
+            "QAS-SECTION: exactly one Quality attribute scenarios table is required"
+        ]
 
     issues: list[str] = []
     seen: set[str] = set()
@@ -4053,7 +4715,10 @@ def quality_attribute_scenario_issues(
 
 
 def validate_gate_a_method_contract(
-    ctx: Context, text: str, *, grandfather_approved_v1: bool = False,
+    ctx: Context,
+    text: str,
+    *,
+    grandfather_approved_v1: bool = False,
 ) -> None:
     """Fail closed on the Fastlane EARS Contract at Gate A boundaries."""
 
@@ -4065,11 +4730,15 @@ def validate_gate_a_method_contract(
         if not table:
             continue
         headers = tuple(table[0])
-        if headers in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}:
+        if headers in {
+            LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
+            LEGACY_REQUIREMENT_HEADERS,
+        }:
             found = True
             legacy_header_shapes.add(headers)
-            legacy_rows.extend(clean_cell(row[0]) if row else "REQ-UNKNOWN"
-                               for row in table[2:])
+            legacy_rows.extend(
+                clean_cell(row[0]) if row else "REQ-UNKNOWN" for row in table[2:]
+            )
             continue
         if headers != NORMATIVE_REQUIREMENT_HEADERS:
             continue
@@ -4078,23 +4747,39 @@ def validate_gate_a_method_contract(
         for row in table[2:]:
             row_id = clean_cell(row[0]) if row else "REQ-UNKNOWN"
             if len(row) != len(NORMATIVE_REQUIREMENT_HEADERS):
-                ctx.error("REQUIREMENT_METHOD_CONTRACT",
-                          f"{row_id}: normative requirement row must have exactly six fields", PRD_FILE)
+                ctx.error(
+                    "REQUIREMENT_METHOD_CONTRACT",
+                    f"{row_id}: normative requirement row must have exactly six fields",
+                    PRD_FILE,
+                )
                 continue
             acceptance_id = clean_cell(row[3])
             expected_acceptance_id = f"AC-{row_id}"
-            if ACCEPTANCE_ID.fullmatch(acceptance_id) is None or acceptance_id != expected_acceptance_id:
-                ctx.error("REQUIREMENT_METHOD_CONTRACT",
-                          f"{row_id}: Acceptance ID must be exactly {expected_acceptance_id}", PRD_FILE)
-            for issue in requirement_method_issues(row[0], row[1], row[2], row[4], row[5]):
+            if (
+                ACCEPTANCE_ID.fullmatch(acceptance_id) is None
+                or acceptance_id != expected_acceptance_id
+            ):
+                ctx.error(
+                    "REQUIREMENT_METHOD_CONTRACT",
+                    f"{row_id}: Acceptance ID must be exactly {expected_acceptance_id}",
+                    PRD_FILE,
+                )
+            for issue in requirement_method_issues(
+                row[0], row[1], row[2], row[4], row[5]
+            ):
                 ctx.error("REQUIREMENT_METHOD_CONTRACT", issue, PRD_FILE)
     if not found:
-        ctx.error("REQUIREMENT_METHOD_CONTRACT",
-                  "REQ-SECTION: no authoritative normative requirement table was found", PRD_FILE)
+        ctx.error(
+            "REQUIREMENT_METHOD_CONTRACT",
+            "REQ-SECTION: no authoritative normative requirement table was found",
+            PRD_FILE,
+        )
         return
 
     legacy_is_grandfathered = bool(
-        grandfather_approved_v1 and legacy_rows and modern_tables == 0
+        grandfather_approved_v1
+        and legacy_rows
+        and modern_tables == 0
         and len(legacy_header_shapes) == 1
     )
     if legacy_rows and not legacy_is_grandfathered:
@@ -4102,7 +4787,8 @@ def validate_gate_a_method_contract(
             ctx.error(
                 "REQUIREMENT_METHOD_MIGRATION_REQUIRED",
                 f"{row_id}: migrate the complete normative table to the Fastlane "
-                "EARS Contract before Gate A can become ready", PRD_FILE,
+                "EARS Contract before Gate A can become ready",
+                PRD_FILE,
             )
     if legacy_is_grandfathered:
         return
@@ -4112,7 +4798,9 @@ def validate_gate_a_method_contract(
         ctx.error("QAS_CONTRACT", issue, PRD_FILE)
 
 
-def _schema_13_requirement_rows(text: str) -> tuple[list[tuple[str, ...]], dict[str, str], list[str]]:
+def _schema_13_requirement_rows(
+    text: str,
+) -> tuple[list[tuple[str, ...]], dict[str, str], list[str]]:
     rows: list[tuple[str, ...]] = []
     acceptance_by_requirement: dict[str, str] = {}
     legacy_ids: list[str] = []
@@ -4120,9 +4808,13 @@ def _schema_13_requirement_rows(text: str) -> tuple[list[tuple[str, ...]], dict[
         if not table:
             continue
         headers = tuple(table[0])
-        if headers in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}:
-            legacy_ids.extend(clean_cell(row[0]) if row else "REQ-UNKNOWN"
-                              for row in table[2:])
+        if headers in {
+            LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
+            LEGACY_REQUIREMENT_HEADERS,
+        }:
+            legacy_ids.extend(
+                clean_cell(row[0]) if row else "REQ-UNKNOWN" for row in table[2:]
+            )
             continue
         if headers != NORMATIVE_REQUIREMENT_HEADERS:
             continue
@@ -4171,19 +4863,26 @@ def _rich_trigger_list(value: str, journey_id: str) -> list[str]:
         raise ValueError(f"{journey_id}: Rich-use-case triggers is unresolved")
     triggers = cleaned.split(", ")
     if cleaned != ", ".join(triggers):
-        raise ValueError(f"{journey_id}: Rich-use-case triggers must use comma-space separation")
+        raise ValueError(
+            f"{journey_id}: Rich-use-case triggers must use comma-space separation"
+        )
     unknown = sorted(set(triggers) - RICH_USE_CASE_TRIGGERS)
     if unknown:
-        raise ValueError(f"{journey_id}: unknown Rich-use-case triggers: " + ", ".join(unknown))
+        raise ValueError(
+            f"{journey_id}: unknown Rich-use-case triggers: " + ", ".join(unknown)
+        )
     if len(triggers) != len(set(triggers)):
         raise ValueError(f"{journey_id}: Rich-use-case triggers contains duplicates")
     return triggers
 
 
 def _state_trigger_map(value: str, subject_id: str) -> dict[str, tuple[str, ...]]:
-    cleaned = clean_cell(value); segments = cleaned.split("; ")
+    cleaned = clean_cell(value)
+    segments = cleaned.split("; ")
     if unresolved(cleaned) or cleaned != "; ".join(segments):
-        raise ValueError(f"{subject_id}: State trigger basis must use canonical '; ' segments")
+        raise ValueError(
+            f"{subject_id}: State trigger basis must use canonical '; ' segments"
+        )
     result: dict[str, tuple[str, ...]] = {}
     for segment in segments:
         parts = segment.split(": ", 1)
@@ -4191,23 +4890,36 @@ def _state_trigger_map(value: str, subject_id: str) -> dict[str, tuple[str, ...]
             raise ValueError(f"{subject_id}: invalid State trigger category")
         category, basis_value = parts
         if category in result:
-            raise ValueError(f"{subject_id}: duplicate State trigger category {category}")
-        result[category] = tuple(_contract_ids(basis_value, STABLE_CONTRACT_ID,
-                                               f"{subject_id} {category} basis IDs"))
+            raise ValueError(
+                f"{subject_id}: duplicate State trigger category {category}"
+            )
+        result[category] = tuple(
+            _contract_ids(
+                basis_value, STABLE_CONTRACT_ID, f"{subject_id} {category} basis IDs"
+            )
+        )
     if list(result) != [item for item in STATE_MODEL_TRIGGERS if item in result]:
-        raise ValueError(f"{subject_id}: State trigger categories are not in canonical order")
+        raise ValueError(
+            f"{subject_id}: State trigger categories are not in canonical order"
+        )
     return result
 
 
 def derive_requirements_contract(
-    text: str, effective_risk: str | None,
-    intake_contract: IntakeFoundationContract | None = None, *,
-    required: bool, grandfather_current_gate_a: bool,
+    text: str,
+    effective_risk: str | None,
+    intake_contract: IntakeFoundationContract | None = None,
+    *,
+    required: bool,
+    grandfather_current_gate_a: bool,
 ) -> tuple[RequirementsContract, list[tuple[str, str]]]:
     """Derive the owner-grounded schema 1.3 requirements projection."""
 
     issues: list[tuple[str, str]] = []
-    add = lambda code, message: issues.append((code, message))
+
+    def add(code: str, message: str) -> None:
+        issues.append((code, message))
+
     missing_records: list[str] = []
     try:
         document = table_after_heading(text, "## Document status")
@@ -4216,7 +4928,11 @@ def derive_requirements_contract(
         if required:
             add("PROJECT_CONTRACT_MIGRATION_REQUIRED", str(exc))
     project_schema = clean_cell(document.get("Project contract schema", ""))
-    requirement_rows, acceptance_by_requirement, legacy_ids = _schema_13_requirement_rows(text)
+    requirement_rows, acceptance_by_requirement, legacy_ids = (
+        _schema_13_requirement_rows(text)
+    )
+    requirement_row_by_id = {row[0]: row for row in requirement_rows}
+
     observed_headers = {tuple(table[0]) for table in markdown_tables(text) if table}
     current_header_map = {
         NORMATIVE_REQUIREMENT_HEADERS: "Six-column normative requirements",
@@ -4243,62 +4959,105 @@ def derive_requirements_contract(
         except ValueError:
             pass
     if project_schema != PROJECT_CONTRACT_SCHEMA:
-        legacy_headers = observed_headers & {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}
+        legacy_headers = observed_headers & {
+            LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
+            LEGACY_REQUIREMENT_HEADERS,
+        }
         real_legacy_ids = [
-            identifier for identifier in legacy_ids if STABLE_CONTRACT_ID.fullmatch(identifier)
+            identifier
+            for identifier in legacy_ids
+            if STABLE_CONTRACT_ID.fullmatch(identifier)
         ]
         exact_legacy_shape = bool(
-            not project_schema and real_legacy_ids
+            not project_schema
+            and real_legacy_ids
             and len(real_legacy_ids) == len(legacy_ids)
             and len(real_legacy_ids) == len(set(real_legacy_ids))
-            and len(legacy_headers) == 1 and not current_present_headers
+            and len(legacy_headers) == 1
+            and not current_present_headers
         )
         if grandfather_current_gate_a and exact_legacy_shape:
             approved_ids = tuple(sorted(real_legacy_ids))
-            legacy_rows = [tuple(clean_cell(cell) for cell in row) for table in markdown_tables(text)
-                           if table and tuple(table[0]) in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
-                           LEGACY_REQUIREMENT_HEADERS} for row in table[2:]]
-            canonical_bytes = b"PROJECT_CONTRACT_SCHEMA: 1.2\n" + json.dumps(
-                (clean_cell(document.get("Current requirements revision", "")), legacy_rows),
-                ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n"
-            contract = RequirementsContract(schema_version="1.2", status="GRANDFATHERED",
-                requirement_ids=approved_ids, acceptance_ids=tuple(f"AC-{item}" for item in approved_ids),
-                canonical_sha256="sha256:" + hashlib.sha256(canonical_bytes).hexdigest(),
-                canonical_bytes=canonical_bytes, grandfathered_approved_gate_a=True)
+            legacy_rows = [
+                tuple(clean_cell(cell) for cell in row)
+                for table in markdown_tables(text)
+                if table
+                and tuple(table[0])
+                in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}
+                for row in table[2:]
+            ]
+            canonical_bytes = (
+                b"PROJECT_CONTRACT_SCHEMA: 1.2\n"
+                + json.dumps(
+                    (
+                        clean_cell(document.get("Current requirements revision", "")),
+                        legacy_rows,
+                    ),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                + b"\n"
+            )
+            contract = RequirementsContract(
+                schema_version="1.2",
+                status="GRANDFATHERED",
+                requirement_ids=approved_ids,
+                acceptance_ids=tuple(f"AC-{item}" for item in approved_ids),
+                canonical_sha256="sha256:"
+                + hashlib.sha256(canonical_bytes).hexdigest(),
+                canonical_bytes=canonical_bytes,
+                grandfathered_approved_gate_a=True,
+            )
             return contract, []
         if not required:
             return RequirementsContract(status="UNINITIALIZED"), []
         migration_targets = ["Project contract schema 1.3"]
-        migration_targets.extend(label for headers, label in current_header_map.items()
-                                 if headers not in current_present_headers)
+        migration_targets.extend(
+            label
+            for headers, label in current_header_map.items()
+            if headers not in current_present_headers
+        )
         message = (
             "Project contract schema 1.3 is required before Gate A readiness; "
             "migrate only the listed generated records without inventing owner facts: "
             + ", ".join(migration_targets)
         )
         return (
-            RequirementsContract(status="MIGRATION_REQUIRED", missing_records=tuple(migration_targets)),
+            RequirementsContract(
+                status="MIGRATION_REQUIRED", missing_records=tuple(migration_targets)
+            ),
             [("PROJECT_CONTRACT_MIGRATION_REQUIRED", message)],
         )
-
 
     if intake_contract is None:
         repository_mode = clean_cell(document.get("Project mode", "")).lower()
         intake_contract, _intake_issues = derive_intake_foundation_contract(
-            text, repository_mode if repository_mode in PROJECT_MODES else None,
-            grandfather_current_gate_a=grandfather_current_gate_a)
+            text,
+            repository_mode if repository_mode in PROJECT_MODES else None,
+            grandfather_current_gate_a=grandfather_current_gate_a,
+        )
     confirmed_intake_ids = set(intake_contract.basis_ids)
     if required and intake_contract.status != "READY_FOR_REQUIREMENTS":
-        add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
-            "Schema 1.3 actor and success-measure bases require a complete confirmed intake foundation")
+        add(
+            "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+            "Schema 1.3 actor and success-measure bases require a complete confirmed intake foundation",
+        )
 
     table_specs = (
         (ACTOR_HEADING, ACTOR_HEADERS, "ACTOR_CONTRACT_INVALID"),
         (JOURNEY_HEADING, JOURNEY_HEADERS, "JOURNEY_CONTRACT_INVALID"),
-        (RICH_USE_CASE_APPLICABILITY_HEADING, RICH_USE_CASE_APPLICABILITY_HEADERS, "RICH_USE_CASE_INVALID"),
+        (
+            RICH_USE_CASE_APPLICABILITY_HEADING,
+            RICH_USE_CASE_APPLICABILITY_HEADERS,
+            "RICH_USE_CASE_INVALID",
+        ),
         (RICH_USE_CASE_HEADING, RICH_USE_CASE_HEADERS, "RICH_USE_CASE_INVALID"),
         (BUSINESS_RULE_HEADING, BUSINESS_RULE_HEADERS, "BUSINESS_RULE_INVALID"),
-        (REQUIREMENT_COVERAGE_HEADING, REQUIREMENT_COVERAGE_HEADERS, "REQUIREMENT_COVERAGE_INVALID"),
+        (
+            REQUIREMENT_COVERAGE_HEADING,
+            REQUIREMENT_COVERAGE_HEADERS,
+            "REQUIREMENT_COVERAGE_INVALID",
+        ),
     )
     tables = tuple(
         _contract_table_or_issue(text, heading, headers, issues, missing_records, code)
@@ -4306,38 +5065,68 @@ def derive_requirements_contract(
     )
     actors, journeys, applicability, use_cases, business_rules, coverage = tables
     if legacy_ids:
-        add("PROJECT_CONTRACT_MIGRATION_REQUIRED",
-            "Migrate legacy normative rows to schema 1.3: " + ", ".join(legacy_ids))
+        add(
+            "PROJECT_CONTRACT_MIGRATION_REQUIRED",
+            "Migrate legacy normative rows to schema 1.3: " + ", ".join(legacy_ids),
+        )
         missing_records.extend(legacy_ids)
     requirement_ids = [row[0] for row in requirement_rows]
-    duplicate_requirements = sorted(identifier for identifier in set(requirement_ids)
-                                    if requirement_ids.count(identifier) > 1)
+    duplicate_requirements = sorted(
+        identifier
+        for identifier in set(requirement_ids)
+        if requirement_ids.count(identifier) > 1
+    )
     if duplicate_requirements:
-        add("REQUIREMENT_COVERAGE_INVALID",
-            "Duplicate authoritative requirement IDs: " + ", ".join(duplicate_requirements))
+        add(
+            "REQUIREMENT_COVERAGE_INVALID",
+            "Duplicate authoritative requirement IDs: "
+            + ", ".join(duplicate_requirements),
+        )
     if not requirement_rows:
-        add("REQUIREMENT_COVERAGE_INVALID", "Schema 1.3 requires at least one normative requirement")
+        add(
+            "REQUIREMENT_COVERAGE_INVALID",
+            "Schema 1.3 requires at least one normative requirement",
+        )
     acceptance_ids: list[str] = []
     for row in requirement_rows:
         requirement_id = row[0]
         acceptance_id = row[3]
         if STABLE_CONTRACT_ID.fullmatch(requirement_id) is None:
-            add("REQUIREMENT_COVERAGE_INVALID", f"Invalid requirement ID {requirement_id!r}")
+            add(
+                "REQUIREMENT_COVERAGE_INVALID",
+                f"Invalid requirement ID {requirement_id!r}",
+            )
         expected_acceptance = f"AC-{requirement_id}"
-        if ACCEPTANCE_ID.fullmatch(acceptance_id) is None or acceptance_id != expected_acceptance:
-            add("REQUIREMENT_COVERAGE_INVALID",
-                f"{requirement_id}: Acceptance ID must be exactly {expected_acceptance}")
+        if (
+            ACCEPTANCE_ID.fullmatch(acceptance_id) is None
+            or acceptance_id != expected_acceptance
+        ):
+            add(
+                "REQUIREMENT_COVERAGE_INVALID",
+                f"{requirement_id}: Acceptance ID must be exactly {expected_acceptance}",
+            )
         acceptance_ids.append(acceptance_id)
-    duplicate_acceptance = sorted(identifier for identifier in set(acceptance_ids)
-                                  if acceptance_ids.count(identifier) > 1)
+    duplicate_acceptance = sorted(
+        identifier
+        for identifier in set(acceptance_ids)
+        if acceptance_ids.count(identifier) > 1
+    )
     if duplicate_acceptance:
-        add("REQUIREMENT_COVERAGE_INVALID",
-            "Duplicate acceptance IDs: " + ", ".join(duplicate_acceptance))
+        add(
+            "REQUIREMENT_COVERAGE_INVALID",
+            "Duplicate acceptance IDs: " + ", ".join(duplicate_acceptance),
+        )
     requirement_set = set(requirement_ids)
 
     if not required and (
         any(table is None for table in tables)
-        or any(unresolved(cell) for table in tables if table for row in table.rows for cell in row)
+        or any(
+            unresolved(cell)
+            for table in tables
+            if table
+            for row in table.rows
+            for cell in row
+        )
         or any(unresolved(cell) for row in requirement_rows for cell in row)
     ):
         return RequirementsContract(status="UNINITIALIZED"), []
@@ -4356,23 +5145,32 @@ def derive_requirements_contract(
             actor_ids.append(actor_id)
             actor_kinds[actor_id] = kind
             if kind not in ACTOR_KINDS:
-                add("ACTOR_CONTRACT_INVALID", f"{actor_id}: invalid actor kind {kind!r}")
+                add(
+                    "ACTOR_CONTRACT_INVALID", f"{actor_id}: invalid actor kind {kind!r}"
+                )
             for label, value in (
                 ("Actor or external system", name),
                 ("Desired outcome or responsibility", outcome),
                 ("Permission/data boundary", boundary),
             ):
                 if not explicit_value(value, allow_none=False):
-                    add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
-                        f"{actor_id}: {label} requires an owner-grounded value")
+                    add(
+                        "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+                        f"{actor_id}: {label} requires an owner-grounded value",
+                    )
             try:
-                basis_ids = _contract_ids(basis_value, re.compile(r"INTAKE-\d{4}"),
-                                          f"{actor_id} Intake basis IDs")
+                basis_ids = _contract_ids(
+                    basis_value,
+                    re.compile(r"INTAKE-\d{4}"),
+                    f"{actor_id} Intake basis IDs",
+                )
                 unknown = sorted(set(basis_ids) - confirmed_intake_ids)
                 if unknown:
-                    add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+                    add(
+                        "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
                         f"{actor_id}: intake basis IDs are not currently confirmed: "
-                        + ", ".join(unknown))
+                        + ", ".join(unknown),
+                    )
             except ValueError as exc:
                 add("ACTOR_CONTRACT_INVALID", str(exc))
 
@@ -4380,11 +5178,21 @@ def derive_requirements_contract(
     journey_requirements: dict[str, set[str]] = {}
     journey_actors: dict[str, set[str]] = {}
     declared_rich_triggers: set[str] = set()
+    triggered_journey_ids: set[str] = set()
     if journeys is not None:
         if not journeys.rows:
             add("JOURNEY_CONTRACT_INVALID", "Journey register has no rows")
         for row in journeys.rows:
-            journey_id, actor_value, goal, trigger, success, failure, requirement_value, trigger_value = row
+            (
+                journey_id,
+                actor_value,
+                goal,
+                trigger,
+                success,
+                failure,
+                requirement_value,
+                trigger_value,
+            ) = row
             if JOURNEY_ID.fullmatch(journey_id) is None:
                 add("JOURNEY_CONTRACT_INVALID", f"Invalid journey ID {journey_id!r}")
                 continue
@@ -4392,74 +5200,130 @@ def derive_requirements_contract(
                 add("JOURNEY_CONTRACT_INVALID", f"Duplicate journey ID {journey_id}")
             journey_ids.append(journey_id)
             for label, value in (
-                ("Goal", goal), ("Trigger", trigger),
+                ("Goal", goal),
+                ("Trigger", trigger),
                 ("Main success outcome", success),
                 ("Alternate/failure behavior", failure),
             ):
                 if not explicit_value(value, allow_none=False):
-                    add("JOURNEY_CONTRACT_INVALID",
-                        f"{journey_id}: {label} requires a concrete generated value grounded in approved requirements")
+                    add(
+                        "JOURNEY_CONTRACT_INVALID",
+                        f"{journey_id}: {label} requires a concrete generated value grounded in approved requirements",
+                    )
             try:
                 refs = _contract_ids(actor_value, ACTOR_ID, f"{journey_id} Actor IDs")
                 journey_actors[journey_id] = set(refs)
                 unknown = sorted(set(refs) - set(actor_ids))
                 if unknown:
-                    add("JOURNEY_CONTRACT_INVALID", f"{journey_id}: unknown actor IDs: " + ", ".join(unknown))
+                    add(
+                        "JOURNEY_CONTRACT_INVALID",
+                        f"{journey_id}: unknown actor IDs: " + ", ".join(unknown),
+                    )
             except ValueError as exc:
                 add("JOURNEY_CONTRACT_INVALID", str(exc))
             try:
-                refs = _contract_ids(requirement_value, STABLE_CONTRACT_ID, f"{journey_id} Requirement IDs")
+                refs = _contract_ids(
+                    requirement_value,
+                    STABLE_CONTRACT_ID,
+                    f"{journey_id} Requirement IDs",
+                )
                 journey_requirements[journey_id] = set(refs)
                 unknown = sorted(set(refs) - requirement_set)
                 if unknown:
-                    add("JOURNEY_CONTRACT_INVALID", f"{journey_id}: unknown requirement IDs: " + ", ".join(unknown))
+                    add(
+                        "JOURNEY_CONTRACT_INVALID",
+                        f"{journey_id}: unknown requirement IDs: " + ", ".join(unknown),
+                    )
             except ValueError as exc:
                 add("JOURNEY_CONTRACT_INVALID", str(exc))
             try:
-                declared_rich_triggers.update(_rich_trigger_list(trigger_value, journey_id))
+                journey_triggers = _rich_trigger_list(trigger_value, journey_id)
+                declared_rich_triggers.update(journey_triggers)
+                if journey_triggers:
+                    triggered_journey_ids.add(journey_id)
             except ValueError as exc:
                 add("JOURNEY_CONTRACT_INVALID", str(exc))
 
-    policy_requires_rich = (
-        effective_risk in {"high", "critical"} or bool(declared_rich_triggers)
+    high_or_critical = effective_risk in {"high", "critical"}
+    required_rich_journey_ids = (
+        set(journey_ids) if high_or_critical else set(triggered_journey_ids)
     )
+    policy_requires_rich = bool(required_rich_journey_ids)
     rich_required = policy_requires_rich
     required_use_case_ids: list[str] = []
     if applicability is not None:
         if len(applicability.rows) != 1:
-            add("RICH_USE_CASE_INVALID", "Rich-use-case applicability requires exactly one row")
+            add(
+                "RICH_USE_CASE_INVALID",
+                "Rich-use-case applicability requires exactly one row",
+            )
         else:
             status, trigger_basis, use_case_value = applicability.rows[0]
             if status == "REQUIRED":
                 rich_required = True
                 if not explicit_value(trigger_basis, allow_none=False):
-                    add("RICH_USE_CASE_INVALID", "Rich-use-case trigger basis is unresolved")
+                    add(
+                        "RICH_USE_CASE_INVALID",
+                        "Rich-use-case trigger basis is unresolved",
+                    )
                 try:
-                    required_use_case_ids = _contract_ids(use_case_value, USE_CASE_ID, "Rich use-case IDs")
+                    required_use_case_ids = _contract_ids(
+                        use_case_value, USE_CASE_ID, "Rich use-case IDs"
+                    )
                 except ValueError as exc:
                     add("RICH_USE_CASE_INVALID", str(exc))
             elif status == "NOT_APPLICABLE":
                 if policy_requires_rich:
-                    add("RICH_USE_CASE_REQUIRED",
-                        "High/critical risk or a declared material journey trigger requires rich use cases")
-                if not trigger_basis.startswith("NOT_APPLICABLE") or unresolved(trigger_basis):
-                    add("RICH_USE_CASE_INVALID", "NOT_APPLICABLE requires a concrete trigger-basis reason")
+                    add(
+                        "RICH_USE_CASE_REQUIRED",
+                        "High/critical risk or a declared material journey trigger requires rich use cases",
+                    )
+                if not trigger_basis.startswith("NOT_APPLICABLE") or unresolved(
+                    trigger_basis
+                ):
+                    add(
+                        "RICH_USE_CASE_INVALID",
+                        "NOT_APPLICABLE requires a concrete trigger-basis reason",
+                    )
                 if use_case_value != "NONE":
-                    add("RICH_USE_CASE_INVALID", "Non-applicable rich use cases require Use-case IDs NONE")
+                    add(
+                        "RICH_USE_CASE_INVALID",
+                        "Non-applicable rich use cases require Use-case IDs NONE",
+                    )
             else:
-                add("RICH_USE_CASE_INVALID", "Applicability must be REQUIRED or NOT_APPLICABLE")
+                add(
+                    "RICH_USE_CASE_INVALID",
+                    "Applicability must be REQUIRED or NOT_APPLICABLE",
+                )
 
     if not rich_required:
         if use_cases is not None and use_cases.rows:
-            add("RICH_USE_CASE_INVALID", "NOT_APPLICABLE rich use cases require an empty rich-use-case table")
+            add(
+                "RICH_USE_CASE_INVALID",
+                "NOT_APPLICABLE rich use cases require an empty rich-use-case table",
+            )
         if business_rules is not None and business_rules.rows:
-            add("BUSINESS_RULE_INVALID", "NOT_APPLICABLE rich use cases require an empty business-rule table")
+            add(
+                "BUSINESS_RULE_INVALID",
+                "NOT_APPLICABLE rich use cases require an empty business-rule table",
+            )
 
     use_case_ids: list[str] = []
+    use_case_journey_ids: set[str] = set()
     referenced_business_rules: set[str] = set()
     if use_cases is not None and rich_required:
         for row in use_cases.rows:
-            use_case_id, journey_id, primary_actor, interests, preconditions, success, minimum_failure, rules_value, requirements_value = row
+            (
+                use_case_id,
+                journey_id,
+                primary_actor,
+                interests,
+                preconditions,
+                success,
+                minimum_failure,
+                rules_value,
+                requirements_value,
+            ) = row
             if USE_CASE_ID.fullmatch(use_case_id) is None:
                 add("RICH_USE_CASE_INVALID", f"Invalid use-case ID {use_case_id!r}")
                 continue
@@ -4467,37 +5331,91 @@ def derive_requirements_contract(
                 add("RICH_USE_CASE_INVALID", f"Duplicate use-case ID {use_case_id}")
             use_case_ids.append(use_case_id)
             if journey_id not in journey_ids:
-                add("RICH_USE_CASE_INVALID", f"{use_case_id}: unknown journey {journey_id}")
+                add(
+                    "RICH_USE_CASE_INVALID",
+                    f"{use_case_id}: unknown journey {journey_id}",
+                )
+            else:
+                use_case_journey_ids.add(journey_id)
             if primary_actor not in journey_actors.get(journey_id, set()):
-                add("RICH_USE_CASE_INVALID", f"{use_case_id}: primary actor is not part of {journey_id}")
+                add(
+                    "RICH_USE_CASE_INVALID",
+                    f"{use_case_id}: primary actor is not part of {journey_id}",
+                )
             for label, value in (
-                ("Stakeholder interests", interests), ("Preconditions", preconditions),
+                ("Stakeholder interests", interests),
+                ("Preconditions", preconditions),
                 ("Success guarantee", success),
                 ("Minimum failure guarantee", minimum_failure),
             ):
                 if not explicit_value(value, allow_none=False):
-                    add("RICH_USE_CASE_INVALID", f"{use_case_id}: {label} must be concrete")
+                    add(
+                        "RICH_USE_CASE_INVALID",
+                        f"{use_case_id}: {label} must be concrete",
+                    )
             try:
-                referenced_business_rules.update(_contract_ids(rules_value, BUSINESS_RULE_ID, f"{use_case_id} Business rule IDs"))
+                referenced_business_rules.update(
+                    _contract_ids(
+                        rules_value,
+                        BUSINESS_RULE_ID,
+                        f"{use_case_id} Business rule IDs",
+                    )
+                )
             except ValueError as exc:
                 add("RICH_USE_CASE_INVALID", str(exc))
             try:
-                refs = set(_contract_ids(requirements_value, STABLE_CONTRACT_ID, f"{use_case_id} Requirement IDs"))
+                refs = set(
+                    _contract_ids(
+                        requirements_value,
+                        STABLE_CONTRACT_ID,
+                        f"{use_case_id} Requirement IDs",
+                    )
+                )
                 unknown = sorted(refs - requirement_set)
                 if unknown:
-                    add("RICH_USE_CASE_INVALID", f"{use_case_id}: unknown requirement IDs: " + ", ".join(unknown))
+                    add(
+                        "RICH_USE_CASE_INVALID",
+                        f"{use_case_id}: unknown requirement IDs: "
+                        + ", ".join(unknown),
+                    )
                 journey_basis = journey_requirements.get(journey_id, set())
                 outside_journey = sorted(refs - journey_basis)
                 if outside_journey:
-                    add("RICH_USE_CASE_INVALID", f"{use_case_id}: requirement IDs are not part of {journey_id}: " + ", ".join(outside_journey))
+                    add(
+                        "RICH_USE_CASE_INVALID",
+                        f"{use_case_id}: requirement IDs are not part of {journey_id}: "
+                        + ", ".join(outside_journey),
+                    )
             except ValueError as exc:
                 add("RICH_USE_CASE_INVALID", str(exc))
         if use_case_ids != required_use_case_ids:
-            add("RICH_USE_CASE_INVALID", "Rich use-case rows must exactly match the applicability record")
+            add(
+                "RICH_USE_CASE_INVALID",
+                "Rich use-case rows must exactly match the applicability record",
+            )
+
+    missing_rich_journey_ids = sorted(required_rich_journey_ids - use_case_journey_ids)
+    if missing_rich_journey_ids:
+        scope = (
+            "every journey at high/critical risk"
+            if high_or_critical
+            else "every journey declaring a material rich-use-case trigger"
+        )
+        add(
+            "RICH_USE_CASE_REQUIRED",
+            f"Rich use cases must cover {scope}; missing="
+            + ",".join(missing_rich_journey_ids),
+        )
 
     business_rule_ids: list[str] = []
     if business_rules is not None and rich_required:
-        for rule_id, rule, basis_value, journey_use_case_value, validation_id in business_rules.rows:
+        for (
+            rule_id,
+            rule,
+            basis_value,
+            journey_use_case_value,
+            validation_id,
+        ) in business_rules.rows:
             if BUSINESS_RULE_ID.fullmatch(rule_id) is None:
                 add("BUSINESS_RULE_INVALID", f"Invalid business-rule ID {rule_id!r}")
                 continue
@@ -4507,84 +5425,223 @@ def derive_requirements_contract(
             if not explicit_value(rule, allow_none=False):
                 add("BUSINESS_RULE_INVALID", f"{rule_id}: Rule must be concrete")
             try:
-                basis_refs = set(_contract_ids(basis_value, STABLE_CONTRACT_ID, f"{rule_id} Basis IDs"))
-                refs = set(_contract_ids(journey_use_case_value, STABLE_CONTRACT_ID, f"{rule_id} Journey/use-case IDs"))
+                basis_refs = set(
+                    _contract_ids(
+                        basis_value, STABLE_CONTRACT_ID, f"{rule_id} Basis IDs"
+                    )
+                )
+                refs = set(
+                    _contract_ids(
+                        journey_use_case_value,
+                        STABLE_CONTRACT_ID,
+                        f"{rule_id} Journey/use-case IDs",
+                    )
+                )
                 unknown = sorted(refs - set(journey_ids) - set(use_case_ids))
                 if unknown:
-                    add("BUSINESS_RULE_INVALID", f"{rule_id}: unknown journey/use-case IDs: " + ", ".join(unknown))
+                    add(
+                        "BUSINESS_RULE_INVALID",
+                        f"{rule_id}: unknown journey/use-case IDs: "
+                        + ", ".join(unknown),
+                    )
                 allowed_basis = (
-                    requirement_set | confirmed_intake_ids | set(journey_ids) | set(use_case_ids)
+                    requirement_set
+                    | confirmed_intake_ids
+                    | set(journey_ids)
+                    | set(use_case_ids)
                 )
                 unknown_basis = sorted(basis_refs - allowed_basis)
                 if unknown_basis:
-                    add("BUSINESS_RULE_INVALID", f"{rule_id}: unknown basis IDs: " + ", ".join(unknown_basis))
+                    add(
+                        "BUSINESS_RULE_INVALID",
+                        f"{rule_id}: unknown basis IDs: " + ", ".join(unknown_basis),
+                    )
             except ValueError as exc:
                 add("BUSINESS_RULE_INVALID", str(exc))
             if validation_id not in set(acceptance_ids):
-                add("BUSINESS_RULE_INVALID", f"{rule_id}: Validation ID must reference a current acceptance ID")
+                add(
+                    "BUSINESS_RULE_INVALID",
+                    f"{rule_id}: Validation ID must reference a current acceptance ID",
+                )
         missing_rules = sorted(referenced_business_rules - set(business_rule_ids))
         extra_rules = sorted(set(business_rule_ids) - referenced_business_rules)
         if missing_rules or extra_rules:
-            add("BUSINESS_RULE_INVALID", "Business-rule rows must exactly match rich-use-case references; missing=" + ",".join(missing_rules) + "; extra=" + ",".join(extra_rules))
+            add(
+                "BUSINESS_RULE_INVALID",
+                "Business-rule rows must exactly match rich-use-case references; missing="
+                + ",".join(missing_rules)
+                + "; extra="
+                + ",".join(extra_rules),
+            )
 
     covered_requirements: list[str] = []
+    covered_actor_ids: set[str] = set()
+    covered_journey_ids: set[str] = set()
     if coverage is not None:
-        for requirement_id, intake_value, actor_value, journey_value, acceptance_value, success_measure in coverage.rows:
+        for (
+            requirement_id,
+            intake_value,
+            actor_value,
+            journey_value,
+            acceptance_value,
+            success_measure,
+        ) in coverage.rows:
             if requirement_id in covered_requirements:
-                add("REQUIREMENT_COVERAGE_INVALID", f"Duplicate coverage row for {requirement_id}")
+                add(
+                    "REQUIREMENT_COVERAGE_INVALID",
+                    f"Duplicate coverage row for {requirement_id}",
+                )
             covered_requirements.append(requirement_id)
             if requirement_id not in requirement_set:
-                add("REQUIREMENT_COVERAGE_INVALID", f"Coverage references unknown requirement {requirement_id}")
-            intake_refs: set[str] = set(); actor_refs: set[str] = set()
-            journey_refs: set[str] = set(); acceptance_refs: set[str] = set()
+                add(
+                    "REQUIREMENT_COVERAGE_INVALID",
+                    f"Coverage references unknown requirement {requirement_id}",
+                )
+            intake_refs: set[str] = set()
+            actor_refs: set[str] = set()
+            journey_refs: set[str] = set()
+            acceptance_refs: list[str] = []
             try:
-                intake_refs = set(_contract_ids(intake_value, re.compile(r"INTAKE-\d{4}"), f"{requirement_id} Intake basis IDs"))
-                actor_refs = set(_contract_ids(actor_value, ACTOR_ID, f"{requirement_id} Actor IDs"))
-                journey_refs = set(_contract_ids(journey_value, JOURNEY_ID, f"{requirement_id} Journey IDs"))
-                acceptance_refs = set(_contract_ids(acceptance_value, STABLE_CONTRACT_ID, f"{requirement_id} Acceptance/test IDs"))
+                intake_refs = set(
+                    _contract_ids(
+                        intake_value,
+                        re.compile(r"INTAKE-\d{4}"),
+                        f"{requirement_id} Intake basis IDs",
+                    )
+                )
+                actor_refs = set(
+                    _contract_ids(actor_value, ACTOR_ID, f"{requirement_id} Actor IDs")
+                )
+                journey_refs = set(
+                    _contract_ids(
+                        journey_value, JOURNEY_ID, f"{requirement_id} Journey IDs"
+                    )
+                )
+                acceptance_refs = _contract_ids(
+                    acceptance_value,
+                    STABLE_CONTRACT_ID,
+                    f"{requirement_id} Acceptance/test IDs",
+                )
                 if not intake_refs <= confirmed_intake_ids:
-                    add("PROJECT_CONTRACT_OWNER_FACT_REQUIRED", f"{requirement_id}: coverage cites intake basis IDs that are not currently confirmed")
+                    add(
+                        "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
+                        f"{requirement_id}: coverage cites intake basis IDs that are not currently confirmed",
+                    )
                 if not actor_refs <= set(actor_ids):
-                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: unknown actor IDs")
+                    add(
+                        "REQUIREMENT_COVERAGE_INVALID",
+                        f"{requirement_id}: unknown actor IDs",
+                    )
                 if not journey_refs <= set(journey_ids):
-                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: unknown journey IDs")
+                    add(
+                        "REQUIREMENT_COVERAGE_INVALID",
+                        f"{requirement_id}: unknown journey IDs",
+                    )
                 expected_acceptance = acceptance_by_requirement.get(requirement_id)
-                if expected_acceptance not in acceptance_refs:
-                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: coverage must include {expected_acceptance}")
-                if any(requirement_id not in journey_requirements.get(item, set()) for item in journey_refs):
-                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: cited journey does not include the requirement")
-                journey_actor_union = set().union(*(journey_actors.get(item, set()) for item in journey_refs))
+                requirement_row = requirement_row_by_id.get(requirement_id)
+                if expected_acceptance is not None and requirement_row is not None:
+                    criterion_bindings = list(
+                        dict.fromkeys(
+                            ACCEPTANCE_TEST_BINDING_ID.findall(requirement_row[4])
+                        )
+                    )
+                    expected_refs = [expected_acceptance, *criterion_bindings]
+                else:
+                    expected_refs = []
+                if acceptance_refs != expected_refs:
+                    add(
+                        "REQUIREMENT_COVERAGE_INVALID",
+                        f"{requirement_id}: Acceptance/test IDs must exactly match "
+                        "the canonical acceptance ID followed by test IDs explicitly "
+                        "bound in that requirement's acceptance criterion; expected="
+                        + ",".join(expected_refs),
+                    )
+                if requirement_id in requirement_set:
+                    covered_actor_ids.update(actor_refs)
+                    covered_journey_ids.update(journey_refs)
+                if any(
+                    requirement_id not in journey_requirements.get(item, set())
+                    for item in journey_refs
+                ):
+                    add(
+                        "REQUIREMENT_COVERAGE_INVALID",
+                        f"{requirement_id}: cited journey does not include the requirement",
+                    )
+                journey_actor_union = set().union(
+                    *(journey_actors.get(item, set()) for item in journey_refs)
+                )
                 if not actor_refs <= journey_actor_union:
-                    add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: every coverage actor must participate in a cited journey")
+                    add(
+                        "REQUIREMENT_COVERAGE_INVALID",
+                        f"{requirement_id}: every coverage actor must participate in a cited journey",
+                    )
             except ValueError as exc:
                 add("REQUIREMENT_COVERAGE_INVALID", str(exc))
-            if success_measure != "INTAKE-0006" or "INTAKE-0006" not in confirmed_intake_ids:
-                add("REQUIREMENT_COVERAGE_INVALID", f"{requirement_id}: Approved success measure ID must be INTAKE-0006")
+            if (
+                success_measure != "INTAKE-0006"
+                or "INTAKE-0006" not in confirmed_intake_ids
+            ):
+                add(
+                    "REQUIREMENT_COVERAGE_INVALID",
+                    f"{requirement_id}: Approved success measure ID must be INTAKE-0006",
+                )
         if covered_requirements != sorted(requirement_set):
             missing = sorted(requirement_set - set(covered_requirements))
             extra = sorted(set(covered_requirements) - requirement_set)
-            add("REQUIREMENT_COVERAGE_INVALID", "Coverage must enumerate every requirement exactly once in sorted order; missing=" + ",".join(missing) + "; extra=" + ",".join(extra))
+            add(
+                "REQUIREMENT_COVERAGE_INVALID",
+                "Coverage must enumerate every requirement exactly once in sorted order; missing="
+                + ",".join(missing)
+                + "; extra="
+                + ",".join(extra),
+            )
+        uncovered_actor_ids = sorted(set(actor_ids) - covered_actor_ids)
+        if uncovered_actor_ids:
+            add(
+                "ACTOR_CONTRACT_INVALID",
+                "Every declared actor must participate in first-release requirement "
+                "coverage; uncovered=" + ",".join(uncovered_actor_ids),
+            )
+        uncovered_journey_ids = sorted(set(journey_ids) - covered_journey_ids)
+        if uncovered_journey_ids:
+            add(
+                "JOURNEY_CONTRACT_INVALID",
+                "Every declared journey must participate in first-release requirement "
+                "coverage; uncovered=" + ",".join(uncovered_journey_ids),
+            )
 
     canonical_bytes: bytes | None = None
     canonical_sha256: str | None = None
     if all(table is not None for table in tables):
-        requirement_payload = json.dumps(requirement_rows, ensure_ascii=False,
-                                         separators=(",", ":")).encode("utf-8") + b"\n"
+        requirement_payload = (
+            json.dumps(
+                requirement_rows, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+            + b"\n"
+        )
         canonical_bytes = (
-            PROJECT_CONTRACT_SCHEMA.encode("utf-8") + b"\n" + requirement_payload
+            PROJECT_CONTRACT_SCHEMA.encode("utf-8")
+            + b"\n"
+            + requirement_payload
             + b"".join(table.canonical_bytes for table in tables if table is not None)
         )
         canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
     return (
         RequirementsContract(
             status="READY" if not issues else "BLOCKED",
-            actor_ids=tuple(actor_ids), journey_ids=tuple(journey_ids),
-            acceptance_ids=tuple(acceptance_by_requirement.get(item, "") for item in sorted(requirement_set)),
-            use_case_ids=tuple(use_case_ids), business_rule_ids=tuple(business_rule_ids),
+            actor_ids=tuple(actor_ids),
+            journey_ids=tuple(journey_ids),
+            acceptance_ids=tuple(
+                acceptance_by_requirement.get(item, "")
+                for item in sorted(requirement_set)
+            ),
+            use_case_ids=tuple(use_case_ids),
+            business_rule_ids=tuple(business_rule_ids),
             requirement_ids=tuple(sorted(requirement_set)),
             rich_use_case_triggers=tuple(sorted(declared_rich_triggers)),
             missing_records=tuple(dict.fromkeys(missing_records)),
-            canonical_sha256=canonical_sha256, canonical_bytes=canonical_bytes,
+            canonical_sha256=canonical_sha256,
+            canonical_bytes=canonical_bytes,
         ),
         issues,
     )
@@ -4603,12 +5660,12 @@ def current_prd_basis_ids(
         document = table_after_heading(text, "## Document status")
     except ValueError:
         document = {}
-    for field in (
+    for field_name in (
         "Current requirements revision",
         "Current design revision",
         "Current construction authorization ID",
     ):
-        value = clean_cell(document.get(field, ""))
+        value = clean_cell(document.get(field_name, ""))
         if STABLE_CONTRACT_ID.fullmatch(value) is not None:
             identifiers.add(value)
     technology_headers = list(TECHNOLOGY_DECISION_HEADERS)
@@ -4626,7 +5683,9 @@ def _exact_property_ids(value: str) -> list[str]:
     if unresolved(cleaned):
         raise ValueError("property IDs are unresolved")
     identifiers = [item.strip() for item in cleaned.split(",")]
-    if not identifiers or any(PROPERTY_ID.fullmatch(item) is None for item in identifiers):
+    if not identifiers or any(
+        PROPERTY_ID.fullmatch(item) is None for item in identifiers
+    ):
         raise ValueError("property IDs must be comma-separated PROP-nnn IDs")
     if len(identifiers) != len(set(identifiers)):
         raise ValueError("property ID list contains duplicates")
@@ -4645,6 +5704,90 @@ def _canonical_id_list(
         raise ValueError(f"{field_name} must use comma-space-separated IDs")
     return identifiers
 
+
+def derive_example_scenario_contract(
+    text: str,
+) -> tuple[ContractTable | None, set[str], list[str]]:
+    """Parse the authoritative example-scenario declarations."""
+
+    issues: list[str] = []
+    try:
+        table = contract_table_after_heading(
+            text, EXAMPLE_SCENARIO_HEADING, EXAMPLE_SCENARIO_HEADERS
+        )
+    except ValueError as exc:
+        return None, set(), [f"{EXAMPLE_SCENARIO_HEADING}: {exc}"]
+    if table is None:
+        return None, set(), [f"Missing {EXAMPLE_SCENARIO_HEADING}"]
+    if not table.rows:
+        issues.append("Example-based scenarios has no stored rows")
+    identifiers: set[str] = set()
+    for test_id, scenario, expected_result, layer in table.rows:
+        if EXAMPLE_SCENARIO_ID.fullmatch(test_id) is None:
+            issues.append(f"Invalid example scenario ID {test_id!r}")
+        elif test_id in identifiers:
+            issues.append(f"Duplicate example scenario ID {test_id}")
+        identifiers.add(test_id)
+        if not explicit_value(scenario, allow_none=False):
+            issues.append(f"{test_id}: Scenario must be concrete")
+        if not explicit_value(expected_result, allow_none=False):
+            issues.append(f"{test_id}: Expected result must be concrete")
+        if layer not in HARNESS_LAYERS:
+            issues.append(f"{test_id}: invalid Harness layer {layer!r}")
+    return table, identifiers, issues
+
+
+def architecture_trace_declaration_issues(
+    architecture: ArchitectureContract,
+    project_contract: ProjectDesignContract,
+    declared_property_test_ids: set[str],
+) -> list[str]:
+    """Require every architecture trace ID to resolve to a current declaration."""
+
+    declared_design_ids = set(project_contract.interface_ids)
+    declared_design_ids.update(project_contract.boundary_ids)
+    declared_design_ids.update(project_contract.state_ids)
+    if architecture.selection is not None:
+        declared_design_ids.add(architecture.selection.architecture_id)
+
+    issues: list[str] = []
+    for trace in architecture.traceability:
+        try:
+            design_ids = _canonical_id_list(
+                trace.design_ids,
+                ARCHITECTURE_DESIGN_ID,
+                f"{trace.requirement_id} architecture traceability design IDs",
+            )
+        except ValueError:
+            pass
+        else:
+            undeclared_design_ids = sorted(set(design_ids) - declared_design_ids)
+            if undeclared_design_ids:
+                issues.append(
+                    f"{trace.requirement_id}: architecture traceability references "
+                    "undeclared design IDs: " + ", ".join(undeclared_design_ids)
+                )
+
+        if _none_with_reason(trace.property_test_ids):
+            continue
+        try:
+            property_test_ids = _canonical_id_list(
+                trace.property_test_ids,
+                ARCHITECTURE_TEST_ID,
+                f"{trace.requirement_id} property/test IDs",
+            )
+        except ValueError:
+            continue
+        undeclared_property_test_ids = sorted(
+            set(property_test_ids) - declared_property_test_ids
+        )
+        if undeclared_property_test_ids:
+            issues.append(
+                f"{trace.requirement_id}: architecture traceability references "
+                "undeclared property/test IDs: "
+                + ", ".join(undeclared_property_test_ids)
+            )
+    return issues
 
 
 def _intake_required_detail(value: str, kind: str) -> tuple[str, ...]:
@@ -4712,69 +5855,148 @@ def _parse_intake_response_register(
         ) = raw
         valid = True
         if OWNER_RESPONSE_ID.fullmatch(owner_response_id) is None:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"Invalid owner response ID {owner_response_id!r}"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"Invalid owner response ID {owner_response_id!r}",
+                )
+            )
             valid = False
         else:
             response_numbers.add(int(owner_response_id.rsplit("-", 1)[1]))
         if INTAKE_CARD_ID.fullmatch(card_id) is None:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid card ID"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has an invalid card ID",
+                )
+            )
             valid = False
         try:
             revision = int(revision_text)
             if revision < 1 or str(revision) != revision_text:
                 raise ValueError
         except ValueError:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid revision"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has an invalid revision",
+                )
+            )
             revision = 0
             valid = False
         if re.fullmatch(r"sha256:[0-9a-f]{64}", presented_card_digest) is None:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid presented-card digest"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has an invalid presented-card digest",
+                )
+            )
             valid = False
         if reply_key not in {"1", "2", "3"}:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid reply key"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has an invalid reply key",
+                )
+            )
             valid = False
         if INTAKE_QUESTION_ID.fullmatch(question_id) is None:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid question ID"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has an invalid question ID",
+                )
+            )
             valid = False
         if selection not in {"A", "B", "C", "RESPONSE"}:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has an invalid selection"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has an invalid selection",
+                )
+            )
             valid = False
-        if selection_detail != "NONE" and not explicit_value(selection_detail, allow_none=False):
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has unresolved selection detail"))
+        if selection_detail != "NONE" and not explicit_value(
+            selection_detail, allow_none=False
+        ):
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has unresolved selection detail",
+                )
+            )
             valid = False
         detail_safety = (
-            None if selection_detail == "NONE"
+            None
+            if selection_detail == "NONE"
             else intake_detail_safety_code(selection_detail)
         )
         if detail_safety is not None:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has unsafe or placeholder selection detail"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has unsafe or placeholder selection detail",
+                )
+            )
             valid = False
-        if selection == "RESPONSE" and (selection_detail == "NONE" or detail_safety is not None):
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} requires concrete factual detail"))
+        if selection == "RESPONSE" and (
+            selection_detail == "NONE" or detail_safety is not None
+        ):
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} requires concrete factual detail",
+                )
+            )
             valid = False
         try:
-            basis_ids = tuple(_canonical_id_list(basis_value, INTAKE_ID, f"{owner_response_id} Basis IDs"))
+            basis_ids = tuple(
+                _canonical_id_list(
+                    basis_value, INTAKE_ID, f"{owner_response_id} Basis IDs"
+                )
+            )
             if not set(basis_ids).issubset(expected_foundation_rows):
                 raise ValueError("Basis IDs must cite canonical intake foundation rows")
         except ValueError as exc:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id}: {exc}"))
+            issues.append(
+                ("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id}: {exc}")
+            )
             basis_ids = ()
             valid = False
         question_key = (owner_response_id, question_id)
         reply_key_pair = (owner_response_id, reply_key)
         if question_key in seen_question_rows or reply_key_pair in seen_reply_rows:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} has a duplicate normalized answer"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} has a duplicate normalized answer",
+                )
+            )
             valid = False
         seen_question_rows.add(question_key)
         seen_reply_rows.add(reply_key_pair)
         presented_question = (card_id, revision, question_id)
         if presented_question in seen_presented_questions:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} repeats an answer to one presented question"))
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} repeats an answer to one presented question",
+                )
+            )
             valid = False
         seen_presented_questions.add(presented_question)
         identity = (card_id, revision, presented_card_digest)
-        if owner_response_id in message_identities and message_identities[owner_response_id] != identity:
-            issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", f"{owner_response_id} mixes card identities"))
+        if (
+            owner_response_id in message_identities
+            and message_identities[owner_response_id] != identity
+        ):
+            issues.append(
+                (
+                    "INTAKE_RESPONSE_REGISTER_INVALID",
+                    f"{owner_response_id} mixes card identities",
+                )
+            )
             valid = False
         message_identities[owner_response_id] = identity
         if valid:
@@ -4787,12 +6009,21 @@ def _parse_intake_response_register(
                     reply_key=reply_key,
                     question_id=question_id,
                     selection=selection,
-                    selection_detail=None if selection_detail == "NONE" else selection_detail,
+                    selection_detail=None
+                    if selection_detail == "NONE"
+                    else selection_detail,
                     basis_ids=basis_ids,
                 )
             )
-    if response_numbers and sorted(response_numbers) != list(range(1, max(response_numbers) + 1)):
-        issues.append(("INTAKE_RESPONSE_REGISTER_INVALID", "Owner response IDs must be monotonic without gaps"))
+    if response_numbers and sorted(response_numbers) != list(
+        range(1, max(response_numbers) + 1)
+    ):
+        issues.append(
+            (
+                "INTAKE_RESPONSE_REGISTER_INVALID",
+                "Owner response IDs must be monotonic without gaps",
+            )
+        )
     return tuple(responses)
 
 
@@ -4838,7 +6069,11 @@ def derive_intake_foundation_contract(
             )
         except ValueError:
             legacy_foundation = legacy_card = legacy_response = None
-        if legacy_foundation is not None and legacy_card is not None and legacy_response is None:
+        if (
+            legacy_foundation is not None
+            and legacy_card is not None
+            and legacy_response is None
+        ):
             if grandfather_current_gate_a:
                 return (
                     IntakeFoundationContract(
@@ -4852,9 +6087,16 @@ def derive_intake_foundation_contract(
                 IntakeFoundationContract(
                     status="FOUNDATION_REQUIRED",
                     repository_mode=repository_mode_value,
-                    missing_fields=tuple(field for _identifier, field in INTAKE_FOUNDATION_FIELDS),
+                    missing_fields=tuple(
+                        field for _identifier, field in INTAKE_FOUNDATION_FIELDS
+                    ),
                 ),
-                [("INTAKE_CONTRACT_MIGRATION_REQUIRED", "Unapproved legacy intake requires owner-response provenance and the normalized response register; retain legacy values only as unconfirmed context, reopen affected facts, and present the smallest current owner card without synthesizing historical OWNER-MSG records")],
+                [
+                    (
+                        "INTAKE_CONTRACT_MIGRATION_REQUIRED",
+                        "Unapproved legacy intake requires owner-response provenance and the normalized response register; retain legacy values only as unconfirmed context, reopen affected facts, and present the smallest current owner card without synthesizing historical OWNER-MSG records",
+                    )
+                ],
             )
         return (
             IntakeFoundationContract(
@@ -4878,7 +6120,9 @@ def derive_intake_foundation_contract(
             IntakeFoundationContract(
                 status="FOUNDATION_REQUIRED",
                 repository_mode=repository_mode_value,
-                missing_fields=tuple(field for _identifier, field in INTAKE_FOUNDATION_FIELDS),
+                missing_fields=tuple(
+                    field for _identifier, field in INTAKE_FOUNDATION_FIELDS
+                ),
             ),
             [
                 (
@@ -4888,12 +6132,22 @@ def derive_intake_foundation_contract(
             ],
         )
     if foundation_table is None or response_table is None or card_table is None:
-        missing_records = ", ".join(name for name, table in (("intake foundation", foundation_table), ("normalized response register", response_table), ("current decision card", card_table)) if table is None)
+        missing_records = ", ".join(
+            name
+            for name, table in (
+                ("intake foundation", foundation_table),
+                ("normalized response register", response_table),
+                ("current decision card", card_table),
+            )
+            if table is None
+        )
         return (
             IntakeFoundationContract(
                 status="FOUNDATION_REQUIRED",
                 repository_mode=repository_mode_value,
-                missing_fields=tuple(field for _identifier, field in INTAKE_FOUNDATION_FIELDS),
+                missing_fields=tuple(
+                    field for _identifier, field in INTAKE_FOUNDATION_FIELDS
+                ),
             ),
             [
                 (
@@ -4904,12 +6158,21 @@ def derive_intake_foundation_contract(
         )
 
     expected_rows = dict(INTAKE_FOUNDATION_FIELDS)
-    normalized_responses = _parse_intake_response_register(response_table, expected_rows, issues)
+    normalized_responses = _parse_intake_response_register(
+        response_table, expected_rows, issues
+    )
     responses_by_provenance = {
         response.provenance: response for response in normalized_responses
     }
     observed_rows: dict[str, tuple[str, str, str, str]] = {}
-    for intake_id, field_name, value, basis, status, owner_response in foundation_table.rows:
+    for (
+        intake_id,
+        field_name,
+        value,
+        basis,
+        status,
+        owner_response,
+    ) in foundation_table.rows:
         if intake_id in observed_rows:
             issues.append(
                 ("INTAKE_FOUNDATION_INVALID", f"Duplicate intake ID {intake_id}")
@@ -4928,19 +6191,31 @@ def derive_intake_foundation_contract(
             )
         if basis not in INTAKE_BASES:
             issues.append(
-                ("INTAKE_FOUNDATION_INVALID", f"{intake_id} has invalid basis {basis!r}")
+                (
+                    "INTAKE_FOUNDATION_INVALID",
+                    f"{intake_id} has invalid basis {basis!r}",
+                )
             )
         if status not in {"OPEN", "CONFIRMED"}:
             issues.append(
-                ("INTAKE_FOUNDATION_INVALID", f"{intake_id} has invalid status {status!r}")
+                (
+                    "INTAKE_FOUNDATION_INVALID",
+                    f"{intake_id} has invalid status {status!r}",
+                )
             )
         if status == "CONFIRMED":
             if not explicit_value(value, allow_none=False):
                 issues.append(
-                    ("INTAKE_FOUNDATION_INVALID", f"{intake_id} has no concrete owner value")
+                    (
+                        "INTAKE_FOUNDATION_INVALID",
+                        f"{intake_id} has no concrete owner value",
+                    )
                 )
             normalized_response = responses_by_provenance.get(owner_response)
-            if normalized_response is None or intake_id not in normalized_response.basis_ids:
+            if (
+                normalized_response is None
+                or intake_id not in normalized_response.basis_ids
+            ):
                 issues.append(
                     (
                         "INTAKE_FOUNDATION_PROVENANCE_INVALID",
@@ -4965,10 +6240,7 @@ def derive_intake_foundation_contract(
                         f"{intake_id} can be confirmed only with OWNER_FACT provenance",
                     )
                 )
-            if (
-                field_name == "OWNER_WORK_CONTEXT"
-                and value not in OWNER_WORK_CONTEXTS
-            ):
+            if field_name == "OWNER_WORK_CONTEXT" and value not in OWNER_WORK_CONTEXTS:
                 issues.append(
                     (
                         "INTAKE_FOUNDATION_INVALID",
@@ -4986,11 +6258,17 @@ def derive_intake_foundation_contract(
                 )
             if owner_response != "NONE":
                 issues.append(
-                    ("INTAKE_FOUNDATION_PROVENANCE_INVALID", f"{intake_id} is OPEN but cites an owner response")
+                    (
+                        "INTAKE_FOUNDATION_PROVENANCE_INVALID",
+                        f"{intake_id} is OPEN but cites an owner response",
+                    )
                 )
         observed_rows[intake_id] = (field_name, value, status, owner_response)
 
-    if tuple((identifier, row[0]) for identifier, row in observed_rows.items()) != INTAKE_FOUNDATION_FIELDS:
+    if (
+        tuple((identifier, row[0]) for identifier, row in observed_rows.items())
+        != INTAKE_FOUNDATION_FIELDS
+    ):
         issues.append(
             (
                 "INTAKE_FOUNDATION_INVALID",
@@ -5013,6 +6291,45 @@ def derive_intake_foundation_contract(
     if owner_row is not None and owner_row[2] == "CONFIRMED":
         owner_work_context = owner_row[1]
 
+    confirmed_values = {
+        field_name: value
+        for field_name, value, status, _owner_response in observed_rows.values()
+        if status == "CONFIRMED"
+    }
+    current_understanding: list[str] = []
+    context_summary = {
+        "NEW_APPLICATION": "Starting point: a new application.",
+        "EXISTING_APPLICATION_CHANGE": (
+            "Starting point: a change to an existing application."
+        ),
+        "REPAIR_OR_MIGRATION": ("Starting point: a repair, replacement, or migration."),
+    }.get(owner_work_context)
+    if context_summary is not None:
+        current_understanding.append(context_summary)
+    users = confirmed_values.get("PRIMARY_USERS")
+    problem = confirmed_values.get("OWNER_STATED_PROBLEM")
+    if users and problem:
+        current_understanding.append(f"Users and problem: {users} — {problem}")
+    elif users:
+        current_understanding.append(f"Users: {users}")
+    elif problem:
+        current_understanding.append(f"Problem: {problem}")
+    outcome = confirmed_values.get("OBSERVABLE_OUTCOME")
+    if outcome:
+        current_understanding.append(f"First useful outcome: {outcome}")
+    boundary = confirmed_values.get("FIRST_RELEASE_BOUNDARY")
+    if boundary:
+        current_understanding.append(f"First release: {boundary}")
+    success = confirmed_values.get("SUCCESS_MEASURE")
+    material_boundaries = confirmed_values.get("MATERIAL_DATA_AND_OPERATING_BOUNDARIES")
+    if success and material_boundaries:
+        current_understanding.append(
+            f"Success and material boundaries: {success} — {material_boundaries}"
+        )
+    elif success:
+        current_understanding.append(f"Success measure: {success}")
+    elif material_boundaries:
+        current_understanding.append(f"Material boundaries: {material_boundaries}")
     all_questions: list[IntakeQuestion] = []
     pending_questions: list[IntakeQuestion] = []
     card_ids: set[str] = set()
@@ -5053,7 +6370,10 @@ def derive_intake_foundation_contract(
             issues.append(("INTAKE_CARD_INVALID", f"Invalid card ID {card_id!r}"))
         if reply_key not in {"1", "2", "3"} or reply_key in reply_keys:
             issues.append(
-                ("INTAKE_CARD_INVALID", f"{question_id} has invalid or duplicate reply key")
+                (
+                    "INTAKE_CARD_INVALID",
+                    f"{question_id} has invalid or duplicate reply key",
+                )
             )
         reply_keys.add(reply_key)
         if (
@@ -5061,7 +6381,10 @@ def derive_intake_foundation_contract(
             or question_id in question_ids
         ):
             issues.append(
-                ("INTAKE_CARD_INVALID", f"Invalid or duplicate question ID {question_id!r}")
+                (
+                    "INTAKE_CARD_INVALID",
+                    f"Invalid or duplicate question ID {question_id!r}",
+                )
             )
         question_ids.add(question_id)
         if kind not in {"FACT", "DECISION"}:
@@ -5070,9 +6393,7 @@ def derive_intake_foundation_contract(
             )
         try:
             question_basis = tuple(
-                _canonical_id_list(
-                    basis_value, INTAKE_ID, f"{question_id} Basis IDs"
-                )
+                _canonical_id_list(basis_value, INTAKE_ID, f"{question_id} Basis IDs")
             )
             if not set(question_basis).issubset(expected_rows):
                 raise ValueError("Basis IDs must cite canonical intake foundation rows")
@@ -5088,7 +6409,10 @@ def derive_intake_foundation_contract(
             options = (option_a, option_b, option_c)
             if any(not explicit_value(option, allow_none=False) for option in options):
                 issues.append(
-                    ("INTAKE_CARD_INVALID", f"{question_id} requires concrete A/B/C choices")
+                    (
+                        "INTAKE_CARD_INVALID",
+                        f"{question_id} requires concrete A/B/C choices",
+                    )
                 )
             if len(set(options)) != 3:
                 issues.append(
@@ -5096,16 +6420,27 @@ def derive_intake_foundation_contract(
                 )
             if recommended not in {"A", "NONE"}:
                 issues.append(
-                    ("INTAKE_CARD_INVALID", f"{question_id} recommendation must be A or NONE")
+                    (
+                        "INTAKE_CARD_INVALID",
+                        f"{question_id} recommendation must be A or NONE",
+                    )
                 )
         else:
-            if any(option != "NOT_APPLICABLE" for option in (option_a, option_b, option_c)):
+            if any(
+                option != "NOT_APPLICABLE" for option in (option_a, option_b, option_c)
+            ):
                 issues.append(
-                    ("INTAKE_CARD_INVALID", f"{question_id} FACT choices must be NOT_APPLICABLE")
+                    (
+                        "INTAKE_CARD_INVALID",
+                        f"{question_id} FACT choices must be NOT_APPLICABLE",
+                    )
                 )
             if recommended != "NONE":
                 issues.append(
-                    ("INTAKE_CARD_INVALID", f"{question_id} FACT recommendation must be NONE")
+                    (
+                        "INTAKE_CARD_INVALID",
+                        f"{question_id} FACT recommendation must be NONE",
+                    )
                 )
         try:
             required_detail = _intake_required_detail(required_detail_value, kind)
@@ -5115,7 +6450,10 @@ def derive_intake_foundation_contract(
         if required_detail:
             if not explicit_value(detail_prompt, allow_none=False):
                 issues.append(
-                    ("INTAKE_CARD_INVALID", f"{question_id} requires a concrete detail prompt")
+                    (
+                        "INTAKE_CARD_INVALID",
+                        f"{question_id} requires a concrete detail prompt",
+                    )
                 )
             detail_prompt_value: str | None = detail_prompt
         else:
@@ -5125,12 +6463,15 @@ def derive_intake_foundation_contract(
                 )
             detail_prompt_value = None
 
-        allowed_selections = {"PENDING", "RESPONSE"} if kind == "FACT" else {
-            "PENDING", "A", "B", "C"
-        }
+        allowed_selections = (
+            {"PENDING", "RESPONSE"} if kind == "FACT" else {"PENDING", "A", "B", "C"}
+        )
         if selection not in allowed_selections:
             issues.append(
-                ("INTAKE_CARD_INVALID", f"{question_id} has invalid selection {selection!r}")
+                (
+                    "INTAKE_CARD_INVALID",
+                    f"{question_id} has invalid selection {selection!r}",
+                )
             )
         resolved = selection != "PENDING"
         provenance = INTAKE_OWNER_RESPONSE.fullmatch(owner_response)
@@ -5143,7 +6484,8 @@ def derive_intake_foundation_contract(
                     )
                 )
             if any(
-                response.card_id == card_id and response.revision == revision
+                response.card_id == card_id
+                and response.revision == revision
                 and response.question_id == question_id
                 for response in normalized_responses
             ):
@@ -5194,11 +6536,10 @@ def derive_intake_foundation_contract(
                             f"{question_id} and {basis_id} must cite the same parsed owner response",
                         )
                     )
-            detail_required = (
-                selection == "RESPONSE"
-                or selection in required_detail
-            )
-            if detail_required and not explicit_value(selection_detail, allow_none=False):
+            detail_required = selection == "RESPONSE" or selection in required_detail
+            if detail_required and not explicit_value(
+                selection_detail, allow_none=False
+            ):
                 issues.append(
                     (
                         "INTAKE_SELECTION_PROVENANCE_INVALID",
@@ -5234,7 +6575,10 @@ def derive_intake_foundation_contract(
 
     if not 1 <= len(all_questions) <= 3:
         issues.append(
-            ("INTAKE_CARD_INVALID", "Current intake card must contain one to three questions")
+            (
+                "INTAKE_CARD_INVALID",
+                "Current intake card must contain one to three questions",
+            )
         )
     if len(card_ids) != 1 or len(revisions) != 1:
         issues.append(
@@ -5242,7 +6586,10 @@ def derive_intake_foundation_contract(
         )
     if sorted(reply_keys) != [str(index) for index in range(1, len(reply_keys) + 1)]:
         issues.append(
-            ("INTAKE_CARD_INVALID", "Reply keys must be consecutive uppercase-choice numbers")
+            (
+                "INTAKE_CARD_INVALID",
+                "Reply keys must be consecutive uppercase-choice numbers",
+            )
         )
 
     pending_card = None
@@ -5296,6 +6643,7 @@ def derive_intake_foundation_contract(
     return (
         IntakeFoundationContract(
             status=status,
+            current_understanding=tuple(current_understanding),
             repository_mode=repository_mode_value,
             owner_work_context=owner_work_context,
             basis_ids=basis_ids,
@@ -5304,9 +6652,13 @@ def derive_intake_foundation_contract(
         ),
         issues,
     )
+
+
 def _none_with_reason(value: str) -> bool:
     cleaned = clean_cell(value)
-    return bool(re.fullmatch(r"NONE\s+(?:-|—)\s+\S.*", cleaned)) and not unresolved(cleaned)
+    return bool(re.fullmatch(r"NONE\s+(?:-|—)\s+\S.*", cleaned)) and not unresolved(
+        cleaned
+    )
 
 
 def _coverage_domain_list(value: str, field_name: str) -> list[str]:
@@ -5357,6 +6709,7 @@ def derive_coverage_contract(
     *,
     required: bool,
     grandfather_current_gate_a: bool,
+    owner_work_context: str | None = None,
 ) -> tuple[CoverageContract, list[str]]:
     issues: list[str] = []
     try:
@@ -5378,10 +6731,14 @@ def derive_coverage_contract(
             )
         if required and not issues:
             issues.append(f"Missing {COVERAGE_PLAN_HEADING}")
-        return CoverageContract(status="BLOCKED" if required else "UNINITIALIZED"), issues
+        return CoverageContract(
+            status="BLOCKED" if required else "UNINITIALIZED"
+        ), issues
     if len(table.rows) != 1:
         issues.append("Adaptive coverage plan must contain exactly one row")
-        return CoverageContract(status="BLOCKED", canonical_bytes=table.canonical_bytes), issues
+        return CoverageContract(
+            status="BLOCKED", canonical_bytes=table.canonical_bytes
+        ), issues
 
     row = table.rows[0]
     if not required and any(unresolved(cell) for cell in row):
@@ -5394,6 +6751,8 @@ def derive_coverage_contract(
     work_kind, profile, disposition, required_value, omitted_value, basis_value = row
     if work_kind not in WORK_KINDS:
         issues.append(f"Adaptive coverage has invalid work kind {work_kind!r}")
+    if owner_work_context == "NEW_APPLICATION" and work_kind != "NEW_BUILD":
+        issues.append("NEW_APPLICATION owner work context requires work kind NEW_BUILD")
     if profile not in DELIVERY_PROFILES:
         issues.append(f"Adaptive coverage has invalid delivery profile {profile!r}")
     elif profile != delivery_profile:
@@ -5417,7 +6776,10 @@ def derive_coverage_contract(
     except ValueError as exc:
         issues.append(str(exc))
     for omission in omissions:
-        if STABLE_CONTRACT_ID.search(omission.reason) is None and "REPOSITORY_BASELINE" not in omission.reason:
+        if (
+            STABLE_CONTRACT_ID.search(omission.reason) is None
+            and "REPOSITORY_BASELINE" not in omission.reason
+        ):
             issues.append(
                 f"Omitted section {omission.section} requires a requirement ID or REPOSITORY_BASELINE basis"
             )
@@ -5453,7 +6815,10 @@ def derive_coverage_contract(
         )
         expected = [
             identifier
-            for identifier in [requirements_revision, *sorted(authoritative_requirement_ids(text))]
+            for identifier in [
+                requirements_revision,
+                *sorted(authoritative_requirement_ids(text)),
+            ]
             if identifier
         ]
         if basis_ids != expected:
@@ -5499,7 +6864,9 @@ def derive_change_impact_contract(
     if table is None:
         if required and not issues:
             issues.append(f"Missing {CHANGE_IMPACT_HEADING}")
-        return ChangeImpactContract(status="BLOCKED" if required else "UNINITIALIZED"), issues
+        return ChangeImpactContract(
+            status="BLOCKED" if required else "UNINITIALIZED"
+        ), issues
 
     if not required and any(unresolved(cell) for row in table.rows for cell in row):
         return (
@@ -5581,7 +6948,9 @@ def derive_change_impact_contract(
                 issues.append(f"{row.change_id}: {exc}")
         changed = set(parsed["Changed basis IDs"])
         affected = set(parsed["Affected IDs"])
-        if any(identifier in authoritative_requirement_ids(text) for identifier in changed):
+        if any(
+            identifier in authoritative_requirement_ids(text) for identifier in changed
+        ):
             stale_targets.update({"GATE_A", "GATE_B", "TASKS", "AWS_AUTHORITY"})
         elif changed or affected:
             stale_targets.update({"GATE_B", "TASKS", "AWS_AUTHORITY"})
@@ -5623,6 +6992,7 @@ def _derive_architecture_contract(
     technology_ids: set[str],
     *,
     required: bool,
+    architecture_disposition: str | None = None,
     grandfather_approved_v1: bool = False,
 ) -> tuple[ArchitectureContract, list[str]]:
     issues: list[str] = []
@@ -5630,7 +7000,11 @@ def _derive_architecture_contract(
         ("drivers", ARCHITECTURE_DRIVER_HEADING, ARCHITECTURE_DRIVER_HEADERS),
         ("candidates", ARCHITECTURE_CANDIDATE_HEADING, ARCHITECTURE_CANDIDATE_HEADERS),
         ("selection", ARCHITECTURE_SELECTION_HEADING, ARCHITECTURE_SELECTION_HEADERS),
-        ("traceability", ARCHITECTURE_TRACEABILITY_HEADING, ARCHITECTURE_TRACEABILITY_HEADERS),
+        (
+            "traceability",
+            ARCHITECTURE_TRACEABILITY_HEADING,
+            ARCHITECTURE_TRACEABILITY_HEADERS,
+        ),
         ("evidence", MATERIAL_AWS_EVIDENCE_HEADING, MATERIAL_AWS_EVIDENCE_HEADERS),
     )
     tables: dict[str, ContractTable | None] = {}
@@ -5640,7 +7014,8 @@ def _derive_architecture_contract(
     for key, heading, headers in specifications:
         try:
             tables[key] = contract_table_after_heading(text, heading, headers)
-        except ValueError as current_exc:
+        except ValueError as exc:
+            current_message = str(exc)
             if key == "selection" and grandfather_approved_v1:
                 try:
                     tables[key] = contract_table_after_heading(
@@ -5649,7 +7024,7 @@ def _derive_architecture_contract(
                     selection_schema_version = 2
                     continue
                 except ValueError as legacy_exc:
-                    current_exc = legacy_exc
+                    current_message = str(legacy_exc)
             if key == "evidence" and grandfather_approved_v1:
                 try:
                     tables[key] = contract_table_after_heading(
@@ -5658,9 +7033,17 @@ def _derive_architecture_contract(
                     evidence_schema_version = 1
                     continue
                 except ValueError as legacy_exc:
-                    current_exc = legacy_exc
+                    current_message = str(legacy_exc)
             tables[key] = None
-            parse_issues.append(f"{heading}: {current_exc}")
+            if key == "traceability" and grandfather_approved_v1:
+                try:
+                    tables[key] = contract_table_after_heading(
+                        text, heading, ARCHITECTURE_TRACEABILITY_HEADERS_V4
+                    )
+                    continue
+                except ValueError as legacy_exc:
+                    current_message = str(legacy_exc)
+            parse_issues.append(f"{heading}: {current_message}")
     issues.extend(parse_issues)
 
     all_missing = all(tables[key] is None for key, _, _ in specifications)
@@ -5672,8 +7055,7 @@ def _derive_architecture_contract(
     except ValueError:
         pass
     grandfathered = all_missing and (
-        grandfather_approved_v1
-        or gate_b_state == "APPROVED_FOR_CONSTRUCTION"
+        grandfather_approved_v1 or gate_b_state == "APPROVED_FOR_CONSTRUCTION"
     )
     if all_missing:
         if required and not grandfathered:
@@ -5681,7 +7063,11 @@ def _derive_architecture_contract(
         return (
             ArchitectureContract(
                 schema_version=1,
-                status="READY" if grandfathered and not issues else "UNINITIALIZED" if not required else "BLOCKED",
+                status="READY"
+                if grandfathered and not issues
+                else "UNINITIALIZED"
+                if not required
+                else "BLOCKED",
                 grandfathered_v1=grandfathered,
             ),
             issues,
@@ -5713,7 +7099,9 @@ def _derive_architecture_contract(
                 issues.append(f"Duplicate architecture driver ID {driver.driver_id}")
             seen_driver_ids.add(driver.driver_id)
             if driver.driver_class not in ARCHITECTURE_DRIVER_CLASSES:
-                issues.append(f"{driver.driver_id}: invalid driver class {driver.driver_class!r}")
+                issues.append(
+                    f"{driver.driver_id}: invalid driver class {driver.driver_class!r}"
+                )
             elif driver.driver_class == "HARD_CONSTRAINT":
                 hard_constraint_ids.add(driver.driver_id)
             try:
@@ -5746,12 +7134,18 @@ def _derive_architecture_contract(
             candidate = ArchitectureCandidate(*row)
             candidates.append(candidate)
             if ARCHITECTURE_CANDIDATE_ID.fullmatch(candidate.candidate_id) is None:
-                issues.append(f"Invalid architecture candidate ID {candidate.candidate_id!r}")
+                issues.append(
+                    f"Invalid architecture candidate ID {candidate.candidate_id!r}"
+                )
             elif candidate.candidate_id in seen_candidate_ids:
-                issues.append(f"Duplicate architecture candidate ID {candidate.candidate_id}")
+                issues.append(
+                    f"Duplicate architecture candidate ID {candidate.candidate_id}"
+                )
             seen_candidate_ids.add(candidate.candidate_id)
             if not explicit_value(candidate.architecture_summary, allow_none=False):
-                issues.append(f"{candidate.candidate_id}: architecture summary must be concrete")
+                issues.append(
+                    f"{candidate.candidate_id}: architecture summary must be concrete"
+                )
             try:
                 coverage = _canonical_id_list(
                     candidate.requirement_coverage,
@@ -5766,10 +7160,14 @@ def _derive_architecture_contract(
             except ValueError as exc:
                 issues.append(str(exc))
             if candidate.eligibility not in ARCHITECTURE_ELIGIBILITY:
-                issues.append(f"{candidate.candidate_id}: invalid eligibility {candidate.eligibility!r}")
+                issues.append(
+                    f"{candidate.candidate_id}: invalid eligibility {candidate.eligibility!r}"
+                )
             if candidate.eligibility == "ELIGIBLE":
                 if candidate.failed_constraints != "NONE":
-                    issues.append(f"{candidate.candidate_id}: an eligible candidate must have Failed constraints NONE")
+                    issues.append(
+                        f"{candidate.candidate_id}: an eligible candidate must have Failed constraints NONE"
+                    )
             elif candidate.eligibility == "INELIGIBLE":
                 try:
                     failed = _canonical_id_list(
@@ -5787,6 +7185,15 @@ def _derive_architecture_contract(
                     issues.append(str(exc))
             if not explicit_value(candidate.tradeoffs, allow_none=False):
                 issues.append(f"{candidate.candidate_id}: tradeoffs must be concrete")
+    if (
+        required
+        and architecture_disposition == "SELECT"
+        and not grandfather_approved_v1
+        and len(seen_candidate_ids) < 2
+    ):
+        issues.append(
+            "SELECT requires at least two complete non-straw whole-system candidates"
+        )
 
     selection_table = tables["selection"]
     if selection_table is not None:
@@ -5815,16 +7222,27 @@ def _derive_architecture_contract(
                     validation=legacy[10],
                 )
             if ARCHITECTURE_ID.fullmatch(selection.architecture_id) is None:
-                issues.append(f"Invalid selected architecture ID {selection.architecture_id!r}")
+                issues.append(
+                    f"Invalid selected architecture ID {selection.architecture_id!r}"
+                )
             if selection.selected_candidate not in seen_candidate_ids:
-                issues.append("Selected architecture must reference a current candidate")
+                issues.append(
+                    "Selected architecture must reference a current candidate"
+                )
             selected = next(
-                (item for item in candidates if item.candidate_id == selection.selected_candidate),
+                (
+                    item
+                    for item in candidates
+                    if item.candidate_id == selection.selected_candidate
+                ),
                 None,
             )
             if selected is not None and selected.eligibility != "ELIGIBLE":
                 issues.append("A hard-constraint-failing candidate cannot be selected")
-            expected_basis = [*expected_requirement_order, *(item.driver_id for item in drivers)]
+            expected_basis = [
+                *expected_requirement_order,
+                *(item.driver_id for item in drivers),
+            ]
             try:
                 basis = _canonical_id_list(
                     selection.requirement_and_driver_basis,
@@ -5889,7 +7307,9 @@ def _derive_architecture_contract(
             )
             for label, value in dossier_fields:
                 if not explicit_value(value, allow_none=False):
-                    issues.append(f"{selection.architecture_id}: {label} must be concrete")
+                    issues.append(
+                        f"{selection.architecture_id}: {label} must be concrete"
+                    )
 
     trace_table = tables["traceability"]
     seen_trace_requirements: set[str] = set()
@@ -5898,20 +7318,34 @@ def _derive_architecture_contract(
             trace = ArchitectureTrace(*row)
             traces.append(trace)
             if trace.requirement_id in seen_trace_requirements:
-                issues.append(f"Duplicate architecture traceability requirement {trace.requirement_id}")
+                issues.append(
+                    f"Duplicate architecture traceability requirement {trace.requirement_id}"
+                )
             seen_trace_requirements.add(trace.requirement_id)
             if trace.requirement_id not in requirements:
-                issues.append(f"Architecture traceability references non-requirement ID {trace.requirement_id}")
+                issues.append(
+                    f"Architecture traceability references non-requirement ID {trace.requirement_id}"
+                )
             try:
                 design_ids = _canonical_id_list(
                     trace.design_ids,
                     ARCHITECTURE_DESIGN_ID,
                     f"{trace.requirement_id} architecture traceability design IDs",
                 )
-                if selection is not None and selection.architecture_id not in design_ids:
-                    issues.append(f"{trace.requirement_id}: traceability must include {selection.architecture_id}")
-                if not any(identifier != (selection.architecture_id if selection else "") for identifier in design_ids):
-                    issues.append(f"{trace.requirement_id}: traceability must include a component, API, data, or control ID")
+                if (
+                    selection is not None
+                    and selection.architecture_id not in design_ids
+                ):
+                    issues.append(
+                        f"{trace.requirement_id}: traceability must include {selection.architecture_id}"
+                    )
+                if not any(
+                    identifier != (selection.architecture_id if selection else "")
+                    for identifier in design_ids
+                ):
+                    issues.append(
+                        f"{trace.requirement_id}: traceability must include at least one additional design ID"
+                    )
             except ValueError as exc:
                 issues.append(str(exc))
             if not _none_with_reason(trace.property_test_ids):
@@ -5926,9 +7360,15 @@ def _derive_architecture_contract(
         missing_traces = sorted(requirements - seen_trace_requirements)
         extra_traces = sorted(seen_trace_requirements - requirements)
         if missing_traces:
-            issues.append("Architecture traceability is missing requirement IDs: " + ", ".join(missing_traces))
+            issues.append(
+                "Architecture traceability is missing requirement IDs: "
+                + ", ".join(missing_traces)
+            )
         if extra_traces:
-            issues.append("Architecture traceability has unknown requirement IDs: " + ", ".join(extra_traces))
+            issues.append(
+                "Architecture traceability has unknown requirement IDs: "
+                + ", ".join(extra_traces)
+            )
 
     evidence_table = tables["evidence"]
     seen_evidence_ids: set[str] = set()
@@ -5951,7 +7391,10 @@ def _derive_architecture_contract(
                 else MaterialAwsEvidence(row[0], "", *row[1:])
             )
             evidence.append(item)
-            if evidence_schema_version == 2 and AWS_DISCOVERY_ID.fullmatch(item.discovery_id) is None:
+            if (
+                evidence_schema_version == 2
+                and AWS_DISCOVERY_ID.fullmatch(item.discovery_id) is None
+            ):
                 issues.append(
                     f"{item.evidence_id}: invalid Discovery ID {item.discovery_id!r}"
                 )
@@ -5969,22 +7412,35 @@ def _derive_architecture_contract(
                 evidence_design_ids[item.evidence_id] = set(bound_ids)
                 unknown = sorted(set(bound_ids) - declared_design_ids)
                 if unknown:
-                    issues.append(f"{item.evidence_id}: unknown design IDs: " + ", ".join(unknown))
+                    issues.append(
+                        f"{item.evidence_id}: unknown design IDs: " + ", ".join(unknown)
+                    )
             except ValueError as exc:
                 issues.append(str(exc))
             if not explicit_value(item.material_claim, allow_none=False):
                 issues.append(f"{item.evidence_id}: material claim must be concrete")
             if item.capability not in AWS_DOCUMENTATION_CAPABILITIES:
-                issues.append(f"{item.evidence_id}: invalid AWS Core capability {item.capability!r}")
+                issues.append(
+                    f"{item.evidence_id}: invalid AWS Core capability {item.capability!r}"
+                )
             else:
                 seen_capabilities.add(item.capability)
-            if re.fullmatch(r"https://(?:docs\.)?aws\.amazon\.com/\S+", item.official_reference) is None:
-                issues.append(f"{item.evidence_id}: Official reference must be an AWS HTTPS URL")
+            if (
+                re.fullmatch(
+                    r"https://(?:docs\.)?aws\.amazon\.com/\S+", item.official_reference
+                )
+                is None
+            ):
+                issues.append(
+                    f"{item.evidence_id}: Official reference must be an AWS HTTPS URL"
+                )
             try:
                 datetime.strptime(item.observed_date, "%Y-%m-%d")
             except ValueError:
                 issues.append(f"{item.evidence_id}: Observed date must use YYYY-MM-DD")
-        missing_capabilities = sorted(AWS_DOCUMENTATION_CAPABILITIES - seen_capabilities)
+        missing_capabilities = sorted(
+            AWS_DOCUMENTATION_CAPABILITIES - seen_capabilities
+        )
         if missing_capabilities:
             issues.append(
                 "Material AWS evidence is missing AWS Core capabilities: "
@@ -6000,7 +7456,10 @@ def _derive_architecture_contract(
             )
             unknown = sorted(set(evidence_ids) - seen_evidence_ids)
             if unknown:
-                issues.append(f"{candidate.candidate_id}: unknown AWS evidence IDs: " + ", ".join(unknown))
+                issues.append(
+                    f"{candidate.candidate_id}: unknown AWS evidence IDs: "
+                    + ", ".join(unknown)
+                )
             unbound = sorted(
                 evidence_id
                 for evidence_id in evidence_ids
@@ -6030,12 +7489,17 @@ def _derive_architecture_contract(
             )
             unknown = sorted(set(evidence_ids) - seen_evidence_ids)
             if unknown:
-                issues.append(f"{trace.requirement_id}: unknown AWS evidence IDs: " + ", ".join(unknown))
+                issues.append(
+                    f"{trace.requirement_id}: unknown AWS evidence IDs: "
+                    + ", ".join(unknown)
+                )
         except ValueError as exc:
             issues.append(str(exc))
 
     try:
-        project_mode = table_after_heading(text, "## Document status").get("Project mode", "")
+        project_mode = table_after_heading(text, "## Document status").get(
+            "Project mode", ""
+        )
     except ValueError:
         project_mode = ""
     if project_mode == "greenfield" and not any(
@@ -6081,7 +7545,7 @@ def harness_status_parts(value: str) -> tuple[str, str | None]:
     for prefix in ("CONDITIONAL", "NOT_APPLICABLE"):
         if not cleaned.startswith(prefix):
             continue
-        suffix = cleaned[len(prefix):].strip()
+        suffix = cleaned[len(prefix) :].strip()
         if suffix.startswith("—"):
             suffix = suffix[1:].strip()
         elif suffix.startswith("-"):
@@ -6187,7 +7651,9 @@ def derive_harness_contract(
             )
         if status == "CONDITIONAL":
             if reason is None:
-                issues.append(f"{row.harness_id}: CONDITIONAL requires a concrete trigger")
+                issues.append(
+                    f"{row.harness_id}: CONDITIONAL requires a concrete trigger"
+                )
             if required:
                 issues.append(
                     f"{row.harness_id}: CONDITIONAL must resolve to REQUIRED or "
@@ -6247,10 +7713,13 @@ def _server_side_authorization_or_not_applicable(value: str) -> bool:
     if _explicit_not_applicable_value(cleaned):
         return True
     normalized = re.sub(r"[\s-]+", "_", cleaned.upper())
-    return "SERVER_SIDE" in normalized or bool(re.search(
-        r"\bserver(?:-side)?\b.*\b(?:authoriz\w*|enforc\w*|verif\w*|den\w*|reject\w*)\b",
-        cleaned, re.IGNORECASE,
-    ))
+    return "SERVER_SIDE" in normalized or bool(
+        re.search(
+            r"\bserver(?:-side)?\b.*\b(?:authoriz\w*|enforc\w*|verif\w*|den\w*|reject\w*)\b",
+            cleaned,
+            re.IGNORECASE,
+        )
+    )
 
 
 def _measurable_interface_bound_or_not_applicable(value: str) -> bool:
@@ -6263,31 +7732,49 @@ def _measurable_interface_bound_or_not_applicable(value: str) -> bool:
 
 
 def _design_reference_issues(
-    identifier: str, requirement_value: str, validation_value: str,
-    requirement_ids: set[str], validation_ids: set[str],
+    identifier: str,
+    requirement_value: str,
+    validation_value: str,
+    requirement_ids: set[str],
+    validation_ids: set[str],
 ) -> list[str]:
     issues: list[str] = []
     try:
-        refs = set(_contract_ids(requirement_value, STABLE_CONTRACT_ID,
-                                 f"{identifier} Requirement IDs"))
+        refs = set(
+            _contract_ids(
+                requirement_value, STABLE_CONTRACT_ID, f"{identifier} Requirement IDs"
+            )
+        )
         unknown = sorted(refs - requirement_ids)
         if unknown:
-            issues.append(f"{identifier}: unknown requirement IDs: " + ", ".join(unknown))
-        refs = set(_contract_ids(validation_value, STABLE_CONTRACT_ID,
-                                 f"{identifier} Validation IDs"))
+            issues.append(
+                f"{identifier}: unknown requirement IDs: " + ", ".join(unknown)
+            )
+        refs = set(
+            _contract_ids(
+                validation_value, STABLE_CONTRACT_ID, f"{identifier} Validation IDs"
+            )
+        )
         unknown = sorted(refs - validation_ids)
         if unknown:
-            issues.append(f"{identifier}: unknown Validation IDs: " + ", ".join(unknown))
+            issues.append(
+                f"{identifier}: unknown Validation IDs: " + ", ".join(unknown)
+            )
     except ValueError as exc:
         issues.append(str(exc))
     return issues
 
 
 def derive_project_design_contract(
-    text: str, requirements_contract: RequirementsContract,
-    coverage_contract: CoverageContract, allowed_basis_ids: set[str],
-    harness: HarnessContract, legacy_design_ids: set[str], *,
-    required: bool, grandfather_approved_v4: bool,
+    text: str,
+    requirements_contract: RequirementsContract,
+    coverage_contract: CoverageContract,
+    allowed_basis_ids: set[str],
+    harness: HarnessContract,
+    legacy_design_ids: set[str],
+    *,
+    required: bool,
+    grandfather_approved_v4: bool,
 ) -> tuple[ProjectDesignContract, list[str]]:
     """Validate the schema-5 interface, boundary, state, and delivery contract."""
 
@@ -6304,61 +7791,103 @@ def derive_project_design_contract(
     if design_schema != PROJECT_DESIGN_CONTRACT_SCHEMA:
         observed_tables = [table for table in markdown_tables(text) if table]
         observed_headers = {tuple(table[0]) for table in observed_tables}
-        current_headers = {INTERFACE_HEADERS, LAYER_BOUNDARY_HEADERS,
-                           STATE_APPLICABILITY_HEADERS, STATE_REGISTER_HEADERS,
-                           FIRST_WAVE_HEADERS, SPIKE_HEADERS}
-        legacy_interface_tables = [table for table in observed_tables
-                                   if tuple(table[0]) == LEGACY_INTERFACE_HEADERS_V4]
+        current_headers = {
+            INTERFACE_HEADERS,
+            LAYER_BOUNDARY_HEADERS,
+            STATE_APPLICABILITY_HEADERS,
+            STATE_REGISTER_HEADERS,
+            FIRST_WAVE_HEADERS,
+            SPIKE_HEADERS,
+        }
+        legacy_interface_tables = [
+            table
+            for table in observed_tables
+            if tuple(table[0]) == LEGACY_INTERFACE_HEADERS_V4
+        ]
         legacy_interface_ids = [
-            clean_cell(row[0]) for table in legacy_interface_tables for row in table[2:]
+            clean_cell(row[0])
+            for table in legacy_interface_tables
+            for row in table[2:]
             if len(row) == len(LEGACY_INTERFACE_HEADERS_V4)
         ]
         structural_text = without_fenced_code(text)
-        schema_five_only_headings = (LAYER_BOUNDARY_HEADING, STATE_APPLICABILITY_HEADING,
-                                     STATE_REGISTER_HEADING, FIRST_WAVE_HEADING, SPIKE_HEADING)
+        schema_five_only_headings = (
+            LAYER_BOUNDARY_HEADING,
+            STATE_APPLICABILITY_HEADING,
+            STATE_REGISTER_HEADING,
+            FIRST_WAVE_HEADING,
+            SPIKE_HEADING,
+        )
         exact_legacy_shape = bool(
             not design_schema
             and len(legacy_interface_tables) == 1
             and legacy_interface_ids
             and all(INTERFACE_ID.fullmatch(item) for item in legacy_interface_ids)
             and not (observed_headers & current_headers)
-            and not any(re.search(rf"^{re.escape(heading)}[ \t]*$", structural_text,
-                                  re.MULTILINE) for heading in schema_five_only_headings)
+            and not any(
+                re.search(
+                    rf"^{re.escape(heading)}[ \t]*$", structural_text, re.MULTILINE
+                )
+                for heading in schema_five_only_headings
+            )
             and any(ARCHITECTURE_ID.fullmatch(item) for item in legacy_design_ids)
-            and any(TECHNOLOGY_DECISION_ID.fullmatch(item) for item in legacy_design_ids)
+            and any(
+                TECHNOLOGY_DECISION_ID.fullmatch(item) for item in legacy_design_ids
+            )
             and any(PROPERTY_ID.fullmatch(item) for item in legacy_design_ids)
             and any(HARNESS_ID.fullmatch(item) for item in legacy_design_ids)
         )
         if grandfather_approved_v4 and exact_legacy_shape:
-            return (ProjectDesignContract(schema_version=4, status="GRANDFATHERED",
-                                          grandfathered_v4=True), [])
+            return (
+                ProjectDesignContract(
+                    schema_version=4, status="GRANDFATHERED", grandfathered_v4=True
+                ),
+                [],
+            )
         if not required:
             return ProjectDesignContract(status="UNINITIALIZED"), []
         return (
             ProjectDesignContract(
                 status="MIGRATION_REQUIRED",
-                missing_records=("Project design contract schema 5", INTERFACE_HEADING,
-                                 LAYER_BOUNDARY_HEADING, STATE_APPLICABILITY_HEADING,
-                                 STATE_REGISTER_HEADING, FIRST_WAVE_HEADING, SPIKE_HEADING),
+                missing_records=(
+                    "Project design contract schema 5",
+                    INTERFACE_HEADING,
+                    LAYER_BOUNDARY_HEADING,
+                    STATE_APPLICABILITY_HEADING,
+                    STATE_REGISTER_HEADING,
+                    FIRST_WAVE_HEADING,
+                    SPIKE_HEADING,
+                ),
             ),
-            ["Project design contract schema 5 requires current interface, "
-             "layer-boundary, state-applicability, first-wave, and spike records"],
+            [
+                "Project design contract schema 5 requires current interface, "
+                "layer-boundary, state-applicability, first-wave, and spike records"
+            ],
         )
 
     interfaces, boundaries, state_applicability, states = (
         _contract_table_or_issue(text, heading, headers, issues, missing_records)
-        for heading, headers in ((INTERFACE_HEADING, INTERFACE_HEADERS),
+        for heading, headers in (
+            (INTERFACE_HEADING, INTERFACE_HEADERS),
             (LAYER_BOUNDARY_HEADING, LAYER_BOUNDARY_HEADERS),
             (STATE_APPLICABILITY_HEADING, STATE_APPLICABILITY_HEADERS),
-            (STATE_REGISTER_HEADING, STATE_REGISTER_HEADERS))
+            (STATE_REGISTER_HEADING, STATE_REGISTER_HEADERS),
+        )
     )
 
-    requirement_ids = set(requirements_contract.requirement_ids) or authoritative_requirement_ids(text)
-    current_validation_ids = (set(allowed_basis_ids) | set(requirements_contract.acceptance_ids)
-                              | set(harness.required_ids))
+    requirement_ids = set(
+        requirements_contract.requirement_ids
+    ) or authoritative_requirement_ids(text)
+    current_validation_ids = (
+        set(allowed_basis_ids)
+        | set(requirements_contract.acceptance_ids)
+        | set(harness.required_ids)
+    )
     journey_requirement_ids: dict[str, set[str]] = {}
     try:
-        journey_table = contract_table_after_heading(text, JOURNEY_HEADING, JOURNEY_HEADERS)
+        journey_table = contract_table_after_heading(
+            text, JOURNEY_HEADING, JOURNEY_HEADERS
+        )
     except ValueError:
         journey_table = None
     if journey_table is not None:
@@ -6368,8 +7897,12 @@ def derive_project_design_contract(
                 continue
             try:
                 journey_requirement_ids[journey_id] = set(
-                    _contract_ids(journey_row[6], STABLE_CONTRACT_ID,
-                                  f"{journey_id} Requirement IDs"))
+                    _contract_ids(
+                        journey_row[6],
+                        STABLE_CONTRACT_ID,
+                        f"{journey_id} Requirement IDs",
+                    )
+                )
             except ValueError:
                 continue
     interface_ids: list[str] = []
@@ -6381,27 +7914,42 @@ def derive_project_design_contract(
             if INTERFACE_ID.fullmatch(contract_id) is None:
                 add(f"Invalid material interface ID {contract_id!r}")
                 continue
-            if contract_id in interface_ids: add(f"Duplicate material interface ID {contract_id}")
+            if contract_id in interface_ids:
+                add(f"Duplicate material interface ID {contract_id}")
             interface_ids.append(contract_id)
             if kind not in INTERFACE_KINDS or not contract_id.startswith(kind + "-"):
                 add(f"{contract_id}: Kind must match its API/EVENT/CLI/FILE prefix")
             try:
-                refs = set(_contract_ids(requirement_value, STABLE_CONTRACT_ID,
-                                         f"{contract_id} Requirement basis"))
+                refs = set(
+                    _contract_ids(
+                        requirement_value,
+                        STABLE_CONTRACT_ID,
+                        f"{contract_id} Requirement basis",
+                    )
+                )
                 unknown = sorted(refs - requirement_ids)
-                if unknown: add(f"{contract_id}: unknown requirement basis IDs: " + ", ".join(unknown))
+                if unknown:
+                    add(
+                        f"{contract_id}: unknown requirement basis IDs: "
+                        + ", ".join(unknown)
+                    )
             except ValueError as exc:
                 add(str(exc))
             for header, value in zip(INTERFACE_HEADERS[3:], details):
-                if not explicit_value(value, allow_none=False): add(f"{contract_id}: {header} must be concrete")
+                if not explicit_value(value, allow_none=False):
+                    add(f"{contract_id}: {header} must be concrete")
             detail_values = dict(zip(INTERFACE_HEADERS[3:], details))
-            if not _server_side_authorization_or_not_applicable(detail_values["Authorization"]):
+            if not _server_side_authorization_or_not_applicable(
+                detail_values["Authorization"]
+            ):
                 add(
                     f"{contract_id}: Authorization must be server-side or use "
                     "NOT_APPLICABLE - <reason>"
                 )
             for header in ("Timeout bound", "Rate bound", "Performance bound"):
-                if not _measurable_interface_bound_or_not_applicable(detail_values[header]):
+                if not _measurable_interface_bound_or_not_applicable(
+                    detail_values[header]
+                ):
                     add(
                         f"{contract_id}: {header} must contain a numeric measurable "
                         "bound or use NOT_APPLICABLE - <reason>"
@@ -6412,79 +7960,178 @@ def derive_project_design_contract(
         if not boundaries.rows and coverage_contract.work_kind == "NEW_BUILD":
             add("NEW_BUILD requires at least one explicit layer boundary")
         for row in boundaries.rows:
-            boundary_id, outer, inner, dto, mapping, direction, authorization, adapter, requirement_value, validation_value = row
+            (
+                boundary_id,
+                outer,
+                inner,
+                dto,
+                mapping,
+                direction,
+                authorization,
+                adapter,
+                requirement_value,
+                validation_value,
+            ) = row
             if BOUNDARY_ID.fullmatch(boundary_id) is None:
                 add(f"Invalid boundary ID {boundary_id!r}")
                 continue
-            if boundary_id in boundary_ids: add(f"Duplicate boundary ID {boundary_id}")
+            if boundary_id in boundary_ids:
+                add(f"Duplicate boundary ID {boundary_id}")
             boundary_ids.append(boundary_id)
-            for header, value in zip(LAYER_BOUNDARY_HEADERS[1:8],
-                                     (outer, inner, dto, mapping, direction, authorization, adapter)):
-                if not explicit_value(value, allow_none=False): add(f"{boundary_id}: {header} must be concrete")
-            if "INWARD" not in direction.upper(): add(f"{boundary_id}: Dependency direction must explicitly point inward")
+            for header, value in zip(
+                LAYER_BOUNDARY_HEADERS[1:8],
+                (outer, inner, dto, mapping, direction, authorization, adapter),
+            ):
+                if not explicit_value(value, allow_none=False):
+                    add(f"{boundary_id}: {header} must be concrete")
+            if "INWARD" not in direction.upper():
+                add(f"{boundary_id}: Dependency direction must explicitly point inward")
             normalized_authorization = authorization.upper().replace("-", "_")
-            if "SERVER_SIDE" not in normalized_authorization: add(f"{boundary_id}: Authorization enforcement must be server-side")
-            issues.extend(_design_reference_issues(
-                boundary_id, requirement_value, validation_value, requirement_ids, current_validation_ids))
+            if "SERVER_SIDE" not in normalized_authorization:
+                add(f"{boundary_id}: Authorization enforcement must be server-side")
+            issues.extend(
+                _design_reference_issues(
+                    boundary_id,
+                    requirement_value,
+                    validation_value,
+                    requirement_ids,
+                    current_validation_ids,
+                )
+            )
 
-    applicable_state_ids: set[str] = set(); state_subjects: dict[str, str] = {}
+    applicable_state_ids: set[str] = set()
+    state_subjects: dict[str, str] = {}
     declared_state_triggers: set[str] = set()
-    required_state_triggers = {RICH_TO_STATE_TRIGGER[item]
-        for item in requirements_contract.rich_use_case_triggers if item in RICH_TO_STATE_TRIGGER}
+    required_state_triggers = {
+        RICH_TO_STATE_TRIGGER[item]
+        for item in requirements_contract.rich_use_case_triggers
+        if item in RICH_TO_STATE_TRIGGER
+    }
     if state_applicability is not None:
-        if not state_applicability.rows: add("State-model applicability requires at least one row")
-        for subject_id, applicability, trigger_basis, state_value in state_applicability.rows:
-            if STABLE_CONTRACT_ID.fullmatch(subject_id) is None: add(f"Invalid state subject ID {subject_id!r}")
+        if not state_applicability.rows:
+            add("State-model applicability requires at least one row")
+        for (
+            subject_id,
+            applicability,
+            trigger_basis,
+            state_value,
+        ) in state_applicability.rows:
+            if STABLE_CONTRACT_ID.fullmatch(subject_id) is None:
+                add(f"Invalid state subject ID {subject_id!r}")
             if applicability == "APPLICABLE":
                 try:
-                    refs = _contract_ids(state_value, STATE_ID, f"{subject_id} State model IDs")
-                    for state_id in refs: applicable_state_ids.add(state_id); state_subjects[state_id] = subject_id
-                    trigger_map = _state_trigger_map(trigger_basis, subject_id); declared_state_triggers.update(trigger_map)
-                    trigger_refs = {item for values in trigger_map.values() for item in values}
-                    unknown_trigger = sorted(trigger_refs - current_validation_ids - requirement_ids)
-                    if unknown_trigger: add(f"{subject_id}: unknown State trigger basis IDs: " + ", ".join(unknown_trigger))
-                except ValueError as exc: add(str(exc))
+                    refs = _contract_ids(
+                        state_value, STATE_ID, f"{subject_id} State model IDs"
+                    )
+                    for state_id in refs:
+                        applicable_state_ids.add(state_id)
+                        state_subjects[state_id] = subject_id
+                    trigger_map = _state_trigger_map(trigger_basis, subject_id)
+                    declared_state_triggers.update(trigger_map)
+                    trigger_refs = {
+                        item for values in trigger_map.values() for item in values
+                    }
+                    unknown_trigger = sorted(
+                        trigger_refs - current_validation_ids - requirement_ids
+                    )
+                    if unknown_trigger:
+                        add(
+                            f"{subject_id}: unknown State trigger basis IDs: "
+                            + ", ".join(unknown_trigger)
+                        )
+                except ValueError as exc:
+                    add(str(exc))
             elif applicability == "NOT_APPLICABLE":
-                if (not trigger_basis.startswith("NOT_APPLICABLE") or
-                        not explicit_value(trigger_basis, allow_none=False) or state_value != "NONE"):
-                    add(f"{subject_id}: NOT_APPLICABLE requires a concrete reason and State model IDs NONE")
-            else: add(f"{subject_id}: State applicability must be APPLICABLE or NOT_APPLICABLE")
+                if (
+                    not trigger_basis.startswith("NOT_APPLICABLE")
+                    or not explicit_value(trigger_basis, allow_none=False)
+                    or state_value != "NONE"
+                ):
+                    add(
+                        f"{subject_id}: NOT_APPLICABLE requires a concrete reason and State model IDs NONE"
+                    )
+            else:
+                add(
+                    f"{subject_id}: State applicability must be APPLICABLE or NOT_APPLICABLE"
+                )
     missing_state_triggers = sorted(required_state_triggers - declared_state_triggers)
-    if missing_state_triggers: add("Journey triggers require applicable state categories: " + ", ".join(missing_state_triggers))
-    if requirements_contract.grandfathered_approved_gate_a and not applicable_state_ids: add("A grandfathered Gate A design requires an applicable state model")
+    if missing_state_triggers:
+        add(
+            "Journey triggers require applicable state categories: "
+            + ", ".join(missing_state_triggers)
+        )
+    if requirements_contract.grandfathered_approved_gate_a and not applicable_state_ids:
+        add("A grandfathered Gate A design requires an applicable state model")
 
     state_ids: list[str] = []
     if states is not None:
         for row in states.rows:
-            state_id, subject_id, state_value, initial_state, transitions, terminal_value, invalid_behavior, requirement_value, validation_value = row
+            (
+                state_id,
+                subject_id,
+                state_value,
+                initial_state,
+                transitions,
+                terminal_value,
+                invalid_behavior,
+                requirement_value,
+                validation_value,
+            ) = row
             if STATE_ID.fullmatch(state_id) is None:
                 add(f"Invalid state model ID {state_id!r}")
                 continue
-            if state_id in state_ids: add(f"Duplicate state model ID {state_id}")
+            if state_id in state_ids:
+                add(f"Duplicate state model ID {state_id}")
             state_ids.append(state_id)
-            if state_id not in applicable_state_ids: add(f"{state_id}: state row is not declared APPLICABLE")
-            if state_subjects.get(state_id) != subject_id: add(f"{state_id}: Subject ID does not match state applicability")
-            declared_states = [item.strip() for item in state_value.split(",") if item.strip()]
-            if (not declared_states or state_value != ", ".join(declared_states)
-                    or initial_state not in declared_states):
-                add(f"{state_id}: States must be canonical and contain the initial state")
+            if state_id not in applicable_state_ids:
+                add(f"{state_id}: state row is not declared APPLICABLE")
+            if state_subjects.get(state_id) != subject_id:
+                add(f"{state_id}: Subject ID does not match state applicability")
+            declared_states = [
+                item.strip() for item in state_value.split(",") if item.strip()
+            ]
+            if (
+                not declared_states
+                or state_value != ", ".join(declared_states)
+                or initial_state not in declared_states
+            ):
+                add(
+                    f"{state_id}: States must be canonical and contain the initial state"
+                )
             if terminal_value != "NONE":
-                terminal_states = [item.strip() for item in terminal_value.split(",") if item.strip()]
+                terminal_states = [
+                    item.strip() for item in terminal_value.split(",") if item.strip()
+                ]
                 if not set(terminal_states) <= set(declared_states):
                     add(f"{state_id}: Terminal states must be declared states or NONE")
-            for label, value in (("Allowed transitions", transitions),
-                                 ("Invalid-transition behavior", invalid_behavior)):
-                if not explicit_value(value, allow_none=False): add(f"{state_id}: {label} must be concrete")
-            issues.extend(_design_reference_issues(
-                state_id, requirement_value, validation_value, requirement_ids, current_validation_ids))
+            for label, value in (
+                ("Allowed transitions", transitions),
+                ("Invalid-transition behavior", invalid_behavior),
+            ):
+                if not explicit_value(value, allow_none=False):
+                    add(f"{state_id}: {label} must be concrete")
+            issues.extend(
+                _design_reference_issues(
+                    state_id,
+                    requirement_value,
+                    validation_value,
+                    requirement_ids,
+                    current_validation_ids,
+                )
+            )
         missing_states = sorted(applicable_state_ids - set(state_ids))
         if missing_states:
-            add("Applicable state models have no state row: " + ", ".join(missing_states))
+            add(
+                "Applicable state models have no state row: "
+                + ", ".join(missing_states)
+            )
 
     first_wave_table: ContractTable | None = None
     first_wave_sentinel = _explicit_not_applicable_section(text, FIRST_WAVE_HEADING)
     try:
-        first_wave_table = contract_table_after_heading(text, FIRST_WAVE_HEADING, FIRST_WAVE_HEADERS)
+        first_wave_table = contract_table_after_heading(
+            text, FIRST_WAVE_HEADING, FIRST_WAVE_HEADERS
+        )
     except ValueError as exc:
         if first_wave_sentinel is None:
             add(f"{FIRST_WAVE_HEADING}: {exc}")
@@ -6495,48 +8142,125 @@ def derive_project_design_contract(
         if first_wave_table is None or len(first_wave_table.rows) != 1:
             add("NEW_BUILD requires exactly one first construction wave row")
         else:
-            wave_id, row_work_kind, journey_id, requirement_value, acceptance_value, harness_id, spike_value = first_wave_table.rows[0]
-            if WAVE_ID.fullmatch(wave_id) is None: add(f"Invalid first-wave ID {wave_id!r}")
-            if row_work_kind != "NEW_BUILD": add("First-wave Work kind must exactly match NEW_BUILD")
+            (
+                wave_id,
+                row_work_kind,
+                journey_id,
+                requirement_value,
+                acceptance_value,
+                harness_id,
+                spike_value,
+            ) = first_wave_table.rows[0]
+            if WAVE_ID.fullmatch(wave_id) is None:
+                add(f"Invalid first-wave ID {wave_id!r}")
+            if row_work_kind != "NEW_BUILD":
+                add("First-wave Work kind must exactly match NEW_BUILD")
             legacy_bridge = requirements_contract.grandfathered_approved_gate_a
             journey_reference: str | None = None if legacy_bridge else journey_id
-            if legacy_bridge and journey_id != "NONE": add(f"{wave_id}: grandfathered Gate A walking-skeleton journey must be NONE")
-            elif not legacy_bridge and journey_id not in set(requirements_contract.journey_ids): add(f"{wave_id}: walking-skeleton journey is not a current JOURNEY ID")
+            if legacy_bridge and journey_id != "NONE":
+                add(
+                    f"{wave_id}: grandfathered Gate A walking-skeleton journey must be NONE"
+                )
+            elif not legacy_bridge and journey_id not in set(
+                requirements_contract.journey_ids
+            ):
+                add(f"{wave_id}: walking-skeleton journey is not a current JOURNEY ID")
             try:
-                wave_requirements = tuple(_contract_ids(requirement_value, STABLE_CONTRACT_ID, f"{wave_id} Requirement IDs"))
+                wave_requirements = tuple(
+                    _contract_ids(
+                        requirement_value,
+                        STABLE_CONTRACT_ID,
+                        f"{wave_id} Requirement IDs",
+                    )
+                )
                 unknown = sorted(set(wave_requirements) - requirement_ids)
-                if unknown: add(f"{wave_id}: unknown requirement IDs: " + ", ".join(unknown))
-                selected_journey_requirements = journey_requirement_ids.get(journey_reference or "")
+                if unknown:
+                    add(f"{wave_id}: unknown requirement IDs: " + ", ".join(unknown))
+                selected_journey_requirements = journey_requirement_ids.get(
+                    journey_reference or ""
+                )
                 if selected_journey_requirements is not None:
-                    outside_journey = sorted(set(wave_requirements) - selected_journey_requirements)
-                    if outside_journey: add(f"{wave_id}: first-wave requirement IDs are not owned by {journey_reference}: " + ", ".join(outside_journey))
-                acceptance_ids = tuple(_contract_ids(acceptance_value, STABLE_CONTRACT_ID, f"{wave_id} Acceptance/test IDs"))
+                    outside_journey = sorted(
+                        set(wave_requirements) - selected_journey_requirements
+                    )
+                    if outside_journey:
+                        add(
+                            f"{wave_id}: first-wave requirement IDs are not owned by {journey_reference}: "
+                            + ", ".join(outside_journey)
+                        )
+                acceptance_ids = tuple(
+                    _contract_ids(
+                        acceptance_value,
+                        STABLE_CONTRACT_ID,
+                        f"{wave_id} Acceptance/test IDs",
+                    )
+                )
                 expected_acceptance = {f"AC-{item}" for item in wave_requirements}
                 missing_acceptance = sorted(expected_acceptance - set(acceptance_ids))
-                if missing_acceptance: add(f"{wave_id}: missing acceptance IDs: " + ", ".join(missing_acceptance))
-                unknown_acceptance = sorted(set(acceptance_ids) - current_validation_ids)
-                if unknown_acceptance: add(f"{wave_id}: unknown acceptance/test IDs: " + ", ".join(unknown_acceptance))
+                if missing_acceptance:
+                    add(
+                        f"{wave_id}: missing acceptance IDs: "
+                        + ", ".join(missing_acceptance)
+                    )
+                unknown_acceptance = sorted(
+                    set(acceptance_ids) - current_validation_ids
+                )
+                if unknown_acceptance:
+                    add(
+                        f"{wave_id}: unknown acceptance/test IDs: "
+                        + ", ".join(unknown_acceptance)
+                    )
             except ValueError as exc:
-                wave_requirements = (); acceptance_ids = (); add(str(exc))
-            harness_row = next((row for row in harness.rows if row.harness_id == harness_id), None)
-            if harness_row is None or harness_row.layer != "End-to-end" or harness_id not in set(harness.required_ids):
-                add(f"{wave_id}: End-to-end Harness ID must reference a current required end-to-end check")
+                wave_requirements = ()
+                acceptance_ids = ()
+                add(str(exc))
+            harness_row = next(
+                (row for row in harness.rows if row.harness_id == harness_id), None
+            )
+            if (
+                harness_row is None
+                or harness_row.layer != "End-to-end"
+                or harness_id not in set(harness.required_ids)
+            ):
+                add(
+                    f"{wave_id}: End-to-end Harness ID must reference a current required end-to-end check"
+                )
             else:
-                harness_basis = set(_canonical_id_list(harness_row.basis_ids, STABLE_CONTRACT_ID, f"{harness_id} Basis IDs"))
-                required_harness_basis = {wave_id, *wave_requirements} if legacy_bridge else {wave_id, journey_id}
+                harness_basis = set(
+                    _canonical_id_list(
+                        harness_row.basis_ids,
+                        STABLE_CONTRACT_ID,
+                        f"{harness_id} Basis IDs",
+                    )
+                )
+                required_harness_basis = (
+                    {wave_id, *wave_requirements}
+                    if legacy_bridge
+                    else {wave_id, journey_id}
+                )
                 if not required_harness_basis <= harness_basis:
-                    message = "include the wave and every selected requirement" if legacy_bridge else f"include both {journey_id} and {wave_id}"
+                    message = (
+                        "include the wave and every selected requirement"
+                        if legacy_bridge
+                        else f"include both {journey_id} and {wave_id}"
+                    )
                     add(f"{wave_id}: {harness_id} Basis IDs must {message}")
             spike_id: str | None
-            if spike_value == "NONE": spike_id = None
+            if spike_value == "NONE":
+                spike_id = None
             elif SPIKE_ID.fullmatch(spike_value) is None:
                 spike_id = None
                 add(f"{wave_id}: invalid Blocking spike ID {spike_value!r}")
-            else: spike_id = spike_value
+            else:
+                spike_id = spike_value
             first_wave = FirstWaveContract(
-                wave_contract_id=wave_id, work_kind=row_work_kind, journey_id=journey_reference,
-                requirement_ids=wave_requirements, acceptance_test_ids=acceptance_ids,
-                harness_id=harness_id, blocking_spike_id=spike_id,
+                wave_contract_id=wave_id,
+                work_kind=row_work_kind,
+                journey_id=journey_reference,
+                requirement_ids=wave_requirements,
+                acceptance_test_ids=acceptance_ids,
+                harness_id=harness_id,
+                blocking_spike_id=spike_id,
             )
     elif first_wave_sentinel is None:
         add("Non-NEW_BUILD work requires an explicit NOT_APPLICABLE first-wave reason")
@@ -6553,34 +8277,59 @@ def derive_project_design_contract(
     expected_spike_id = first_wave.blocking_spike_id if first_wave is not None else None
     if expected_spike_id is None:
         if spike_sentinel is None:
-            add("A first wave without a blocking spike requires an explicit NOT_APPLICABLE spike reason")
+            add(
+                "A first wave without a blocking spike requires an explicit NOT_APPLICABLE spike reason"
+            )
     elif spike_table is None or len(spike_table.rows) != 1:
         add("A referenced blocking spike requires exactly one spike row")
     else:
-        spike_id, unknown, time_box, disposable, exit_criterion, next_action = spike_table.rows[0]
-        if spike_id != expected_spike_id: add("Blocking spike row must exactly match the first-wave spike ID")
-        if not explicit_value(unknown, allow_none=False): add(f"{spike_id}: Blocking technical unknown must be concrete")
+        spike_id, unknown, time_box, disposable, exit_criterion, next_action = (
+            spike_table.rows[0]
+        )
+        if spike_id != expected_spike_id:
+            add("Blocking spike row must exactly match the first-wave spike ID")
+        if not explicit_value(unknown, allow_none=False):
+            add(f"{spike_id}: Blocking technical unknown must be concrete")
         if re.fullmatch(r"MAX_ATTEMPTS: [1-9]\d*", time_box) is None:
             add(f"{spike_id}: Time box must use MAX_ATTEMPTS: <positive integer>")
-        for label, value in (("Disposable output boundary", disposable),
-                             ("Exit criterion", exit_criterion)):
-            if not explicit_value(value, allow_none=False): add(f"{spike_id}: {label} must be concrete")
+        for label, value in (
+            ("Disposable output boundary", disposable),
+            ("Exit criterion", exit_criterion),
+        ):
+            if not explicit_value(value, allow_none=False):
+                add(f"{spike_id}: {label} must be concrete")
         if not valid_property_execution_command(exit_criterion):
             add(
                 f"{spike_id}: Exit criterion must be one explicit local command, "
                 "not prose, shell control, or placeholder content"
             )
         if next_action != "DISCARD_AND_BUILD_WALKING_SKELETON":
-            add(f"{spike_id}: Required next action must be DISCARD_AND_BUILD_WALKING_SKELETON")
+            add(
+                f"{spike_id}: Required next action must be DISCARD_AND_BUILD_WALKING_SKELETON"
+            )
         spike = SpikeContract(
-            spike_id=spike_id, technical_unknown=unknown, time_box=time_box,
-            disposable_boundary=disposable, exit_criterion=exit_criterion,
+            spike_id=spike_id,
+            technical_unknown=unknown,
+            time_box=time_box,
+            disposable_boundary=disposable,
+            exit_criterion=exit_criterion,
             required_next_action=next_action,
         )
 
     canonical_parts: list[bytes] = [b"PROJECT_DESIGN_CONTRACT_SCHEMA: 5\n"]
-    if requirements_contract.grandfathered_approved_gate_a and requirements_contract.canonical_sha256 is None: add("Grandfathered Gate A design requires a canonical legacy requirements projection")
-    elif requirements_contract.grandfathered_approved_gate_a: canonical_parts.append(f"LEGACY_GATE_A_BRIDGE: {requirements_contract.canonical_sha256}\n".encode("utf-8"))
+    if (
+        requirements_contract.grandfathered_approved_gate_a
+        and requirements_contract.canonical_sha256 is None
+    ):
+        add(
+            "Grandfathered Gate A design requires a canonical legacy requirements projection"
+        )
+    elif requirements_contract.grandfathered_approved_gate_a:
+        canonical_parts.append(
+            f"LEGACY_GATE_A_BRIDGE: {requirements_contract.canonical_sha256}\n".encode(
+                "utf-8"
+            )
+        )
     for table in (interfaces, boundaries, state_applicability, states):
         if table is not None:
             canonical_parts.append(table.canonical_bytes)
@@ -6594,17 +8343,25 @@ def derive_project_design_contract(
         canonical_parts.append(spike_sentinel)
     canonical_bytes = b"".join(canonical_parts)
     canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
-    if not required and any(unresolved(cell)
-                            for table in (interfaces, boundaries, state_applicability, states)
-                            if table is not None for row in table.rows for cell in row):
+    if not required and any(
+        unresolved(cell)
+        for table in (interfaces, boundaries, state_applicability, states)
+        if table is not None
+        for row in table.rows
+        for cell in row
+    ):
         return ProjectDesignContract(status="UNINITIALIZED"), []
     return (
         ProjectDesignContract(
             status="READY" if not issues else "BLOCKED",
-            interface_ids=tuple(interface_ids), boundary_ids=tuple(boundary_ids),
-            state_ids=tuple(state_ids), first_wave=first_wave, spike=spike,
+            interface_ids=tuple(interface_ids),
+            boundary_ids=tuple(boundary_ids),
+            state_ids=tuple(state_ids),
+            first_wave=first_wave,
+            spike=spike,
             missing_records=tuple(dict.fromkeys(missing_records)),
-            canonical_sha256=canonical_sha256, canonical_bytes=canonical_bytes,
+            canonical_sha256=canonical_sha256,
+            canonical_bytes=canonical_bytes,
         ),
         issues,
     )
@@ -6625,6 +8382,14 @@ def derive_design_contract(
             document = table_after_heading(text, "## Document status")
         except ValueError:
             document = {}
+        repository_mode = clean_cell(document.get("Project mode", "")).lower()
+        coverage_intake_contract, _coverage_intake_issues = (
+            derive_intake_foundation_contract(
+                text,
+                repository_mode if repository_mode in PROJECT_MODES else None,
+                grandfather_current_gate_a=grandfather_approved_v1,
+            )
+        )
         coverage_contract, coverage_issues = derive_coverage_contract(
             text,
             clean_cell(document.get("Current requirements revision", "")) or None,
@@ -6633,6 +8398,7 @@ def derive_design_contract(
             clean_cell(document.get("AWS lane", "")) or None,
             required=required,
             grandfather_current_gate_a=grandfather_approved_v1,
+            owner_work_context=coverage_intake_contract.owner_work_context,
         )
         if required:
             issues.extend(coverage_issues)
@@ -6672,6 +8438,7 @@ def derive_design_contract(
     except ValueError as exc:
         execution_table = None
         issues.append(f"Property execution contract: {exc}")
+    example_table, example_ids, example_issues = derive_example_scenario_contract(text)
 
     both_missing = technology_table is None and execution_table is None and not issues
     if technology_table is None:
@@ -6682,8 +8449,11 @@ def derive_design_contract(
     technologies: list[TechnologyDecision] = []
     seen_technology_ids: set[str] = set()
     concern_counts: dict[str, int] = {}
-    allowed_basis_ids = current_prd_basis_ids(text, design_revision) | set(requirements_contract.actor_ids
-        + requirements_contract.journey_ids + requirements_contract.acceptance_ids)
+    allowed_basis_ids = current_prd_basis_ids(text, design_revision) | set(
+        requirements_contract.actor_ids
+        + requirements_contract.journey_ids
+        + requirements_contract.acceptance_ids
+    )
     if technology_table is not None:
         if not technology_table.rows:
             issues.append("Technology decision register has no stored rows")
@@ -6691,17 +8461,25 @@ def derive_design_contract(
             decision = TechnologyDecision(*row)
             technologies.append(decision)
             if TECHNOLOGY_DECISION_ID.fullmatch(decision.decision_id) is None:
-                issues.append(f"Invalid technology decision ID {decision.decision_id!r}")
+                issues.append(
+                    f"Invalid technology decision ID {decision.decision_id!r}"
+                )
             elif decision.decision_id in seen_technology_ids:
-                issues.append(f"Duplicate technology decision ID {decision.decision_id}")
+                issues.append(
+                    f"Duplicate technology decision ID {decision.decision_id}"
+                )
             seen_technology_ids.add(decision.decision_id)
             if TECHNOLOGY_CONCERN.fullmatch(decision.concern) is None:
                 issues.append(
                     f"{decision.decision_id}: invalid technology concern {decision.concern!r}"
                 )
-            concern_counts[decision.concern] = concern_counts.get(decision.concern, 0) + 1
+            concern_counts[decision.concern] = (
+                concern_counts.get(decision.concern, 0) + 1
+            )
             if any(technology_contract_value_is_unresolved(cell) for cell in row):
-                issues.append(f"{decision.decision_id}: unresolved technology decision cell")
+                issues.append(
+                    f"{decision.decision_id}: unresolved technology decision cell"
+                )
             if not unresolved(decision.selection) and not valid_technology_selection(
                 decision.selection
             ):
@@ -6709,9 +8487,9 @@ def derive_design_contract(
                     f"{decision.decision_id}: invalid selection {decision.selection!r}; "
                     "use NOT_APPLICABLE — <reason> when the concern does not apply"
                 )
-            if not unresolved(decision.version_policy) and not valid_technology_version_policy(
+            if not unresolved(
                 decision.version_policy
-            ):
+            ) and not valid_technology_version_policy(decision.version_policy):
                 issues.append(
                     f"{decision.decision_id}: invalid version policy {decision.version_policy!r}"
                 )
@@ -6725,8 +8503,13 @@ def derive_design_contract(
                     f"{decision.decision_id}: Selection and Version policy must both "
                     "use NOT_APPLICABLE — <reason>, or both be applicable"
                 )
-            if not unresolved(decision.source) and decision.source not in TECHNOLOGY_SOURCES:
-                issues.append(f"{decision.decision_id}: invalid source {decision.source!r}")
+            if (
+                not unresolved(decision.source)
+                and decision.source not in TECHNOLOGY_SOURCES
+            ):
+                issues.append(
+                    f"{decision.decision_id}: invalid source {decision.source!r}"
+                )
             if not unresolved(decision.basis_ids):
                 if not valid_technology_basis_ids(decision.basis_ids):
                     issues.append(
@@ -6764,16 +8547,22 @@ def derive_design_contract(
             execution = PropertyExecution(*row)
             executions.append(execution)
             if PROPERTY_ID.fullmatch(execution.property_id) is None:
-                issues.append(f"Invalid property execution ID {execution.property_id!r}")
+                issues.append(
+                    f"Invalid property execution ID {execution.property_id!r}"
+                )
             elif execution.property_id in seen_execution_ids:
-                issues.append(f"Duplicate property execution ID {execution.property_id}")
+                issues.append(
+                    f"Duplicate property execution ID {execution.property_id}"
+                )
             seen_execution_ids.add(execution.property_id)
             if TECHNOLOGY_DECISION_ID.fullmatch(execution.framework_tech_id) is None:
                 issues.append(
                     f"{execution.property_id}: invalid Framework TECH ID {execution.framework_tech_id!r}"
                 )
             if any(unresolved(cell) for cell in row):
-                issues.append(f"{execution.property_id}: unresolved property execution cell")
+                issues.append(
+                    f"{execution.property_id}: unresolved property execution cell"
+                )
             if not valid_property_execution_command(execution.exact_command):
                 issues.append(
                     f"{execution.property_id}: Exact command must be one explicit "
@@ -6799,9 +8588,7 @@ def derive_design_contract(
                     f"{PROPERTY_TEST_EVIDENCE_DESTINATION}"
                 )
 
-    technology_by_id = {
-        decision.decision_id: decision for decision in technologies
-    }
+    technology_by_id = {decision.decision_id: decision for decision in technologies}
     for execution in executions:
         property_technology = technology_by_id.get(execution.framework_tech_id)
         if (
@@ -6848,11 +8635,17 @@ def derive_design_contract(
     if applicability_table is not None:
         seen_requirements: set[str] = set()
         for requirement_id, applicability, reason_or_ids in applicability_table.rows:
-            if unresolved(requirement_id) or unresolved(applicability) or unresolved(reason_or_ids):
+            if (
+                unresolved(requirement_id)
+                or unresolved(applicability)
+                or unresolved(reason_or_ids)
+            ):
                 issues.append("Property applicability row contains unresolved cells")
                 continue
             if requirement_id in seen_requirements:
-                issues.append(f"Duplicate property applicability requirement {requirement_id}")
+                issues.append(
+                    f"Duplicate property applicability requirement {requirement_id}"
+                )
             seen_requirements.add(requirement_id)
             if STABLE_CONTRACT_ID.fullmatch(requirement_id) is None:
                 issues.append(
@@ -6930,7 +8723,9 @@ def derive_design_contract(
         if definition is None:
             issues.append(f"{property_id}: applicable property has no definition")
         elif any(unresolved(cell) for cell in definition):
-            issues.append(f"{property_id}: applicable property definition is unresolved")
+            issues.append(
+                f"{property_id}: applicable property definition is unresolved"
+            )
         else:
             expected_requirement_ids = sorted(
                 applicable_requirements_by_property.get(property_id, set())
@@ -6949,12 +8744,16 @@ def derive_design_contract(
     for property_id in sorted(execution_ids - applicable_property_ids):
         issues.append(f"{property_id}: execution row is not referenced as APPLICABLE")
 
+    declared_property_ids = applicable_property_ids & set(definitions) & execution_ids
+    declared_property_test_ids = declared_property_ids | example_ids
+
     architecture, architecture_issues = _derive_architecture_contract(
         text,
         design_revision,
         set(technology_by_id),
         required=required,
         grandfather_approved_v1=grandfather_approved_v1,
+        architecture_disposition=coverage_contract.architecture_disposition,
     )
     issues.extend(architecture_issues)
     harness, harness_issues = derive_harness_contract(
@@ -6996,6 +8795,16 @@ def derive_design_contract(
     if required:
         issues.extend(project_contract_issues)
 
+    if not project_contract.grandfathered_v4:
+        issues.extend(example_issues)
+        trace_issues = architecture_trace_declaration_issues(
+            architecture,
+            project_contract,
+            declared_property_test_ids,
+        )
+        issues.extend(trace_issues)
+        if trace_issues:
+            architecture = replace(architecture, status="BLOCKED")
 
     canonical_sha256: str | None = None
     if (
@@ -7003,33 +8812,32 @@ def derive_design_contract(
         and applicability_table is not None
         and definition_table is not None
         and execution_table is not None
-        and (
-            harness.canonical_bytes is not None
-            or harness.grandfathered_v1
-        )
-        and (
-            change_impact.canonical_bytes is not None
-            or grandfather_approved_v1
-        )
+        and (harness.canonical_bytes is not None or harness.grandfathered_v1)
+        and (change_impact.canonical_bytes is not None or grandfather_approved_v1)
         and (
             project_contract.canonical_bytes is not None
             or project_contract.grandfathered_v4
         )
+        and (example_table is not None or project_contract.grandfathered_v4)
     ):
         architecture_bytes = architecture.canonical_bytes or b""
         harness_bytes = harness.canonical_bytes or b""
         change_impact_bytes = change_impact.canonical_bytes or b""
         project_contract_bytes = project_contract.canonical_bytes or b""
-        canonical_sha256 = "sha256:" + hashlib.sha256(
-            architecture_bytes
-            + harness_bytes
-            + change_impact_bytes
-            + project_contract_bytes
-            + technology_table.canonical_bytes
-            + applicability_table.canonical_bytes
-            + definition_table.canonical_bytes
-            + execution_table.canonical_bytes
-        ).hexdigest()
+        canonical_sha256 = (
+            "sha256:"
+            + hashlib.sha256(
+                architecture_bytes
+                + harness_bytes
+                + change_impact_bytes
+                + project_contract_bytes
+                + technology_table.canonical_bytes
+                + (example_table.canonical_bytes if example_table is not None else b"")
+                + applicability_table.canonical_bytes
+                + definition_table.canonical_bytes
+                + execution_table.canonical_bytes
+            ).hexdigest()
+        )
     status = (
         "UNINITIALIZED"
         if both_missing and not required
@@ -7113,7 +8921,9 @@ def parse_envelope_paths(value: str, label: str, *, allow_none: bool) -> list[st
         return []
     prefix = "PATHS: "
     if not cleaned.startswith(prefix):
-        raise ValueError(f"{label} must use PATHS: path; path" + (" or NONE" if allow_none else ""))
+        raise ValueError(
+            f"{label} must use PATHS: path; path" + (" or NONE" if allow_none else "")
+        )
     items = [item.strip() for item in cleaned[len(prefix) :].split(";")]
     return parse_task_write_set(",".join(items), label)
 
@@ -7124,7 +8934,9 @@ def parse_envelope_targets(value: str) -> list[str]:
         return []
     prefix = "TARGETS: "
     if not cleaned.startswith(prefix):
-        raise ValueError("Allowed external-state targets must use TARGETS: target; target or NONE")
+        raise ValueError(
+            "Allowed external-state targets must use TARGETS: target; target or NONE"
+        )
     items = [item.strip() for item in cleaned[len(prefix) :].split(";")]
     return parse_task_external_state(",".join(items), "Gate B envelope")
 
@@ -7151,11 +8963,15 @@ def parse_command_prefixes(value: str) -> list[str]:
     cleaned = clean_cell(value)
     prefix = "ALLOW_PREFIXES: "
     if not cleaned.startswith(prefix):
-        raise ValueError("Local command boundary must use ALLOW_PREFIXES: prefix; prefix")
+        raise ValueError(
+            "Local command boundary must use ALLOW_PREFIXES: prefix; prefix"
+        )
     values = [item.strip() for item in cleaned[len(prefix) :].split(";")]
     if not values or any(not item for item in values):
         raise ValueError("Local command boundary contains an empty prefix")
-    if any(SHELL_CONTROL.search(item) or item.startswith(("-", "#")) for item in values):
+    if any(
+        SHELL_CONTROL.search(item) or item.startswith(("-", "#")) for item in values
+    ):
         raise ValueError("Local command prefixes cannot contain shell-control syntax")
     if len(values) != len(set(values)):
         raise ValueError("Local command boundary contains duplicate prefixes")
@@ -7163,7 +8979,9 @@ def parse_command_prefixes(value: str) -> list[str]:
 
 
 def validation_commands(section: str, task_id: str) -> list[str]:
-    fences = re.findall(r"^```[^\r\n]*\r?\n(.*?)^```\s*$", section, re.MULTILINE | re.DOTALL)
+    fences = re.findall(
+        r"^```[^\r\n]*\r?\n(.*?)^```\s*$", section, re.MULTILINE | re.DOTALL
+    )
     commands: list[str] = []
     for body in fences:
         for raw_line in body.splitlines():
@@ -7173,7 +8991,9 @@ def validation_commands(section: str, task_id: str) -> list[str]:
             if command.startswith("$ "):
                 command = command[2:].strip()
             if SHELL_CONTROL.search(command):
-                raise ValueError(f"{task_id}: Validation command contains shell-control syntax")
+                raise ValueError(
+                    f"{task_id}: Validation command contains shell-control syntax"
+                )
             commands.append(command)
     if not commands:
         raise ValueError(f"{task_id}: Validation requires at least one fenced command")
@@ -7275,7 +9095,11 @@ def validate_relative_path(value: Any) -> str | None:
         return None
     value = value.strip()
     pure = PurePosixPath(value)
-    if pure.is_absolute() or "\\" in value or any(part in {"", ".", ".."} for part in pure.parts):
+    if (
+        pure.is_absolute()
+        or "\\" in value
+        or any(part in {"", ".", ".."} for part in pure.parts)
+    ):
         return None
     return value
 
@@ -7289,12 +9113,22 @@ def has_symlink_component(root: Path, relative: str) -> bool:
     return False
 
 
+MAX_REQUIRED_FILES = 512
+MAX_REQUIRED_FILE_BYTES = 16 * 1024 * 1024
+MAX_PROJECT_SOURCE_BYTES = 64 * 1024 * 1024
+
+
 def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str | None:
+    cached = ctx.texts.get(relative)
+    if cached is not None:
+        return cached
     if validate_relative_path(relative) is None:
         ctx.error("MANIFEST_UNSAFE_PATH", f"Unsafe project-relative path: {relative!r}")
         return None
     if has_symlink_component(ctx.root, relative):
-        ctx.error("REQUIRED_FILE_SYMLINK", "Required path contains a symbolic link", relative)
+        ctx.error(
+            "REQUIRED_FILE_SYMLINK", "Required path contains a symbolic link", relative
+        )
         return None
     path = ctx.root / relative
     if not path.exists():
@@ -7302,15 +9136,74 @@ def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str
             ctx.error("REQUIRED_FILE_MISSING", "Required file is missing", relative)
         return None
     if not path.is_file():
-        ctx.error("REQUIRED_FILE_NOT_REGULAR", "Required path is not a regular file", relative)
+        ctx.error(
+            "REQUIRED_FILE_NOT_REGULAR", "Required path is not a regular file", relative
+        )
+        return None
+    remaining = MAX_PROJECT_SOURCE_BYTES - ctx.source_bytes_read
+    if remaining <= 0:
+        ctx.error(
+            "PROJECT_SOURCE_LIMIT",
+            f"Required project text exceeds the {MAX_PROJECT_SOURCE_BYTES}-byte aggregate limit",
+            relative,
+        )
+        return None
+    read_limit = min(MAX_REQUIRED_FILE_BYTES, remaining)
+    try:
+        with path.open("rb") as stream:
+            raw = stream.read(read_limit + 1)
+    except OSError as exc:
+        ctx.error(
+            "REQUIRED_FILE_UNREADABLE", f"Unable to read UTF-8 text: {exc}", relative
+        )
+        return None
+    if len(raw) > read_limit:
+        code = (
+            "REQUIRED_FILE_TOO_LARGE"
+            if read_limit == MAX_REQUIRED_FILE_BYTES
+            else "PROJECT_SOURCE_LIMIT"
+        )
+        limit = (
+            MAX_REQUIRED_FILE_BYTES
+            if code == "REQUIRED_FILE_TOO_LARGE"
+            else MAX_PROJECT_SOURCE_BYTES
+        )
+        scope = "per-file" if code == "REQUIRED_FILE_TOO_LARGE" else "aggregate"
+        ctx.error(
+            code,
+            f"Required project text exceeds the {limit}-byte {scope} limit",
+            relative,
+        )
         return None
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as exc:
-        ctx.error("REQUIRED_FILE_UNREADABLE", f"Unable to read UTF-8 text: {exc}", relative)
+        text = raw.decode("utf-8")
+    except UnicodeError as exc:
+        ctx.error(
+            "REQUIRED_FILE_UNREADABLE", f"Unable to read UTF-8 text: {exc}", relative
+        )
         return None
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    ctx.source_bytes_read += len(raw)
     ctx.texts[relative] = text
     return text
+
+
+def bounded_prd_snapshot(
+    root: Path, expected_sha256: str | None = None
+) -> tuple[str, str]:
+    """Read one normalized, size-bounded PRD snapshot and bind it by digest."""
+
+    snapshot_context = Context(root=root.resolve())
+    text = safe_read_text(snapshot_context, PRD_FILE)
+    if text is None or snapshot_context.has_errors:
+        raise ValueError("Unable to read a bounded PRD snapshot")
+    digest = "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+    if expected_sha256 is not None and (
+        re.fullmatch(r"sha256:[0-9a-f]{64}", expected_sha256) is None
+        or digest != expected_sha256
+    ):
+        raise ValueError("PRD snapshot changed after project inspection")
+    return text, digest
 
 
 def load_json_document(ctx: Context, relative: str, code: str) -> dict[str, Any] | None:
@@ -7338,7 +9231,9 @@ def table_after_heading(text: str, heading: str) -> dict[str, str]:
         re.finditer(rf"^{re.escape(heading)}[ \t]*$", structural, re.MULTILINE)
     )
     if len(matches) != 1:
-        raise ValueError(f"Expected exactly one heading {heading!r}; found {len(matches)}")
+        raise ValueError(
+            f"Expected exactly one heading {heading!r}; found {len(matches)}"
+        )
     lines = text[matches[0].end() :].splitlines()
     structural_lines = structural[matches[0].end() :].splitlines()
     start = next(
@@ -7380,6 +9275,170 @@ def marked_receipt(text: str, gate: str) -> str:
     if match is None:
         raise ValueError(f"Marked {gate} receipt must contain one text fence")
     return match.group("receipt").replace("\r\n", "\n").strip()
+
+
+def current_gate_receipt_contract(
+    root: Path, report: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Return the exact receipt proposal for the currently pending owner gate."""
+
+    lifecycle_state = str(report.get("lifecycle_state", ""))
+    next_prompt = str(report.get("next_prompt", ""))
+    if lifecycle_state == "WAITING_GATE_A" and next_prompt == "INTAKE-20":
+        gate = "GATE_A"
+        owner_action_kind = "APPROVE_GATE_A"
+    elif lifecycle_state == "WAITING_GATE_B" and next_prompt == "DESIGN-20":
+        gate = "GATE_B"
+        owner_action_kind = "APPROVE_GATE_B"
+    else:
+        raise ValueError("The project is not waiting for a Gate A or Gate B receipt")
+
+    try:
+        basis = report.get("basis")
+        if not isinstance(basis, Mapping):
+            raise ValueError("Current gate basis is missing")
+        text, _ = bounded_prd_snapshot(
+            root, clean_cell(basis.get("prd_snapshot_sha256", ""))
+        )
+        requirements_revision = clean_cell(basis.get("requirements_revision", ""))
+        if REQ_ID.fullmatch(requirements_revision) is None:
+            raise ValueError("Current requirements revision is invalid")
+        if gate == "GATE_A":
+            gate_a_agent = table_after_heading(
+                text, "### Gate A — agent analysis record"
+            )
+            gate_a_card = table_after_heading(text, "### Gate A — readiness card")
+            assumption_ids = parse_exact_id_list(
+                gate_a_agent.get("Proposed assumption IDs required to proceed", ""),
+                re.compile(r"ASM-\d+"),
+                "Gate A proposed assumptions",
+            )
+            assumptions = ", ".join(assumption_ids) if assumption_ids else "NONE"
+            cost_posture = clean_cell(gate_a_card.get("Cost posture", ""))
+            parse_cost_posture(cost_posture)
+            fixed_lines = [
+                "APPROVE REQUIREMENTS GATE A",
+                f"Requirements revision: {requirements_revision}",
+                f"Cost posture: {cost_posture}",
+                f"Accepted assumptions: {assumptions}",
+            ]
+            fields = {
+                "requirements_revision": requirements_revision,
+                "cost_posture": cost_posture,
+                "accepted_assumptions": assumptions,
+            }
+        else:
+            design_revision = clean_cell(basis.get("design_revision", ""))
+            authorization_id = clean_cell(basis.get("construction_authorization", ""))
+            if DES_ID.fullmatch(design_revision) is None:
+                raise ValueError("Current design revision is invalid")
+            if AUTH_ID.fullmatch(authorization_id) is None:
+                raise ValueError("Current construction authorization is invalid")
+            envelope_digest = canonical_envelope_sha256(text)
+            fixed_lines = [
+                "APPROVE PRD AND CONSTRUCTION GATE B",
+                f"Requirements revision: {requirements_revision}",
+                f"Design revision: {design_revision}",
+                f"Construction authorization: {authorization_id}",
+                f"Construction envelope SHA-256: {envelope_digest}",
+                "Use the proposed construction envelope above.",
+            ]
+            fields = {
+                "requirements_revision": requirements_revision,
+                "design_revision": design_revision,
+                "construction_authorization": authorization_id,
+                "construction_envelope_sha256": envelope_digest,
+            }
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise ValueError("The current pending gate contract is invalid") from exc
+
+    return {
+        "gate": gate,
+        "lifecycle_state": lifecycle_state,
+        "next_prompt": next_prompt,
+        "owner_action_kind": owner_action_kind,
+        "fixed_lines": fixed_lines,
+        "fields": fields,
+        "expected_receipt": "\n".join([*fixed_lines, "Approver: <name/handle>"]),
+    }
+
+
+def validate_gate_receipt_candidate(
+    candidate: str, contract: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate one owner receipt without writing or echoing rejected content."""
+
+    common = {
+        "schema_version": 1,
+        "gate": contract["gate"],
+        "lifecycle_state": contract["lifecycle_state"],
+        "next_prompt": contract["next_prompt"],
+        "owner_action_kind": contract["owner_action_kind"],
+        "formal_receipt_required": True,
+        "project_state_changed": False,
+        "expected_receipt": contract["expected_receipt"],
+    }
+
+    def rejected(code: str, message: str) -> dict[str, Any]:
+        return {
+            **common,
+            "status": "FAIL",
+            "candidate_accepted": False,
+            "errors": [{"code": code, "message": message}],
+        }
+
+    if len(candidate) > MAX_GATE_RECEIPT_CHARACTERS:
+        return rejected(
+            "GATE_RECEIPT_TOO_LONG",
+            "The owner receipt exceeds the bounded receipt length",
+        )
+    normalized = re.sub(r"\r+\n", "\n", candidate).replace("\r", "\n").strip()
+    if not normalized or any(
+        ord(character) < 32 and character != "\n" for character in normalized
+    ):
+        return rejected(
+            "GATE_RECEIPT_FORMAT_INVALID",
+            "The owner receipt contains invalid or missing text",
+        )
+    lines = normalized.split("\n")
+    fixed_lines = contract.get("fixed_lines")
+    if not isinstance(fixed_lines, list) or not all(
+        isinstance(line, str) for line in fixed_lines
+    ):
+        return rejected(
+            "GATE_RECEIPT_CONTRACT_INVALID",
+            "The current gate receipt contract is invalid",
+        )
+    if len(lines) != len(fixed_lines) + 1:
+        return rejected(
+            "GATE_RECEIPT_FORMAT_INVALID",
+            "The owner receipt must contain the complete exact ordered block",
+        )
+    if lines[:-1] != fixed_lines:
+        return rejected(
+            "GATE_RECEIPT_BASIS_MISMATCH",
+            "The owner receipt does not match the current exact gate proposal",
+        )
+    approver_prefix = "Approver: "
+    if not lines[-1].startswith(approver_prefix):
+        return rejected(
+            "GATE_RECEIPT_FORMAT_INVALID",
+            "The final owner receipt line must be the Approver field",
+        )
+    approver = lines[-1][len(approver_prefix) :]
+    if not explicit_human_approver(approver):
+        return rejected(
+            "GATE_RECEIPT_APPROVER_INVALID",
+            "The approver must be an explicit human owner identity",
+        )
+    return {
+        **common,
+        "status": "PASS",
+        "candidate_accepted": True,
+        "normalized_receipt": normalized,
+        "fields": {**dict(contract.get("fields", {})), "approver": approver},
+        "errors": [],
+    }
 
 
 def exact_selection(
@@ -7436,24 +9495,47 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
             MANIFEST_FILE,
         )
     if manifest.get("schema_version") != 1:
-        ctx.error("MANIFEST_SCHEMA", "Unsupported manifest schema_version", MANIFEST_FILE)
+        ctx.error(
+            "MANIFEST_SCHEMA", "Unsupported manifest schema_version", MANIFEST_FILE
+        )
     version = manifest.get("bootstrap_version")
     if not isinstance(version, str) or re.fullmatch(r"\d+\.\d+\.\d+", version) is None:
-        ctx.error("MANIFEST_VERSION", "bootstrap_version must be semantic version text", MANIFEST_FILE)
+        ctx.error(
+            "MANIFEST_VERSION",
+            "bootstrap_version must be semantic version text",
+            MANIFEST_FILE,
+        )
 
     files = manifest.get("required_files")
     if not isinstance(files, list):
-        ctx.error("MANIFEST_REQUIRED_FILES", "required_files must be an array", MANIFEST_FILE)
+        ctx.error(
+            "MANIFEST_REQUIRED_FILES", "required_files must be an array", MANIFEST_FILE
+        )
+        return
+    if len(files) > MAX_REQUIRED_FILES:
+        ctx.error(
+            "MANIFEST_REQUIRED_FILES_LIMIT",
+            f"required_files exceeds the {MAX_REQUIRED_FILES}-entry limit",
+            MANIFEST_FILE,
+        )
         return
     seen: set[str] = set()
     folded: set[str] = set()
     for item in files:
         relative = validate_relative_path(item)
         if relative is None:
-            ctx.error("MANIFEST_UNSAFE_PATH", f"Unsafe required_files entry: {item!r}", MANIFEST_FILE)
+            ctx.error(
+                "MANIFEST_UNSAFE_PATH",
+                f"Unsafe required_files entry: {item!r}",
+                MANIFEST_FILE,
+            )
             continue
         if relative in seen or relative.casefold() in folded:
-            ctx.error("MANIFEST_DUPLICATE_PATH", f"Duplicate required path: {relative}", MANIFEST_FILE)
+            ctx.error(
+                "MANIFEST_DUPLICATE_PATH",
+                f"Duplicate required path: {relative}",
+                MANIFEST_FILE,
+            )
             continue
         seen.add(relative)
         folded.add(relative.casefold())
@@ -7465,6 +9547,14 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
             "Manifest omits mandatory control files: " + ", ".join(missing_mandatory),
             MANIFEST_FILE,
         )
+    missing_controls = sorted(CONTROL_HASH_FILES - seen)
+    if missing_controls:
+        ctx.error(
+            "MANIFEST_CONTROL_REQUIRED_FILES",
+            "Manifest control files must also be required files: "
+            + ", ".join(missing_controls),
+            MANIFEST_FILE,
+        )
     if set(manifest.get("template_placeholders", [])) != CANONICAL_PLACEHOLDERS:
         ctx.error(
             "MANIFEST_PLACEHOLDERS",
@@ -7473,7 +9563,10 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
         )
     source_hashes = manifest.get("source_sha256")
     expected_source_paths = seen - {MANIFEST_FILE}
-    if not isinstance(source_hashes, dict) or set(source_hashes) != expected_source_paths:
+    if (
+        not isinstance(source_hashes, dict)
+        or set(source_hashes) != expected_source_paths
+    ):
         ctx.error(
             "MANIFEST_SOURCE_HASHES",
             "source_sha256 must map every required file except the manifest itself",
@@ -7493,15 +9586,10 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
                 )
                 continue
             if ctx.template_source and not has_symlink_component(ctx.root, relative):
-                try:
-                    actual = hashlib.sha256((ctx.root / relative).read_bytes()).hexdigest()
-                except OSError as exc:
-                    ctx.error(
-                        "MANIFEST_SOURCE_HASHES",
-                        f"Unable to hash template source: {exc}",
-                        relative,
-                    )
+                source_text = ctx.texts.get(relative)
+                if source_text is None:
                     continue
+                actual = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
                 if actual != expected:
                     ctx.error(
                         "MANIFEST_SOURCE_HASHES",
@@ -7518,7 +9606,10 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
         return
     for relative in sorted(CONTROL_HASH_FILES):
         expected = controls.get(relative)
-        if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
+        if (
+            not isinstance(expected, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected) is None
+        ):
             ctx.error(
                 "MANIFEST_CONTROL_HASHES",
                 f"Invalid SHA-256 for trusted control {relative}",
@@ -7527,15 +9618,10 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
             continue
         if has_symlink_component(ctx.root, relative):
             continue
-        try:
-            actual = hashlib.sha256((ctx.root / relative).read_bytes()).hexdigest()
-        except OSError as exc:
-            ctx.error(
-                "CONTROL_HASH_UNREADABLE",
-                f"Unable to hash trusted control: {exc}",
-                relative,
-            )
+        control_text = ctx.texts.get(relative)
+        if control_text is None:
             continue
+        actual = hashlib.sha256(control_text.encode("utf-8")).hexdigest()
         if actual != expected:
             ctx.error(
                 "CONTROL_HASH_MISMATCH",
@@ -7544,13 +9630,19 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
             )
 
 
-def validate_prompt_pack(ctx: Context, manifest: dict[str, Any], state: dict[str, Any]) -> None:
+def validate_prompt_pack(
+    ctx: Context, manifest: dict[str, Any], state: dict[str, Any]
+) -> None:
     text = ctx.texts.get(PROMPT_FILE) or safe_read_text(ctx, PROMPT_FILE)
     if text is None:
         return
-    version_match = re.search(r"^\*\*Pack version:\*\*\s*(\d+\.\d+\.\d+)\s*$", text, re.MULTILINE)
+    version_match = re.search(
+        r"^\*\*Pack version:\*\*\s*(\d+\.\d+\.\d+)\s*$", text, re.MULTILINE
+    )
     if version_match is None:
-        ctx.error("PROMPT_VERSION_MISSING", "Prompt pack version is missing", PROMPT_FILE)
+        ctx.error(
+            "PROMPT_VERSION_MISSING", "Prompt pack version is missing", PROMPT_FILE
+        )
     else:
         versions = {
             str(manifest.get("bootstrap_version")),
@@ -7558,22 +9650,42 @@ def validate_prompt_pack(ctx: Context, manifest: dict[str, Any], state: dict[str
             version_match.group(1),
         }
         if len(versions) != 1:
-            ctx.error("BOOTSTRAP_VERSION_DRIFT", f"Version values disagree: {sorted(versions)}")
+            ctx.error(
+                "BOOTSTRAP_VERSION_DRIFT",
+                f"Version values disagree: {sorted(versions)}",
+            )
 
     expected = manifest.get("canonical_prompt_ids")
     actual = re.findall(r"^##\s+([A-Z]+-\d{2})\s+", text, re.MULTILINE)
-    if not isinstance(expected, list) or not all(isinstance(item, str) for item in expected):
-        ctx.error("PROMPT_IDS_MANIFEST", "canonical_prompt_ids must be an array of strings", MANIFEST_FILE)
+    if not isinstance(expected, list) or not all(
+        isinstance(item, str) for item in expected
+    ):
+        ctx.error(
+            "PROMPT_IDS_MANIFEST",
+            "canonical_prompt_ids must be an array of strings",
+            MANIFEST_FILE,
+        )
     elif actual != expected:
-        ctx.error("PROMPT_IDS_DRIFT", f"Prompt headings do not match manifest order: {actual}", PROMPT_FILE)
+        ctx.error(
+            "PROMPT_IDS_DRIFT",
+            f"Prompt headings do not match manifest order: {actual}",
+            PROMPT_FILE,
+        )
     elif len(actual) != len(set(actual)):
-        ctx.error("PROMPT_IDS_DUPLICATE", "Canonical prompt IDs must be unique", PROMPT_FILE)
+        ctx.error(
+            "PROMPT_IDS_DUPLICATE", "Canonical prompt IDs must be unique", PROMPT_FILE
+        )
 
 
 def validate_placeholders(ctx: Context) -> None:
     if ctx.template_source:
         return
-    excluded = {MANIFEST_FILE, "bootstrap.py", "scripts/bootstrap_doctor.py"}
+    excluded = {
+        MANIFEST_FILE,
+        "bootstrap.py",
+        "scripts/bootstrap_doctor.py",
+        "scripts/fastlane_project_identity.py",
+    }
     for relative, text in sorted(ctx.texts.items()):
         if relative in excluded or relative.startswith("tests/"):
             continue
@@ -7596,7 +9708,11 @@ def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
         "execution",
     }
     if set(state) != expected_top:
-        ctx.error("STATE_SCHEMA", f"State keys must be exactly {sorted(expected_top)}", STATE_FILE)
+        ctx.error(
+            "STATE_SCHEMA",
+            f"State keys must be exactly {sorted(expected_top)}",
+            STATE_FILE,
+        )
     if state.get("schema_version") != 1:
         ctx.error("STATE_SCHEMA", "Unsupported state schema_version", STATE_FILE)
 
@@ -7654,7 +9770,11 @@ def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
         ("execution", execution, execution_expected),
     ):
         if set(value) != expected:
-            ctx.error("STATE_SCHEMA", f"{name} keys must be exactly {sorted(expected)}", STATE_FILE)
+            ctx.error(
+                "STATE_SCHEMA",
+                f"{name} keys must be exactly {sorted(expected)}",
+                STATE_FILE,
+            )
 
     setup_status = setup.get("status")
     setup_method = setup.get("method")
@@ -7671,7 +9791,43 @@ def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
     for key in ("name", "region", "cost_posture"):
         value = project.get(key)
         if not isinstance(value, str) or not value.strip():
-            ctx.error("PROJECT_IDENTITY", f"project.{key} must be non-empty text", STATE_FILE)
+            ctx.error(
+                "PROJECT_IDENTITY", f"project.{key} must be non-empty text", STATE_FILE
+            )
+    name = project.get("name")
+    if (
+        isinstance(name, str)
+        and name.strip()
+        and not (ctx.template_source and name == PROJECT_NAME_TOKEN)
+    ):
+        try:
+            canonical_name = normalize_project_name(name)
+        except ValueError as exc:
+            ctx.error("PROJECT_IDENTITY", str(exc), STATE_FILE)
+        else:
+            if canonical_name != name:
+                ctx.error(
+                    "PROJECT_IDENTITY",
+                    "project.name must use its canonical normalized value",
+                    STATE_FILE,
+                )
+    region = project.get("region")
+    if (
+        isinstance(region, str)
+        and region.strip()
+        and not (ctx.template_source and region == "{{AWS_REGION}}")
+    ):
+        try:
+            canonical_region = normalize_aws_region(region)
+        except ValueError as exc:
+            ctx.error("PROJECT_IDENTITY", str(exc), STATE_FILE)
+        else:
+            if canonical_region != region:
+                ctx.error(
+                    "PROJECT_IDENTITY",
+                    "project.region must use its canonical lowercase value",
+                    STATE_FILE,
+                )
     cost_posture = project.get("cost_posture")
     if isinstance(cost_posture, str) and not (
         ctx.template_source and cost_posture == "{{COST_POSTURE}}"
@@ -7689,7 +9845,9 @@ def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
     ):
         value = project.get(key)
         if value is not None and (not isinstance(value, str) or value not in allowed):
-            ctx.error("PROJECT_VOCABULARY", f"Invalid project.{key}: {value!r}", STATE_FILE)
+            ctx.error(
+                "PROJECT_VOCABULARY", f"Invalid project.{key}: {value!r}", STATE_FILE
+            )
     baseline_state = project.get("brownfield_baseline")
     if not isinstance(baseline_state, str) or baseline_state not in BROWNFIELD_STATES:
         ctx.error("PROJECT_VOCABULARY", "Invalid brownfield_baseline state", STATE_FILE)
@@ -7723,21 +9881,40 @@ def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
     if plan is not None and PLAN_ID.fullmatch(str(plan)) is None:
         ctx.error("STATE_RUN", "plan_revision must be null or PLAN-nnnn", STATE_FILE)
     plan_state = execution.get("plan_state")
-    if not isinstance(plan_state, str) or plan_state not in {"UNINITIALIZED", "CURRENT", "STALE"}:
-        ctx.error("STATE_RUN", "plan_state must be UNINITIALIZED, CURRENT, or STALE", STATE_FILE)
+    if not isinstance(plan_state, str) or plan_state not in {
+        "UNINITIALIZED",
+        "CURRENT",
+        "STALE",
+    }:
+        ctx.error(
+            "STATE_RUN",
+            "plan_state must be UNINITIALIZED, CURRENT, or STALE",
+            STATE_FILE,
+        )
     if (plan is None) != (plan_state == "UNINITIALIZED"):
-        ctx.error("STATE_RUN", "plan_revision and plan_state are inconsistent", STATE_FILE)
+        ctx.error(
+            "STATE_RUN", "plan_revision and plan_state are inconsistent", STATE_FILE
+        )
     active = execution.get("active_tasks")
-    if not isinstance(active, list) or not all(isinstance(item, str) and TASK_ID.fullmatch(item) for item in active):
+    if not isinstance(active, list) or not all(
+        isinstance(item, str) and TASK_ID.fullmatch(item) for item in active
+    ):
         ctx.error("STATE_RUN", "active_tasks must contain only TASK IDs", STATE_FILE)
     elif len(active) != len(set(active)):
         ctx.error("STATE_RUN", "active_tasks contains duplicates", STATE_FILE)
     attempts = execution.get("attempts")
     if not isinstance(attempts, dict) or any(
-        TASK_ID.fullmatch(str(key)) is None or not isinstance(value, int) or isinstance(value, bool) or value < 0
+        TASK_ID.fullmatch(str(key)) is None
+        or not isinstance(value, int)
+        or isinstance(value, bool)
+        or value < 0
         for key, value in (attempts.items() if isinstance(attempts, dict) else [])
     ):
-        ctx.error("STATE_RUN", "attempts must map TASK IDs to non-negative integers", STATE_FILE)
+        ctx.error(
+            "STATE_RUN",
+            "attempts must map TASK IDs to non-negative integers",
+            STATE_FILE,
+        )
     run_id = execution.get("run_id")
     coordinator = execution.get("coordinator")
     run_state = run_state_value if isinstance(run_state_value, str) else ""
@@ -7751,17 +9928,29 @@ def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
             or execution.get("mode") != "NONE"
             or execution.get("active_tasks")
         ):
-            ctx.error("STATE_RUN", "IDLE execution cannot have a coordinator, run ID, run mode, or active tasks", STATE_FILE)
+            ctx.error(
+                "STATE_RUN",
+                "IDLE execution cannot have a coordinator, run ID, run mode, or active tasks",
+                STATE_FILE,
+            )
     else:
         if run_id is None or coordinator is None or execution.get("mode") == "NONE":
-            ctx.error("STATE_RUN", "A non-IDLE execution requires a coordinator, run ID, and run mode", STATE_FILE)
+            ctx.error(
+                "STATE_RUN",
+                "A non-IDLE execution requires a coordinator, run ID, and run mode",
+                STATE_FILE,
+            )
         expected_basis_keys = {
             "requirements_revision",
             "design_revision",
             "construction_authorization",
         }
         if not isinstance(basis, dict) or set(basis) != expected_basis_keys:
-            ctx.error("STATE_RUN", "A non-IDLE execution requires a complete revision basis", STATE_FILE)
+            ctx.error(
+                "STATE_RUN",
+                "A non-IDLE execution requires a complete revision basis",
+                STATE_FILE,
+            )
     checkpoint = execution.get("last_checkpoint")
     if checkpoint is not None:
         checkpoint_keys = {"id", "at", "evidence_ref"}
@@ -7772,11 +9961,17 @@ def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
             or unresolved(str(checkpoint.get("at", "")))
             or unresolved(str(checkpoint.get("evidence_ref", "")))
         ):
-            ctx.error("STATE_RUN", "last_checkpoint fields must be explicit", STATE_FILE)
+            ctx.error(
+                "STATE_RUN", "last_checkpoint fields must be explicit", STATE_FILE
+            )
     if run_state in {"CHECKPOINTED", "BLOCKED", "COMPLETE"} and checkpoint is None:
-        ctx.error("STATE_RUN", f"{run_state} execution requires a checkpoint", STATE_FILE)
+        ctx.error(
+            "STATE_RUN", f"{run_state} execution requires a checkpoint", STATE_FILE
+        )
     if run_state == "COMPLETE" and execution.get("active_tasks"):
-        ctx.error("STATE_RUN", "COMPLETE execution cannot have active tasks", STATE_FILE)
+        ctx.error(
+            "STATE_RUN", "COMPLETE execution cannot have active tasks", STATE_FILE
+        )
     if execution.get("state") == "RUNNING":
         ctx.error(
             "RUN_UNCLEAN_INTERRUPTION",
@@ -7790,7 +9985,9 @@ def validate_brownfield_contract(ctx: Context, text: str) -> None:
     heading = "### 1.2 Brownfield baseline and preservation contract"
     matches = list(re.finditer(rf"^{re.escape(heading)}\s*$", text, re.MULTILINE))
     if len(matches) != 1:
-        ctx.error("BROWNFIELD_PRD_BASELINE", f"Expected exactly one {heading!r}", PRD_FILE)
+        ctx.error(
+            "BROWNFIELD_PRD_BASELINE", f"Expected exactly one {heading!r}", PRD_FILE
+        )
         return
     next_heading = re.search(r"^##\s+2\.", text[matches[0].end() :], re.MULTILINE)
     end = matches[0].end() + next_heading.start() if next_heading else len(text)
@@ -7807,7 +10004,11 @@ def validate_brownfield_contract(ctx: Context, text: str) -> None:
     for row in tables[0][2:]:
         if len(row) >= 2:
             if row[0] in baseline:
-                ctx.error("BROWNFIELD_PRD_BASELINE", f"Duplicate brownfield field {row[0]!r}", PRD_FILE)
+                ctx.error(
+                    "BROWNFIELD_PRD_BASELINE",
+                    f"Duplicate brownfield field {row[0]!r}",
+                    PRD_FILE,
+                )
             baseline[row[0]] = row[1]
     missing = sorted(BROWNFIELD_BASELINE_FIELDS - set(baseline))
     if missing:
@@ -7817,17 +10018,22 @@ def validate_brownfield_contract(ctx: Context, text: str) -> None:
             PRD_FILE,
         )
     unresolved_fields = sorted(
-        field for field in BROWNFIELD_BASELINE_FIELDS if not explicit_value(baseline.get(field, ""), allow_none=True)
+        field
+        for field in BROWNFIELD_BASELINE_FIELDS
+        if not explicit_value(baseline.get(field, ""), allow_none=True)
     )
     if unresolved_fields:
         ctx.error(
             "BROWNFIELD_PRD_BASELINE",
-            "Brownfield baseline has unresolved fields: " + ", ".join(unresolved_fields),
+            "Brownfield baseline has unresolved fields: "
+            + ", ".join(unresolved_fields),
             PRD_FILE,
         )
 
     preservation_rows = [
-        row for row in tables[1][2:] if row and re.fullmatch(r"PRES-\d+", row[0]) is not None
+        row
+        for row in tables[1][2:]
+        if row and re.fullmatch(r"PRES-\d+", row[0]) is not None
     ]
     if not preservation_rows:
         ctx.error(
@@ -7836,7 +10042,9 @@ def validate_brownfield_contract(ctx: Context, text: str) -> None:
             PRD_FILE,
         )
     for row in preservation_rows:
-        if len(row) < 5 or any(not explicit_value(value, allow_none=False) for value in row[1:5]):
+        if len(row) < 5 or any(
+            not explicit_value(value, allow_none=False) for value in row[1:5]
+        ):
             ctx.error(
                 "BROWNFIELD_PRD_PRESERVATION",
                 f"{row[0]} must explicitly define the preserved behavior and change boundary",
@@ -7854,7 +10062,11 @@ def validate_construction_envelope(
 ) -> None:
     missing = sorted(ENVELOPE_EXPLICIT_FIELDS - set(envelope))
     if missing:
-        ctx.error("GATE_B_ENVELOPE", "Construction envelope is missing fields: " + ", ".join(missing), PRD_FILE)
+        ctx.error(
+            "GATE_B_ENVELOPE",
+            "Construction envelope is missing fields: " + ", ".join(missing),
+            PRD_FILE,
+        )
     unresolved_fields = sorted(
         field
         for field in ENVELOPE_EXPLICIT_FIELDS
@@ -7872,15 +10084,24 @@ def validate_construction_envelope(
     if unresolved_fields:
         ctx.error(
             "GATE_B_ENVELOPE",
-            "Construction envelope has unresolved fields: " + ", ".join(unresolved_fields),
+            "Construction envelope has unresolved fields: "
+            + ", ".join(unresolved_fields),
             PRD_FILE,
         )
 
-    if envelope.get("Construction authorization ID") != fields.get("construction_authorization"):
-        ctx.error("GATE_B_ENVELOPE", "Envelope AUTH does not match current AUTH", PRD_FILE)
+    if envelope.get("Construction authorization ID") != fields.get(
+        "construction_authorization"
+    ):
+        ctx.error(
+            "GATE_B_ENVELOPE", "Envelope AUTH does not match current AUTH", PRD_FILE
+        )
     authorized_baseline = envelope.get("Authorized baseline commit", "")
     if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", authorized_baseline) is None:
-        ctx.error("GATE_B_ENVELOPE", "Authorized baseline commit must be a full lowercase Git commit hash", PRD_FILE)
+        ctx.error(
+            "GATE_B_ENVELOPE",
+            "Authorized baseline commit must be a full lowercase Git commit hash",
+            PRD_FILE,
+        )
     else:
         validate_authorized_baseline_repository(ctx, authorized_baseline)
     expected_project_rows = {
@@ -7894,15 +10115,27 @@ def validate_construction_envelope(
     }
     for key, expected in expected_project_rows.items():
         if expected is None or envelope.get(key) != expected:
-            ctx.error("GATE_B_PROJECT_DRIFT", f"Envelope {key} does not exactly match Document status", PRD_FILE)
+            ctx.error(
+                "GATE_B_PROJECT_DRIFT",
+                f"Envelope {key} does not exactly match Document status",
+                PRD_FILE,
+            )
     try:
         authorized_ids = parse_authorized_ids(
             envelope.get("Authorized requirement and design IDs", "")
         )
         if fields.get("requirements_revision") != authorized_ids[0]:
-            ctx.error("GATE_B_ENVELOPE", "Authorized ID basis must include the current REQ revision", PRD_FILE)
+            ctx.error(
+                "GATE_B_ENVELOPE",
+                "Authorized ID basis must include the current REQ revision",
+                PRD_FILE,
+            )
         if fields.get("design_revision") != authorized_ids[1]:
-            ctx.error("GATE_B_ENVELOPE", "Authorized ID basis must include the current DES revision", PRD_FILE)
+            ctx.error(
+                "GATE_B_ENVELOPE",
+                "Authorized ID basis must include the current DES revision",
+                PRD_FILE,
+            )
         required_scope_ids = {
             decision.decision_id for decision in design_contract.technology_decisions
         }
@@ -7923,9 +10156,7 @@ def validate_construction_envelope(
                     design_contract.project_contract.first_wave.wave_contract_id
                 )
             if design_contract.project_contract.spike is not None:
-                required_scope_ids.add(
-                    design_contract.project_contract.spike.spike_id
-                )
+                required_scope_ids.add(design_contract.project_contract.spike.spike_id)
         missing_scope_ids = sorted(required_scope_ids - set(authorized_ids[2:]))
         if missing_scope_ids:
             ctx.error(
@@ -7940,8 +10171,7 @@ def validate_construction_envelope(
     if (
         design_contract.status != "READY"
         or design_contract.canonical_sha256 is None
-        or envelope.get("Design contract SHA-256")
-        != design_contract.canonical_sha256
+        or envelope.get("Design contract SHA-256") != design_contract.canonical_sha256
     ):
         ctx.error(
             "GATE_B_DESIGN_CONTRACT_HASH",
@@ -7950,9 +10180,17 @@ def validate_construction_envelope(
         )
 
     if envelope.get("Autonomous construction") not in {"ALLOWED", "PROHIBITED"}:
-        ctx.error("GATE_B_ENVELOPE", "Autonomous construction must be ALLOWED or PROHIBITED", PRD_FILE)
+        ctx.error(
+            "GATE_B_ENVELOPE",
+            "Autonomous construction must be ALLOWED or PROHIBITED",
+            PRD_FILE,
+        )
     numeric: dict[str, int] = {}
-    for key in ("Maximum generated tasks", "Maximum parallel workers", "Attempt budget"):
+    for key in (
+        "Maximum generated tasks",
+        "Maximum parallel workers",
+        "Attempt budget",
+    ):
         value = envelope.get(key, "")
         if re.fullmatch(r"[1-9]\d*", value) is None:
             ctx.error("GATE_B_ENVELOPE", f"{key} must be a positive integer", PRD_FILE)
@@ -7987,12 +10225,26 @@ def validate_construction_envelope(
             envelope.get("GitHub repository, branch, and merge constraints", ""),
             envelope.get("GitHub boundary", ""),
         )
-        parse_future_expiry(envelope.get("Authorization expiry or completion condition", ""))
+        parse_future_expiry(
+            envelope.get("Authorization expiry or completion condition", "")
+        )
     except ValueError as exc:
-        ctx.error("GATE_B_ENVELOPE", str(exc), PRD_FILE)
-    if numeric.get("Maximum parallel workers", 1) > 1 and "isolated worktree" not in envelope.get(
-        "Parallelism rule", ""
-    ).lower():
+        code = (
+            "GATE_B_AUTHORITY_EXPIRED"
+            if str(exc) == "Construction authorization is expired"
+            else "GATE_B_ENVELOPE"
+        )
+        message = (
+            "Gate B authority expired; the owner must reapprove the current "
+            "design boundary before any new local or AWS operation"
+            if code == "GATE_B_AUTHORITY_EXPIRED"
+            else str(exc)
+        )
+        ctx.error(code, message, PRD_FILE)
+    if (
+        numeric.get("Maximum parallel workers", 1) > 1
+        and "isolated worktree" not in envelope.get("Parallelism rule", "").lower()
+    ):
         ctx.error(
             "GATE_B_ENVELOPE",
             "More than one worker requires disjoint work in isolated worktrees",
@@ -8006,8 +10258,15 @@ def validate_construction_envelope(
         "explicit-gate": {"NONE", "DOCS_ONLY", "READ_ONLY", "MUTATE_LISTED_RESOURCES"},
     }
     lane = selections.get("aws_lane")
-    if lane in lane_boundaries and envelope.get("AWS boundary") not in lane_boundaries[lane]:
-        ctx.error("AWS_LANE_BOUNDARY", "AWS boundary does not match the selected project lane", PRD_FILE)
+    if (
+        lane in lane_boundaries
+        and envelope.get("AWS boundary") not in lane_boundaries[lane]
+    ):
+        ctx.error(
+            "AWS_LANE_BOUNDARY",
+            "AWS boundary does not match the selected project lane",
+            PRD_FILE,
+        )
     aws_boundary = envelope.get("AWS boundary")
     if aws_boundary in {"NONE", "DOCS_ONLY"}:
         expected = f"NOT_APPLICABLE — AWS boundary {aws_boundary} authorizes no authenticated action"
@@ -8034,27 +10293,52 @@ def validate_construction_envelope(
             if key in required_read and (
                 not explicit_value(value) or value.startswith("NOT_APPLICABLE — ")
             ):
-                ctx.error("GATE_B_ENVELOPE", f"{key} is required for READ_ONLY AWS authority", PRD_FILE)
+                ctx.error(
+                    "GATE_B_ENVELOPE",
+                    f"{key} is required for READ_ONLY AWS authority",
+                    PRD_FILE,
+                )
             elif key not in required_read and not (
                 explicit_value(value) or value.startswith("NOT_APPLICABLE — ")
             ):
-                ctx.error("GATE_B_ENVELOPE", f"{key} must be explicit for READ_ONLY AWS authority", PRD_FILE)
+                ctx.error(
+                    "GATE_B_ENVELOPE",
+                    f"{key} must be explicit for READ_ONLY AWS authority",
+                    PRD_FILE,
+                )
         try:
             parse_aws_environment(envelope.get("AWS environment", ""))
             parse_future_expiry(envelope.get("AWS authorization validity", ""))
         except ValueError as exc:
-            ctx.error("GATE_B_ENVELOPE", str(exc), PRD_FILE)
+            code = (
+                "GATE_B_AUTHORITY_EXPIRED"
+                if str(exc) == "Construction authorization is expired"
+                else "GATE_B_ENVELOPE"
+            )
+            message = (
+                "Gate B authority expired; the owner must reapprove the current "
+                "design boundary before any new local or AWS operation"
+                if code == "GATE_B_AUTHORITY_EXPIRED"
+                else str(exc)
+            )
+            ctx.error(code, message, PRD_FILE)
     elif aws_boundary == "MUTATE_LISTED_RESOURCES":
         for key in sorted(AWS_DETAIL_FIELDS):
             value = envelope.get(key, "")
             if not explicit_value(value) or value.startswith("NOT_APPLICABLE — "):
-                ctx.error("GATE_B_ENVELOPE", f"{key} is required for AWS mutation authority", PRD_FILE)
+                ctx.error(
+                    "GATE_B_ENVELOPE",
+                    f"{key} is required for AWS mutation authority",
+                    PRD_FILE,
+                )
         try:
             _environment, environment_class = parse_aws_environment(
                 envelope.get("AWS environment", "")
             )
             if lane == "fast-dev" and environment_class != "NON_PRODUCTION":
-                raise ValueError("fast-dev AWS mutation authority must be NON_PRODUCTION")
+                raise ValueError(
+                    "fast-dev AWS mutation authority must be NON_PRODUCTION"
+                )
             validate_aws_artifact(
                 envelope.get("AWS artifact authorization and provenance", ""),
                 envelope.get("Authorized baseline commit", ""),
@@ -8065,7 +10349,18 @@ def validate_construction_envelope(
             )
             parse_future_expiry(envelope.get("AWS authorization validity", ""))
         except ValueError as exc:
-            ctx.error("GATE_B_ENVELOPE", str(exc), PRD_FILE)
+            code = (
+                "GATE_B_AUTHORITY_EXPIRED"
+                if str(exc) == "Construction authorization is expired"
+                else "GATE_B_ENVELOPE"
+            )
+            message = (
+                "Gate B authority expired; the owner must reapprove the current "
+                "design boundary before any new local or AWS operation"
+                if code == "GATE_B_AUTHORITY_EXPIRED"
+                else str(exc)
+            )
+            ctx.error(code, message, PRD_FILE)
 
 
 def validate_readiness_card(
@@ -8080,9 +10375,9 @@ def validate_readiness_card(
             f"{gate.replace('_', ' ')} readiness-card fields must be exact",
             PRD_FILE,
         )
-    for field in sorted(expected_fields):
-        value = clean_cell(card.get(field, ""))
-        if field == "Outstanding gaps" and value == "NONE":
+    for field_name in sorted(expected_fields):
+        value = clean_cell(card.get(field_name, ""))
+        if field_name == "Outstanding gaps" and value == "NONE":
             continue
         if value.startswith("NOT_APPLICABLE — ") and explicit_value(
             value.removeprefix("NOT_APPLICABLE — ")
@@ -8091,7 +10386,7 @@ def validate_readiness_card(
         if not explicit_value(value, allow_none=False):
             ctx.error(
                 f"{gate}_READINESS_CARD",
-                f"{field} is not an explicit current decision basis",
+                f"{field_name} is not an explicit current decision basis",
                 PRD_FILE,
             )
 
@@ -8184,28 +10479,38 @@ def derive_req_aws_materiality(
         and requirements_revision
         and requirements_revision not in basis_ids
     ):
-        issues.append(
-            f"AWS materiality basis IDs must include {requirements_revision}"
-        )
+        issues.append(f"AWS materiality basis IDs must include {requirements_revision}")
     if raw_materiality == "REQUIRED":
         if basis_none or not basis_ids:
             issues.append("REQUIRED AWS materiality needs current basis IDs")
         if discovery_none or not discovery_ids:
             issues.append("REQUIRED AWS materiality needs current AWS-DISC evidence")
         if not unresolved_none or unresolved_ids:
-            issues.append("REQUIRED AWS materiality cannot retain unresolved AWS fact IDs at Gate A")
+            issues.append(
+                "REQUIRED AWS materiality cannot retain unresolved AWS fact IDs at Gate A"
+            )
     elif raw_materiality == "OPTIONAL":
         if basis_none and not basis_none_with_reason:
-            issues.append("OPTIONAL AWS materiality needs basis IDs or NONE with a reason")
+            issues.append(
+                "OPTIONAL AWS materiality needs basis IDs or NONE with a reason"
+            )
         if discovery_none and not discovery_none_with_reason:
-            issues.append("OPTIONAL AWS materiality needs AWS-DISC IDs or NONE with a reason")
+            issues.append(
+                "OPTIONAL AWS materiality needs AWS-DISC IDs or NONE with a reason"
+            )
         if not unresolved_none or unresolved_ids:
-            issues.append("OPTIONAL AWS materiality cannot retain unresolved material AWS fact IDs")
+            issues.append(
+                "OPTIONAL AWS materiality cannot retain unresolved material AWS fact IDs"
+            )
     elif raw_materiality == "NOT_MATERIAL":
         if not basis_none or basis_ids or not basis_none_with_reason:
-            issues.append("NOT_MATERIAL requires AWS materiality basis IDs NONE with a reason")
+            issues.append(
+                "NOT_MATERIAL requires AWS materiality basis IDs NONE with a reason"
+            )
         if not discovery_none or discovery_ids or not discovery_none_with_reason:
-            issues.append("NOT_MATERIAL requires AWS Core discovery IDs NONE with a reason")
+            issues.append(
+                "NOT_MATERIAL requires AWS Core discovery IDs NONE with a reason"
+            )
         if not unresolved_none or unresolved_ids:
             issues.append("NOT_MATERIAL cannot retain unresolved AWS fact IDs")
 
@@ -8240,8 +10545,14 @@ def validate_prd(
     text = ctx.texts.get(PRD_FILE) or safe_read_text(ctx, PRD_FILE)
     if text is None:
         return (
-            {}, {}, {}, False, DesignContract(), CoverageContract(),
-            IntakeFoundationContract(), RequirementsContract(),
+            {},
+            {},
+            {},
+            False,
+            DesignContract(),
+            CoverageContract(),
+            IntakeFoundationContract(),
+            RequirementsContract(),
         )
     try:
         document = table_after_heading(text, "## Document status")
@@ -8252,7 +10563,9 @@ def validate_prd(
         gate_b_agent = table_after_heading(text, "## 27. Gate B agent review record")
         gate_b_card = table_after_heading(text, "### Gate B — readiness card")
         envelope = table_after_heading(text, "## 28. Construction envelope")
-        gate_b_owner = table_after_heading(text, "## 29. Gate B owner authorization record")
+        gate_b_owner = table_after_heading(
+            text, "## 29. Gate B owner authorization record"
+        )
         envelope_digest = canonical_envelope_sha256(text)
         # Check marker structure even before either gate is approved.
         marked_receipt(text, "gate-a")
@@ -8260,12 +10573,32 @@ def validate_prd(
     except ValueError as exc:
         ctx.error("PRD_STRUCTURE", str(exc), PRD_FILE)
         return (
-            {}, {}, {}, False, DesignContract(), CoverageContract(),
-            IntakeFoundationContract(), RequirementsContract(),
+            {},
+            {},
+            {},
+            False,
+            DesignContract(),
+            CoverageContract(),
+            IntakeFoundationContract(),
+            RequirementsContract(),
         )
 
     project = state.get("project", {})
     lifecycle = state.get("lifecycle", {})
+    prd_name = html.unescape(clean_cell(workload.get("Workload", "")))
+    if project.get("name") != prd_name:
+        ctx.error(
+            "STATE_PRD_DRIFT",
+            "project.name does not match the PRD Workload value",
+            STATE_FILE,
+        )
+    prd_region = clean_cell(workload.get("Primary Region", ""))
+    if project.get("region") != prd_region:
+        ctx.error(
+            "STATE_PRD_DRIFT",
+            "project.region does not match the PRD Primary Region value",
+            STATE_FILE,
+        )
     selection_values = {
         "mode": document.get("Project mode", ""),
         "delivery_profile": document.get("Delivery profile", ""),
@@ -8284,23 +10617,35 @@ def validate_prd(
     }
     selections = {
         "mode": exact_selection(
-            ctx, selection_values["mode"], PROJECT_MODES,
-            "PROJECT_VOCABULARY", "Project mode",
+            ctx,
+            selection_values["mode"],
+            PROJECT_MODES,
+            "PROJECT_VOCABULARY",
+            "Project mode",
             allow_unselected=unselected_fields["mode"],
         ),
         "delivery_profile": exact_selection(
-            ctx, selection_values["delivery_profile"], DELIVERY_PROFILES,
-            "PROJECT_VOCABULARY", "Delivery profile",
+            ctx,
+            selection_values["delivery_profile"],
+            DELIVERY_PROFILES,
+            "PROJECT_VOCABULARY",
+            "Delivery profile",
             allow_unselected=unselected_fields["delivery_profile"],
         ),
         "effective_risk": exact_selection(
-            ctx, selection_values["effective_risk"], RISK_LEVELS,
-            "PROJECT_VOCABULARY", "Effective risk",
+            ctx,
+            selection_values["effective_risk"],
+            RISK_LEVELS,
+            "PROJECT_VOCABULARY",
+            "Effective risk",
             allow_unselected=unselected_fields["effective_risk"],
         ),
         "aws_lane": exact_selection(
-            ctx, selection_values["aws_lane"], AWS_LANES,
-            "PROJECT_VOCABULARY", "AWS lane",
+            ctx,
+            selection_values["aws_lane"],
+            AWS_LANES,
+            "PROJECT_VOCABULARY",
+            "AWS lane",
             allow_unselected=unselected_fields["aws_lane"],
         ),
     }
@@ -8327,7 +10672,9 @@ def validate_prd(
     fields = {
         "requirements_revision": document.get("Current requirements revision", ""),
         "design_revision": document.get("Current design revision", ""),
-        "construction_authorization": document.get("Current construction authorization ID", ""),
+        "construction_authorization": document.get(
+            "Current construction authorization ID", ""
+        ),
         "gate_a": document.get("Gate A derived status", ""),
         "gate_b": document.get("Gate B derived status", ""),
     }
@@ -8338,7 +10685,9 @@ def validate_prd(
     }
     for key, pattern in patterns.items():
         if pattern.fullmatch(fields[key]) is None:
-            ctx.error("PRD_REVISION_ID", f"Invalid PRD {key}: {fields[key]!r}", PRD_FILE)
+            ctx.error(
+                "PRD_REVISION_ID", f"Invalid PRD {key}: {fields[key]!r}", PRD_FILE
+            )
     if fields["gate_a"] not in GATE_A_STATES or fields["gate_b"] not in GATE_B_STATES:
         ctx.error("PRD_GATE", "Invalid PRD derived gate state", PRD_FILE)
     for key, value in fields.items():
@@ -8348,6 +10697,12 @@ def validate_prd(
                 f"lifecycle.{key}={lifecycle.get(key)!r} does not match PRD {value!r}",
                 STATE_FILE,
             )
+    fields["gate_b_authorization_source"] = clean_cell(
+        gate_b_owner.get("Authorization source", "")
+    )
+    fields["gate_b_authorized_at"] = clean_cell(
+        gate_b_owner.get("Authorization provided at", "")
+    )
 
     gate_a_ready_or_current = fields["gate_a"] in {
         "PENDING_OWNER_APPROVAL",
@@ -8361,7 +10716,9 @@ def validate_prd(
         "READY_WITH_PROPOSED_ASSUMPTIONS",
         "READY_FOR_OWNER_APPROVAL",
     }
-    gate_b_agent_ready = gate_b_agent.get("Agent recommendation") == "READY_FOR_CONSTRUCTION_APPROVAL"
+    gate_b_agent_ready = (
+        gate_b_agent.get("Agent recommendation") == "READY_FOR_CONSTRUCTION_APPROVAL"
+    )
     coverage_required = gate_a_agent_ready or gate_a_ready_or_current
     grandfather_approved_v1_requirements = bool(
         fields["gate_a"] == "APPROVED_FOR_DESIGN"
@@ -8396,10 +10753,7 @@ def validate_prd(
     )
     for code, issue in intake_issues:
         ctx.error(code, issue, PRD_FILE)
-    if (
-        gate_a_ready_or_current
-        and intake_contract.status != "READY_FOR_REQUIREMENTS"
-    ):
+    if gate_a_ready_or_current and intake_contract.status != "READY_FOR_REQUIREMENTS":
         ctx.error(
             "INTAKE_FOUNDATION_REQUIRED",
             "Gate A requires a complete owner-grounded intake foundation and no pending card",
@@ -8413,6 +10767,7 @@ def validate_prd(
         selections.get("aws_lane"),
         required=coverage_required,
         grandfather_current_gate_a=grandfather_approved_v1_requirements,
+        owner_work_context=intake_contract.owner_work_context,
     )
     if coverage_required:
         for issue in coverage_issues:
@@ -8436,12 +10791,10 @@ def validate_prd(
     design_contract_required = gate_b_agent_ready or gate_b_ready_or_current
     grandfather_approved_v1_design = bool(
         fields["gate_b"] == "APPROVED_FOR_CONSTRUCTION"
-        and gate_b_agent.get("Design revision reviewed")
-        == fields["design_revision"]
+        and gate_b_agent.get("Design revision reviewed") == fields["design_revision"]
         and gate_b_agent.get("Construction authorization ID reviewed")
         == fields["construction_authorization"]
-        and gate_b_owner.get("Authorized design revision")
-        == fields["design_revision"]
+        and gate_b_owner.get("Authorized design revision") == fields["design_revision"]
         and gate_b_owner.get("Authorized construction authorization ID")
         == fields["construction_authorization"]
     )
@@ -8477,8 +10830,7 @@ def validate_prd(
     if gate_b_agent_ready or gate_b_ready_or_current:
         validate_readiness_card(ctx, gate_b_card, GATE_B_READINESS_FIELDS, "GATE_B")
         expected_technology_ids = ", ".join(
-            decision.decision_id
-            for decision in design_contract.technology_decisions
+            decision.decision_id for decision in design_contract.technology_decisions
         )
         if (
             not expected_technology_ids
@@ -8507,7 +10859,11 @@ def validate_prd(
                     PRD_FILE,
                 )
         if gate_b_card.get("Outstanding gaps") != "NONE":
-            ctx.error("GATE_B_READINESS_CARD", "Gate B readiness requires Outstanding gaps NONE", PRD_FILE)
+            ctx.error(
+                "GATE_B_READINESS_CARD",
+                "Gate B readiness requires Outstanding gaps NONE",
+                PRD_FILE,
+            )
     if gate_a_agent_ready and fields["gate_a"] == "BLOCKED":
         ctx.error(
             "GATE_A_LIFECYCLE_TRANSITION",
@@ -8531,8 +10887,15 @@ def validate_prd(
                 + ", ".join(missing_selections),
                 PRD_FILE,
             )
-    if selections["mode"] == "greenfield" and project.get("brownfield_baseline") != "NOT_APPLICABLE":
-        ctx.error("BROWNFIELD_STATE", "Greenfield mode requires NOT_APPLICABLE brownfield state", STATE_FILE)
+    if (
+        selections["mode"] == "greenfield"
+        and project.get("brownfield_baseline") != "NOT_APPLICABLE"
+    ):
+        ctx.error(
+            "BROWNFIELD_STATE",
+            "Greenfield mode requires NOT_APPLICABLE brownfield state",
+            STATE_FILE,
+        )
     if selections["mode"] == "brownfield" and gate_a_ready_or_current:
         if project.get("brownfield_baseline") != "RECORDED":
             ctx.error(
@@ -8549,16 +10912,26 @@ def validate_prd(
         re.MULTILINE | re.DOTALL,
     )
     if functional_match is not None:
-        rows = re.findall(r"^\|\s*FR-\d+\s*\|(.+)$", functional_match.group(0), re.MULTILINE)
-        requirements_present = requirements_present and any("TODO" not in row.upper() for row in rows)
+        rows = re.findall(
+            r"^\|\s*FR-\d+\s*\|(.+)$", functional_match.group(0), re.MULTILINE
+        )
+        requirements_present = requirements_present and any(
+            "TODO" not in row.upper() for row in rows
+        )
     requirements_present = (
-        requirements_present
-        and intake_contract.status == "READY_FOR_REQUIREMENTS"
+        requirements_present and intake_contract.status == "READY_FOR_REQUIREMENTS"
     )
 
     if gate_a_ready_or_current:
-        if gate_a_agent.get("Requirements revision analyzed") != fields["requirements_revision"]:
-            ctx.error("GATE_A_REVISION_MISMATCH", "Gate A analysis does not match current REQ", PRD_FILE)
+        if (
+            gate_a_agent.get("Requirements revision analyzed")
+            != fields["requirements_revision"]
+        ):
+            ctx.error(
+                "GATE_A_REVISION_MISMATCH",
+                "Gate A analysis does not match current REQ",
+                PRD_FILE,
+            )
         if gate_a_agent.get("Agent recommendation") not in {
             "READY_WITH_PROPOSED_ASSUMPTIONS",
             "READY_FOR_OWNER_APPROVAL",
@@ -8566,7 +10939,11 @@ def validate_prd(
             ctx.error("GATE_A_RECOMMENDATION", "Gate A was not agent-ready", PRD_FILE)
         for key in ("Open blocking finding IDs", "Open blocking decision IDs"):
             if gate_a_agent.get(key) != "NONE":
-                ctx.error("GATE_A_BLOCKER", f"{key} must be NONE before owner approval", PRD_FILE)
+                ctx.error(
+                    "GATE_A_BLOCKER",
+                    f"{key} must be NONE before owner approval",
+                    PRD_FILE,
+                )
 
     if fields["gate_a"] == "APPROVED_FOR_DESIGN":
         expected = "\n".join(
@@ -8578,10 +10955,16 @@ def validate_prd(
                 f"Approver: {gate_a_owner.get('Approver', '')}",
             ]
         )
-        if gate_a_owner.get("Owner decision") != "APPROVED" or gate_a_owner.get(
-            "Authorized requirements revision"
-        ) != fields["requirements_revision"]:
-            ctx.error("GATE_A_OWNER_RECORD", "Gate A owner record is not current and approved", PRD_FILE)
+        if (
+            gate_a_owner.get("Owner decision") != "APPROVED"
+            or gate_a_owner.get("Authorized requirements revision")
+            != fields["requirements_revision"]
+        ):
+            ctx.error(
+                "GATE_A_OWNER_RECORD",
+                "Gate A owner record is not current and approved",
+                PRD_FILE,
+            )
         if gate_a_owner.get("Authorized cost posture") != card_cost_posture:
             ctx.error(
                 "GATE_A_COST_AUTHORIZATION",
@@ -8589,7 +10972,11 @@ def validate_prd(
                 PRD_FILE,
             )
         if gate_a_owner.get("Derived Gate A state") != fields["gate_a"]:
-            ctx.error("GATE_A_OWNER_RECORD", "Detailed Gate A state does not match Document status", PRD_FILE)
+            ctx.error(
+                "GATE_A_OWNER_RECORD",
+                "Detailed Gate A state does not match Document status",
+                PRD_FILE,
+            )
         if not explicit_human_approver(gate_a_owner.get("Approver", "")):
             ctx.error(
                 "GATE_A_HUMAN_APPROVER",
@@ -8603,9 +10990,17 @@ def validate_prd(
                 PRD_FILE,
             )
         if not explicit_value(gate_a_owner.get("Authorization source", "")):
-            ctx.error("GATE_A_OWNER_RECORD", "Gate A authorization source is unresolved", PRD_FILE)
+            ctx.error(
+                "GATE_A_OWNER_RECORD",
+                "Gate A authorization source is unresolved",
+                PRD_FILE,
+            )
         if gate_a_owner.get("Verbatim owner receipt") != "RECORDED_BELOW":
-            ctx.error("GATE_A_OWNER_RECORD", "Approved Gate A must reference the marked receipt block", PRD_FILE)
+            ctx.error(
+                "GATE_A_OWNER_RECORD",
+                "Approved Gate A must reference the marked receipt block",
+                PRD_FILE,
+            )
         try:
             required_ids = parse_exact_id_list(
                 gate_a_agent.get("Proposed assumption IDs required to proceed", ""),
@@ -8628,7 +11023,11 @@ def validate_prd(
         try:
             actual = marked_receipt(text, "gate-a")
             if actual != expected:
-                ctx.error("GATE_A_RECEIPT_MISMATCH", "Marked Gate A receipt does not match structured fields", PRD_FILE)
+                ctx.error(
+                    "GATE_A_RECEIPT_MISMATCH",
+                    "Marked Gate A receipt does not match structured fields",
+                    PRD_FILE,
+                )
         except ValueError as exc:
             ctx.error("GATE_A_RECEIPT_MISMATCH", str(exc), PRD_FILE)
 
@@ -8636,18 +11035,30 @@ def validate_prd(
         reviewed = {
             "Requirements revision reviewed": fields["requirements_revision"],
             "Design revision reviewed": fields["design_revision"],
-            "Construction authorization ID reviewed": fields["construction_authorization"],
+            "Construction authorization ID reviewed": fields[
+                "construction_authorization"
+            ],
         }
         for key, value in reviewed.items():
             if gate_b_agent.get(key) != value:
-                ctx.error("GATE_B_REVISION_MISMATCH", f"{key} does not match current state", PRD_FILE)
-        if gate_b_agent.get("Construction envelope SHA-256 reviewed") != envelope_digest:
+                ctx.error(
+                    "GATE_B_REVISION_MISMATCH",
+                    f"{key} does not match current state",
+                    PRD_FILE,
+                )
+        if (
+            gate_b_agent.get("Construction envelope SHA-256 reviewed")
+            != envelope_digest
+        ):
             ctx.error(
                 "GATE_B_ENVELOPE_HASH",
                 "Gate B agent review does not bind the complete current construction envelope",
                 PRD_FILE,
             )
-        if gate_b_agent.get("Agent recommendation") != "READY_FOR_CONSTRUCTION_APPROVAL":
+        if (
+            gate_b_agent.get("Agent recommendation")
+            != "READY_FOR_CONSTRUCTION_APPROVAL"
+        ):
             ctx.error("GATE_B_RECOMMENDATION", "Gate B was not agent-ready", PRD_FILE)
         for key in (
             "PRD completeness gaps",
@@ -8655,7 +11066,9 @@ def validate_prd(
             "Unresolved risk or preservation gaps",
         ):
             if gate_b_agent.get(key) != "NONE":
-                ctx.error("GATE_B_GAP", f"{key} must be NONE before owner approval", PRD_FILE)
+                ctx.error(
+                    "GATE_B_GAP", f"{key} must be NONE before owner approval", PRD_FILE
+                )
         validate_construction_envelope(
             ctx,
             envelope,
@@ -8667,8 +11080,15 @@ def validate_prd(
 
     if fields["gate_b"] == "APPROVED_FOR_CONSTRUCTION":
         if fields["gate_a"] != "APPROVED_FOR_DESIGN":
-            ctx.error("GATE_B_WITHOUT_GATE_A", "Gate B cannot be current while Gate A is not current", PRD_FILE)
-        if gate_b_owner.get("Authorized construction envelope SHA-256") != envelope_digest:
+            ctx.error(
+                "GATE_B_WITHOUT_GATE_A",
+                "Gate B cannot be current while Gate A is not current",
+                PRD_FILE,
+            )
+        if (
+            gate_b_owner.get("Authorized construction envelope SHA-256")
+            != envelope_digest
+        ):
             ctx.error(
                 "GATE_B_ENVELOPE_HASH",
                 "Gate B owner authorization does not bind the complete current construction envelope",
@@ -8688,13 +11108,21 @@ def validate_prd(
         owner_values = {
             "Authorized requirements revision": fields["requirements_revision"],
             "Authorized design revision": fields["design_revision"],
-            "Authorized construction authorization ID": fields["construction_authorization"],
+            "Authorized construction authorization ID": fields[
+                "construction_authorization"
+            ],
         }
         if gate_b_owner.get("Owner decision") != "APPROVED":
-            ctx.error("GATE_B_OWNER_RECORD", "Gate B owner decision is not APPROVED", PRD_FILE)
+            ctx.error(
+                "GATE_B_OWNER_RECORD", "Gate B owner decision is not APPROVED", PRD_FILE
+            )
         for key, value in owner_values.items():
             if gate_b_owner.get(key) != value:
-                ctx.error("GATE_B_OWNER_RECORD", f"{key} does not match current state", PRD_FILE)
+                ctx.error(
+                    "GATE_B_OWNER_RECORD",
+                    f"{key} does not match current state",
+                    PRD_FILE,
+                )
         if not explicit_human_approver(gate_b_owner.get("Approver", "")):
             ctx.error(
                 "GATE_B_HUMAN_APPROVER",
@@ -8708,15 +11136,31 @@ def validate_prd(
                 PRD_FILE,
             )
         if not explicit_value(gate_b_owner.get("Authorization source", "")):
-            ctx.error("GATE_B_OWNER_RECORD", "Gate B authorization source is unresolved", PRD_FILE)
+            ctx.error(
+                "GATE_B_OWNER_RECORD",
+                "Gate B authorization source is unresolved",
+                PRD_FILE,
+            )
         if gate_b_owner.get("Derived Gate B state") != fields["gate_b"]:
-            ctx.error("GATE_B_OWNER_RECORD", "Detailed Gate B state does not match Document status", PRD_FILE)
+            ctx.error(
+                "GATE_B_OWNER_RECORD",
+                "Detailed Gate B state does not match Document status",
+                PRD_FILE,
+            )
         if gate_b_owner.get("Verbatim owner receipt") != "RECORDED_BELOW":
-            ctx.error("GATE_B_OWNER_RECORD", "Approved Gate B must reference the marked receipt block", PRD_FILE)
+            ctx.error(
+                "GATE_B_OWNER_RECORD",
+                "Approved Gate B must reference the marked receipt block",
+                PRD_FILE,
+            )
         try:
             actual = marked_receipt(text, "gate-b")
             if actual != expected:
-                ctx.error("GATE_B_RECEIPT_MISMATCH", "Marked Gate B receipt does not match structured fields", PRD_FILE)
+                ctx.error(
+                    "GATE_B_RECEIPT_MISMATCH",
+                    "Marked Gate B receipt does not match structured fields",
+                    PRD_FILE,
+                )
         except ValueError as exc:
             ctx.error("GATE_B_RECEIPT_MISMATCH", str(exc), PRD_FILE)
 
@@ -8738,7 +11182,9 @@ def path_boundary_contains(allowed: str, requested: str) -> bool:
     allowed_base = allowed[:-3] if allowed.endswith("/**") else allowed
     requested_base = requested[:-3] if requested.endswith("/**") else requested
     if allowed.endswith("/**"):
-        return requested_base == allowed_base or requested_base.startswith(allowed_base + "/")
+        return requested_base == allowed_base or requested_base.startswith(
+            allowed_base + "/"
+        )
     return allowed == requested and not requested.endswith("/**")
 
 
@@ -8770,7 +11216,9 @@ def external_target_contains(allowed: str, requested: str) -> bool:
     requested = requested.casefold()
     if allowed == requested:
         return True
-    return any(requested.startswith(allowed + separator) for separator in ("/", ":", "#"))
+    return any(
+        requested.startswith(allowed + separator) for separator in ("/", ":", "#")
+    )
 
 
 def validate_tasks_against_envelope(
@@ -8809,24 +11257,59 @@ def validate_tasks_against_envelope(
             )
         )
         authorized_ids.update(ID_LIKE.findall(envelope.get("Authorized outcome", "")))
-        boundary_mode, explicit_task_ids = parse_task_boundary(envelope.get("Task boundary", ""))
-        command_prefixes = parse_command_prefixes(envelope.get("Local command boundary", ""))
+        boundary_mode, explicit_task_ids = parse_task_boundary(
+            envelope.get("Task boundary", "")
+        )
+        command_prefixes = parse_command_prefixes(
+            envelope.get("Local command boundary", "")
+        )
         github_repo = parse_github_constraints(
             envelope.get("GitHub repository, branch, and merge constraints", ""),
             envelope.get("GitHub boundary", ""),
         )
-        parse_future_expiry(envelope.get("Authorization expiry or completion condition", ""))
+        parse_future_expiry(
+            envelope.get("Authorization expiry or completion condition", "")
+        )
     except (ValueError, TypeError) as exc:
-        ctx.error("GATE_B_ENVELOPE", f"Cannot validate task boundaries: {exc}", PRD_FILE)
+        if str(exc) == "Construction authorization is expired":
+            ctx.error(
+                "GATE_B_AUTHORITY_EXPIRED",
+                "Gate B authority expired; the owner must reapprove the current "
+                "design boundary before any new local or AWS operation",
+                PRD_FILE,
+            )
+        else:
+            ctx.error(
+                "GATE_B_ENVELOPE",
+                f"Cannot validate task boundaries: {exc}",
+                PRD_FILE,
+            )
         return
     if len(tasks) > maximum_tasks:
-        ctx.error("TASK_LIMIT_EXCEEDED", f"{len(tasks)} tasks exceed AUTH maximum {maximum_tasks}", TASKS_FILE)
+        ctx.error(
+            "TASK_LIMIT_EXCEEDED",
+            f"{len(tasks)} tasks exceed AUTH maximum {maximum_tasks}",
+            TASKS_FILE,
+        )
     if snapshot_workers > maximum_workers:
-        ctx.error("WORKER_LIMIT_EXCEEDED", "TASKS Maximum workers exceeds AUTH", TASKS_FILE)
-    if maximum_workers > 1 and "isolated worktree" not in envelope.get("Parallelism rule", "").lower():
-        ctx.error("GATE_B_ENVELOPE", "Parallel AUTH above one worker must require isolated worktrees", PRD_FILE)
+        ctx.error(
+            "WORKER_LIMIT_EXCEEDED", "TASKS Maximum workers exceeds AUTH", TASKS_FILE
+        )
+    if (
+        maximum_workers > 1
+        and "isolated worktree" not in envelope.get("Parallelism rule", "").lower()
+    ):
+        ctx.error(
+            "GATE_B_ENVELOPE",
+            "Parallel AUTH above one worker must require isolated worktrees",
+            PRD_FILE,
+        )
     if snapshot.get("Baseline commit") != envelope.get("Authorized baseline commit"):
-        ctx.error("TASK_BASELINE_DRIFT", "TASKS baseline commit does not match AUTH", TASKS_FILE)
+        ctx.error(
+            "TASK_BASELINE_DRIFT",
+            "TASKS baseline commit does not match AUTH",
+            TASKS_FILE,
+        )
     snapshot_protected = snapshot.get("Protected dirty paths", "NONE")
     try:
         task_protected = (
@@ -8837,12 +11320,27 @@ def validate_tasks_against_envelope(
     except ValueError as exc:
         ctx.error("TASK_SNAPSHOT", str(exc), TASKS_FILE)
         task_protected = []
-    if [item.casefold() for item in task_protected] != [item.casefold() for item in authorized_protected]:
-        ctx.error("TASK_BASELINE_DRIFT", "TASKS protected dirty paths do not match AUTH", TASKS_FILE)
+    if [item.casefold() for item in task_protected] != [
+        item.casefold() for item in authorized_protected
+    ]:
+        ctx.error(
+            "TASK_BASELINE_DRIFT",
+            "TASKS protected dirty paths do not match AUTH",
+            TASKS_FILE,
+        )
 
-    execution = state.get("execution") if isinstance(state.get("execution"), dict) else {}
-    if execution.get("mode") == "AUTONOMOUS" and envelope.get("Autonomous construction") != "ALLOWED":
-        ctx.error("AUTONOMY_OUTSIDE_AUTH", "AUTONOMOUS run is not allowed by Gate B", STATE_FILE)
+    execution = (
+        state.get("execution") if isinstance(state.get("execution"), dict) else {}
+    )
+    if (
+        execution.get("mode") == "AUTONOMOUS"
+        and envelope.get("Autonomous construction") != "ALLOWED"
+    ):
+        ctx.error(
+            "AUTONOMY_OUTSIDE_AUTH",
+            "AUTONOMOUS run is not allowed by Gate B",
+            STATE_FILE,
+        )
     if not tasks:
         return
 
@@ -8850,7 +11348,11 @@ def validate_tasks_against_envelope(
     aws_boundary = envelope.get("AWS boundary", "NONE")
     protected = snapshot.get("Protected dirty paths", "NONE")
     try:
-        protected_paths = [] if protected == "NONE" else parse_task_write_set(protected, "Protected dirty paths")
+        protected_paths = (
+            []
+            if protected == "NONE"
+            else parse_task_write_set(protected, "Protected dirty paths")
+        )
     except ValueError as exc:
         ctx.error("TASK_SNAPSHOT", str(exc), TASKS_FILE)
         protected_paths = []
@@ -8864,23 +11366,47 @@ def validate_tasks_against_envelope(
         except (KeyError, ValueError):
             continue
         for requested in writes:
-            if not any(path_boundary_contains(allowed, requested) for allowed in allowed_writes):
-                ctx.error("TASK_OUTSIDE_WRITE_BOUNDARY", f"{task.task_id} write {requested!r} is outside AUTH", TASKS_FILE)
-            if any(path_boundaries_overlap(requested, excluded) for excluded in excluded_writes):
-                ctx.error("TASK_EXCLUDED_WRITE", f"{task.task_id} overlaps excluded path {requested!r}", TASKS_FILE)
+            if not any(
+                path_boundary_contains(allowed, requested) for allowed in allowed_writes
+            ):
+                ctx.error(
+                    "TASK_OUTSIDE_WRITE_BOUNDARY",
+                    f"{task.task_id} write {requested!r} is outside AUTH",
+                    TASKS_FILE,
+                )
+            if any(
+                path_boundaries_overlap(requested, excluded)
+                for excluded in excluded_writes
+            ):
+                ctx.error(
+                    "TASK_EXCLUDED_WRITE",
+                    f"{task.task_id} overlaps excluded path {requested!r}",
+                    TASKS_FILE,
+                )
             if task.status in {"READY", "IN_PROGRESS"} and any(
                 path_boundaries_overlap(requested, dirty) for dirty in protected_paths
             ):
-                ctx.error("TASK_PROTECTED_DIRTY_OVERLAP", f"{task.task_id} overlaps protected dirty path {requested!r}", TASKS_FILE)
+                ctx.error(
+                    "TASK_PROTECTED_DIRTY_OVERLAP",
+                    f"{task.task_id} overlaps protected dirty path {requested!r}",
+                    TASKS_FILE,
+                )
         for target in external_targets:
-            if not any(external_target_contains(allowed, target) for allowed in allowed_external):
+            if not any(
+                external_target_contains(allowed, target)
+                for allowed in allowed_external
+            ):
                 ctx.error(
                     "TASK_EXTERNAL_STATE_BOUNDARY",
                     f"{task.task_id} external target {target!r} is outside AUTH",
                     TASKS_FILE,
                 )
         if boundary_mode == "EXPLICIT" and task.task_id not in explicit_task_ids:
-            ctx.error("TASK_OUTSIDE_TASK_BOUNDARY", f"{task.task_id} is not listed by AUTH", TASKS_FILE)
+            ctx.error(
+                "TASK_OUTSIDE_TASK_BOUNDARY",
+                f"{task.task_id} is not listed by AUTH",
+                TASKS_FILE,
+            )
 
         sections, _duplicates = inspect_task_sections(task.block)
         referenced_ids = set(ID_LIKE.findall(task.metadata.get("Requirements", "")))
@@ -8899,9 +11425,14 @@ def validate_tasks_against_envelope(
             )
         if task.status in {"READY", "IN_PROGRESS", "DONE"}:
             try:
-                commands = validation_commands(sections.get("Validation", ""), task.task_id)
+                commands = validation_commands(
+                    sections.get("Validation", ""), task.task_id
+                )
                 for command in commands:
-                    if not any(command_matches_prefix(command, prefix) for prefix in command_prefixes):
+                    if not any(
+                        command_matches_prefix(command, prefix)
+                        for prefix in command_prefixes
+                    ):
                         ctx.error(
                             "TASK_COMMAND_BOUNDARY",
                             f"{task.task_id} command {command!r} is outside AUTH",
@@ -8911,24 +11442,40 @@ def validate_tasks_against_envelope(
                 ctx.error("TASK_COMMAND_BOUNDARY", str(exc), TASKS_FILE)
         try:
             if task.attempt_budget > maximum_attempts:
-                ctx.error("TASK_ATTEMPT_BOUNDARY", f"{task.task_id} attempt budget exceeds AUTH", TASKS_FILE)
+                ctx.error(
+                    "TASK_ATTEMPT_BOUNDARY",
+                    f"{task.task_id} attempt budget exceeds AUTH",
+                    TASKS_FILE,
+                )
         except (KeyError, ValueError):
             pass
         aws_mode = clean_cell(task.metadata.get("AWS mode", "NONE")).upper()
         allowed_aws_modes = {
             "NONE": {"NONE"},
             "DOCS_ONLY": {"NONE", "DOCS_ONLY"},
-            "READ_ONLY": {"NONE", "DOCS_ONLY", "READ_ONLY"},
-            "MUTATE_LISTED_RESOURCES": {"NONE", "DOCS_ONLY", "READ_ONLY", "MUTATION"},
+            "READ_ONLY": {"NONE", "DOCS_ONLY"},
+            "MUTATE_LISTED_RESOURCES": {"NONE", "DOCS_ONLY"},
         }
         if aws_mode not in allowed_aws_modes.get(aws_boundary, set()):
-            ctx.error("TASK_AWS_BOUNDARY", f"{task.task_id} AWS mode exceeds AUTH", TASKS_FILE)
+            ctx.error(
+                "TASK_AWS_BOUNDARY",
+                f"{task.task_id} AWS mode exceeds the local-task ceiling",
+                TASKS_FILE,
+            )
         issue = clean_cell(task.metadata.get("GitHub issue", "PENDING_SYNC"))
         if github_boundary in {"NONE", "READ_ONLY"} and issue != "PENDING_SYNC":
-            ctx.error("TASK_GITHUB_BOUNDARY", f"{task.task_id} has a GitHub write result outside AUTH", TASKS_FILE)
+            ctx.error(
+                "TASK_GITHUB_BOUNDARY",
+                f"{task.task_id} has a GitHub write result outside AUTH",
+                TASKS_FILE,
+            )
         elif github_boundary not in {"NONE", "READ_ONLY"} and issue != "PENDING_SYNC":
             match = GITHUB_ISSUE_URL.fullmatch(issue)
-            if match is None or github_repo is None or match.group("repo").casefold() != github_repo.casefold():
+            if (
+                match is None
+                or github_repo is None
+                or match.group("repo").casefold() != github_repo.casefold()
+            ):
                 ctx.error(
                     "TASK_GITHUB_BOUNDARY",
                     f"{task.task_id} issue URL does not match the authorized GitHub repository",
@@ -8937,26 +11484,49 @@ def validate_tasks_against_envelope(
 
     active = [task for task in tasks if task.status == "IN_PROGRESS"]
     if len(active) > min(maximum_workers, snapshot_workers):
-        ctx.error("WORKER_LIMIT_EXCEEDED", "IN_PROGRESS tasks exceed the active worker limit", TASKS_FILE)
+        ctx.error(
+            "WORKER_LIMIT_EXCEEDED",
+            "IN_PROGRESS tasks exceed the active worker limit",
+            TASKS_FILE,
+        )
     for index, first in enumerate(active):
         first_writes = parse_task_write_set(first.metadata["Write set"], first.task_id)
-        first_external = parse_task_external_state(first.metadata["External state"], first.task_id)
+        first_external = parse_task_external_state(
+            first.metadata["External state"], first.task_id
+        )
         for second in active[index + 1 :]:
-            second_writes = parse_task_write_set(second.metadata["Write set"], second.task_id)
-            second_external = parse_task_external_state(second.metadata["External state"], second.task_id)
-            conflict = any(path_boundaries_overlap(a, b) for a in first_writes for b in second_writes)
-            conflict |= any(external_targets_overlap(a, b) for a in first_external for b in second_external)
+            second_writes = parse_task_write_set(
+                second.metadata["Write set"], second.task_id
+            )
+            second_external = parse_task_external_state(
+                second.metadata["External state"], second.task_id
+            )
+            conflict = any(
+                path_boundaries_overlap(a, b)
+                for a in first_writes
+                for b in second_writes
+            )
+            conflict |= any(
+                external_targets_overlap(a, b)
+                for a in first_external
+                for b in second_external
+            )
             conflict |= clean_cell(first.metadata["AWS mode"]).upper() == "MUTATION"
             conflict |= clean_cell(second.metadata["AWS mode"]).upper() == "MUTATION"
             if conflict:
-                ctx.error("ACTIVE_TASK_CONFLICT", f"{first.task_id} conflicts with {second.task_id}", TASKS_FILE)
+                ctx.error(
+                    "ACTIVE_TASK_CONFLICT",
+                    f"{first.task_id} conflicts with {second.task_id}",
+                    TASKS_FILE,
+                )
+
 
 def git_read(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
     environment = os.environ.copy()
     environment["GIT_OPTIONAL_LOCKS"] = "0"
     return subprocess.run(
         [
-            "git",
+            resolve_trusted_git(root),
             "-c",
             "core.fsmonitor=false",
             "-c",
@@ -9053,7 +11623,9 @@ def parse_checkpoint_git_receipt(
     dirty = (
         []
         if dirty_value == "NONE"
-        else parse_task_write_set(dirty_value, f"{checkpoint_id} checkpoint Dirty paths")
+        else parse_task_write_set(
+            dirty_value, f"{checkpoint_id} checkpoint Dirty paths"
+        )
     )
     return match.group(1), dirty
 
@@ -9070,22 +11642,32 @@ def validate_checkpoint_record(
         rows = parse_checkpoint_rows(tasks_text)
         matching = [row for row in rows if row.checkpoint_id == checkpoint_id]
         if not rows or len(matching) != 1 or rows[-1].checkpoint_id != checkpoint_id:
-            raise ValueError(f"{checkpoint_id}: must be the unique newest checkpoint row")
+            raise ValueError(
+                f"{checkpoint_id}: must be the unique newest checkpoint row"
+            )
         row = matching[0]
         if row.run_id != snapshot.get("Active run ID"):
-            raise ValueError(f"{checkpoint_id}: checkpoint run does not match the snapshot")
+            raise ValueError(
+                f"{checkpoint_id}: checkpoint run does not match the snapshot"
+            )
         if not explicit_timestamp(row.recorded_at):
-            raise ValueError(f"{checkpoint_id}: checkpoint time must be ISO 8601 with timezone")
+            raise ValueError(
+                f"{checkpoint_id}: checkpoint time must be ISO 8601 with timezone"
+            )
         for prefix, expected in (
             ("REQ", snapshot.get("Requirements revision", "")),
             ("DES", snapshot.get("Design revision", "")),
             ("AUTH", snapshot.get("Construction authorization", "")),
         ):
             if re.findall(rf"\b{prefix}-\d{{4,}}\b", row.basis) != [expected]:
-                raise ValueError(f"{checkpoint_id}: checkpoint REQ/DES/AUTH basis is not current")
+                raise ValueError(
+                    f"{checkpoint_id}: checkpoint REQ/DES/AUTH basis is not current"
+                )
         parse_checkpoint_git_receipt(tasks_text, checkpoint_id)
         if not explicit_value(row.task_outcomes):
-            raise ValueError(f"{checkpoint_id}: task outcomes and attempts are unresolved")
+            raise ValueError(
+                f"{checkpoint_id}: task outcomes and attempts are unresolved"
+            )
         for task in tasks:
             token = re.compile(
                 rf"(?<![A-Za-z0-9-]){re.escape(task.task_id)}(?![A-Za-z0-9-])"
@@ -9095,23 +11677,32 @@ def validate_checkpoint_record(
                 for segment in re.split(r"[;\n]", row.task_outcomes)
                 if token.search(segment) is not None
             ]
-            if len(segments) != 1 or re.search(
-                rf"\b{re.escape(task.status)}\b", segments[0]
-            ) is None:
-                raise ValueError(f"{checkpoint_id}: outcome for {task.task_id} is not current")
+            if (
+                len(segments) != 1
+                or re.search(rf"\b{re.escape(task.status)}\b", segments[0]) is None
+            ):
+                raise ValueError(
+                    f"{checkpoint_id}: outcome for {task.task_id} is not current"
+                )
             attempt = re.compile(
                 rf"\battempts?(?:\s+used)?\s*[=:]\s*{task.attempts_used}"
                 rf"(?:\s*/\s*{task.attempt_budget})?(?!\s*/\s*\d)\b",
                 re.IGNORECASE,
             )
             if attempt.search(segments[0]) is None:
-                raise ValueError(f"{checkpoint_id}: attempts for {task.task_id} are not current")
+                raise ValueError(
+                    f"{checkpoint_id}: attempts for {task.task_id} are not current"
+                )
         if (
             not explicit_value(row.evidence_and_external)
-            or re.search(r"\bevidence\b", row.evidence_and_external, re.IGNORECASE) is None
-            or re.search(r"\bexternal\b", row.evidence_and_external, re.IGNORECASE) is None
+            or re.search(r"\bevidence\b", row.evidence_and_external, re.IGNORECASE)
+            is None
+            or re.search(r"\bexternal\b", row.evidence_and_external, re.IGNORECASE)
+            is None
         ):
-            raise ValueError(f"{checkpoint_id}: evidence and external actions are unresolved")
+            raise ValueError(
+                f"{checkpoint_id}: evidence and external actions are unresolved"
+            )
         evidence_cell = row.evidence_and_external
         for task in tasks:
             references = [
@@ -9129,19 +11720,30 @@ def validate_checkpoint_record(
                 is None
                 for reference in references
             ):
-                raise ValueError(f"{checkpoint_id}: evidence for {task.task_id} is incomplete")
+                raise ValueError(
+                    f"{checkpoint_id}: evidence for {task.task_id} is incomplete"
+                )
         if (
             not explicit_value(row.blockers_and_next)
             or re.search(r"\bblockers?\b", row.blockers_and_next, re.IGNORECASE) is None
             or re.search(r"\bnext\b", row.blockers_and_next, re.IGNORECASE) is None
         ):
-            raise ValueError(f"{checkpoint_id}: blockers and next action are unresolved")
-        structural_verify = without_fenced_code(verify_text) if verify_text is not None else ""
-        if re.search(
-            rf"(?<![A-Za-z0-9-]){re.escape(checkpoint_id)}(?![A-Za-z0-9-])",
-            structural_verify,
-        ) is None:
-            raise ValueError(f"{checkpoint_id}: checkpoint is not referenced in VERIFY.md")
+            raise ValueError(
+                f"{checkpoint_id}: blockers and next action are unresolved"
+            )
+        structural_verify = (
+            without_fenced_code(verify_text) if verify_text is not None else ""
+        )
+        if (
+            re.search(
+                rf"(?<![A-Za-z0-9-]){re.escape(checkpoint_id)}(?![A-Za-z0-9-])",
+                structural_verify,
+            )
+            is None
+        ):
+            raise ValueError(
+                f"{checkpoint_id}: checkpoint is not referenced in VERIFY.md"
+            )
     except (KeyError, ValueError) as exc:
         ctx.error("CONSTRUCTION_CHECKPOINT_UNVERIFIED", str(exc), TASKS_FILE)
 
@@ -9174,7 +11776,10 @@ def validate_authorized_baseline_repository(ctx: Context, baseline: str) -> None
             PRD_FILE,
         )
         return
-    if resolved.returncode != 0 or resolved.stdout.decode("ascii", errors="replace").strip() != baseline:
+    if (
+        resolved.returncode != 0
+        or resolved.stdout.decode("ascii", errors="replace").strip() != baseline
+    ):
         ctx.error(
             "GATE_B_GIT_UNVERIFIED",
             "Authorized baseline commit does not resolve exactly in this repository",
@@ -9193,7 +11798,10 @@ def validate_construction_repository(
 
     baseline = snapshot.get("Baseline commit", "")
     known_green = snapshot.get("Last known-green commit", "")
-    for label, value in (("Baseline commit", baseline), ("Last known-green commit", known_green)):
+    for label, value in (
+        ("Baseline commit", baseline),
+        ("Last known-green commit", known_green),
+    ):
         if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", value) is None:
             ctx.error(
                 "CONSTRUCTION_GIT_UNVERIFIED",
@@ -9225,10 +11833,16 @@ def validate_construction_repository(
         inside = git_read(ctx.root, "rev-parse", "--is-inside-work-tree")
         bare = git_read(ctx.root, "rev-parse", "--is-bare-repository")
         head_result = git_read(ctx.root, "rev-parse", "--verify", "HEAD^{commit}")
-        baseline_result = git_read(ctx.root, "rev-parse", "--verify", f"{baseline}^{{commit}}")
-        green_result = git_read(ctx.root, "rev-parse", "--verify", f"{known_green}^{{commit}}")
+        baseline_result = git_read(
+            ctx.root, "rev-parse", "--verify", f"{baseline}^{{commit}}"
+        )
+        green_result = git_read(
+            ctx.root, "rev-parse", "--verify", f"{known_green}^{{commit}}"
+        )
         checkpoint_result = (
-            git_read(ctx.root, "rev-parse", "--verify", f"{checkpoint_commit}^{{commit}}")
+            git_read(
+                ctx.root, "rev-parse", "--verify", f"{checkpoint_commit}^{{commit}}"
+            )
             if checkpoint_commit is not None
             else None
         )
@@ -9271,7 +11885,8 @@ def validate_construction_repository(
         )
         return
     if checkpoint_result is not None and (
-        checkpoint_result.stdout.decode("ascii", errors="replace").strip() != resolved_green
+        checkpoint_result.stdout.decode("ascii", errors="replace").strip()
+        != resolved_green
     ):
         ctx.error(
             "CONSTRUCTION_CHECKPOINT_UNVERIFIED",
@@ -9340,8 +11955,12 @@ def validate_construction_repository(
     if not reconcile_worktree:
         return
     try:
-        tracked = git_read(ctx.root, "diff", "--name-only", "-z", "--relative", "HEAD", "--", ".")
-        untracked = git_read(ctx.root, "ls-files", "--others", "--exclude-standard", "-z", "--", ".")
+        tracked = git_read(
+            ctx.root, "diff", "--name-only", "-z", "--relative", "HEAD", "--", "."
+        )
+        untracked = git_read(
+            ctx.root, "ls-files", "--others", "--exclude-standard", "-z", "--", "."
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         ctx.error(
             "CONSTRUCTION_GIT_UNVERIFIED",
@@ -9389,7 +12008,9 @@ def validate_construction_repository(
     unused = sorted(
         boundary
         for boundary in protected
-        if not any(path_boundary_contains(boundary, path) for path in observed_nonledger)
+        if not any(
+            path_boundary_contains(boundary, path) for path in observed_nonledger
+        )
     )
     if uncovered or unused:
         details: list[str] = []
@@ -9420,11 +12041,42 @@ def validate_resume_repository(
     )
 
 
+LEGACY_TASK_AWS_MODE = re.compile(
+    r"^(?P<task>TASK-\d+): invalid AWS mode '(?:READ_ONLY|MUTATION)'$"
+)
+
+
+def record_task_graph_validation_errors(ctx: Context, message: str) -> None:
+    """Project legacy authenticated task modes as a fail-closed replan."""
+
+    issues = [line.strip() for line in message.splitlines() if line.strip()]
+    legacy = [line for line in issues if LEGACY_TASK_AWS_MODE.fullmatch(line)]
+    remaining = [line for line in issues if line not in legacy]
+    if legacy:
+        task_ids = sorted(
+            {
+                match.group("task")
+                for line in legacy
+                if (match := LEGACY_TASK_AWS_MODE.fullmatch(line)) is not None
+            }
+        )
+        ctx.error(
+            "TASK_AWS_MODE_REPLAN_REQUIRED",
+            "Legacy authenticated task AWS mode requires replanning local work "
+            f"for {', '.join(task_ids)}; preserve every DONE completion and "
+            "append-only VERIFY evidence row rather than rewriting observed evidence",
+            TASKS_FILE,
+        )
+    if remaining:
+        ctx.error("TASK_GRAPH_INVALID", "\n".join(remaining), TASKS_FILE)
+
+
 def validate_tasks(
     ctx: Context,
     state: dict[str, Any],
     prd_fields: dict[str, str],
     envelope: dict[str, str],
+    requirements_contract: RequirementsContract,
     design_contract: DesignContract,
 ) -> TaskSummary:
     summary = TaskSummary()
@@ -9445,7 +12097,11 @@ def validate_tasks(
             details.append("missing=" + ", ".join(missing))
         if extra:
             details.append("unexpected=" + ", ".join(extra))
-        ctx.error("TASK_SNAPSHOT", "Active execution snapshot fields must be exact: " + "; ".join(details), TASKS_FILE)
+        ctx.error(
+            "TASK_SNAPSHOT",
+            "Active execution snapshot fields must be exact: " + "; ".join(details),
+            TASKS_FILE,
+        )
 
     run_state = snapshot.get("Run state", "")
     if run_state not in SNAPSHOT_RUN_STATES:
@@ -9455,36 +12111,64 @@ def validate_tasks(
         if snapshot_workers < 1:
             raise ValueError
     except ValueError:
-        ctx.error("TASK_SNAPSHOT", "Maximum workers must be a positive integer", TASKS_FILE)
+        ctx.error(
+            "TASK_SNAPSHOT", "Maximum workers must be a positive integer", TASKS_FILE
+        )
     active_run_id = snapshot.get("Active run ID", "")
     coordinator = snapshot.get("Coordinator", "")
     if run_state == "NOT_STARTED":
         if active_run_id != "NONE" or coordinator != "UNASSIGNED":
-            ctx.error("TASK_SNAPSHOT", "NOT_STARTED requires no run ID and an unassigned coordinator", TASKS_FILE)
+            ctx.error(
+                "TASK_SNAPSHOT",
+                "NOT_STARTED requires no run ID and an unassigned coordinator",
+                TASKS_FILE,
+            )
     else:
-        if RUN_ID.fullmatch(active_run_id) is None or coordinator in {"", "NONE", "UNASSIGNED", "TODO"}:
-            ctx.error("TASK_SNAPSHOT", "An active or checkpointed run requires a RUN ID and coordinator", TASKS_FILE)
+        if RUN_ID.fullmatch(active_run_id) is None or coordinator in {
+            "",
+            "NONE",
+            "UNASSIGNED",
+            "TODO",
+        }:
+            ctx.error(
+                "TASK_SNAPSHOT",
+                "An active or checkpointed run requires a RUN ID and coordinator",
+                TASKS_FILE,
+            )
     current_wave = snapshot.get("Current wave", "")
     if current_wave != "NONE" and re.fullmatch(r"[1-9]\d*", current_wave) is None:
-        ctx.error("TASK_SNAPSHOT", "Current wave must be NONE or a positive integer", TASKS_FILE)
+        ctx.error(
+            "TASK_SNAPSHOT",
+            "Current wave must be NONE or a positive integer",
+            TASKS_FILE,
+        )
     checkpoint = snapshot.get("Last checkpoint", "")
     if run_state in {"PAUSED", "BLOCKED", "COMPLETE"}:
         if CHECKPOINT_ID.fullmatch(checkpoint) is None:
-            ctx.error("TASK_SNAPSHOT", f"{run_state} requires a checkpoint ID", TASKS_FILE)
+            ctx.error(
+                "TASK_SNAPSHOT", f"{run_state} requires a checkpoint ID", TASKS_FILE
+            )
     elif checkpoint != "NONE":
-        ctx.error("TASK_SNAPSHOT", f"{run_state or 'unknown run state'} must not claim a checkpoint", TASKS_FILE)
+        ctx.error(
+            "TASK_SNAPSHOT",
+            f"{run_state or 'unknown run state'} must not claim a checkpoint",
+            TASKS_FILE,
+        )
     try:
         if snapshot.get("Protected dirty paths") != "NONE":
-            parse_task_write_set(snapshot.get("Protected dirty paths", ""), "Protected dirty paths")
+            parse_task_write_set(
+                snapshot.get("Protected dirty paths", ""), "Protected dirty paths"
+            )
     except ValueError as exc:
         ctx.error("TASK_SNAPSHOT", str(exc), TASKS_FILE)
     if not explicit_value(snapshot.get("Next safe action", ""), allow_none=False):
         ctx.error("TASK_SNAPSHOT", "Next safe action must be explicit", TASKS_FILE)
     if snapshot.get("Gate B state") == "APPROVED_FOR_CONSTRUCTION":
         for key in ("Baseline commit", "Last known-green commit"):
-            if re.fullmatch(
-                r"(?:[0-9a-f]{40}|[0-9a-f]{64})", snapshot.get(key, "")
-            ) is None:
+            if (
+                re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", snapshot.get(key, ""))
+                is None
+            ):
                 ctx.error(
                     "TASK_SNAPSHOT",
                     f"Current Gate B requires a full lowercase {key}",
@@ -9494,20 +12178,51 @@ def validate_tasks(
     raw_plan = snapshot.get("Task-plan revision", "")
     summary.plan_state = snapshot.get("Task-plan state", "")
     summary.plan_revision = None if raw_plan == "UNINITIALIZED" else raw_plan
-    if summary.plan_revision is not None and PLAN_ID.fullmatch(summary.plan_revision) is None:
-        ctx.error("TASK_PLAN_STATE", "Task-plan revision must be UNINITIALIZED or PLAN-nnnn", TASKS_FILE)
+    if (
+        summary.plan_revision is not None
+        and PLAN_ID.fullmatch(summary.plan_revision) is None
+    ):
+        ctx.error(
+            "TASK_PLAN_STATE",
+            "Task-plan revision must be UNINITIALIZED or PLAN-nnnn",
+            TASKS_FILE,
+        )
     if summary.plan_state not in {"UNINITIALIZED", "CURRENT", "STALE"}:
-        ctx.error("TASK_PLAN_STATE", "Task-plan state must be UNINITIALIZED, CURRENT, or STALE", TASKS_FILE)
+        ctx.error(
+            "TASK_PLAN_STATE",
+            "Task-plan state must be UNINITIALIZED, CURRENT, or STALE",
+            TASKS_FILE,
+        )
     if summary.plan_revision is None and summary.plan_state != "UNINITIALIZED":
-        ctx.error("TASK_PLAN_STATE", "UNINITIALIZED revision requires UNINITIALIZED plan state", TASKS_FILE)
+        ctx.error(
+            "TASK_PLAN_STATE",
+            "UNINITIALIZED revision requires UNINITIALIZED plan state",
+            TASKS_FILE,
+        )
     if summary.plan_revision is not None and summary.plan_state == "UNINITIALIZED":
-        ctx.error("TASK_PLAN_STATE", "Initialized revision cannot have UNINITIALIZED plan state", TASKS_FILE)
-    execution = state.get("execution") if isinstance(state.get("execution"), dict) else {}
-    lifecycle = state.get("lifecycle") if isinstance(state.get("lifecycle"), dict) else {}
+        ctx.error(
+            "TASK_PLAN_STATE",
+            "Initialized revision cannot have UNINITIALIZED plan state",
+            TASKS_FILE,
+        )
+    execution = (
+        state.get("execution") if isinstance(state.get("execution"), dict) else {}
+    )
+    lifecycle = (
+        state.get("lifecycle") if isinstance(state.get("lifecycle"), dict) else {}
+    )
     if summary.plan_revision != execution.get("plan_revision"):
-        ctx.error("STATE_TASK_DRIFT", "Task-plan revision does not match bootstrap state", TASKS_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT",
+            "Task-plan revision does not match bootstrap state",
+            TASKS_FILE,
+        )
     if summary.plan_state != execution.get("plan_state"):
-        ctx.error("STATE_TASK_DRIFT", "Task-plan state does not match bootstrap state", TASKS_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT",
+            "Task-plan state does not match bootstrap state",
+            TASKS_FILE,
+        )
     snapshot_pairs = {
         "Requirements revision": "requirements_revision",
         "Design revision": "design_revision",
@@ -9516,7 +12231,11 @@ def validate_tasks(
     }
     for snapshot_key, lifecycle_key in snapshot_pairs.items():
         if snapshot.get(snapshot_key) != lifecycle.get(lifecycle_key):
-            ctx.error("STATE_TASK_DRIFT", f"{snapshot_key} does not match lifecycle state", TASKS_FILE)
+            ctx.error(
+                "STATE_TASK_DRIFT",
+                f"{snapshot_key} does not match lifecycle state",
+                TASKS_FILE,
+            )
 
     run_map = {
         "IDLE": "NOT_STARTED",
@@ -9525,22 +12244,31 @@ def validate_tasks(
         "BLOCKED": "BLOCKED",
         "COMPLETE": "COMPLETE",
     }
-    execution_state = execution.get("state") if isinstance(execution.get("state"), str) else ""
+    execution_state = (
+        execution.get("state") if isinstance(execution.get("state"), str) else ""
+    )
     expected_run = run_map.get(execution_state)
     if expected_run is not None and snapshot.get("Run state") != expected_run:
-        ctx.error("STATE_TASK_DRIFT", "Run state does not match bootstrap state", TASKS_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT", "Run state does not match bootstrap state", TASKS_FILE
+        )
     expected_run_id = execution.get("run_id") or "NONE"
     if snapshot.get("Active run ID") != expected_run_id:
-        ctx.error("STATE_TASK_DRIFT", "Active run ID does not match bootstrap state", TASKS_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT",
+            "Active run ID does not match bootstrap state",
+            TASKS_FILE,
+        )
     expected_coordinator = execution.get("coordinator") or "UNASSIGNED"
     if snapshot.get("Coordinator") != expected_coordinator:
-        ctx.error("STATE_TASK_DRIFT", "Coordinator does not match bootstrap state", TASKS_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT", "Coordinator does not match bootstrap state", TASKS_FILE
+        )
 
     verify_text = ctx.texts.get(VERIFY_FILE) or safe_read_text(ctx, VERIFY_FILE)
     try:
         approved_tech_ids = {
-            decision.decision_id
-            for decision in design_contract.technology_decisions
+            decision.decision_id for decision in design_contract.technology_decisions
         }
         property_execution_by_id = {
             execution.property_id: execution
@@ -9559,7 +12287,7 @@ def validate_tasks(
             technology_decisions_by_id,
         )
     except ValueError as exc:
-        ctx.error("TASK_GRAPH_INVALID", str(exc), TASKS_FILE)
+        record_task_graph_validation_errors(ctx, str(exc))
         return summary
 
     missing_property_ids = missing_current_property_task_coverage(
@@ -9574,18 +12302,104 @@ def validate_tasks(
             + ", ".join(missing_property_ids),
             TASKS_FILE,
         )
+    try:
+        requirement_rules = (
+            task_requirement_rules(ctx.texts.get(PRD_FILE, ""), requirements_contract)
+            if summary.plan_state == "CURRENT"
+            else {}
+        )
+        requirement_evidence, requirement_evidence_issues = (
+            task_requirement_evidence_dispositions(
+                verify_text,
+                {
+                    "Requirements revision": snapshot.get("Requirements revision", ""),
+                    "Design revision": snapshot.get("Design revision", ""),
+                    "Construction authorization": snapshot.get(
+                        "Construction authorization", ""
+                    ),
+                },
+                requirement_rules,
+            )
+        )
+        requirement_coverage = derive_task_requirement_coverage(
+            tasks,
+            summary.plan_state,
+            requirement_rules,
+            requirement_evidence,
+        )
+    except ValueError as exc:
+        ctx.error("TASK_REQUIREMENT_TRACE_INVALID", str(exc), TASKS_FILE)
+    else:
+        summary.requirement_coverage = {
+            record.requirement_id: record.to_dict()
+            for record in requirement_coverage.records
+        }
+        summary.missing_requirement_ids = list(
+            requirement_coverage.missing_requirement_ids
+        )
+        summary.requirement_coverage_complete = bool(
+            summary.plan_state == "CURRENT"
+            and not requirement_coverage.trace_issues
+            and not requirement_evidence_issues
+            and not requirement_coverage.evidence_issues
+            and not requirement_coverage.missing_requirement_ids
+        )
+        if requirement_coverage.trace_issues:
+            ctx.error(
+                "TASK_REQUIREMENT_TRACE_INVALID",
+                "\n".join(requirement_coverage.trace_issues),
+                TASKS_FILE,
+            )
+        all_evidence_issues = [
+            *requirement_evidence_issues,
+            *requirement_coverage.evidence_issues,
+        ]
+        if all_evidence_issues:
+            ctx.error(
+                "TASK_REQUIREMENT_COVERAGE_EVIDENCE_INVALID",
+                "\n".join(all_evidence_issues),
+                VERIFY_FILE,
+            )
+        if requirement_coverage.missing_requirement_ids:
+            ctx.error(
+                "TASK_REQUIREMENT_COVERAGE",
+                "CURRENT task plan does not cover approved requirement IDs: "
+                + ", ".join(requirement_coverage.missing_requirement_ids),
+                TASKS_FILE,
+            )
 
     if summary.plan_revision is None and tasks:
-        ctx.error("TASK_PLAN_STATE", "UNINITIALIZED task plan contains task blocks", TASKS_FILE)
+        ctx.error(
+            "TASK_PLAN_STATE",
+            "UNINITIALIZED task plan contains task blocks",
+            TASKS_FILE,
+        )
     if summary.plan_revision is not None and not tasks:
-        ctx.error("TASK_PLAN_STATE", "Initialized task plan contains no task blocks", TASKS_FILE)
-    if summary.plan_state == "CURRENT" and prd_fields.get("gate_b") != "APPROVED_FOR_CONSTRUCTION":
-        ctx.error("TASK_PLAN_STATE", "CURRENT task plan requires current Gate B", TASKS_FILE)
-    if summary.plan_state == "STALE" and any(task.status in {"READY", "IN_PROGRESS"} for task in tasks):
-        ctx.error("TASK_PLAN_STATE", "STALE task plan cannot contain runnable or active tasks", TASKS_FILE)
+        ctx.error(
+            "TASK_PLAN_STATE",
+            "Initialized task plan contains no task blocks",
+            TASKS_FILE,
+        )
+    if (
+        summary.plan_state == "CURRENT"
+        and prd_fields.get("gate_b") != "APPROVED_FOR_CONSTRUCTION"
+    ):
+        ctx.error(
+            "TASK_PLAN_STATE", "CURRENT task plan requires current Gate B", TASKS_FILE
+        )
+    if summary.plan_state == "STALE" and any(
+        task.status in {"READY", "IN_PROGRESS"} for task in tasks
+    ):
+        ctx.error(
+            "TASK_PLAN_STATE",
+            "STALE task plan cannot contain runnable or active tasks",
+            TASKS_FILE,
+        )
 
     summary.statuses = {task.task_id: task.status for task in tasks}
-    summary.active = sorted(task.task_id for task in tasks if task.status == "IN_PROGRESS")
+    summary.active = sorted(
+        task.task_id for task in tasks if task.status == "IN_PROGRESS"
+    )
     summary.ready = sorted(ready)
     summary.attempts_used = {task.task_id: task.attempts_used for task in tasks}
     summary.attempt_budgets = {task.task_id: task.attempt_budget for task in tasks}
@@ -9600,22 +12414,31 @@ def validate_tasks(
     state_active_value = execution.get("active_tasks")
     state_active = (
         sorted(state_active_value)
-        if isinstance(state_active_value, list) and all(isinstance(item, str) for item in state_active_value)
+        if isinstance(state_active_value, list)
+        and all(isinstance(item, str) for item in state_active_value)
         else []
     )
     if summary.active != state_active:
-        ctx.error("STATE_TASK_DRIFT", "active_tasks does not match IN_PROGRESS task records", STATE_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT",
+            "active_tasks does not match IN_PROGRESS task records",
+            STATE_FILE,
+        )
     task_attempts = {task.task_id: task.attempts_used for task in tasks}
     if execution.get("attempts") != task_attempts:
-        ctx.error("STATE_TASK_DRIFT", "attempt counters do not match task records", STATE_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT", "attempt counters do not match task records", STATE_FILE
+        )
     state_checkpoint = execution.get("last_checkpoint")
     expected_checkpoint = (
-        state_checkpoint.get("id")
-        if isinstance(state_checkpoint, dict)
-        else "NONE"
+        state_checkpoint.get("id") if isinstance(state_checkpoint, dict) else "NONE"
     )
     if snapshot.get("Last checkpoint") != expected_checkpoint:
-        ctx.error("STATE_TASK_DRIFT", "Last checkpoint does not match bootstrap state", TASKS_FILE)
+        ctx.error(
+            "STATE_TASK_DRIFT",
+            "Last checkpoint does not match bootstrap state",
+            TASKS_FILE,
+        )
 
     basis = execution.get("basis")
     if basis is not None:
@@ -9625,7 +12448,11 @@ def validate_tasks(
             "construction_authorization": prd_fields.get("construction_authorization"),
         }
         if basis != expected_basis:
-            ctx.error("RUN_BASIS_STALE", "Execution basis does not match current PRD revisions", STATE_FILE)
+            ctx.error(
+                "RUN_BASIS_STALE",
+                "Execution basis does not match current PRD revisions",
+                STATE_FILE,
+            )
     if prd_fields.get("gate_b") == "APPROVED_FOR_CONSTRUCTION" or tasks:
         validate_tasks_against_envelope(ctx, tasks, snapshot, state, envelope)
     construction_states = {"RUNNING", "CHECKPOINTED", "BLOCKED", "COMPLETE"}
@@ -9639,26 +12466,30 @@ def validate_tasks(
             ctx,
             snapshot,
             tasks_text=text,
-            reconcile_worktree=execution_state in {"CHECKPOINTED", "BLOCKED", "COMPLETE"},
+            reconcile_worktree=execution_state
+            in {"CHECKPOINTED", "BLOCKED", "COMPLETE"},
         )
     return summary
 
 
-def validate_release_decision(ctx: Context) -> str:
+def validate_release_decision_record(ctx: Context) -> dict[str, str]:
+    """Validate the release state and its durable evidence acknowledgment."""
+
     relative = VERIFY_FILE
     text = ctx.texts.get(relative) or safe_read_text(ctx, relative)
     if text is None:
-        return "NOT_READY"
+        return {"release_state": "NOT_READY", "active_evidence_cutoff": "NONE"}
     heading = "## Current release decision"
     matches = list(re.finditer(rf"^{re.escape(heading)}[ \t]*$", text, re.MULTILINE))
     if len(matches) != 1:
         ctx.error("RELEASE_DECISION", f"Expected exactly one {heading!r}", relative)
-        return "NOT_READY"
+        return {"release_state": "NOT_READY", "active_evidence_cutoff": "NONE"}
     section = text[matches[0].end() :]
     next_heading = re.search(r"^##\s+", section, re.MULTILINE)
     if next_heading:
         section = section[: next_heading.start()]
     decisions = re.findall(r"^- Release state:\s*`([^`]+)`\s*$", section, re.MULTILINE)
+    release_state = decisions[0] if len(decisions) == 1 else "NOT_READY"
     if len(decisions) != 1 or decisions[0] not in {
         "NOT_READY",
         "READY_TO_DEPLOY",
@@ -9669,64 +12500,323 @@ def validate_release_decision(ctx: Context) -> str:
             "Release decision must be exactly NOT_READY, READY_TO_DEPLOY, or RELEASE_VERIFIED",
             relative,
         )
-        return "NOT_READY"
-    return decisions[0]
+        release_state = "NOT_READY"
+    cutoff_rows = re.findall(
+        r"^- Active evidence cutoff:\s*(?P<value>[^\r\n]+?)\s*$",
+        section,
+        re.MULTILINE,
+    )
+    cutoff = clean_cell(cutoff_rows[0]) if len(cutoff_rows) == 1 else "NONE"
+    if len(cutoff_rows) != 1 or (
+        cutoff not in {"TODO", "NONE"} and re.fullmatch(r"EV-\d{4,}", cutoff) is None
+    ):
+        ctx.error(
+            "RELEASE_EVIDENCE_CUTOFF",
+            "Active evidence cutoff must appear exactly once and be TODO, NONE, "
+            "or one canonical EV-* ID",
+            relative,
+        )
+        cutoff = "NONE"
+    return {
+        "release_state": release_state,
+        "active_evidence_cutoff": cutoff,
+    }
+
+
+def validate_release_decision(ctx: Context) -> str:
+    """Compatibility wrapper returning only the validated release state."""
+
+    return validate_release_decision_record(ctx)["release_state"]
+
+
+AWS_LIFECYCLE_INTENT_VALUES = {"NONE", "RESIDUAL_REVIEW", "TEARDOWN", "RETAIN"}
+AWS_LIFECYCLE_INTENT_SOURCE = re.compile(r"owner-message MSG-AWS-LIFECYCLE-\d{4,}")
+
+
+def validate_aws_lifecycle_intent_record(ctx: Context) -> dict[str, Any]:
+    """Validate the atomic, non-authorizing owner lifecycle-intent record."""
+
+    legacy_none = {
+        "value": "NONE",
+        "source": "NONE",
+        "recorded_at": "NONE",
+        "provenance_status": "LEGACY_NONE",
+        "authorizes_aws_access": False,
+        "authorizes_mutation": False,
+    }
+    text = ctx.texts.get(VERIFY_FILE) or safe_read_text(ctx, VERIFY_FILE)
+    if text is None:
+        return legacy_none
+    heading = "## Current release decision"
+    headings = list(re.finditer(rf"^{re.escape(heading)}[ \t]*$", text, re.MULTILINE))
+    if len(headings) != 1:
+        # validate_release_decision_record owns the structural diagnostic.
+        return legacy_none
+    section = text[headings[0].end() :]
+    next_heading = re.search(r"^##\s+", section, re.MULTILINE)
+    if next_heading:
+        section = section[: next_heading.start()]
+    value_lines = list(
+        re.finditer(
+            r"^- AWS lifecycle intent:\s*`([^`]+)`\s*$",
+            section,
+            re.MULTILINE,
+        )
+    )
+    source_lines = list(
+        re.finditer(
+            r"^- AWS lifecycle intent source:\s*`([^`]+)`\s*$",
+            section,
+            re.MULTILINE,
+        )
+    )
+    recorded_lines = list(
+        re.finditer(
+            r"^- AWS lifecycle intent recorded at:\s*`([^`]+)`\s*$",
+            section,
+            re.MULTILINE,
+        )
+    )
+    if not value_lines and not source_lines and not recorded_lines:
+        return legacy_none
+    if (
+        len(value_lines) == 1
+        and value_lines[0].group(1) == "NONE"
+        and not source_lines
+        and not recorded_lines
+    ):
+        return legacy_none
+    exact_record = re.search(
+        r"^- AWS lifecycle intent:\s*`([^`]+)`\s*\r?\n"
+        r"- AWS lifecycle intent source:\s*`([^`]+)`\s*\r?\n"
+        r"- AWS lifecycle intent recorded at:\s*`([^`]+)`\s*$",
+        section,
+        re.MULTILINE,
+    )
+    if (
+        len(value_lines) != 1
+        or len(source_lines) != 1
+        or len(recorded_lines) != 1
+        or exact_record is None
+    ):
+        ctx.error(
+            "AWS_LIFECYCLE_INTENT_PROVENANCE",
+            "AWS lifecycle intent must be one exact ordered value/source/recorded-at triple",
+            VERIFY_FILE,
+        )
+        return legacy_none
+    value, source, recorded_at = exact_record.groups()
+    valid = value in AWS_LIFECYCLE_INTENT_VALUES
+    if value == "NONE":
+        valid = valid and source == "NONE" and recorded_at == "NONE"
+    else:
+        valid = bool(
+            valid
+            and AWS_LIFECYCLE_INTENT_SOURCE.fullmatch(source)
+            and _iso_datetime(recorded_at) is not None
+        )
+    if not valid:
+        ctx.error(
+            "AWS_LIFECYCLE_INTENT_PROVENANCE",
+            "Non-NONE AWS lifecycle intent requires an owner-message source and timezone-aware recorded-at value; NONE requires NONE provenance",
+            VERIFY_FILE,
+        )
+        return legacy_none
+    return {
+        "value": value,
+        "source": source,
+        "recorded_at": recorded_at,
+        "provenance_status": "CURRENT",
+        "authorizes_aws_access": False,
+        "authorizes_mutation": False,
+    }
 
 
 def validate_aws_lifecycle_intent(ctx: Context) -> str:
-    """Read a non-authorizing AWS follow-up intent from the release record."""
+    """Compatibility wrapper returning only the validated intent value."""
 
-    text = ctx.texts.get(VERIFY_FILE) or safe_read_text(ctx, VERIFY_FILE)
-    if text is None:
-        return "NONE"
-    matches = re.findall(
-        r"^- AWS lifecycle intent:\s*`([^`]+)`\s*$", text, re.MULTILINE
-    )
-    if not matches:
-        # Compatibility: approved projects created before this field default to
-        # no AWS follow-up. Absence can never create account access or mutation.
-        return "NONE"
-    if len(matches) != 1 or matches[0] not in {
-        "NONE", "RESIDUAL_REVIEW", "TEARDOWN"
-    }:
-        ctx.error(
-            "AWS_LIFECYCLE_INTENT",
-            "AWS lifecycle intent must be exactly NONE, RESIDUAL_REVIEW, or TEARDOWN",
-            VERIFY_FILE,
-        )
-        return "NONE"
-    return matches[0]
+    return str(validate_aws_lifecycle_intent_record(ctx)["value"])
 
 
 def derive_teardown_route(
-    intent: str, teardown_sequence: Mapping[str, Any]
+    intent: str,
+    teardown_sequence: Mapping[str, Any],
+    residual_disposition: Mapping[str, Any] | None = None,
 ) -> tuple[str, str] | None:
     """Route residual review and teardown without treating intent as authority."""
 
-    if intent == "NONE":
-        return None
     status = clean_cell(teardown_sequence.get("status", "NOT_ACTIVE"))
+    if status == "ACTION_TERMINAL_REQUIRED":
+        return "AWS_TEARDOWN_ACTION_TERMINAL", "AWS-50"
+    if status == "POST_ACTION_REVIEW":
+        return "AWS_RESIDUAL_REVIEW", "AWS-40"
     if status == "BLOCKED":
         return "AWS_RESIDUAL_REVIEW_BLOCKED", "STOP"
+    disposition = residual_disposition or {}
+    disposition_status = clean_cell(disposition.get("status", "NOT_APPLICABLE"))
+    disposition_value = clean_cell(disposition.get("value", "NONE"))
+    if status in {"READY_FOR_TEARDOWN", "RESIDUALS_REMAIN"}:
+        if disposition_status != "CURRENT":
+            return "AWS_RESIDUALS_REMAIN", "STOP"
+        if disposition_status == "CURRENT":
+            if disposition_value == "RETAIN":
+                return "AWS_RESIDUALS_RETAINED", "STOP"
+            if disposition_value == "INVESTIGATE":
+                return "AWS_RESIDUAL_REVIEW", "AWS-40"
+            if disposition_value == "REMOVE":
+                return (
+                    ("WAITING_AWS_TEARDOWN_AUTH", "AWS-50")
+                    if status == "READY_FOR_TEARDOWN"
+                    else ("AWS_RESIDUAL_REVIEW", "AWS-40")
+                )
+    if intent == "NONE":
+        return None
     if intent == "RESIDUAL_REVIEW":
         if status == "VERIFIED_CLEAN":
             return "AWS_RESIDUAL_REVIEW_COMPLETE", "STOP"
-        if status in {"READY_FOR_TEARDOWN", "RESIDUALS_REMAIN"}:
-            return "AWS_RESIDUALS_REMAIN", "STOP"
         return "AWS_RESIDUAL_REVIEW", "AWS-40"
     if intent == "TEARDOWN":
-        if status == "READY_FOR_TEARDOWN":
-            return "WAITING_AWS_TEARDOWN_AUTH", "AWS-50"
         if status == "VERIFIED_CLEAN":
             return (
                 ("AWS_TEARDOWN_COMPLETE", "STOP")
                 if teardown_sequence.get("post_action_bound") is True
                 else ("AWS_RESIDUAL_REVIEW_COMPLETE", "STOP")
             )
-        if status == "RESIDUALS_REMAIN":
-            return "AWS_RESIDUALS_REMAIN", "STOP"
         return "AWS_RESIDUAL_REVIEW", "AWS-40"
     return None
+
+
+def derive_aws_residual_disposition(
+    intent_record: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one non-authorizing residual choice to the latest AWS-40 evidence."""
+
+    base: dict[str, Any] = {
+        "status": "NOT_APPLICABLE",
+        "value": "NONE",
+        "basis_evidence_id": "NONE",
+        "basis_status": "NONE",
+        "basis_observed_at": "NONE",
+        "recorded_at": clean_cell(intent_record.get("recorded_at", "NONE")),
+        "authorizes_aws_access": False,
+        "authorizes_mutation": False,
+        "issues": [],
+    }
+    basis_status = clean_cell(teardown_sequence.get("status", "NOT_ACTIVE"))
+    intent = clean_cell(intent_record.get("value", "NONE"))
+    if basis_status not in {"READY_FOR_TEARDOWN", "RESIDUALS_REMAIN"}:
+        if intent == "RETAIN":
+            return {
+                **base,
+                "status": "INVALID",
+                "issues": ["RETAIN requires current residual-resource evidence"],
+            }
+        return base
+    basis_observed_at = clean_cell(teardown_sequence.get("observed_at", ""))
+    basis_time = _iso_datetime(basis_observed_at)
+    recorded_at = clean_cell(intent_record.get("recorded_at", ""))
+    record_time = _iso_datetime(recorded_at)
+    projection = {
+        **base,
+        "status": "PENDING",
+        "basis_evidence_id": clean_cell(teardown_sequence.get("evidence_id", "NONE")),
+        "basis_status": basis_status,
+        "basis_observed_at": basis_observed_at or "NONE",
+        "recorded_at": recorded_at or "NONE",
+    }
+    if basis_time is None:
+        return {
+            **projection,
+            "status": "INVALID",
+            "issues": ["Residual disposition basis lacks an exact observed timestamp"],
+        }
+    mapped = {
+        "RETAIN": "RETAIN",
+        "RESIDUAL_REVIEW": "INVESTIGATE",
+        "TEARDOWN": "REMOVE",
+    }.get(intent)
+    if (
+        mapped is None
+        or intent_record.get("provenance_status") != "CURRENT"
+        or record_time is None
+    ):
+        return projection
+    if basis_status == "RESIDUALS_REMAIN" and record_time <= basis_time:
+        return projection
+    if (
+        basis_status == "READY_FOR_TEARDOWN"
+        and intent != "TEARDOWN"
+        and record_time <= basis_time
+    ):
+        return projection
+    return {**projection, "status": "CURRENT", "value": mapped}
+
+
+def aws_deployment_teardown_sequence_conflict(
+    deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+) -> bool:
+    """Reject simultaneous open deployment and teardown journal epochs."""
+
+    deployment_status = clean_cell(deployment_sequence.get("status", ""))
+    teardown_status = clean_cell(teardown_sequence.get("status", ""))
+    deployment_open = deployment_status not in {"", "NONE", "NOT_ACTIVE", "CONSUMED"}
+    teardown_open = teardown_status not in {
+        "",
+        "NONE",
+        "NOT_ACTIVE",
+        "VERIFIED_CLEAN",
+        "RESIDUALS_REMAIN",
+    }
+    return deployment_open and teardown_open
+
+
+def release_lifecycle_intent_boundary_is_settled(
+    release_decision: str, deployment_sequence: Mapping[str, Any]
+) -> bool:
+    """Allow elective post-release intent only at an auditable boundary."""
+
+    deployment_status = clean_cell(deployment_sequence.get("status", ""))
+    return bool(
+        not deployment_sequence.get("issues")
+        and (
+            (
+                release_decision == "RELEASE_VERIFIED"
+                and deployment_status in {"NOT_ACTIVE", "CONSUMED"}
+            )
+            or (release_decision == "NOT_READY" and deployment_status == "CONSUMED")
+        )
+    )
+
+
+def aws_lifecycle_intent_route_is_eligible(
+    intent: str,
+    lifecycle_state: str,
+    release_decision: str,
+    tasks: TaskSummary,
+    deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+) -> bool:
+    """Return whether elective owner intent may enter AWS-40 now."""
+
+    return bool(
+        intent in {"RESIDUAL_REVIEW", "TEARDOWN"}
+        and (
+            lifecycle_state in {"RELEASE_REVIEW", "RELEASE_VERIFIED"}
+            or clean_cell(deployment_sequence.get("status", "")) == "CONSUMED"
+        )
+        and (
+            tasks.terminal
+            or clean_cell(deployment_sequence.get("status", "")) == "CONSUMED"
+        )
+        and release_lifecycle_intent_boundary_is_settled(
+            release_decision, deployment_sequence
+        )
+        and clean_cell(teardown_sequence.get("status", ""))
+        not in {"ACTION_TERMINAL_REQUIRED", "POST_ACTION_REVIEW"}
+        and not teardown_sequence.get("issues")
+    )
 
 
 def derive_route(
@@ -9746,7 +12836,11 @@ def derive_route(
             else ("INTAKE_REQUIRED", "INTAKE-10")
         )
     if gate_a == "BLOCKED":
-        return ("REQUIREMENTS_ANALYSIS", "REQ-10") if requirements_present else ("INTAKE_REQUIRED", "INTAKE-10")
+        return (
+            ("REQUIREMENTS_ANALYSIS", "REQ-10")
+            if requirements_present
+            else ("INTAKE_REQUIRED", "INTAKE-10")
+        )
     if gate_a == "PENDING_OWNER_APPROVAL":
         return "WAITING_GATE_A", "INTAKE-20"
     if gate_a != "APPROVED_FOR_DESIGN":
@@ -9754,7 +12848,11 @@ def derive_route(
     if gate_b == "STALE":
         return "DESIGN_STALE", "DESIGN-10"
     if gate_b == "BLOCKED":
-        return ("WAITING_GATE_B", "DESIGN-20") if gate_b_agent_ready else ("DESIGN_REQUIRED", "DESIGN-10")
+        return (
+            ("WAITING_GATE_B", "DESIGN-20")
+            if gate_b_agent_ready
+            else ("DESIGN_REQUIRED", "DESIGN-10")
+        )
     if gate_b == "PENDING_OWNER_APPROVAL":
         return "WAITING_GATE_B", "DESIGN-20"
     if gate_b != "APPROVED_FOR_CONSTRUCTION":
@@ -9782,9 +12880,107 @@ def derive_route(
     return "BLOCKED", "STOP"
 
 
-def _preserve_specialized_teardown_block(
-    ctx: Context, lifecycle_state: str
-) -> bool:
+def derive_aws_delivery_route(
+    release_decision: str,
+    aws_execution: Mapping[str, Any],
+    deployment_sequence: Mapping[str, Any],
+    lane: str | None,
+    release_evidence_cutoff: str = "NONE",
+) -> tuple[str, str] | None:
+    """Route a release without confusing authority with an attempted action."""
+
+    deployment_status = clean_cell(deployment_sequence.get("status", ""))
+    if deployment_sequence.get("issues"):
+        return "BLOCKED", "STOP"
+    if deployment_status == "ACTION_TERMINAL_REQUIRED":
+        return "AWS_DEPLOYMENT_ACTION_TERMINAL", "AWS-20"
+    if deployment_status == "RECONCILIATION_REQUIRED":
+        return "AWS_DEPLOYMENT_RECONCILIATION", "AWS-30"
+    if deployment_status in {"RECONCILED", "BLOCKED"}:
+        terminal_evidence = clean_cell(deployment_sequence.get("evidence_id", ""))
+        if release_evidence_cutoff != terminal_evidence:
+            return "RELEASE_REVIEW", "RELEASE-10"
+    if deployment_status == "CONSUMED":
+        if release_decision == "NOT_READY":
+            return "RELEASE_REVIEW_BLOCKED", "STOP"
+        if release_decision != "READY_TO_DEPLOY":
+            return None
+        if (
+            clean_cell(deployment_sequence.get("current_mutation_authority_status", ""))
+            == "UNAVAILABLE"
+        ):
+            return None
+    if release_decision != "READY_TO_DEPLOY":
+        return None
+    progress_state = clean_cell(aws_execution.get("progress_state", ""))
+    if progress_state == "WAITING_AWS_MUTATION_AUTH":
+        return "WAITING_AWS_MUTATION_AUTH", "AWS-20"
+    if progress_state == "AWS_PREFLIGHT_READY" and lane == "fast-dev":
+        return "AWS_PREFLIGHT_READY", "AWS-20"
+    if progress_state == "AWS_PREFLIGHT_READY":
+        return "AWS_PREFLIGHT_READY", "STOP"
+    return progress_state or "AWS_PREFLIGHT_REQUIRED", "AWS-10"
+
+
+def _preserve_expired_authority_for_deployment_closure(
+    ctx: Context,
+    deployment_sequence: Mapping[str, Any],
+    release_decision: str,
+) -> None:
+    status = clean_cell(deployment_sequence.get("status", ""))
+    terminal_reconciliation = bool(
+        (
+            status in {"RECONCILED", "BLOCKED"}
+            or (status == "CONSUMED" and release_decision != "READY_TO_DEPLOY")
+        )
+        and not deployment_sequence.get("issues")
+        and clean_cell(deployment_sequence.get("phase", "")) == "AWS-30"
+        and clean_cell(deployment_sequence.get("reconciliation_status", ""))
+        in {"COMPLETE", "BLOCKED"}
+    )
+    read_only_reconciliation = bool(
+        status == "RECONCILIATION_REQUIRED"
+        and not deployment_sequence.get("issues")
+        and clean_cell(deployment_sequence.get("action_status", ""))
+        in AWS_DEPLOYMENT_TERMINAL_STATUSES
+    )
+    completed_without_attempt = bool(
+        status == "NOT_ACTIVE" and release_decision == "RELEASE_VERIFIED"
+    )
+    if (
+        status != "ACTION_TERMINAL_REQUIRED"
+        and not read_only_reconciliation
+        and not terminal_reconciliation
+        and not completed_without_attempt
+    ):
+        return
+    ctx.diagnostics = [
+        Diagnostic(item.code, item.message, item.path, "WARNING")
+        if item.code == "GATE_B_AUTHORITY_EXPIRED"
+        else item
+        for item in ctx.diagnostics
+    ]
+
+
+def _preserve_expired_authority_for_teardown_closure(
+    ctx: Context, teardown_sequence: Mapping[str, Any]
+) -> None:
+    """Keep only the local UNKNOWN closure after a valid teardown STARTED row."""
+
+    if clean_cell(teardown_sequence.get("status", "")) not in {
+        "ACTION_TERMINAL_REQUIRED",
+        "POST_ACTION_REVIEW",
+    } or teardown_sequence.get("issues"):
+        return
+    ctx.diagnostics = [
+        Diagnostic(item.code, item.message, item.path, "WARNING")
+        if item.code == "GATE_B_AUTHORITY_EXPIRED"
+        else item
+        for item in ctx.diagnostics
+    ]
+
+
+def _preserve_specialized_teardown_block(ctx: Context, lifecycle_state: str) -> bool:
     """Keep the teardown safety route only when every error belongs to it."""
 
     return lifecycle_state == "AWS_RESIDUAL_REVIEW_BLOCKED" and all(
@@ -9855,15 +13051,36 @@ def inspect_project(
     verify_text = ctx.texts.get(VERIFY_FILE) or safe_read_text(ctx, VERIFY_FILE)
     if verify_text is not None:
         try:
+            active_scope = table_after_heading(verify_text, "## Active evidence scope")
+        except ValueError:
+            active_scope = {}
+        verify_name = html.unescape(clean_cell(active_scope.get("Workload", "")))
+        if verify_name and state.get("project", {}).get("name") != verify_name:
+            ctx.error(
+                "STATE_VERIFY_DRIFT",
+                "project.name does not match the VERIFY Workload value",
+                VERIFY_FILE,
+            )
+        try:
             aws_core_rows = parse_aws_core_evidence(
                 verify_text,
                 allow_legacy=allow_legacy_design_discovery,
             )
         except ValueError as exc:
             ctx.error("AWS_CORE_EVIDENCE_GENERATED_INVALID", str(exc), VERIFY_FILE)
-    tasks = validate_tasks(ctx, state, prd_fields, envelope, design_contract)
-    release_decision = validate_release_decision(ctx)
-    aws_lifecycle_intent = validate_aws_lifecycle_intent(ctx)
+    tasks = validate_tasks(
+        ctx,
+        state,
+        prd_fields,
+        envelope,
+        requirements_contract,
+        design_contract,
+    )
+    release_record = validate_release_decision_record(ctx)
+    release_decision = release_record["release_state"]
+    release_evidence_cutoff = release_record["active_evidence_cutoff"]
+    aws_lifecycle_intent_record = validate_aws_lifecycle_intent_record(ctx)
+    aws_lifecycle_intent = str(aws_lifecycle_intent_record["value"])
     validate_placeholders(ctx)
 
     gate_a = prd_fields.get("gate_a", "BLOCKED")
@@ -9929,15 +13146,13 @@ def inspect_project(
             )
     req_aws_core_ready = not req_aws_core_issues
     if (
-        (gate_a_agent_ready or gate_a in {"PENDING_OWNER_APPROVAL", "APPROVED_FOR_DESIGN"})
-        and req_materiality_value == "REQUIRED"
-    ):
+        gate_a_agent_ready
+        or gate_a in {"PENDING_OWNER_APPROVAL", "APPROVED_FOR_DESIGN"}
+    ) and req_materiality_value == "REQUIRED":
         if req_aws_core_issues:
             blocking_aws_core_phases.add("REQ-10")
         for issue in req_aws_core_issues:
-            ctx.error(
-                aws_core_evidence_diagnostic_code(issue), issue, VERIFY_FILE
-            )
+            ctx.error(aws_core_evidence_diagnostic_code(issue), issue, VERIFY_FILE)
     design_aws_core_issues = aws_core_phase_evidence_issues(
         aws_core_rows,
         "DESIGN-10",
@@ -10042,6 +13257,28 @@ def inspect_project(
         construction_authorization=construction_authorization,
         artifact_binding=artifact_binding,
     )
+    deployment_sequence = derive_deployment_sequence_state(
+        verify_text or "",
+        read_authority,
+        requirements_revision=str(prd_fields.get("requirements_revision", "")),
+        design_revision=str(prd_fields.get("design_revision", "")),
+        construction_authorization=construction_authorization,
+        envelope=envelope,
+        lane=selections.get("aws_lane"),
+        artifact_binding=artifact_binding,
+        release_evidence_cutoff=release_evidence_cutoff,
+        release_state=release_decision,
+        gate_b_authority_source=str(prd_fields.get("gate_b_authorization_source", "")),
+        gate_b_authorized_at=str(prd_fields.get("gate_b_authorized_at", "")),
+        cost_posture=str(state.get("project", {}).get("cost_posture", "")),
+        restricted_closure=(
+            gate_b != "APPROVED_FOR_CONSTRUCTION"
+            or any(item.code == "GATE_B_AUTHORITY_EXPIRED" for item in ctx.diagnostics)
+        ),
+    )
+    _preserve_expired_authority_for_deployment_closure(
+        ctx, deployment_sequence, release_decision
+    )
     teardown_sequence = derive_teardown_sequence_state(
         verify_text or "",
         read_authority,
@@ -10049,7 +13286,23 @@ def inspect_project(
         design_revision=str(prd_fields.get("design_revision", "")),
         construction_authorization=construction_authorization,
         envelope=envelope,
+        restricted_closure=(
+            gate_b != "APPROVED_FOR_CONSTRUCTION"
+            or any(item.code == "GATE_B_AUTHORITY_EXPIRED" for item in ctx.diagnostics)
+        ),
+        cost_posture=str(state.get("project", {}).get("cost_posture", "")),
+        active_artifact=artifact_binding,
     )
+    _preserve_expired_authority_for_teardown_closure(ctx, teardown_sequence)
+    aws_sequence_conflict = aws_deployment_teardown_sequence_conflict(
+        deployment_sequence, teardown_sequence
+    )
+    if aws_sequence_conflict:
+        ctx.error(
+            "AWS_DEPLOYMENT_TEARDOWN_CONFLICT",
+            "Open deployment and teardown journal epochs cannot coexist; close one sequence before continuing",
+            VERIFY_FILE,
+        )
     aws_execution = derive_aws_execution_projection(
         req_materiality,
         release_decision=release_decision,
@@ -10058,26 +13311,78 @@ def inspect_project(
         preflight=preflight,
         lane=selections.get("aws_lane"),
     )
-    aws_execution_planning_ready = preflight.get("status") == "READY"
-    if release_decision == "READY_TO_DEPLOY" and not ctx.has_errors:
-        lifecycle_state = str(aws_execution["progress_state"])
-        next_prompt = (
-            "AWS-20"
-            if lifecycle_state == "WAITING_AWS_MUTATION_AUTH"
-            or (
-                lifecycle_state == "AWS_PREFLIGHT_READY"
-                and selections.get("aws_lane") == "fast-dev"
-            )
-            else "STOP" if lifecycle_state == "AWS_PREFLIGHT_READY" else "AWS-10"
-        )
+    if deployment_sequence.get("status") not in {"NOT_ACTIVE", "CONSUMED"}:
+        aws_execution = {
+            **aws_execution,
+            "active": False,
+            "progress_state": "NOT_ACTIVE",
+        }
     elif (
-        release_decision == "RELEASE_VERIFIED"
-        and lifecycle_state == "RELEASE_VERIFIED"
-        and not ctx.has_errors
+        deployment_sequence.get("status") == "CONSUMED"
+        and release_decision == "READY_TO_DEPLOY"
+        and deployment_sequence.get("current_mutation_authority_status") == "CONSUMED"
     ):
-        teardown_route = derive_teardown_route(aws_lifecycle_intent, teardown_sequence)
-        if teardown_route is not None:
-            lifecycle_state, next_prompt = teardown_route
+        aws_execution = {
+            **aws_execution,
+            "progress_state": "WAITING_AWS_MUTATION_AUTH",
+        }
+        if selections.get("aws_lane") == "fast-dev":
+            ctx.error(
+                "AWS_DEPLOYMENT_AUTHORITY_REPLAY",
+                "A fast-dev retry requires a freshly approved Gate B construction authorization",
+                PRD_FILE,
+            )
+    aws_execution_planning_ready = preflight.get("status") == "READY"
+    aws_delivery_route = derive_aws_delivery_route(
+        release_decision,
+        aws_execution,
+        deployment_sequence,
+        selections.get("aws_lane"),
+        release_evidence_cutoff,
+    )
+    residual_disposition = derive_aws_residual_disposition(
+        aws_lifecycle_intent_record, teardown_sequence
+    )
+    if residual_disposition.get("status") == "INVALID":
+        ctx.error(
+            "AWS_RESIDUAL_DISPOSITION_INVALID",
+            "; ".join(str(item) for item in residual_disposition.get("issues", [])),
+            VERIFY_FILE,
+        )
+    teardown_recovery_route = derive_teardown_route(
+        aws_lifecycle_intent, teardown_sequence, residual_disposition
+    )
+    teardown_status = clean_cell(teardown_sequence.get("status", ""))
+    if aws_sequence_conflict:
+        lifecycle_state, next_prompt = "BLOCKED", "STOP"
+    elif (
+        not ctx.has_errors
+        and teardown_status in {"READY_FOR_TEARDOWN", "RESIDUALS_REMAIN"}
+        and not teardown_sequence.get("issues")
+        and teardown_recovery_route is not None
+    ):
+        lifecycle_state, next_prompt = teardown_recovery_route
+    elif (
+        teardown_status in {"ACTION_TERMINAL_REQUIRED", "POST_ACTION_REVIEW", "BLOCKED"}
+        and not teardown_sequence.get("issues")
+        and teardown_recovery_route is not None
+    ):
+        lifecycle_state, next_prompt = teardown_recovery_route
+    elif (
+        not ctx.has_errors
+        and aws_lifecycle_intent_route_is_eligible(
+            aws_lifecycle_intent,
+            lifecycle_state,
+            release_decision,
+            tasks,
+            deployment_sequence,
+            teardown_sequence,
+        )
+        and teardown_recovery_route is not None
+    ):
+        lifecycle_state, next_prompt = teardown_recovery_route
+    elif aws_delivery_route is not None and not ctx.has_errors:
+        lifecycle_state, next_prompt = aws_delivery_route
     if next_prompt == "AWS-10" and not aws_guidance_ready:
         ctx.warning(
             "AWS_CORE_AWS10_EVIDENCE_REQUIRED",
@@ -10090,6 +13395,14 @@ def inspect_project(
         ctx.error(
             "AWS_PREFLIGHT_EVIDENCE_INVALID",
             "; ".join(str(item) for item in preflight["issues"]),
+            VERIFY_FILE,
+        )
+    # A stale attempted basis never authorizes new mutation, but read-only
+    # reconciliation still proceeds so the observed action can be closed.
+    if deployment_sequence.get("issues"):
+        ctx.error(
+            "AWS_DEPLOYMENT_EVIDENCE_INVALID",
+            "; ".join(str(item) for item in deployment_sequence["issues"]),
             VERIFY_FILE,
         )
     if teardown_sequence.get("issues"):
@@ -10144,7 +13457,12 @@ def inspect_project(
         aws_core_usage=aws_core_usage,
         owner_stage_hint=owner_stage_hint,
         active_artifact=artifact_binding,
+        deployment_sequence=deployment_sequence,
         teardown_sequence=teardown_sequence,
+        req_aws_core_materiality=req_materiality_value,
+        req_aws_core_ready=req_aws_core_ready,
+        aws_lifecycle_intent_record=aws_lifecycle_intent_record,
+        release_evidence_cutoff=release_evidence_cutoff,
     )
 
 
@@ -10153,7 +13471,14 @@ def inspect_git_baseline(root: Path) -> str:
 
     try:
         result = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
+            [
+                resolve_trusted_git(root),
+                "-C",
+                str(root),
+                "rev-parse",
+                "--verify",
+                "HEAD",
+            ],
             check=False,
             capture_output=True,
             text=True,
@@ -10179,7 +13504,9 @@ DEFINE_AGENT_DIAGNOSTICS = frozenset(
         "REQUIREMENT_COVERAGE_INVALID",
         "INTAKE_CARD_REQUIRED",
         "INTAKE_CONTRACT_MIGRATION_REQUIRED",
-        "INTAKE_SELECTION_PROVENANCE_INVALID", "INTAKE_FOUNDATION_PROVENANCE_INVALID", "INTAKE_RESPONSE_REGISTER_INVALID",
+        "INTAKE_SELECTION_PROVENANCE_INVALID",
+        "INTAKE_FOUNDATION_PROVENANCE_INVALID",
+        "INTAKE_RESPONSE_REGISTER_INVALID",
         "GATE_A_LIFECYCLE_TRANSITION",
         "GATE_A_READINESS_CARD",
         "GATE_A_RECOMMENDATION",
@@ -10216,6 +13543,7 @@ DELIVER_AGENT_DIAGNOSTICS = frozenset(
         "STATE_TASK_DRIFT",
         "TASK_ATTEMPT_BOUNDARY",
         "TASK_AWS_BOUNDARY",
+        "TASK_AWS_MODE_REPLAN_REQUIRED",
         "TASK_BASELINE_DRIFT",
         "TASK_COMMAND_BOUNDARY",
         "TASK_EXCLUDED_WRITE",
@@ -10228,8 +13556,19 @@ DELIVER_AGENT_DIAGNOSTICS = frozenset(
         "TASK_OUTSIDE_WRITE_BOUNDARY",
         "TASK_PLAN_STATE",
         "TASK_PROPERTY_COVERAGE",
+        "TASK_REQUIREMENT_TRACE_INVALID",
+        "TASK_REQUIREMENT_COVERAGE",
+        "TASK_REQUIREMENT_COVERAGE_EVIDENCE_INVALID",
         "TASK_SNAPSHOT",
         "WORKER_LIMIT_EXCEEDED",
+    }
+)
+TASK_REPLAN_DIAGNOSTICS = frozenset(
+    {
+        "TASK_AWS_MODE_REPLAN_REQUIRED",
+        "TASK_REQUIREMENT_TRACE_INVALID",
+        "TASK_REQUIREMENT_COVERAGE",
+        "TASK_REQUIREMENT_COVERAGE_EVIDENCE_INVALID",
     }
 )
 OWNER_DECISION_DIAGNOSTICS = frozenset(
@@ -10265,12 +13604,14 @@ OWNER_AUTHORIZATION_DIAGNOSTICS = frozenset(
         "GATE_B_OWNER_RECORD",
         "GATE_B_RECEIPT_MISMATCH",
         "GATE_B_WITHOUT_GATE_A",
+        "GATE_B_AUTHORITY_EXPIRED",
     }
 )
 UNCONFIGURED_SETUP_DIAGNOSTICS = frozenset(
     {
         "PLACEHOLDER_UNRESOLVED",
         "PROJECT_COST_POSTURE",
+        "PROJECT_IDENTITY",
         "STATE_SETUP",
     }
 )
@@ -10424,6 +13765,12 @@ def derive_remediation(
         elif diagnostic.code in OWNER_AUTHORIZATION_DIAGNOSTICS:
             responsible_party = "OWNER"
             category = "OWNER_AUTHORIZATION"
+        elif diagnostic.code in TASK_REPLAN_DIAGNOSTICS and _agent_correction_is_safe(
+            diagnostic, owner_stage, gate_b, envelope, tasks
+        ):
+            responsible_party = "CODEX"
+            category = "AGENT_REPLAN"
+            automatic = True
         elif _agent_correction_is_safe(
             diagnostic, owner_stage, gate_b, envelope, tasks
         ):
@@ -10443,7 +13790,7 @@ def derive_remediation(
 
     codex_payload: list[dict[str, str]] = []
     for item in items:
-        if item["category"] != "AGENT_CORRECTION":
+        if item["category"] not in {"AGENT_CORRECTION", "AGENT_REPLAN"}:
             continue
         diagnostic_index = int(str(item["diagnostic_id"]).rsplit("-", 1)[1]) - 1
         diagnostic = ctx.diagnostics[diagnostic_index]
@@ -10468,13 +13815,14 @@ def derive_remediation(
     )
     if repeated_fingerprint:
         for item in items:
-            if item["category"] == "AGENT_CORRECTION":
+            if item["category"] in {"AGENT_CORRECTION", "AGENT_REPLAN"}:
                 item["responsible_party"] = "HUMAN_REVIEWER"
                 item["category"] = "MANUAL_SAFETY_REVIEW"
                 item["automatic_correction_allowed"] = False
 
     manual = [item for item in items if item["category"] == "MANUAL_SAFETY_REVIEW"]
     codex = [item for item in items if item["category"] == "AGENT_CORRECTION"]
+    replans = [item for item in items if item["category"] == "AGENT_REPLAN"]
     owner_decisions = [item for item in items if item["category"] == "OWNER_DECISION"]
     owner_setup = [item for item in items if item["category"] == "OWNER_SETUP"]
     owner_authorization = [
@@ -10485,6 +13833,13 @@ def derive_remediation(
             "responsible_party": "HUMAN_REVIEWER",
             "action_kind": "REVIEW_SAFETY_BLOCKER",
             "automatic_continuation_allowed": False,
+        }
+    elif replans:
+        next_action = {
+            "responsible_party": "CODEX",
+            "action_kind": "REPLAN_TASKS",
+            "automatic_continuation_allowed": True,
+            "preserve_done_evidence": True,
         }
     elif codex:
         next_action = {
@@ -10542,10 +13897,14 @@ def derive_interaction(
     aws_mutation_authority_ready: bool = False,
     aws_lane: str | None = None,
     aws_read_authority_required: bool = False,
+    req_aws_core_materiality: str = "OPTIONAL",
+    req_aws_core_ready: bool = True,
 ) -> dict[str, Any]:
     """Derive stable owner interaction metadata without conversational prose."""
 
-    aws_evidence_failure = any(code.startswith("AWS_CORE_") for code in diagnostic_codes)
+    aws_core_capability_unavailable = (
+        "AWS_CORE_CAPABILITY_UNAVAILABLE" in diagnostic_codes
+    )
 
     if lifecycle_state in {
         "INTAKE_REQUIRED",
@@ -10562,7 +13921,10 @@ def derive_interaction(
         owner_stage = owner_stage_hint
 
     route_reason_code = lifecycle_state
-    if lifecycle_state == "AWS_RESIDUAL_REVIEW_BLOCKED":
+    if lifecycle_state in {
+        "AWS_RESIDUAL_REVIEW_BLOCKED",
+        "RELEASE_REVIEW_BLOCKED",
+    }:
         response_mode = "BLOCKER"
         state = "BLOCKED"
         action_kind = "REVIEW_SAFETY_BLOCKER"
@@ -10575,11 +13937,13 @@ def derive_interaction(
             if isinstance(next_action, Mapping)
             else ""
         )
-        if remediation_action == "CORRECT_AND_REVALIDATE":
+        if remediation_action in {"CORRECT_AND_REVALIDATE", "REPLAN_TASKS"}:
             response_mode = "OWNER_UPDATE"
             state = "WORKING"
             action_kind = "NONE_CONTINUE_AUTOMATICALLY"
             automatic = True
+            if remediation_action == "REPLAN_TASKS":
+                route_reason_code = "TASK_REPLAN_REQUIRED"
         elif remediation_action == "ANSWER_OPEN_DECISIONS":
             response_mode = "OWNER_UPDATE"
             state = "NEEDS_INPUT"
@@ -10601,10 +13965,26 @@ def derive_interaction(
         else:
             response_mode = "BLOCKER"
             state = "BLOCKED"
-            action_kind = "ENABLE_AWS_CORE" if aws_evidence_failure else "FIX_VALIDATION_FAILURE"
+            action_kind = (
+                "ENABLE_AWS_CORE"
+                if aws_core_capability_unavailable
+                else "FIX_VALIDATION_FAILURE"
+            )
             automatic = False
         formal_receipt = False
-    elif lifecycle_state == "AWS_RESIDUAL_REVIEW":
+    elif lifecycle_state in {
+        "AWS_DEPLOYMENT_ACTION_TERMINAL",
+        "AWS_TEARDOWN_ACTION_TERMINAL",
+    }:
+        response_mode = "OWNER_UPDATE"
+        state = "WORKING"
+        action_kind = "NONE_CONTINUE_AUTOMATICALLY"
+        automatic = True
+        formal_receipt = False
+    elif lifecycle_state in {
+        "AWS_DEPLOYMENT_RECONCILIATION",
+        "AWS_RESIDUAL_REVIEW",
+    }:
         response_mode = "AWS_RECEIPT" if aws_read_authority_required else "OWNER_UPDATE"
         state = "AWAITING_APPROVAL" if aws_read_authority_required else "WORKING"
         action_kind = (
@@ -10615,7 +13995,9 @@ def derive_interaction(
         automatic = not aws_read_authority_required
         formal_receipt = aws_read_authority_required
     elif lifecycle_state == "WAITING_AWS_TEARDOWN_AUTH":
-        response_mode = "OWNER_UPDATE" if aws_mutation_authority_ready else "AWS_RECEIPT"
+        response_mode = (
+            "OWNER_UPDATE" if aws_mutation_authority_ready else "AWS_RECEIPT"
+        )
         state = "WORKING" if aws_mutation_authority_ready else "AWAITING_APPROVAL"
         action_kind = (
             "NONE_CONTINUE_AUTOMATICALLY"
@@ -10626,6 +14008,7 @@ def derive_interaction(
         formal_receipt = not aws_mutation_authority_ready
     elif lifecycle_state in {
         "AWS_RESIDUAL_REVIEW_COMPLETE",
+        "AWS_RESIDUALS_RETAINED",
         "AWS_TEARDOWN_COMPLETE",
     }:
         response_mode = "OWNER_UPDATE"
@@ -10636,7 +14019,7 @@ def derive_interaction(
     elif lifecycle_state == "AWS_RESIDUALS_REMAIN":
         response_mode = "BLOCKER"
         state = "NEEDS_INPUT"
-        action_kind = "REVIEW_AWS_RESIDUALS"
+        action_kind = "CHOOSE_AWS_RESIDUAL_DISPOSITION"
         automatic = False
         formal_receipt = False
     elif aws_progress_state == "AWS_GUIDANCE_REQUIRED":
@@ -10664,7 +14047,9 @@ def derive_interaction(
         automatic = aws_lane == "fast-dev"
         formal_receipt = False
     elif aws_progress_state == "WAITING_AWS_MUTATION_AUTH":
-        response_mode = "OWNER_UPDATE" if aws_mutation_authority_ready else "AWS_RECEIPT"
+        response_mode = (
+            "OWNER_UPDATE" if aws_mutation_authority_ready else "AWS_RECEIPT"
+        )
         state = "WORKING" if aws_mutation_authority_ready else "AWAITING_APPROVAL"
         action_kind = (
             "NONE_CONTINUE_AUTOMATICALLY"
@@ -10686,7 +14071,9 @@ def derive_interaction(
         automatic = False
         formal_receipt = True
     elif next_prompt == "AWS-50":
-        response_mode = "OWNER_UPDATE" if aws_mutation_authority_ready else "AWS_RECEIPT"
+        response_mode = (
+            "OWNER_UPDATE" if aws_mutation_authority_ready else "AWS_RECEIPT"
+        )
         state = "WORKING" if aws_mutation_authority_ready else "AWAITING_APPROVAL"
         action_kind = (
             "NONE_CONTINUE_AUTOMATICALLY"
@@ -10738,26 +14125,40 @@ def derive_interaction(
         automatic = True
         formal_receipt = False
 
+    req_core_material = bool(
+        owner_stage == "DEFINE"
+        and next_prompt in {"REQ-10", "INTAKE-20"}
+        and req_aws_core_materiality == "REQUIRED"
+    )
     material = (
-        owner_stage == "DESIGN"
+        req_core_material
+        or owner_stage == "DESIGN"
         or next_prompt.startswith("AWS-")
         or aws_progress_state is not None
     )
     if not material:
         evidence_status = "NOT_REQUIRED"
+    elif req_core_material:
+        evidence_status = (
+            "CURRENT"
+            if req_aws_core_ready
+            else ("BLOCKED" if has_errors else "REQUIRED")
+        )
     elif aws_progress_state is not None:
         evidence_status = (
-            "REQUIRED"
-            if aws_progress_state == "AWS_GUIDANCE_REQUIRED"
-            else "CURRENT"
+            "REQUIRED" if aws_progress_state == "AWS_GUIDANCE_REQUIRED" else "CURRENT"
         )
     elif next_prompt.startswith("AWS-"):
-        evidence_status = "CURRENT" if aws_execution_planning_ready else (
-            "BLOCKED" if has_errors else "REQUIRED"
+        evidence_status = (
+            "CURRENT"
+            if aws_execution_planning_ready
+            else ("BLOCKED" if has_errors else "REQUIRED")
         )
     else:
-        evidence_status = "CURRENT" if design_aws_core_ready else (
-            "BLOCKED" if has_errors else "REQUIRED"
+        evidence_status = (
+            "CURRENT"
+            if design_aws_core_ready
+            else ("BLOCKED" if has_errors else "REQUIRED")
         )
 
     blocking_ids: list[str] = []
@@ -10829,7 +14230,9 @@ def _context_selector_span(request: SliceRequest, text: str) -> SourceSpan:
         return _heading_title_span(text, request.selector)
     if request.selector_kind == "TASK_ID":
         matches = [
-            task for task in inspect_task_blocks(text) if task.task_id == request.selector
+            task
+            for task in inspect_task_blocks(text)
+            if task.task_id == request.selector
         ]
         if len(matches) != 1:
             raise ValueError(
@@ -10851,7 +14254,9 @@ def _context_selector_span(request: SliceRequest, text: str) -> SourceSpan:
                 if structural_line.strip().startswith("|")
                 else None
             )
-            if cells is not None and any(token.search(clean_cell(cell)) for cell in cells):
+            if cells is not None and any(
+                token.search(clean_cell(cell)) for cell in cells
+            ):
                 matches.append(SourceSpan(offset, offset + len(source_line)))
             offset += len(source_line)
         if len(matches) != 1:
@@ -10896,13 +14301,19 @@ def _context_request(
         "Read-only AWS preflight evidence",
         "Read-only AWS preflight",
         "Action authorization provenance",
+        "AWS deployment action and reconciliation evidence",
         "Conditional AWS action receipts",
         "Teardown reconciliation evidence",
         "13. Teardown and decommissioning",
         "14. Residual-resource and billing verification",
     }
+    # A phase procedure is complete guidance, not one atomic lifecycle record.
+    # It may move on demand as a whole when current required state needs the
+    # initial budget; the coordinator contract still requires loading the
+    # selected phase reference before acting. Task blocks and controlling
+    # state records remain atomic and required.
     required = initial and (
-        selector_kind in {"WHOLE_FILE", "TASK_ID"} or selector in required_selectors
+        selector_kind == "TASK_ID" or selector in required_selectors
     )
     return SliceRequest(
         path=path,
@@ -10925,8 +14336,7 @@ def _resolve_context_metadata(
         _context_request(value, active_ids, initial=True) for value in source_slices
     ]
     on_demand_requests = [
-        _context_request(value, active_ids, initial=False)
-        for value in on_demand_slices
+        _context_request(value, active_ids, initial=False) for value in on_demand_slices
     ]
     return resolve_context_packet(
         initial_requests,
@@ -10943,13 +14353,61 @@ def derive_context_plan(
     coverage: CoverageContract,
     *,
     next_prompt: str = "",
+    restricted_deployment_closure: bool = False,
+    restricted_teardown_closure: bool = False,
     source_texts: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Select an ephemeral, route-bounded canonical context packet."""
 
     stage = interaction.get("owner_stage")
     reason = interaction.get("route_reason_code")
-    if stage == "DEFINE":
+    deployment_closure_context = restricted_deployment_closure and next_prompt in {
+        "AWS-20",
+        "AWS-30",
+        "RELEASE-10",
+    }
+    teardown_closure_context = restricted_teardown_closure and next_prompt in {
+        "AWS-40",
+        "AWS-50",
+    }
+    closure_context = deployment_closure_context or teardown_closure_context
+    if teardown_closure_context:
+        source_slices = [
+            ".agents/skills/fastlane/references/deliver.md",
+            f"{VERIFY_FILE}#Teardown reconciliation evidence",
+        ]
+        on_demand_slices = [
+            f"{TASKS_FILE}#Active execution snapshot",
+            f"{PRD_FILE}#Construction envelope",
+            f"{VERIFY_FILE}#Action authorization provenance",
+            f"{VERIFY_FILE}#Read-only AWS preflight evidence",
+            f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence",
+            f"{RUNBOOK_FILE}#Conditional AWS action receipts",
+            f"{RUNBOOK_FILE}#Read-only AWS preflight",
+            f"{RUNBOOK_FILE}#13. Teardown and decommissioning",
+            f"{RUNBOOK_FILE}#14. Residual-resource and billing verification",
+        ]
+    elif deployment_closure_context:
+        source_slices = [
+            ".agents/skills/fastlane/references/deliver.md",
+            f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence",
+        ]
+        on_demand_slices = [
+            f"{TASKS_FILE}#Active execution snapshot",
+            f"{PRD_FILE}#Construction envelope",
+            f"{VERIFY_FILE}#Action authorization provenance",
+            f"{VERIFY_FILE}#Read-only AWS preflight evidence",
+            f"{RUNBOOK_FILE}#Conditional AWS action receipts",
+            f"{RUNBOOK_FILE}#Read-only AWS preflight",
+        ]
+        if next_prompt in {"AWS-30", "RELEASE-10"}:
+            on_demand_slices.extend(
+                [
+                    f"{VERIFY_FILE}#Verification matrix",
+                    f"{VERIFY_FILE}#Current release decision",
+                ]
+            )
+    elif stage == "DEFINE":
         source_slices = [
             ".agents/skills/fastlane/references/define.md",
             f"{PRD_FILE}#Document status",
@@ -10989,10 +14447,12 @@ def derive_context_plan(
         raise ValueError("context plan requires a known owner stage")
 
     active_ids: list[str] = []
+    task_context_ids: list[str] = []
     if stage == "DELIVER":
-        active_ids.extend(tasks.active)
-        if not active_ids and tasks.ready:
-            active_ids.append(tasks.ready[0])
+        task_context_ids.extend(tasks.active)
+        if not task_context_ids and tasks.ready:
+            task_context_ids.append(tasks.ready[0])
+        active_ids.extend(task_context_ids)
     else:
         active_ids.extend(coverage.basis_ids)
     blockers = interaction.get("blocking_ids")
@@ -11000,43 +14460,83 @@ def derive_context_plan(
         active_ids.extend(item for item in blockers if isinstance(item, str))
     active_ids = sorted(set(active_ids))
 
-    if stage == "DELIVER" and active_ids:
-        source_slices.append(f"{TASKS_FILE}#" + active_ids[0])
+    if stage == "DELIVER" and task_context_ids:
+        source_slices.append(f"{TASKS_FILE}#" + task_context_ids[0])
     aws_phase = next_prompt if next_prompt.startswith("AWS-") else ""
+    teardown_context_reasons = {
+        "AWS_RESIDUAL_REVIEW",
+        "AWS_RESIDUAL_REVIEW_COMPLETE",
+        "AWS_RESIDUALS_RETAINED",
+        "AWS_RESIDUALS_REMAIN",
+        "AWS_RESIDUAL_REVIEW_BLOCKED",
+        "AWS_TEARDOWN_COMPLETE",
+        "AWS_TEARDOWN_ACTION_TERMINAL",
+    }
+    teardown_phase_context = (
+        aws_phase in {"AWS-40", "AWS-50"} or reason in teardown_context_reasons
+    )
+    if teardown_phase_context and not closure_context:
+        source_slices = [
+            ".agents/skills/fastlane/references/deliver.md",
+            f"{VERIFY_FILE}#Teardown reconciliation evidence",
+        ]
+        on_demand_slices.extend(
+            [
+                f"{TASKS_FILE}#Active execution snapshot",
+                f"{PRD_FILE}#Construction envelope",
+                f"{VERIFY_FILE}#Action authorization provenance",
+                f"{VERIFY_FILE}#Read-only AWS preflight evidence",
+                f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence",
+                f"{VERIFY_FILE}#AWS Core evidence",
+                f"{RUNBOOK_FILE}#Conditional AWS action receipts",
+                f"{RUNBOOK_FILE}#Read-only AWS preflight",
+                f"{RUNBOOK_FILE}#13. Teardown and decommissioning",
+                f"{RUNBOOK_FILE}#14. Residual-resource and billing verification",
+            ]
+        )
+        if task_context_ids:
+            on_demand_slices.append(f"{TASKS_FILE}#" + task_context_ids[0])
     common_aws_slices = [
         f"{VERIFY_FILE}#Action authorization provenance",
+        f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence",
         f"{RUNBOOK_FILE}#Conditional AWS action receipts",
         f"{VERIFY_FILE}#AWS Core evidence",
         f"{VERIFY_FILE}#Read-only AWS preflight evidence",
         f"{RUNBOOK_FILE}#Read-only AWS preflight",
     ]
-    if aws_phase == "AWS-50":
-        source_slices.extend(
-            [
-                f"{VERIFY_FILE}#Action authorization provenance",
-                f"{RUNBOOK_FILE}#Conditional AWS action receipts",
-                f"{VERIFY_FILE}#Teardown reconciliation evidence",
-                f"{RUNBOOK_FILE}#13. Teardown and decommissioning",
-            ]
+    if closure_context:
+        pass
+    elif teardown_phase_context:
+        pass
+    elif reason == "AWS_DEPLOYMENT_ACTION_TERMINAL":
+        source_slices.append(
+            f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence"
         )
+        on_demand_slices.extend(common_aws_slices)
+    elif reason == "AWS_DEPLOYMENT_RECONCILIATION":
+        source_slices.append(
+            f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence"
+        )
+        on_demand_slices.extend(common_aws_slices)
     elif aws_phase or (isinstance(reason, str) and reason.startswith("AWS_")):
         source_slices.extend(common_aws_slices)
-    teardown_context_reasons = {
-        "AWS_RESIDUAL_REVIEW",
-        "AWS_RESIDUAL_REVIEW_COMPLETE",
-        "AWS_RESIDUALS_REMAIN",
-        "AWS_RESIDUAL_REVIEW_BLOCKED",
-        "AWS_TEARDOWN_COMPLETE",
-    }
-    if aws_phase == "AWS-40" or reason in teardown_context_reasons:
+    if aws_phase == "AWS-30" and not closure_context:
         source_slices.extend(
             [
-                f"{VERIFY_FILE}#Teardown reconciliation evidence",
-                f"{RUNBOOK_FILE}#13. Teardown and decommissioning",
-                f"{RUNBOOK_FILE}#14. Residual-resource and billing verification",
+                f"{VERIFY_FILE}#Verification matrix",
+                f"{VERIFY_FILE}#Current release decision",
+            ]
+        )
+    if next_prompt == "RELEASE-10" and not closure_context:
+        source_slices.extend(
+            [
+                f"{VERIFY_FILE}#Verification matrix",
+                f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence",
+                f"{VERIFY_FILE}#Current release decision",
             ]
         )
     source_slices = list(dict.fromkeys(source_slices))
+    on_demand_slices = list(dict.fromkeys(on_demand_slices))
 
     plan: dict[str, Any] = {
         "source_slices": source_slices,
@@ -11103,7 +14603,9 @@ def derive_write_authority(
     except ValueError:
         return result
     active_task = tasks.active[0] if len(tasks.active) == 1 else "NONE"
-    active_write_set = tasks.write_sets.get(active_task, []) if active_task != "NONE" else []
+    active_write_set = (
+        tasks.write_sets.get(active_task, []) if active_task != "NONE" else []
+    )
     return {
         "valid": True,
         "authorization_id": construction_authorization,
@@ -11115,16 +14617,238 @@ def derive_write_authority(
     }
 
 
+def derive_deployment_journal_closure_authority(
+    deployment_sequence: Mapping[str, Any],
+    next_prompt: str,
+    *,
+    restricted_closure: bool,
+) -> dict[str, Any]:
+    """Expose only the exact local VERIFY closure operation for one attempt."""
+
+    empty: dict[str, Any] = {
+        "valid": False,
+        "kind": "NONE",
+        "authorization_id": "NONE",
+        "mode": "BOUNDED_EVIDENCE_CLOSURE",
+        "allowed_write_paths": [],
+        "allowed_sections": [],
+        "allowed_operations": [],
+        "allowed_release_states": [],
+        "attempt_id": "NONE",
+        "evidence_id": "NONE",
+        "construction_authorization": "NONE",
+        "aws_mutation_authority": "NONE",
+    }
+    if not restricted_closure or deployment_sequence.get("issues"):
+        return empty
+    status = clean_cell(deployment_sequence.get("status", ""))
+    contract = {
+        ("ACTION_TERMINAL_REQUIRED", "AWS-20"): (
+            [AWS_DEPLOYMENT_EVIDENCE_HEADING],
+            ["APPEND_ACTION_TERMINAL_ROW"],
+            [],
+        ),
+        ("RECONCILIATION_REQUIRED", "AWS-30"): (
+            [
+                "bootstrap:aws-read-preflight-receipt",
+                "## Action authorization provenance",
+                AWS_DEPLOYMENT_EVIDENCE_HEADING,
+            ],
+            [
+                "RECORD_RECONCILIATION_READ_AUTHORITY",
+                "APPEND_RECONCILIATION_ROW",
+            ],
+            [],
+        ),
+        ("RECONCILED", "RELEASE-10"): (
+            ["## Current release decision"],
+            ["UPDATE_RELEASE_DECISION_AND_EVIDENCE_CUTOFF"],
+            (
+                ["NOT_READY"]
+                if deployment_sequence.get("basis_stale") is True
+                else ["NOT_READY", "RELEASE_VERIFIED"]
+            ),
+        ),
+        ("BLOCKED", "RELEASE-10"): (
+            ["## Current release decision"],
+            ["UPDATE_RELEASE_DECISION_AND_EVIDENCE_CUTOFF"],
+            ["NOT_READY"],
+        ),
+    }.get((status, next_prompt))
+    if contract is None:
+        return empty
+    attempt_id = clean_cell(deployment_sequence.get("attempt_id", ""))
+    evidence_id = clean_cell(deployment_sequence.get("evidence_id", ""))
+    if AWS_DEPLOYMENT_ATTEMPT_ID.fullmatch(attempt_id) is None:
+        return empty
+    if next_prompt == "RELEASE-10" and re.fullmatch(r"EV-\d{4,}", evidence_id) is None:
+        return empty
+    sections, operations, allowed_release_states = contract
+    return {
+        **empty,
+        "valid": True,
+        "kind": "AWS_DEPLOYMENT_JOURNAL_CLOSURE",
+        "authorization_id": "AWS_DEPLOYMENT_JOURNAL_CLOSURE",
+        "allowed_write_paths": [VERIFY_FILE],
+        "allowed_sections": sections,
+        "allowed_operations": operations,
+        "allowed_release_states": allowed_release_states,
+        "attempt_id": attempt_id,
+        "evidence_id": evidence_id if evidence_id else "NONE",
+    }
+
+
+def derive_teardown_journal_closure_authority(
+    teardown_sequence: Mapping[str, Any],
+    next_prompt: str,
+    *,
+    restricted_closure: bool,
+) -> dict[str, Any]:
+    """Expose one exact VERIFY-only UNKNOWN closure for a lone STARTED row."""
+
+    empty: dict[str, Any] = {
+        "valid": False,
+        "kind": "NONE",
+        "authorization_id": "NONE",
+        "mode": "BOUNDED_EVIDENCE_CLOSURE",
+        "allowed_write_paths": [],
+        "allowed_sections": [],
+        "allowed_operations": [],
+        "attempt_id": "NONE",
+        "evidence_id": "NONE",
+        "construction_authorization": "NONE",
+        "aws_mutation_authority": "NONE",
+    }
+    if (
+        not restricted_closure
+        or teardown_sequence.get("issues")
+        or clean_cell(teardown_sequence.get("status", "")) != "ACTION_TERMINAL_REQUIRED"
+        or next_prompt != "AWS-50"
+    ):
+        return empty
+    attempt_id = clean_cell(teardown_sequence.get("attempt_id", ""))
+    evidence_id = clean_cell(teardown_sequence.get("evidence_id", ""))
+    if (
+        AWS_TEARDOWN_ATTEMPT_ID.fullmatch(attempt_id) is None
+        or re.fullmatch(r"EV-\d{4,}", evidence_id) is None
+    ):
+        return empty
+    return {
+        **empty,
+        "valid": True,
+        "kind": "AWS_TEARDOWN_JOURNAL_CLOSURE",
+        "authorization_id": "AWS_TEARDOWN_JOURNAL_CLOSURE",
+        "allowed_write_paths": [VERIFY_FILE],
+        "allowed_sections": [AWS_TEARDOWN_EVIDENCE_HEADING],
+        "allowed_operations": ["APPEND_TEARDOWN_TERMINAL_ROW"],
+        "attempt_id": attempt_id,
+        "evidence_id": evidence_id,
+    }
+
+
+def lifecycle_intent_record_boundary_is_settled(
+    tasks: TaskSummary,
+    release_decision: str,
+    deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+) -> bool:
+    """Return whether one local owner-intent record may be updated."""
+
+    return bool(
+        (
+            tasks.terminal
+            or clean_cell(deployment_sequence.get("status", "")) == "CONSUMED"
+        )
+        and release_lifecycle_intent_boundary_is_settled(
+            release_decision, deployment_sequence
+        )
+        and clean_cell(teardown_sequence.get("status", ""))
+        in {
+            "NOT_ACTIVE",
+            "STALE",
+            "READY_FOR_TEARDOWN",
+            "VERIFIED_CLEAN",
+            "RESIDUALS_REMAIN",
+        }
+        and not teardown_sequence.get("issues")
+    )
+
+
+def derive_aws_lifecycle_intent_write_authority(
+    ctx: Context,
+    tasks: TaskSummary,
+    release_decision: str,
+    deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+    external_authority: Mapping[str, Any],
+    *,
+    lifecycle_intent: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Expose one exact local owner-intent update and no AWS authority."""
+
+    empty: dict[str, Any] = {
+        "valid": False,
+        "kind": "NONE",
+        "authorization_id": "NONE",
+        "mode": "BOUNDED_RELEASE_INTENT_RECORD",
+        "allowed_write_paths": [],
+        "allowed_sections": [],
+        "allowed_operations": [],
+        "allowed_values": [],
+        "construction_authorization": "NONE",
+        "aws_mutation_authority": "NONE",
+    }
+    intent_value = clean_cell((lifecycle_intent or {}).get("value", "NONE"))
+    teardown_status = clean_cell(teardown_sequence.get("status", "NOT_ACTIVE"))
+    allowed_values = (
+        ["RETAIN", "RESIDUAL_REVIEW", "TEARDOWN"]
+        if teardown_status in {"READY_FOR_TEARDOWN", "RESIDUALS_REMAIN"}
+        else ["NONE", "RESIDUAL_REVIEW", "TEARDOWN"]
+    )
+    intent_route_active = bool(
+        intent_value in {"RESIDUAL_REVIEW", "TEARDOWN"}
+        and teardown_status in {"NOT_ACTIVE", "STALE"}
+    )
+    if (
+        ctx.has_errors
+        or intent_route_active
+        or not lifecycle_intent_record_boundary_is_settled(
+            tasks,
+            release_decision,
+            deployment_sequence,
+            teardown_sequence,
+        )
+        or clean_cell(external_authority.get("validity", "NONE")) == "CURRENT"
+    ):
+        return empty
+    return {
+        **empty,
+        "valid": True,
+        "kind": "AWS_LIFECYCLE_INTENT_RECORD",
+        "authorization_id": "AWS_LIFECYCLE_INTENT_RECORD",
+        "allowed_write_paths": [VERIFY_FILE],
+        "allowed_sections": ["## Current release decision"],
+        "allowed_operations": ["UPDATE_AWS_LIFECYCLE_INTENT"],
+        "allowed_values": allowed_values,
+    }
+
+
 def _action_authorization_rows(text: str) -> dict[str, dict[str, str]]:
     heading = "## Action authorization provenance"
     structural = without_fenced_code(text)
-    matches = list(re.finditer(rf"^{re.escape(heading)}[ \t]*$", structural, re.MULTILINE))
+    matches = list(
+        re.finditer(rf"^{re.escape(heading)}[ \t]*$", structural, re.MULTILINE)
+    )
     if len(matches) != 1:
         return {}
     original_lines = text[matches[0].end() :].splitlines()
     structural_lines = structural[matches[0].end() :].splitlines()
     start = next(
-        (index for index, line in enumerate(structural_lines) if line.strip().startswith("|")),
+        (
+            index
+            for index, line in enumerate(structural_lines)
+            if line.strip().startswith("|")
+        ),
         None,
     )
     if start is None:
@@ -11169,24 +14893,20 @@ def _receipt_fields(receipt: str, expected_title: str) -> dict[str, str] | None:
     return result
 
 
-def _authorization_valid_until(value: str, result: str) -> str | None:
+def _authorization_valid_until(
+    value: str, result: str, *, allow_expired: bool = False
+) -> str | None:
     cleaned = clean_cell(value)
     normalized = cleaned[:-1] + "+00:00" if cleaned.endswith("Z") else cleaned
     try:
         expires = datetime.fromisoformat(normalized)
     except ValueError:
-        if cleaned == "ONE_OPERATION" and result in {
-            "AUTHORIZED", "RUNNING", "READY"
-        }:
+        if cleaned == "ONE_OPERATION" and result in {"AUTHORIZED", "RUNNING", "READY"}:
             return cleaned
-        return (
-            cleaned
-            if explicit_value(cleaned) and result == "NOT_STARTED"
-            else None
-        )
+        return cleaned if explicit_value(cleaned) and result == "NOT_STARTED" else None
     if expires.tzinfo is None or expires.utcoffset() is None:
         return None
-    return cleaned if expires > datetime.now(timezone.utc) else None
+    return cleaned if allow_expired or expires > datetime.now(timezone.utc) else None
 
 
 def _parse_cost_ceiling(value: str) -> tuple[str, Decimal] | None:
@@ -11198,9 +14918,7 @@ def _parse_cost_ceiling(value: str) -> tuple[str, Decimal] | None:
         return None
 
 
-def _cost_at_most(
-    candidate: tuple[str, Decimal], ceiling: tuple[str, Decimal]
-) -> bool:
+def _cost_at_most(candidate: tuple[str, Decimal], ceiling: tuple[str, Decimal]) -> bool:
     return candidate[0] == ceiling[0] and candidate[1] <= ceiling[1]
 
 
@@ -11229,14 +14947,14 @@ def _read_bound_honors_cost_posture(
     if gate_value.startswith("NOT_APPLICABLE"):
         return True
     gate_cap = _parse_cost_ceiling(gate_value)
-    return candidate is not None and gate_cap is not None and _cost_at_most(
-        candidate, gate_cap
+    return (
+        candidate is not None
+        and gate_cap is not None
+        and _cost_at_most(candidate, gate_cap)
     )
 
 
-def _envelope_scalar(
-    envelope: Mapping[str, str], field: str, label: str
-) -> str | None:
+def _envelope_scalar(envelope: Mapping[str, str], field: str, label: str) -> str | None:
     value = clean_cell(envelope.get(field, ""))
     prefix = label + ":"
     if not value.startswith(prefix):
@@ -11245,9 +14963,7 @@ def _envelope_scalar(
     return candidate if explicit_value(candidate, allow_none=False) else None
 
 
-def _envelope_values(
-    envelope: Mapping[str, str], field: str, label: str
-) -> list[str]:
+def _envelope_values(envelope: Mapping[str, str], field: str, label: str) -> list[str]:
     value = clean_cell(envelope.get(field, ""))
     prefix = label + ":"
     if not value.startswith(prefix):
@@ -11265,15 +14981,15 @@ def _receipt_identity_matches_gate_b(
     except ValueError:
         return False
     expected = {
-        "Profile or role": _envelope_scalar(
-            envelope, "AWS role or profile", "ROLE"
-        ),
+        "Profile or role": _envelope_scalar(envelope, "AWS role or profile", "ROLE"),
         "Account": _envelope_scalar(envelope, "AWS account", "ACCOUNT"),
         "Region": _envelope_scalar(envelope, "AWS Region", "REGION"),
         "Environment": environment,
     }
-    return all(expected_value is not None and fields.get(field) == expected_value
-               for field, expected_value in expected.items())
+    return all(
+        expected_value is not None and fields.get(field) == expected_value
+        for field, expected_value in expected.items()
+    )
 
 
 def _receipt_scope_within_gate_b(
@@ -11308,9 +15024,7 @@ def _receipt_artifact_matches_gate_b(
         return False
     if artifact != clean_cell(active_artifact):
         return False
-    approved = clean_cell(
-        envelope.get("AWS artifact authorization and provenance", "")
-    )
+    approved = clean_cell(envelope.get("AWS artifact authorization and provenance", ""))
     if approved.startswith("NOT_APPLICABLE"):
         return envelope.get("AWS boundary") == "READ_ONLY"
     if AWS_EXACT_ARTIFACT.fullmatch(approved) is not None:
@@ -11324,18 +15038,39 @@ def _receipt_artifact_matches_gate_b(
     return AWS_DERIVED_ARTIFACT.fullmatch(approved) is not None
 
 
+def _authorization_expiry_ceiling(value: str, *, allow_expired: bool) -> datetime:
+    if not allow_expired:
+        return parse_future_expiry(value)
+    cleaned = clean_cell(value)
+    match = re.fullmatch(
+        r"Expires at (?P<timestamp>[^\s;]+); earlier completion: (?P<condition>[^\r\n]+)",
+        cleaned,
+    )
+    if match is None or not explicit_value(match.group("condition"), allow_none=False):
+        raise ValueError("Authorization expiry is not canonical")
+    expires_at = _iso_datetime(match.group("timestamp"))
+    if expires_at is None:
+        raise ValueError("Authorization expiry timestamp is not ISO 8601 with timezone")
+    return expires_at
+
+
 def _receipt_validity_within_gate_b(
     valid_until: str,
     result: str,
     envelope: Mapping[str, str],
+    *,
+    allow_expired: bool = False,
 ) -> str | None:
-    current = _authorization_valid_until(valid_until, result)
+    current = _authorization_valid_until(
+        valid_until, result, allow_expired=allow_expired
+    )
     if current is None:
         return None
     try:
         ceilings = [
-            parse_future_expiry(
-                envelope.get("Authorization expiry or completion condition", "")
+            _authorization_expiry_ceiling(
+                envelope.get("Authorization expiry or completion condition", ""),
+                allow_expired=allow_expired,
             )
         ]
     except ValueError:
@@ -11343,7 +15078,9 @@ def _receipt_validity_within_gate_b(
     aws_validity = clean_cell(envelope.get("AWS authorization validity", ""))
     if not aws_validity.startswith("NOT_APPLICABLE"):
         try:
-            ceilings.append(parse_future_expiry(aws_validity))
+            ceilings.append(
+                _authorization_expiry_ceiling(aws_validity, allow_expired=allow_expired)
+            )
         except ValueError:
             return None
     if current == "ONE_OPERATION":
@@ -11376,8 +15113,10 @@ def _mutation_cost_within_gate_b(
         return False
     candidate = _parse_cost_ceiling(value)
     gate_cap = _parse_cost_ceiling(envelope.get("AWS cost ceiling", ""))
-    return candidate is not None and gate_cap is not None and _cost_at_most(
-        candidate, gate_cap
+    return (
+        candidate is not None
+        and gate_cap is not None
+        and _cost_at_most(candidate, gate_cap)
     )
 
 
@@ -11399,9 +15138,7 @@ def _exact_receipt_fields(
         if key.strip() != expected:
             return None
         value = value.strip()
-        if not explicit_value(
-            value, allow_none=expected in allow_none_fields
-        ):
+        if not explicit_value(value, allow_none=expected in allow_none_fields):
             return None
         result[expected] = value
     return result
@@ -11415,6 +15152,7 @@ def _read_preflight_receipt_authority(
     active_artifact: str,
     *,
     allow_one_operation: bool = True,
+    allow_expired: bool = False,
 ) -> dict[str, Any] | None:
     """Project one exact owner-authored read-only preflight scope."""
 
@@ -11434,7 +15172,10 @@ def _read_preflight_receipt_authority(
     digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
     result = clean_cell(row.get("Result", ""))
     valid_until = _receipt_validity_within_gate_b(
-        fields["Valid until"], result, envelope
+        fields["Valid until"],
+        result,
+        envelope,
+        allow_expired=allow_expired,
     )
     if valid_until == "ONE_OPERATION" and not allow_one_operation:
         return None
@@ -11459,7 +15200,8 @@ def _read_preflight_receipt_authority(
     read_cost = (
         f"EXPECTED: {clean_cell(cost_match.group('effect'))}; "
         f"BOUNDED_BY: {clean_cell(cost_match.group('bound'))}"
-        if cost_match else "NONE"
+        if cost_match
+        else "NONE"
     )
     expected_scope = (
         f"ACCOUNT: {fields['Account']}; REGION: {fields['Region']}; "
@@ -11494,14 +15236,10 @@ def _read_preflight_receipt_authority(
         return None
     resources = _split_authority_values(fields["Stack, application, and resources"])
     operations = _split_authority_values(fields["Allowed read-only operations"])
-    read_only_operation = re.compile(
-        r"(?i)^(?:[a-z0-9-]+:)?(?:BatchGet|Check|Describe|Detect|Estimate|Get|"
-        r"Head|List|Lookup|Preview|Search|Simulate|Validate)[A-Za-z0-9]*$"
-    )
     if (
         not resources
         or not operations
-        or any(read_only_operation.fullmatch(item) is None for item in operations)
+        or any(AWS_READ_ONLY_OPERATION.fullmatch(item) is None for item in operations)
         or not _receipt_identity_matches_gate_b(fields, envelope)
         or not _receipt_scope_within_gate_b(resources, operations, envelope)
         or not _receipt_artifact_matches_gate_b(
@@ -11527,6 +15265,191 @@ def _read_preflight_receipt_authority(
         "cost_ceiling": read_cost,
         "rollback_boundary": "NONE",
         "expiration": valid_until,
+        "authorized_at": observed_at,
+        "authority_source": clean_cell(row.get("Stable owner-message source", "")),
+    }
+
+
+def _deployment_reconciliation_read_authority(
+    verify_text: str,
+    cost_posture: str,
+    group: list[dict[str, str]],
+    *,
+    allow_expired: bool = False,
+    require_post_action_freshness: bool = False,
+) -> dict[str, Any] | None:
+    """Project exact read-only scope for current or restricted reconciliation."""
+
+    if not group:
+        return None
+    first = group[0]
+    basis_match = re.fullmatch(
+        r"REQ-\d{4,} / DES-\d{4,} / (?P<auth>AUTH-\d{4,})",
+        clean_cell(first.get("REQ / DES / AUTH", "")),
+    )
+    scope_match = re.fullmatch(
+        r"ACCOUNT: (?P<account>[^;]+); REGION: (?P<region>[^;]+); "
+        r"ENVIRONMENT: (?P<environment>[^;]+)",
+        clean_cell(first.get("Account / Region / environment", "")),
+    )
+    if basis_match is None or scope_match is None:
+        return None
+    account = clean_cell(scope_match.group("account"))
+    region = clean_cell(scope_match.group("region"))
+    environment = clean_cell(scope_match.group("environment"))
+    artifact = clean_cell(first.get("Artifact digest", ""))
+    if (
+        any(
+            not explicit_value(value, allow_none=False) or "*" in value
+            for value in (account, region, environment)
+        )
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", artifact) is None
+    ):
+        return None
+    try:
+        attempted_resources = _deployment_values(
+            first.get("Resources", ""), "Resources", allow_none=False
+        )
+        receipt = marked_receipt(verify_text, "aws-read-preflight")
+    except ValueError:
+        return None
+    fields = _exact_receipt_fields(
+        receipt,
+        "AUTHORIZE AWS READ-ONLY PREFLIGHT",
+        AWS_READ_PREFLIGHT_RECEIPT_FIELDS,
+    )
+    row = _action_authorization_rows(verify_text).get("Read-only preflight")
+    if fields is None or row is None or unresolved(receipt):
+        return None
+    authorization_id = fields["Read authorization"]
+    digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
+    result = clean_cell(row.get("Result", ""))
+    valid_until = _authorization_valid_until(
+        fields["Valid until"], result, allow_expired=allow_expired
+    )
+    if valid_until in {None, "ONE_OPERATION"}:
+        return None
+    cost_validity = clean_cell(row.get("Cost ceiling and validity", ""))
+    cost_match = re.fullmatch(
+        r"COST: (?P<effect>.+?); BOUNDED_BY: (?P<bound>.+?); VALID_UNTIL: (?P<until>.+)",
+        cost_validity,
+    )
+    valid_cost_provenance = bool(
+        cost_match
+        and explicit_value(cost_match.group("effect"), allow_none=False)
+        and explicit_value(cost_match.group("bound"), allow_none=False)
+        and not clean_cell(cost_match.group("effect")).startswith("NOT_APPLICABLE")
+        and not clean_cell(cost_match.group("bound")).startswith("NOT_APPLICABLE")
+        and _read_bound_honors_cost_posture(
+            cost_match.group("bound"),
+            cost_posture,
+            "NOT_APPLICABLE — reconciliation receipt is the read-only ceiling",
+        )
+        and clean_cell(cost_match.group("until")) == fields["Valid until"]
+    )
+    expected_scope = (
+        f"ACCOUNT: {fields['Account']}; REGION: {fields['Region']}; "
+        f"ENVIRONMENT: {fields['Environment']}"
+    )
+    expected_resources = (
+        f"RESOURCES: {fields['Stack, application, and resources']}; "
+        f"OPERATIONS: {fields['Allowed read-only operations']}"
+    )
+    observed_at = clean_cell(row.get("Observed at", ""))
+    authorized_at = _iso_datetime(observed_at)
+    if (
+        AWS_READ_AUTHORIZATION_ID.fullmatch(authorization_id) is None
+        or fields["Construction authorization"] != basis_match.group("auth")
+        or fields["Prohibited operations"] != "ALL_MUTATIONS"
+        or fields["Account"] != account
+        or fields["Region"] != region
+        or fields["Environment"] != environment
+        or fields["Artifact digest"] != artifact
+        or row.get("Authorization ID") != authorization_id
+        or row.get("Construction AUTH") != basis_match.group("auth")
+        or row.get("Role or profile") != fields["Profile or role"]
+        or row.get("Artifact digest") != artifact
+        or row.get("Account / Region / environment") != expected_scope
+        or row.get("Resources and operations") != expected_resources
+        or row.get("Approver") != fields["Approver"]
+        or not explicit_human_approver(fields["Approver"])
+        or clean_cell(row.get("Verbatim receipt SHA-256", "")) != digest
+        or not explicit_value(
+            row.get("Stable owner-message source", ""), allow_none=False
+        )
+        or "*" in clean_cell(row.get("Stable owner-message source", ""))
+        or authorized_at is None
+        or clean_cell(row.get("Identity and boundary match", ""))
+        not in {"PASS", "VERIFIED"}
+        or not valid_cost_provenance
+        or result not in {"AUTHORIZED", "RUNNING", "READY"}
+    ):
+        return None
+    resources = _split_authority_values(fields["Stack, application, and resources"])
+    operations = _split_authority_values(fields["Allowed read-only operations"])
+    if (
+        not resources
+        or not operations
+        or len(resources) != len(set(resources))
+        or len(operations) != len(set(operations))
+        or any("*" in item for item in resources + operations)
+        or set(resources) != set(attempted_resources)
+        or any(AWS_READ_ONLY_OPERATION.fullmatch(item) is None for item in operations)
+    ):
+        return None
+
+    if require_post_action_freshness:
+        terminal_reconciliation = (
+            group[-1]
+            if clean_cell(group[-1].get("Phase", "")) == "AWS-30"
+            and clean_cell(group[-1].get("Status", "")) in {"COMPLETE", "BLOCKED"}
+            else None
+        )
+        if terminal_reconciliation is None:
+            prior_times = [_iso_datetime(item.get("Observed at", "")) for item in group]
+            if any(item is None for item in prior_times) or authorized_at <= max(
+                prior_times
+            ):
+                return None
+        else:
+            prior_times = [
+                _iso_datetime(item.get("Observed at", "")) for item in group[:-1]
+            ]
+            terminal_at = _iso_datetime(terminal_reconciliation.get("Observed at", ""))
+            if (
+                not prior_times
+                or any(item is None for item in prior_times)
+                or terminal_at is None
+                or authorized_at <= max(prior_times)
+                or authorized_at > terminal_at
+            ):
+                return None
+
+    read_cost = (
+        f"EXPECTED: {clean_cell(cost_match.group('effect'))}; "
+        f"BOUNDED_BY: {clean_cell(cost_match.group('bound'))}"
+        if cost_match
+        else "NONE"
+    )
+    return {
+        "kind": "AWS_READ_ONLY",
+        "validity": "CURRENT",
+        "authorization_id": authorization_id,
+        "receipt_digest": digest,
+        "account": account,
+        "region": region,
+        "environment": environment,
+        "role_or_profile": fields["Profile or role"],
+        "resources": resources,
+        "operations": operations,
+        "artifact_plan_binding": {"artifact": artifact, "plan": "NONE"},
+        "cost_ceiling": read_cost,
+        "rollback_boundary": "NONE",
+        "expiration": valid_until,
+        "authorized_at": observed_at,
+        "authority_source": clean_cell(row.get("Stable owner-message source", "")),
+        "reconciliation_only": require_post_action_freshness,
+        "attempt_id": clean_cell(first.get("Attempt ID", "")),
     }
 
 
@@ -11546,6 +15469,1613 @@ def parse_teardown_reconciliation_evidence(text: str) -> list[dict[str, str]]:
     if table is None:
         return []
     return [dict(zip(table.headers, row)) for row in table.rows]
+
+
+def parse_deployment_reconciliation_evidence(
+    text: str,
+) -> list[dict[str, str]]:
+    """Parse the append-only AWS-20/AWS-30 deployment operation journal."""
+
+    table = contract_table_after_heading(
+        text, AWS_DEPLOYMENT_EVIDENCE_HEADING, AWS_DEPLOYMENT_EVIDENCE_HEADERS
+    )
+    if table is None:
+        return []
+    return [dict(zip(table.headers, row)) for row in table.rows]
+
+
+def parse_verification_matrix(text: str) -> list[dict[str, str]]:
+    """Parse the canonical release acceptance registry."""
+
+    table = contract_table_after_heading(
+        text, VERIFICATION_MATRIX_HEADING, VERIFICATION_MATRIX_HEADERS
+    )
+    if table is None:
+        return []
+    return [dict(zip(table.headers, row)) for row in table.rows]
+
+
+def _deployment_acceptance_evidence_issues(
+    verify_text: str,
+    evidence_ids: list[str],
+    expected: Mapping[str, Any],
+) -> list[str]:
+    """Resolve AWS-30 COMPLETE IDs to current VERIFIED target-bound evidence."""
+
+    try:
+        rows = parse_verification_matrix(verify_text)
+    except ValueError as exc:
+        return [str(exc)]
+    by_id: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        evidence_id = clean_cell(row.get("Evidence ID", ""))
+        if re.fullmatch(r"EV-\d{4,}", evidence_id):
+            by_id.setdefault(evidence_id, []).append(row)
+    expected_target = (
+        f"ARTIFACT: {expected.get('artifact')}; ACCOUNT: {expected.get('account')}; "
+        f"REGION: {expected.get('region')}; ENVIRONMENT: {expected.get('environment')}"
+    )
+    issues: list[str] = []
+    for evidence_id in evidence_ids:
+        matching = by_id.get(evidence_id, [])
+        if len(matching) != 1:
+            issues.append(
+                f"{evidence_id} must resolve exactly once in the Verification matrix"
+            )
+            continue
+        row = matching[0]
+        if clean_cell(row.get("Status", "")) != "VERIFIED":
+            issues.append(f"{evidence_id} Verification matrix status must be VERIFIED")
+        requirement = clean_cell(row.get("Requirement or invariant", ""))
+        manual_evidence = clean_cell(row.get("AWS/manual evidence", ""))
+        if not explicit_value(requirement, allow_none=False) or "*" in requirement:
+            issues.append(f"{evidence_id} requires a concrete requirement or invariant")
+        if (
+            not explicit_value(manual_evidence, allow_none=False)
+            or "*" in manual_evidence
+        ):
+            issues.append(f"{evidence_id} requires concrete AWS/manual evidence")
+        if clean_cell(row.get("Artifact/environment", "")) != expected_target:
+            issues.append(
+                f"{evidence_id} does not bind the exact artifact/account/Region/environment"
+            )
+    return issues
+
+
+def _deployment_operation_result_issues(
+    value: str, evidence_id: str, *, started: bool
+) -> list[str]:
+    """Validate the machine-readable operation identifier and direct-result grammar."""
+
+    cleaned = clean_cell(value)
+    if started:
+        return (
+            []
+            if cleaned == AWS_DEPLOYMENT_PRECALL_RESULT
+            else [f"{evidence_id} STARTED must use the exact pre-call result sentinel"]
+        )
+    match = re.fullmatch(
+        r"IDENTIFIERS: (?P<identifiers>.+); RESULT: (?P<result>.+)", cleaned
+    )
+    if match is None:
+        return [
+            f"{evidence_id} post-call result must use IDENTIFIERS: <list or NONE reason>; RESULT: <direct result>"
+        ]
+    identifiers = clean_cell(match.group("identifiers"))
+    result = clean_cell(match.group("result"))
+    none_match = re.fullmatch(r"NONE \u2014 (?P<reason>.+)", identifiers)
+    if none_match is not None:
+        reason = clean_cell(none_match.group("reason"))
+        if not explicit_value(reason, allow_none=False) or "*" in reason:
+            return [f"{evidence_id} NONE identifiers require a concrete reason"]
+    else:
+        values = [item.strip() for item in identifiers.split(",")]
+        if (
+            not values
+            or len(values) != len(set(values))
+            or any(
+                not explicit_value(item, allow_none=False)
+                or "*" in item
+                or re.search(r"[\r\n\x00-\x1f\x7f]", item) is not None
+                for item in values
+            )
+        ):
+            return [
+                f"{evidence_id} operation identifiers must be a unique exact wildcard-free list"
+            ]
+    if not explicit_value(result, allow_none=False) or "*" in result:
+        return [f"{evidence_id} requires a concrete direct result"]
+    return []
+
+
+def _deployment_values(value: str, label: str, *, allow_none: bool) -> list[str]:
+    cleaned = clean_cell(value)
+    if allow_none and cleaned == "NONE":
+        return []
+    values = _split_authority_values(cleaned)
+    if (
+        not values
+        or len(values) != len(set(values))
+        or any("*" in item for item in values)
+    ):
+        raise ValueError(f"{label} must be a unique wildcard-free exact list")
+    return values
+
+
+def _deployment_evidence_ids(value: str, *, allow_none: bool) -> list[str]:
+    values = _deployment_values(value, "Acceptance evidence IDs", allow_none=allow_none)
+    if any(re.fullmatch(r"EV-\d{4,}", item) is None for item in values):
+        raise ValueError(
+            "Acceptance evidence IDs must be a unique comma-separated EV list or NONE"
+        )
+    return values
+
+
+def _deployment_expected_binding(
+    verify_text: str,
+    *,
+    construction_authorization: str,
+    envelope: Mapping[str, str],
+    lane: str | None,
+    artifact_binding: str,
+    gate_b_authority_source: str = "",
+    gate_b_authorized_at: str = "",
+) -> tuple[dict[str, Any], list[str]]:
+    """Return the current mutation ceiling without treating it as an attempt."""
+
+    issues: list[str] = []
+    if construction_authorization == "NONE":
+        return {}, ["deployment evidence requires a current construction authorization"]
+    if lane not in {"fast-dev", "explicit-gate"}:
+        return {}, ["deployment evidence is not permitted for the selected AWS lane"]
+    try:
+        environment, _environment_class = parse_aws_environment(
+            envelope.get("AWS environment", "")
+        )
+    except ValueError:
+        environment = ""
+    account = _envelope_scalar(envelope, "AWS account", "ACCOUNT")
+    region = _envelope_scalar(envelope, "AWS Region", "REGION")
+    deployment_role = _envelope_scalar(envelope, "AWS role or profile", "ROLE")
+    resources = _envelope_values(envelope, "AWS resource allowlist", "RESOURCES")
+    allowed_operations = _envelope_values(
+        envelope, "AWS allowed operations", "OPERATIONS"
+    )
+    operations = (
+        [
+            operation
+            for operation in allowed_operations
+            if AWS_READ_ONLY_OPERATION.fullmatch(operation) is None
+        ]
+        if lane == "fast-dev"
+        else allowed_operations
+    )
+    for label, value in (
+        ("AWS account", account),
+        ("AWS Region", region),
+        ("AWS environment", environment),
+        ("AWS role or profile", deployment_role),
+    ):
+        if not value:
+            issues.append(f"deployment evidence requires exact {label}")
+    if not resources or not operations:
+        issues.append(
+            "deployment evidence requires exact Gate B resources and operations"
+        )
+    if not _receipt_artifact_matches_gate_b(
+        artifact_binding, envelope, artifact_binding
+    ):
+        issues.append("deployment evidence artifact is outside current Gate B")
+    authorization_validity = clean_cell(envelope.get("AWS authorization validity", ""))
+    validity_match = re.fullmatch(
+        r"Expires at (?P<timestamp>[^\s;]+); earlier completion: [^\r\n]+",
+        authorization_validity,
+    )
+    expected: dict[str, Any] = {
+        "authorization_id": construction_authorization,
+        "receipt_digest": "NONE",
+        "authorized_at": clean_cell(gate_b_authorized_at),
+        "valid_until": (
+            validity_match.group("timestamp") if validity_match is not None else "NONE"
+        ),
+        "deployment_role": deployment_role or "NONE",
+        "deployment_authority_source": clean_cell(gate_b_authority_source),
+        "artifact": artifact_binding,
+        "plan": clean_cell(envelope.get("AWS stack or application", "")),
+        "account": account or "NONE",
+        "region": region or "NONE",
+        "environment": environment or "NONE",
+        "resources": resources,
+        "operations": operations,
+        "verify_text": verify_text,
+    }
+    if lane == "fast-dev":
+        if validity_match is None:
+            issues.append(
+                "fast-dev deployment evidence requires exact authorization validity"
+            )
+        if not explicit_timestamp(expected["authorized_at"]):
+            issues.append(
+                "fast-dev deployment evidence requires the Gate B authorization timestamp"
+            )
+        if not explicit_value(expected["plan"], allow_none=False):
+            issues.append(
+                "fast-dev deployment evidence requires an exact stack or application"
+            )
+        if (
+            not explicit_value(
+                expected["deployment_authority_source"], allow_none=False
+            )
+            or "*" in expected["deployment_authority_source"]
+        ):
+            issues.append(
+                "fast-dev deployment evidence requires the Gate B owner authorization source"
+            )
+        return expected, issues
+
+    try:
+        receipt = marked_receipt(verify_text, "aws-deployment")
+        provenance = _action_authorization_rows(verify_text).get("Deployment")
+    except ValueError:
+        receipt = ""
+        provenance = None
+    fields = _exact_receipt_fields(
+        receipt,
+        "AUTHORIZE AWS DEPLOYMENT",
+        AWS_DEPLOYMENT_RECEIPT_FIELDS,
+        allow_none_fields=frozenset({"Rollback boundary"}),
+    )
+    digest = (
+        "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
+        if receipt
+        else "NONE"
+    )
+    if fields is None or provenance is None or unresolved(receipt):
+        issues.append(
+            "explicit-gate deployment evidence requires one exact owner-authored receipt"
+        )
+        return expected, issues
+    receipt_resources = _split_authority_values(
+        fields["Stack, application, and resources"]
+    )
+    receipt_operations = _split_authority_values(fields["Allowed operations"])
+    receipt_scope = (
+        f"ACCOUNT: {fields['Account']}; REGION: {fields['Region']}; "
+        f"ENVIRONMENT: {fields['Environment']}"
+    )
+    receipt_resources_and_operations = (
+        f"RESOURCES: {fields['Stack, application, and resources']}; "
+        f"OPERATIONS: {fields['Allowed operations']}"
+    )
+    expected.update(
+        {
+            "authorization_id": fields["AWS authorization"],
+            "receipt_digest": digest,
+            "authorized_at": clean_cell(provenance.get("Observed at", "")),
+            "valid_until": fields["Valid until"],
+            "deployment_role": fields["Profile or role"],
+            "deployment_authority_source": clean_cell(
+                provenance.get("Stable owner-message source", "")
+            ),
+            "artifact": fields["Artifact digest"],
+            "plan": fields["IaC plan/change-set binding"],
+            "account": fields["Account"],
+            "region": fields["Region"],
+            "environment": fields["Environment"],
+            "resources": receipt_resources,
+            "operations": receipt_operations,
+        }
+    )
+    receipt_binding_invalid = (
+        re.fullmatch(r"AWS-AUTH-\d{4,}", fields["AWS authorization"]) is None
+        or fields["Construction authorization"] != construction_authorization
+        or AWS_PLAN_BINDING.fullmatch(fields["IaC plan/change-set binding"]) is None
+        or not _receipt_identity_matches_gate_b(fields, envelope)
+        or not _receipt_scope_within_gate_b(
+            receipt_resources, receipt_operations, envelope
+        )
+        or not _receipt_artifact_matches_gate_b(
+            fields["Artifact digest"], envelope, artifact_binding
+        )
+        or fields["Rollback boundary"] != _gate_b_rollback_value(envelope)
+    )
+    provenance_invalid = (
+        provenance.get("Authorization ID") != fields["AWS authorization"]
+        or provenance.get("Construction AUTH") != construction_authorization
+        or provenance.get("Role or profile") != fields["Profile or role"]
+        or provenance.get("Artifact digest") != fields["Artifact digest"]
+        or provenance.get("IaC plan/change-set binding")
+        != fields["IaC plan/change-set binding"]
+        or provenance.get("Account / Region / environment") != receipt_scope
+        or provenance.get("Resources and operations")
+        != receipt_resources_and_operations
+        or provenance.get("Approver") != fields["Approver"]
+        or not explicit_human_approver(fields["Approver"])
+        or clean_cell(provenance.get("Verbatim receipt SHA-256", "")) != digest
+        or not explicit_value(
+            provenance.get("Stable owner-message source", ""), allow_none=False
+        )
+        or not explicit_timestamp(provenance.get("Observed at", ""))
+        or clean_cell(provenance.get("Identity and boundary match", ""))
+        not in {"PASS", "VERIFIED"}
+        or clean_cell(provenance.get("Result", ""))
+        not in {"AUTHORIZED", "RUNNING", "READY"}
+        or AWS_PREFLIGHT_ID.fullmatch(
+            clean_cell(provenance.get("Preflight evidence", ""))
+        )
+        is None
+    )
+    if receipt_binding_invalid:
+        issues.append(
+            "deployment receipt does not match current Gate B identity, scope, "
+            "artifact, plan, or rollback boundary"
+        )
+    if provenance_invalid:
+        issues.append(
+            "deployment receipt does not match its exact authorization provenance"
+        )
+    return expected, issues
+
+
+def _deployment_row_binding_issues(
+    row: Mapping[str, str],
+    expected: Mapping[str, Any],
+    read_authority: Mapping[str, Any] | None,
+    *,
+    historical: bool = False,
+) -> list[str]:
+    evidence_id = clean_cell(row.get("Evidence ID", "")) or "deployment row"
+    phase = clean_cell(row.get("Phase", ""))
+    status = clean_cell(row.get("Status", ""))
+    issues: list[str] = []
+    expected_scope = (
+        f"ACCOUNT: {expected.get('account')}; REGION: {expected.get('region')}; "
+        f"ENVIRONMENT: {expected.get('environment')}"
+    )
+    scalar_fields = {
+        "Deployment authorization": expected.get("authorization_id"),
+        "Deployment receipt digest": expected.get("receipt_digest"),
+        "Deployment valid until": expected.get("valid_until"),
+        "Deployment authority source": expected.get("deployment_authority_source"),
+        "Deployment role or profile": expected.get("deployment_role"),
+        "Artifact digest": expected.get("artifact"),
+        "Plan/change-set binding": expected.get("plan"),
+        "Account / Region / environment": expected_scope,
+    }
+    for field_name, value in scalar_fields.items():
+        if clean_cell(row.get(field_name, "")) != clean_cell(value):
+            issues.append(f"{evidence_id} {field_name} does not match its authority")
+    try:
+        resources = _deployment_values(
+            row.get("Resources", ""), "Resources", allow_none=False
+        )
+        operations = _deployment_values(
+            row.get("Mutation operations", ""),
+            "Mutation operations",
+            allow_none=False,
+        )
+    except ValueError as exc:
+        issues.append(str(exc))
+        resources, operations = [], []
+    if set(resources) != set(expected.get("resources", [])):
+        issues.append(f"{evidence_id} Resources do not match the attempted scope")
+    if set(operations) != set(expected.get("operations", [])):
+        issues.append(
+            f"{evidence_id} Mutation operations do not match the attempted scope"
+        )
+    started = phase == "AWS-20" and status == "STARTED"
+    operation_result = clean_cell(
+        row.get("Operation identifiers and direct result", "")
+    )
+    issues.extend(
+        _deployment_operation_result_issues(
+            operation_result, evidence_id, started=started
+        )
+    )
+    rollback_result = clean_cell(row.get("Rollback result", ""))
+    if started and rollback_result != "NONE":
+        issues.append(f"{evidence_id} STARTED must use Rollback result = NONE")
+    for field_name, allow_none in (
+        ("Rollback result", True),
+        ("Durable source", False),
+    ):
+        if not explicit_value(row.get(field_name, ""), allow_none=allow_none):
+            issues.append(f"{evidence_id} requires {field_name}")
+    blocker_reason = clean_cell(row.get("Blocker or stale reason", ""))
+    if status in {"BLOCKED", "STALE"}:
+        if not explicit_value(blocker_reason, allow_none=False):
+            issues.append(f"{evidence_id} requires an exact blocker or stale reason")
+    elif blocker_reason != "NONE":
+        issues.append(f"{evidence_id} must use Blocker or stale reason = NONE")
+    identity = clean_cell(row.get("Identity and boundary match", ""))
+    if phase == "AWS-20":
+        for field_name in (
+            "Read authorization",
+            "Read role or profile",
+            "Read receipt digest",
+            "Read valid until",
+            "Read authority source",
+            "Read operations observed",
+            "Acceptance evidence IDs",
+        ):
+            if clean_cell(row.get(field_name, "")) != "NONE":
+                issues.append(f"{evidence_id} AWS-20 requires {field_name} = NONE")
+        if identity not in {"PASS", "VERIFIED"}:
+            issues.append(
+                f"{evidence_id} AWS-20 requires verified identity and boundary"
+            )
+        return issues
+
+    read_id = clean_cell(row.get("Read authorization", ""))
+    read_role = clean_cell(row.get("Read role or profile", ""))
+    read_digest = clean_cell(row.get("Read receipt digest", ""))
+    read_valid_until = clean_cell(row.get("Read valid until", ""))
+    read_source = clean_cell(row.get("Read authority source", ""))
+    read_provenance = _parse_deployment_read_provenance(read_source)
+    if AWS_READ_AUTHORIZATION_ID.fullmatch(read_id) is None:
+        issues.append(f"{evidence_id} AWS-30 requires a separate read authorization")
+    if not explicit_value(read_role, allow_none=False):
+        issues.append(f"{evidence_id} AWS-30 requires a separate read role")
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", read_digest) is None:
+        issues.append(f"{evidence_id} AWS-30 requires an exact read receipt digest")
+    read_expiry = _iso_datetime(read_valid_until)
+    observed_at = _iso_datetime(row.get("Observed at", ""))
+    if read_valid_until == "ONE_OPERATION" or read_expiry is None:
+        issues.append(f"{evidence_id} AWS-30 requires reusable ISO read validity")
+    elif observed_at is not None and observed_at > read_expiry:
+        issues.append(f"{evidence_id} AWS-30 was observed after read authority expiry")
+    if read_provenance is None:
+        issues.append(
+            f"{evidence_id} AWS-30 requires the exact durable read authority "
+            "source, authorization time, resources, and operations envelope"
+        )
+    try:
+        observed_reads = _deployment_values(
+            row.get("Read operations observed", ""),
+            "Read operations observed",
+            allow_none=status == "STALE",
+        )
+        acceptance_ids = _deployment_evidence_ids(
+            row.get("Acceptance evidence IDs", ""),
+            allow_none=status != "COMPLETE",
+        )
+    except ValueError as exc:
+        issues.append(str(exc))
+        observed_reads, acceptance_ids = [], []
+    if read_provenance is not None:
+        read_authorized_at = _iso_datetime(read_provenance["authorized_at"])
+        if (
+            observed_at is not None
+            and read_authorized_at is not None
+            and observed_at < read_authorized_at
+        ):
+            issues.append(
+                f"{evidence_id} AWS-30 observation precedes read authorization"
+            )
+        if resources != read_provenance["resources"]:
+            issues.append(
+                f"{evidence_id} Resources do not match the durable read authorization"
+            )
+        if not set(observed_reads).issubset(set(read_provenance["operations"])):
+            issues.append(
+                f"{evidence_id} observed reads exceed the durable read authorization"
+            )
+    if status in {"COMPLETE", "BLOCKED"} and identity not in {"PASS", "VERIFIED"}:
+        issues.append(f"{evidence_id} AWS-30 requires verified identity and boundary")
+    if status == "STALE" and not explicit_value(identity, allow_none=False):
+        issues.append(
+            f"{evidence_id} STALE requires a concrete identity and boundary result"
+        )
+    if (
+        status in {"COMPLETE", "BLOCKED"}
+        and not historical
+        and read_authority is not None
+    ):
+        same_read_id = read_id == clean_cell(read_authority.get("authorization_id", ""))
+        if not same_read_id:
+            issues.append(
+                f"{evidence_id} read authorization does not match current authority"
+            )
+        else:
+            read_scope = (
+                f"ACCOUNT: {read_authority.get('account')}; "
+                f"REGION: {read_authority.get('region')}; "
+                f"ENVIRONMENT: {read_authority.get('environment')}"
+            )
+            read_authorized_at = _iso_datetime(read_authority.get("authorized_at", ""))
+            if read_authorized_at is None:
+                issues.append(f"{evidence_id} read authorization timestamp is invalid")
+            elif observed_at is not None and observed_at < read_authorized_at:
+                issues.append(
+                    f"{evidence_id} AWS-30 observation precedes read authorization"
+                )
+            if read_role != clean_cell(read_authority.get("role_or_profile", "")):
+                issues.append(f"{evidence_id} read role does not match its receipt")
+            if read_digest != clean_cell(read_authority.get("receipt_digest", "")):
+                issues.append(f"{evidence_id} read receipt digest is tampered")
+            if read_valid_until != clean_cell(read_authority.get("expiration", "")):
+                issues.append(f"{evidence_id} read validity is tampered")
+            expected_read_source = _format_deployment_read_provenance(
+                clean_cell(read_authority.get("authority_source", "")),
+                clean_cell(read_authority.get("authorized_at", "")),
+                read_authority.get("resources", []),
+                read_authority.get("operations", []),
+            )
+            if read_source != expected_read_source:
+                issues.append(f"{evidence_id} read authority provenance is tampered")
+            if expected_scope != read_scope:
+                issues.append(f"{evidence_id} read account boundary is stale")
+            if resources != list(read_authority.get("resources", [])):
+                issues.append(
+                    f"{evidence_id} attempted resources do not match read scope"
+                )
+            if not set(observed_reads).issubset(
+                set(read_authority.get("operations", []))
+            ):
+                issues.append(
+                    f"{evidence_id} observed reads exceed the read authorization"
+                )
+    if status == "COMPLETE":
+        if not acceptance_ids:
+            issues.append(f"{evidence_id} COMPLETE requires acceptance evidence IDs")
+        else:
+            issues.extend(
+                _deployment_acceptance_evidence_issues(
+                    str(expected.get("verify_text", "")), acceptance_ids, expected
+                )
+            )
+    return issues
+
+
+def _format_deployment_read_provenance(
+    source: str,
+    authorized_at: str,
+    resources: Any,
+    operations: Any,
+) -> str:
+    """Format the exact durable AWS-30 read-authorization envelope."""
+
+    resource_values = list(resources) if isinstance(resources, (list, tuple)) else []
+    operation_values = list(operations) if isinstance(operations, (list, tuple)) else []
+    return (
+        f"SOURCE: {clean_cell(source)}; AUTHORIZED_AT: {clean_cell(authorized_at)}; "
+        f"RESOURCES: {', '.join(clean_cell(item) for item in resource_values)}; "
+        f"OPERATIONS: {', '.join(clean_cell(item) for item in operation_values)}"
+    )
+
+
+def _parse_deployment_read_provenance(value: str) -> dict[str, Any] | None:
+    """Parse one canonical AWS-30 envelope without reviving its authority."""
+
+    cleaned = clean_cell(value)
+    match = AWS_DEPLOYMENT_READ_PROVENANCE.fullmatch(cleaned)
+    if match is None:
+        return None
+    source = clean_cell(match.group("source"))
+    authorized_at = clean_cell(match.group("authorized_at"))
+    try:
+        resources = _deployment_values(
+            match.group("resources"), "Read-authorized resources", allow_none=False
+        )
+        operations = _deployment_values(
+            match.group("operations"), "Read-authorized operations", allow_none=False
+        )
+    except ValueError:
+        return None
+    if (
+        not explicit_value(source, allow_none=False)
+        or "*" in source
+        or _iso_datetime(authorized_at) is None
+        or any(AWS_READ_ONLY_OPERATION.fullmatch(item) is None for item in operations)
+    ):
+        return None
+    canonical = _format_deployment_read_provenance(
+        source, authorized_at, resources, operations
+    )
+    if cleaned != canonical:
+        return None
+    return {
+        "source": source,
+        "authorized_at": authorized_at,
+        "resources": resources,
+        "operations": operations,
+    }
+
+
+def _deployment_historical_authority_proof_issues(
+    group: list[dict[str, str]],
+    verify_text: str,
+    *,
+    gate_b_authority_source: str,
+    gate_b_authorized_at: str,
+) -> list[str]:
+    """Prove a stale STARTED row followed its durable original authority."""
+
+    first = group[0]
+    issues: list[str] = []
+    basis = clean_cell(first.get("REQ / DES / AUTH", ""))
+    basis_match = re.fullmatch(
+        r"REQ-\d{4,} / DES-\d{4,} / (?P<auth>AUTH-\d{4,})", basis
+    )
+    started_at = _iso_datetime(first.get("Observed at", ""))
+    if basis_match is None or started_at is None:
+        return ["historical deployment authorization timing proof is unavailable"]
+
+    authorization_id = clean_cell(first.get("Deployment authorization", ""))
+    receipt_digest = clean_cell(first.get("Deployment receipt digest", ""))
+    authority_source = clean_cell(first.get("Deployment authority source", ""))
+    if receipt_digest == "NONE":
+        authorized_at = _iso_datetime(gate_b_authorized_at)
+        if (
+            authorization_id != basis_match.group("auth")
+            or authorized_at is None
+            or authority_source != clean_cell(gate_b_authority_source)
+            or not explicit_value(authority_source, allow_none=False)
+        ):
+            issues.append(
+                "historical fast-dev STARTED lacks its original Gate B authorization provenance"
+            )
+        elif started_at < authorized_at:
+            issues.append(
+                "historical deployment STARTED precedes its original authorization provenance"
+            )
+        return issues
+
+    try:
+        receipt = marked_receipt(verify_text, "aws-deployment")
+        provenance = _action_authorization_rows(verify_text).get("Deployment")
+    except ValueError:
+        receipt = ""
+        provenance = None
+    fields = _exact_receipt_fields(
+        receipt,
+        "AUTHORIZE AWS DEPLOYMENT",
+        AWS_DEPLOYMENT_RECEIPT_FIELDS,
+        allow_none_fields=frozenset({"Rollback boundary"}),
+    )
+    if fields is None or provenance is None or unresolved(receipt):
+        return [
+            "historical explicit-gate STARTED lacks its durable original receipt and provenance"
+        ]
+    digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
+    receipt_scope = (
+        f"ACCOUNT: {fields['Account']}; REGION: {fields['Region']}; "
+        f"ENVIRONMENT: {fields['Environment']}"
+    )
+    receipt_resources_and_operations = (
+        f"RESOURCES: {fields['Stack, application, and resources']}; "
+        f"OPERATIONS: {fields['Allowed operations']}"
+    )
+    authorized_at = _iso_datetime(provenance.get("Observed at", ""))
+    binding_invalid = (
+        fields["AWS authorization"] != authorization_id
+        or fields["Construction authorization"] != basis_match.group("auth")
+        or digest != receipt_digest
+        or fields["Valid until"] != clean_cell(first.get("Deployment valid until", ""))
+        or fields["Profile or role"]
+        != clean_cell(first.get("Deployment role or profile", ""))
+        or fields["Artifact digest"] != clean_cell(first.get("Artifact digest", ""))
+        or fields["IaC plan/change-set binding"]
+        != clean_cell(first.get("Plan/change-set binding", ""))
+        or receipt_scope != clean_cell(first.get("Account / Region / environment", ""))
+        or set(_split_authority_values(fields["Stack, application, and resources"]))
+        != set(
+            _deployment_values(
+                first.get("Resources", ""), "Resources", allow_none=False
+            )
+        )
+        or set(_split_authority_values(fields["Allowed operations"]))
+        != set(
+            _deployment_values(
+                first.get("Mutation operations", ""),
+                "Mutation operations",
+                allow_none=False,
+            )
+        )
+        or provenance.get("Authorization ID") != authorization_id
+        or provenance.get("Construction AUTH") != basis_match.group("auth")
+        or provenance.get("Role or profile") != fields["Profile or role"]
+        or provenance.get("Artifact digest") != fields["Artifact digest"]
+        or provenance.get("IaC plan/change-set binding")
+        != fields["IaC plan/change-set binding"]
+        or provenance.get("Account / Region / environment") != receipt_scope
+        or provenance.get("Resources and operations")
+        != receipt_resources_and_operations
+        or clean_cell(provenance.get("Stable owner-message source", ""))
+        != authority_source
+        or provenance.get("Approver") != fields["Approver"]
+        or not explicit_human_approver(fields["Approver"])
+        or clean_cell(provenance.get("Verbatim receipt SHA-256", "")) != digest
+        or authorized_at is None
+        or clean_cell(provenance.get("Identity and boundary match", ""))
+        not in {"PASS", "VERIFIED"}
+        or clean_cell(provenance.get("Result", ""))
+        not in {"AUTHORIZED", "RUNNING", "READY"}
+    )
+    if binding_invalid:
+        issues.append(
+            "historical explicit-gate STARTED does not bind its durable original receipt and provenance"
+        )
+    elif started_at < authorized_at:
+        issues.append(
+            "historical deployment STARTED precedes its original authorization provenance"
+        )
+    return issues
+
+
+def _deployment_historical_group_issues(
+    group: list[dict[str, str]],
+    verify_text: str,
+    *,
+    current_read_authority: Mapping[str, Any] | None = None,
+    require_authorization_proof: bool = False,
+    gate_b_authority_source: str = "",
+    gate_b_authorized_at: str = "",
+) -> list[str]:
+    """Validate immutable historical rows without reviving their authority."""
+
+    first = group[0]
+    issues: list[str] = []
+    scope = clean_cell(first.get("Account / Region / environment", ""))
+    scope_match = re.fullmatch(
+        r"ACCOUNT: (?P<account>[^;]+); REGION: (?P<region>[^;]+); "
+        r"ENVIRONMENT: (?P<environment>[^;]+)",
+        scope,
+    )
+    try:
+        resources = _deployment_values(
+            first.get("Resources", ""), "Resources", allow_none=False
+        )
+        operations = _deployment_values(
+            first.get("Mutation operations", ""),
+            "Mutation operations",
+            allow_none=False,
+        )
+    except ValueError as exc:
+        return [str(exc)]
+    basis = clean_cell(first.get("REQ / DES / AUTH", ""))
+    if re.fullmatch(r"REQ-\d{4,} / DES-\d{4,} / AUTH-\d{4,}", basis) is None:
+        issues.append(
+            "historical deployment attempt has a noncanonical REQ / DES / AUTH basis"
+        )
+    authorization_id = clean_cell(first.get("Deployment authorization", ""))
+    digest = clean_cell(first.get("Deployment receipt digest", ""))
+    deployment_valid_until = clean_cell(first.get("Deployment valid until", ""))
+    deployment_source = clean_cell(first.get("Deployment authority source", ""))
+    fast_dev = digest == "NONE"
+    if fast_dev:
+        if re.fullmatch(r"AUTH-\d{4,}", authorization_id) is None:
+            issues.append("historical fast-dev attempt has noncanonical authority")
+    elif (
+        re.fullmatch(r"AWS-AUTH-\d{4,}", authorization_id) is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
+    ):
+        issues.append("historical explicit-gate attempt has noncanonical authority")
+    expires_at = _iso_datetime(deployment_valid_until)
+    started_at = _iso_datetime(first.get("Observed at", ""))
+    if fast_dev and expires_at is None:
+        issues.append("historical fast-dev validity must be an ISO 8601 timestamp")
+    elif (
+        not fast_dev
+        and deployment_valid_until != "ONE_OPERATION"
+        and expires_at is None
+    ):
+        issues.append(
+            "historical explicit-gate validity must be ISO 8601 or ONE_OPERATION"
+        )
+    elif started_at is not None and expires_at is not None and started_at > expires_at:
+        issues.append("historical deployment STARTED occurred after authority expiry")
+    if (
+        not explicit_value(deployment_source, allow_none=False)
+        or "*" in deployment_source
+    ):
+        issues.append("historical deployment authority source is unresolved")
+    if scope_match is None:
+        issues.append("historical deployment attempt has a noncanonical account scope")
+        account = region = environment = "NONE"
+    else:
+        account = clean_cell(scope_match.group("account"))
+        region = clean_cell(scope_match.group("region"))
+        environment = clean_cell(scope_match.group("environment"))
+        for label, value in (
+            ("account", account),
+            ("Region", region),
+            ("environment", environment),
+        ):
+            if not explicit_value(value, allow_none=False) or "*" in value:
+                issues.append(
+                    f"historical deployment {label} must be concrete and wildcard-free"
+                )
+    deployment_role = clean_cell(first.get("Deployment role or profile", ""))
+    artifact = clean_cell(first.get("Artifact digest", ""))
+    plan = clean_cell(first.get("Plan/change-set binding", ""))
+    if not explicit_value(deployment_role, allow_none=False) or "*" in deployment_role:
+        issues.append(
+            "historical deployment attempt requires a concrete deployment role"
+        )
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", artifact) is None:
+        issues.append("historical deployment attempt requires an exact artifact digest")
+    if fast_dev:
+        if not explicit_value(plan, allow_none=False) or "*" in plan:
+            issues.append("historical fast-dev attempt requires an exact plan binding")
+    elif AWS_PLAN_BINDING.fullmatch(plan) is None:
+        issues.append(
+            "historical explicit-gate attempt requires a canonical plan binding"
+        )
+    expected = {
+        "authorization_id": authorization_id,
+        "receipt_digest": digest,
+        "valid_until": deployment_valid_until,
+        "deployment_authority_source": deployment_source,
+        "deployment_role": deployment_role,
+        "artifact": artifact,
+        "plan": plan,
+        "account": account,
+        "region": region,
+        "environment": environment,
+        "resources": resources,
+        "operations": operations,
+        "verify_text": verify_text,
+    }
+    if require_authorization_proof:
+        issues.extend(
+            _deployment_historical_authority_proof_issues(
+                group,
+                verify_text,
+                gate_b_authority_source=gate_b_authority_source,
+                gate_b_authorized_at=gate_b_authorized_at,
+            )
+        )
+    for row in group:
+        issues.extend(
+            _deployment_row_binding_issues(
+                row,
+                expected,
+                current_read_authority,
+                historical=current_read_authority is None,
+            )
+        )
+    return issues
+
+
+def _deployment_group_projection(
+    base: Mapping[str, Any],
+    attempt_id: str,
+    group: list[dict[str, str]],
+) -> dict[str, Any]:
+    action_rows = [row for row in group if row["Phase"] == "AWS-20"]
+    terminal_rows = [
+        row for row in action_rows if row["Status"] in AWS_DEPLOYMENT_TERMINAL_STATUSES
+    ]
+    action = terminal_rows[0] if terminal_rows else action_rows[0]
+    reconciliation_rows = [row for row in group if row["Phase"] == "AWS-30"]
+    reconciliation = reconciliation_rows[-1] if reconciliation_rows else None
+    latest = reconciliation or action
+    try:
+        resources = _deployment_values(
+            latest["Resources"], "Resources", allow_none=False
+        )
+        operations = _deployment_values(
+            latest["Mutation operations"],
+            "Mutation operations",
+            allow_none=False,
+        )
+        observed_reads = (
+            _deployment_values(
+                latest["Read operations observed"],
+                "Read operations observed",
+                allow_none=latest["Status"] == "STALE",
+            )
+            if latest["Phase"] == "AWS-30"
+            else []
+        )
+        acceptance_ids = (
+            _deployment_evidence_ids(
+                latest["Acceptance evidence IDs"],
+                allow_none=latest["Status"] != "COMPLETE",
+            )
+            if latest["Phase"] == "AWS-30"
+            else []
+        )
+    except ValueError as exc:
+        return {**base, "status": "BLOCKED", "issues": [str(exc)]}
+    reconciliation_status = (
+        clean_cell(reconciliation["Status"]) if reconciliation else "NONE"
+    )
+    read_provenance = (
+        _parse_deployment_read_provenance(latest["Read authority source"])
+        if latest["Phase"] == "AWS-30"
+        else None
+    )
+    status = (
+        "ACTION_TERMINAL_REQUIRED"
+        if clean_cell(action["Status"]) == "STARTED" and reconciliation is None
+        else {
+            "COMPLETE": "RECONCILED",
+            "BLOCKED": "BLOCKED",
+            "STALE": "RECONCILIATION_REQUIRED",
+            "NONE": "RECONCILIATION_REQUIRED",
+        }[reconciliation_status]
+    )
+    return {
+        **base,
+        "status": status,
+        "attempt_id": attempt_id,
+        "evidence_id": clean_cell(latest["Evidence ID"]),
+        "phase": clean_cell(latest["Phase"]),
+        "action_status": clean_cell(action["Status"]),
+        "reconciliation_status": reconciliation_status,
+        "deployment_authorization": clean_cell(latest["Deployment authorization"]),
+        "deployment_receipt_digest": clean_cell(latest["Deployment receipt digest"]),
+        "deployment_valid_until": clean_cell(latest["Deployment valid until"]),
+        "deployment_authority_source": clean_cell(
+            latest["Deployment authority source"]
+        ),
+        "read_authorization": clean_cell(latest["Read authorization"]),
+        "deployment_role_or_profile": clean_cell(latest["Deployment role or profile"]),
+        "read_role_or_profile": clean_cell(latest["Read role or profile"]),
+        "read_receipt_digest": clean_cell(latest["Read receipt digest"]),
+        "read_valid_until": clean_cell(latest["Read valid until"]),
+        "read_authorized_at": (
+            read_provenance["authorized_at"] if read_provenance else "NONE"
+        ),
+        "read_authorized_resources": (
+            read_provenance["resources"] if read_provenance else []
+        ),
+        "read_authorized_operations": (
+            read_provenance["operations"] if read_provenance else []
+        ),
+        "read_authority_source": clean_cell(latest["Read authority source"]),
+        "artifact_digest": clean_cell(latest["Artifact digest"]),
+        "plan_binding": clean_cell(latest["Plan/change-set binding"]),
+        "resources": resources,
+        "mutation_operations": operations,
+        "read_operations_observed": observed_reads,
+        "acceptance_evidence_ids": acceptance_ids,
+        "operation_result": clean_cell(
+            latest["Operation identifiers and direct result"]
+        ),
+        "rollback_result": clean_cell(latest["Rollback result"]),
+        "identity_and_boundary_match": clean_cell(
+            latest["Identity and boundary match"]
+        ),
+        "blocker_or_stale_reason": clean_cell(latest["Blocker or stale reason"]),
+    }
+
+
+def _deployment_authority_timing_issues(
+    group: list[dict[str, str]], expected: Mapping[str, Any]
+) -> list[str]:
+    """Validate that mutation began within the exact recorded authority window."""
+
+    issues: list[str] = []
+    started_at = _iso_datetime(group[0].get("Observed at", ""))
+    authorized_at = _iso_datetime(expected.get("authorized_at", ""))
+    valid_until = clean_cell(expected.get("valid_until", ""))
+    expires_at = None if valid_until == "ONE_OPERATION" else _iso_datetime(valid_until)
+    if started_at is None:
+        issues.append("deployment STARTED timestamp is invalid")
+    if authorized_at is None:
+        issues.append("deployment authorization timestamp is invalid")
+    elif started_at is not None and started_at < authorized_at:
+        issues.append("deployment STARTED precedes its authorization provenance")
+    if valid_until != "ONE_OPERATION" and expires_at is None:
+        issues.append("deployment authority has a noncanonical validity boundary")
+    elif started_at is not None and expires_at is not None and started_at > expires_at:
+        issues.append("deployment STARTED occurred after authority expiry")
+    return issues
+
+
+def derive_deployment_sequence_state(
+    verify_text: str,
+    read_authority: Mapping[str, Any] | None,
+    *,
+    requirements_revision: str,
+    design_revision: str,
+    construction_authorization: str,
+    envelope: Mapping[str, str],
+    lane: str | None,
+    artifact_binding: str,
+    release_evidence_cutoff: str = "NONE",
+    release_state: str = "READY_TO_DEPLOY",
+    gate_b_authority_source: str = "",
+    gate_b_authorized_at: str = "",
+    cost_posture: str = "",
+    restricted_closure: bool = False,
+) -> dict[str, Any]:
+    """Derive AWS-20/AWS-30 sequencing without inferring an attempted action."""
+
+    base: dict[str, Any] = {
+        "status": "NOT_ACTIVE",
+        "attempt_id": "NONE",
+        "evidence_id": "NONE",
+        "phase": "NONE",
+        "action_status": "NONE",
+        "reconciliation_status": "NONE",
+        "deployment_authorization": "NONE",
+        "deployment_receipt_digest": "NONE",
+        "deployment_valid_until": "NONE",
+        "deployment_authority_source": "NONE",
+        "read_authorization": "NONE",
+        "deployment_role_or_profile": "NONE",
+        "read_role_or_profile": "NONE",
+        "read_receipt_digest": "NONE",
+        "read_valid_until": "NONE",
+        "read_authorized_at": "NONE",
+        "read_authorized_resources": [],
+        "read_authorized_operations": [],
+        "read_authority_source": "NONE",
+        "artifact_digest": "NONE",
+        "plan_binding": "NONE",
+        "resources": [],
+        "mutation_operations": [],
+        "read_operations_observed": [],
+        "acceptance_evidence_ids": [],
+        "operation_result": "NONE",
+        "rollback_result": "NONE",
+        "identity_and_boundary_match": "NONE",
+        "blocker_or_stale_reason": "NONE",
+        "basis_stale": False,
+        "acknowledged": False,
+        "acknowledged_evidence_id": "NONE",
+        "release_evidence_cutoff": release_evidence_cutoff,
+        "current_mutation_authority_status": "UNAVAILABLE",
+        "issues": [],
+    }
+    try:
+        rows = parse_deployment_reconciliation_evidence(verify_text)
+    except ValueError as exc:
+        return {**base, "status": "BLOCKED", "issues": [str(exc)]}
+    concrete: list[dict[str, str]] = []
+    invalid_identifiers: list[str] = []
+    for row in rows:
+        evidence_id = clean_cell(row.get("Evidence ID", ""))
+        if re.fullmatch(r"EV-\d{4,}", evidence_id):
+            concrete.append(row)
+            continue
+        status = clean_cell(row.get("Status", ""))
+        placeholder = (
+            unresolved(evidence_id)
+            and status in {"", "NOT_STARTED"}
+            and all(
+                unresolved(row.get(header, ""))
+                for header in AWS_DEPLOYMENT_EVIDENCE_HEADERS
+                if header not in {"Evidence ID", "Status"}
+            )
+        )
+        if not placeholder:
+            invalid_identifiers.append(evidence_id or "EMPTY")
+    if invalid_identifiers:
+        return {
+            **base,
+            "status": "BLOCKED",
+            "issues": [
+                "AWS deployment evidence has noncanonical or partially populated IDs: "
+                + ", ".join(sorted(invalid_identifiers))
+            ],
+        }
+    if not concrete:
+        return base
+    evidence_ids = [clean_cell(row["Evidence ID"]) for row in concrete]
+    if len(evidence_ids) != len(set(evidence_ids)):
+        return {
+            **base,
+            "status": "BLOCKED",
+            "issues": ["AWS deployment evidence contains duplicate Evidence IDs"],
+        }
+    structural_issues: list[str] = []
+    timestamps: list[datetime] = []
+    groups: dict[str, list[dict[str, str]]] = {}
+    attempt_order: list[str] = []
+    closed_attempts: set[str] = set()
+    active_attempt = ""
+    for row in concrete:
+        evidence_id = clean_cell(row["Evidence ID"])
+        attempt_id = clean_cell(row.get("Attempt ID", ""))
+        phase = clean_cell(row.get("Phase", ""))
+        status = clean_cell(row.get("Status", ""))
+        observed_at = _iso_datetime(row.get("Observed at", ""))
+        if AWS_DEPLOYMENT_ATTEMPT_ID.fullmatch(attempt_id) is None:
+            structural_issues.append(f"{evidence_id} has a noncanonical Attempt ID")
+        if phase == "AWS-20" and status not in AWS_DEPLOYMENT_ACTION_STATUSES:
+            structural_issues.append(
+                f"{evidence_id} has invalid AWS-20 status {status or 'EMPTY'}"
+            )
+        elif phase == "AWS-30" and status not in AWS_DEPLOYMENT_RECONCILIATION_STATUSES:
+            structural_issues.append(
+                f"{evidence_id} has invalid AWS-30 status {status or 'EMPTY'}"
+            )
+        elif phase not in {"AWS-20", "AWS-30"}:
+            structural_issues.append(
+                f"{evidence_id} phase must be exactly AWS-20 or AWS-30"
+            )
+        if observed_at is None:
+            structural_issues.append(
+                f"{evidence_id} Observed at must be ISO 8601 with timezone"
+            )
+        else:
+            timestamps.append(observed_at)
+        if attempt_id != active_attempt:
+            if attempt_id in closed_attempts:
+                structural_issues.append(
+                    f"{evidence_id} reopens a noncontiguous deployment attempt"
+                )
+            if active_attempt:
+                closed_attempts.add(active_attempt)
+            active_attempt = attempt_id
+            attempt_order.append(attempt_id)
+        groups.setdefault(attempt_id, []).append(row)
+    if len(timestamps) != len(set(timestamps)):
+        structural_issues.append("AWS deployment evidence timestamps must be unique")
+    if len(timestamps) == len(concrete) and timestamps != sorted(timestamps):
+        structural_issues.append(
+            "AWS deployment evidence must be appended in observed-time order"
+        )
+    replayed_authorization_ids: set[str] = set()
+    replayed_receipt_digests: set[str] = set()
+    for index, attempt_id in enumerate(attempt_order):
+        group = groups.get(attempt_id, [])
+        started = [
+            row
+            for row in group
+            if row.get("Phase") == "AWS-20" and row.get("Status") == "STARTED"
+        ]
+        terminal = [
+            row
+            for row in group
+            if row.get("Phase") == "AWS-20"
+            and row.get("Status") in AWS_DEPLOYMENT_TERMINAL_STATUSES
+        ]
+        reconciliations = [row for row in group if row.get("Phase") == "AWS-30"]
+        if len(started) != 1 or not group or group[0] not in started:
+            structural_issues.append(
+                f"{attempt_id or 'EMPTY'} requires exactly one first AWS-20 STARTED row"
+            )
+        if len(terminal) > 1:
+            structural_issues.append(
+                f"{attempt_id or 'EMPTY'} has more than one AWS-20 terminal row"
+            )
+        if reconciliations and len(terminal) != 1:
+            structural_issues.append(
+                f"{attempt_id or 'EMPTY'} AWS-30 requires one prior AWS-20 terminal row"
+            )
+        elif reconciliations:
+            terminal_index = group.index(terminal[0])
+            if any(group.index(row) < terminal_index for row in reconciliations):
+                structural_issues.append(
+                    f"{attempt_id or 'EMPTY'} AWS-30 must follow the AWS-20 terminal row"
+                )
+        stale_reconciliations = [
+            row for row in reconciliations if row.get("Status") == "STALE"
+        ]
+        terminal_reconciliations = [
+            row
+            for row in reconciliations
+            if row.get("Status") in {"COMPLETE", "BLOCKED"}
+        ]
+        if (
+            len(reconciliations) > 2
+            or len(stale_reconciliations) > 1
+            or len(terminal_reconciliations) > 1
+        ):
+            structural_issues.append(
+                f"{attempt_id or 'EMPTY'} exceeds the bounded AWS-30 retry sequence"
+            )
+        if len(reconciliations) == 2:
+            if reconciliations[0].get("Status") != "STALE" or reconciliations[1].get(
+                "Status"
+            ) not in {"COMPLETE", "BLOCKED"}:
+                structural_issues.append(
+                    f"{attempt_id or 'EMPTY'} AWS-30 recovery must be STALE then terminal"
+                )
+            if clean_cell(
+                reconciliations[0].get("Read authorization", "")
+            ) == clean_cell(reconciliations[1].get("Read authorization", "")):
+                structural_issues.append(
+                    f"{attempt_id or 'EMPTY'} AWS-30 recovery requires a fresh read authorization"
+                )
+        if reconciliations and group[-1] not in reconciliations:
+            structural_issues.append(
+                f"{attempt_id or 'EMPTY'} AWS-30 reconciliation must be last"
+            )
+        immutable_fields = (
+            "REQ / DES / AUTH",
+            "Deployment authorization",
+            "Deployment receipt digest",
+            "Deployment valid until",
+            "Deployment authority source",
+            "Deployment role or profile",
+            "Artifact digest",
+            "Plan/change-set binding",
+            "Resources",
+            "Mutation operations",
+            "Account / Region / environment",
+        )
+        if group:
+            first = group[0]
+            for row in group[1:]:
+                for field_name in immutable_fields:
+                    if clean_cell(row.get(field_name, "")) != clean_cell(
+                        first.get(field_name, "")
+                    ):
+                        structural_issues.append(
+                            f"{attempt_id or 'EMPTY'} changes immutable {field_name}"
+                        )
+        authority_row = started[0] if started else group[0]
+        authorization_id = clean_cell(authority_row.get("Deployment authorization", ""))
+        receipt_digest = clean_cell(authority_row.get("Deployment receipt digest", ""))
+        if authorization_id in replayed_authorization_ids:
+            structural_issues.append(
+                f"{attempt_id or 'EMPTY'} replays a deployment authorization ID"
+            )
+        replayed_authorization_ids.add(authorization_id)
+        if receipt_digest != "NONE":
+            if receipt_digest in replayed_receipt_digests:
+                structural_issues.append(
+                    f"{attempt_id or 'EMPTY'} replays a deployment receipt digest"
+                )
+            replayed_receipt_digests.add(receipt_digest)
+        if index < len(attempt_order) - 1:
+            if not terminal_reconciliations:
+                structural_issues.append(
+                    f"{attempt_id or 'EMPTY'} was not reconciled before the next attempt"
+                )
+    if structural_issues:
+        return {**base, "status": "BLOCKED", "issues": structural_issues}
+
+    deployment_rows_by_id = {clean_cell(row["Evidence ID"]): row for row in concrete}
+    if re.fullmatch(r"EV-\d{4,}", release_evidence_cutoff):
+        cutoff_row = deployment_rows_by_id.get(release_evidence_cutoff)
+        try:
+            verification_rows = parse_verification_matrix(verify_text)
+        except ValueError as exc:
+            return {**base, "status": "BLOCKED", "issues": [str(exc)]}
+        verification_matches = [
+            row
+            for row in verification_rows
+            if clean_cell(row.get("Evidence ID", "")) == release_evidence_cutoff
+        ]
+        if (1 if cutoff_row is not None else 0) + len(verification_matches) != 1:
+            return {
+                **base,
+                "status": "BLOCKED",
+                "issues": [
+                    "Active evidence cutoff must resolve exactly once across the "
+                    "deployment journal and Verification matrix"
+                ],
+            }
+        if cutoff_row is not None and not (
+            cutoff_row.get("Phase") == "AWS-30"
+            and cutoff_row.get("Status") in {"COMPLETE", "BLOCKED"}
+        ):
+            return {
+                **base,
+                "status": "BLOCKED",
+                "issues": ["Active evidence cutoff names a nonterminal deployment row"],
+            }
+
+    if len(attempt_order) > 1:
+        previous_group = groups[attempt_order[-2]]
+        previous_terminal = next(
+            (
+                row
+                for row in reversed(previous_group)
+                if row.get("Phase") == "AWS-30"
+                and row.get("Status") in {"COMPLETE", "BLOCKED"}
+            ),
+            None,
+        )
+        latest_group = groups[attempt_order[-1]]
+        latest_terminal = next(
+            (
+                row
+                for row in reversed(latest_group)
+                if row.get("Phase") == "AWS-30"
+                and row.get("Status") in {"COMPLETE", "BLOCKED"}
+            ),
+            None,
+        )
+        allowed_cutoffs = (
+            {clean_cell(previous_terminal.get("Evidence ID", ""))}
+            if previous_terminal is not None
+            else set()
+        )
+        if latest_terminal is not None:
+            allowed_cutoffs.add(clean_cell(latest_terminal.get("Evidence ID", "")))
+        if release_evidence_cutoff not in allowed_cutoffs:
+            return {
+                **base,
+                "status": "BLOCKED",
+                "attempt_id": attempt_order[-1],
+                "issues": [
+                    "A later deployment attempt requires the prior terminal "
+                    "AWS-30 evidence cutoff acknowledged by RELEASE-10"
+                ],
+            }
+
+    for historical_attempt_id in attempt_order[:-1]:
+        historical_issues = _deployment_historical_group_issues(
+            groups[historical_attempt_id], verify_text
+        )
+        if historical_issues:
+            return {
+                **base,
+                "status": "BLOCKED",
+                "attempt_id": historical_attempt_id,
+                "issues": historical_issues,
+            }
+
+    expected_basis = (
+        f"{requirements_revision} / {design_revision} / {construction_authorization}"
+    )
+    attempt_id = attempt_order[-1]
+    group = groups[attempt_id]
+    projection = _deployment_group_projection(base, attempt_id, group)
+    terminal_reconciliation = next(
+        (
+            row
+            for row in reversed(group)
+            if row.get("Phase") == "AWS-30"
+            and row.get("Status") in {"COMPLETE", "BLOCKED"}
+        ),
+        None,
+    )
+    if terminal_reconciliation is not None:
+        terminal_id = clean_cell(terminal_reconciliation["Evidence ID"])
+        if (
+            release_state != "READY_TO_DEPLOY"
+            and release_evidence_cutoff != terminal_id
+        ):
+            return {
+                **projection,
+                "status": "BLOCKED",
+                "issues": [
+                    "Post-reconciliation release state requires the exact terminal AWS-30 evidence cutoff"
+                ],
+            }
+        acknowledged = release_evidence_cutoff == terminal_id
+        terminal_basis_stale = False
+        if acknowledged:
+            allowed_release_states = (
+                {"NOT_READY"}
+                if clean_cell(terminal_reconciliation.get("Status", "")) == "BLOCKED"
+                or clean_cell(group[0].get("REQ / DES / AUTH", "")) != expected_basis
+                else {"NOT_READY", "RELEASE_VERIFIED"}
+            )
+            if release_state not in allowed_release_states:
+                return {
+                    **projection,
+                    "status": "BLOCKED",
+                    "basis_stale": (
+                        clean_cell(group[0].get("REQ / DES / AUTH", ""))
+                        != expected_basis
+                    ),
+                    "issues": [
+                        "Terminal AWS-30 acknowledgement must update release state "
+                        "and evidence cutoff together within the reconciliation result"
+                    ],
+                }
+            terminal_issues = _deployment_historical_group_issues(group, verify_text)
+        else:
+            terminal_basis_stale = (
+                clean_cell(group[0].get("REQ / DES / AUTH", "")) != expected_basis
+            )
+            restricted_read = restricted_closure or terminal_basis_stale
+            terminal_read_authority = None if restricted_read else read_authority
+            if terminal_read_authority is None:
+                terminal_read_authority = _deployment_reconciliation_read_authority(
+                    verify_text,
+                    cost_posture,
+                    group,
+                    allow_expired=restricted_read,
+                    require_post_action_freshness=restricted_read,
+                )
+            current_expected, current_binding_issues = _deployment_expected_binding(
+                verify_text,
+                construction_authorization=construction_authorization,
+                envelope=envelope,
+                lane=lane,
+                artifact_binding=artifact_binding,
+                gate_b_authority_source=gate_b_authority_source,
+                gate_b_authorized_at=gate_b_authorized_at,
+            )
+            group_key = (
+                clean_cell(group[0].get("Deployment authorization", "")),
+                clean_cell(group[0].get("Deployment receipt digest", "")),
+            )
+            current_key = (
+                clean_cell(current_expected.get("authorization_id", "")),
+                clean_cell(current_expected.get("receipt_digest", "")),
+            )
+            if terminal_basis_stale:
+                terminal_issues = _deployment_historical_group_issues(
+                    group,
+                    verify_text,
+                    current_read_authority=terminal_read_authority,
+                    require_authorization_proof=True,
+                    gate_b_authority_source=gate_b_authority_source,
+                    gate_b_authorized_at=gate_b_authorized_at,
+                )
+            else:
+                terminal_issues = list(current_binding_issues)
+                terminal_issues.extend(
+                    _deployment_authority_timing_issues(group, current_expected)
+                )
+                for row in group:
+                    terminal_issues.extend(
+                        _deployment_row_binding_issues(
+                            row,
+                            current_expected,
+                            terminal_read_authority,
+                        )
+                    )
+            if terminal_read_authority is None:
+                terminal_issues.append(
+                    "Unacknowledged terminal AWS-30 evidence requires its exact marked read receipt"
+                )
+        if terminal_issues:
+            return {
+                **projection,
+                "status": "BLOCKED",
+                "basis_stale": terminal_basis_stale,
+                "issues": terminal_issues,
+            }
+        current_expected, current_issues = _deployment_expected_binding(
+            verify_text,
+            construction_authorization=construction_authorization,
+            envelope=envelope,
+            lane=lane,
+            artifact_binding=artifact_binding,
+            gate_b_authority_source=gate_b_authority_source,
+            gate_b_authorized_at=gate_b_authorized_at,
+        )
+        consumed_key = (
+            clean_cell(group[0].get("Deployment authorization", "")),
+            clean_cell(group[0].get("Deployment receipt digest", "")),
+        )
+        current_key = (
+            clean_cell(current_expected.get("authorization_id", "")),
+            clean_cell(current_expected.get("receipt_digest", "")),
+        )
+        if current_issues or not all(current_key):
+            authority_status = "UNAVAILABLE"
+        elif current_key == consumed_key:
+            authority_status = "CONSUMED"
+        else:
+            authority_status = "FRESH"
+        return {
+            **projection,
+            "status": "CONSUMED" if acknowledged else projection["status"],
+            "acknowledged": acknowledged,
+            "acknowledged_evidence_id": terminal_id if acknowledged else "NONE",
+            "release_evidence_cutoff": release_evidence_cutoff,
+            "current_mutation_authority_status": authority_status,
+            "basis_stale": terminal_basis_stale,
+        }
+
+    group_basis = clean_cell(group[0].get("REQ / DES / AUTH", ""))
+    basis_stale = group_basis != expected_basis
+    reconciliation_read_authority = None
+    if projection.get("status") == "RECONCILIATION_REQUIRED":
+        restricted_read = restricted_closure or basis_stale
+        reconciliation_read_authority = None if restricted_read else read_authority
+        if reconciliation_read_authority is None:
+            reconciliation_read_authority = _deployment_reconciliation_read_authority(
+                verify_text,
+                cost_posture,
+                group,
+                allow_expired=restricted_read,
+                require_post_action_freshness=restricted_read,
+            )
+        elif not restricted_read:
+            reconciliation_read_authority = {
+                **dict(reconciliation_read_authority),
+                "reconciliation_only": False,
+                "attempt_id": attempt_id,
+            }
+    if basis_stale:
+        historical_issues = _deployment_historical_group_issues(
+            group,
+            verify_text,
+            current_read_authority=(
+                reconciliation_read_authority
+                if any(row.get("Phase") == "AWS-30" for row in group)
+                else None
+            ),
+            require_authorization_proof=True,
+            gate_b_authority_source=gate_b_authority_source,
+            gate_b_authorized_at=gate_b_authorized_at,
+        )
+        if historical_issues:
+            return {
+                **base,
+                "status": "BLOCKED",
+                "attempt_id": attempt_id,
+                "basis_stale": True,
+                "issues": historical_issues,
+            }
+        if projection.get("status") == "ACTION_TERMINAL_REQUIRED":
+            return {**projection, "basis_stale": True}
+        return {
+            **projection,
+            "status": "RECONCILIATION_REQUIRED",
+            "basis_stale": True,
+            "reconciliation_read_authority": (
+                dict(reconciliation_read_authority)
+                if reconciliation_read_authority is not None
+                else {}
+            ),
+            "blocker_or_stale_reason": (
+                projection.get("blocker_or_stale_reason")
+                if projection.get("reconciliation_status") == "STALE"
+                else "Current REQ / DES / AUTH differs from the attempted action"
+            ),
+        }
+
+    expected, binding_issues = _deployment_expected_binding(
+        verify_text,
+        construction_authorization=construction_authorization,
+        envelope=envelope,
+        lane=lane,
+        artifact_binding=artifact_binding,
+        gate_b_authority_source=gate_b_authority_source,
+        gate_b_authorized_at=gate_b_authorized_at,
+    )
+    group_key = (
+        clean_cell(group[0].get("Deployment authorization", "")),
+        clean_cell(group[0].get("Deployment receipt digest", "")),
+    )
+    expected_key = (
+        clean_cell(expected.get("authorization_id", "")),
+        clean_cell(expected.get("receipt_digest", "")),
+    )
+    if group_key != expected_key:
+        historical_issues = _deployment_historical_group_issues(
+            group,
+            verify_text,
+            require_authorization_proof=True,
+            gate_b_authority_source=gate_b_authority_source,
+            gate_b_authorized_at=gate_b_authorized_at,
+        )
+        if historical_issues:
+            return {
+                **base,
+                "status": "BLOCKED",
+                "attempt_id": attempt_id,
+                "issues": historical_issues,
+            }
+        return {
+            **projection,
+            "reconciliation_read_authority": (
+                dict(reconciliation_read_authority)
+                if reconciliation_read_authority is not None
+                else {}
+            ),
+        }
+    binding_issues.extend(_deployment_authority_timing_issues(group, expected))
+    for row in group:
+        if clean_cell(row.get("REQ / DES / AUTH", "")) != expected_basis:
+            binding_issues.append(
+                f"{row['Evidence ID']} does not match current REQ / DES / AUTH"
+            )
+        binding_issues.extend(
+            _deployment_row_binding_issues(row, expected, reconciliation_read_authority)
+        )
+    if binding_issues:
+        return {
+            **base,
+            "status": "BLOCKED",
+            "attempt_id": attempt_id,
+            "issues": binding_issues,
+        }
+    return {
+        **projection,
+        "reconciliation_read_authority": (
+            dict(reconciliation_read_authority)
+            if reconciliation_read_authority is not None
+            else {}
+        ),
+    }
 
 
 def _teardown_values(value: str, label: str, *, allow_none: bool) -> list[str]:
@@ -11569,6 +17099,7 @@ def _teardown_receipt_row_issues(
     construction_authorization: str,
     envelope: Mapping[str, str],
     require_row_role_match: bool = True,
+    historical: bool = False,
 ) -> tuple[dict[str, str] | None, str, list[str]]:
     """Validate one evidence row against the exact current teardown receipt."""
 
@@ -11587,11 +17118,16 @@ def _teardown_receipt_row_issues(
     provenance = _action_authorization_rows(verify_text).get("Teardown")
     digest = (
         "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
-        if receipt else "NONE"
+        if receipt
+        else "NONE"
     )
     issues: list[str] = []
     if fields is None or provenance is None or unresolved(receipt):
-        return None, digest, ["evidence requires one exact owner-authored teardown receipt"]
+        return (
+            None,
+            digest,
+            ["evidence requires one exact owner-authored teardown receipt"],
+        )
     action_authorization = clean_cell(row.get("Teardown authorization", ""))
     action_digest = clean_cell(row.get("Teardown receipt digest", ""))
     expected_scope = (
@@ -11617,9 +17153,8 @@ def _teardown_receipt_row_issues(
         or fields["Cost effect"] != clean_cell(row.get("Cost effect", ""))
         or fields["Post-teardown verification"]
         != clean_cell(row.get("Post-teardown verification", ""))
-        or clean_cell(row.get("Account / Region / environment", ""))
-        != expected_scope
-        or not _receipt_identity_matches_gate_b(fields, envelope)
+        or clean_cell(row.get("Account / Region / environment", "")) != expected_scope
+        or (not historical and not _receipt_identity_matches_gate_b(fields, envelope))
         or provenance.get("Authorization ID") != action_authorization
         or provenance.get("Construction AUTH") != construction_authorization
         or provenance.get("Role or profile") != fields["Profile or role"]
@@ -11639,9 +17174,12 @@ def _teardown_receipt_row_issues(
 
 
 def _teardown_action_attempt_row_issues(
-    row: Mapping[str, str], envelope: Mapping[str, str]
+    row: Mapping[str, str],
+    envelope: Mapping[str, str],
+    *,
+    historical: bool = False,
 ) -> list[str]:
-    """Validate the direct, mutation-only evidence preserved by AWS-50."""
+    """Validate one direct AWS-50 STARTED or terminal journal row."""
 
     issues: list[str] = []
     status = clean_cell(row.get("Status", ""))
@@ -11672,7 +17210,9 @@ def _teardown_action_attempt_row_issues(
         )
     except ValueError as exc:
         return [str(exc)]
-    if not _receipt_scope_within_gate_b(resources, operations, envelope):
+    if not historical and not _receipt_scope_within_gate_b(
+        resources, operations, envelope
+    ):
         issues.append("matching AWS-50 attempt exceeds Gate B")
     if (
         set(resources).intersection(retained)
@@ -11692,14 +17232,253 @@ def _teardown_action_attempt_row_issues(
     ):
         if not explicit_value(row.get(field_name, ""), allow_none=allow_none):
             issues.append(f"matching AWS-50 attempt requires {field_name}")
-    if clean_cell(row.get("Identity and boundary match", "")) not in {"PASS", "VERIFIED"}:
+    if clean_cell(row.get("Identity and boundary match", "")) not in {
+        "PASS",
+        "VERIFIED",
+    }:
         issues.append("matching AWS-50 attempt requires verified identity and boundary")
+    direct_fields = (
+        "Stack events and terminal status",
+        "Resources removed",
+        "Snapshots and backups",
+        "Residual resources",
+        "Inventory or discovery limits",
+    )
+    if status == "STARTED":
+        if (
+            clean_cell(row.get("Stack events and terminal status", ""))
+            != AWS_TEARDOWN_PRECALL_RESULT
+        ):
+            issues.append("AWS-50 STARTED must use the exact pre-call sentinel")
+        if (
+            clean_cell(row.get("Inventory or discovery limits", ""))
+            != AWS_TEARDOWN_PRECALL_RESULT
+        ):
+            issues.append(
+                "AWS-50 STARTED inventory must use the exact pre-call sentinel"
+            )
+        for field_name in (
+            "Resources removed",
+            "Snapshots and backups",
+            "Residual resources",
+        ):
+            if clean_cell(row.get(field_name, "")) != "NONE":
+                issues.append(f"AWS-50 STARTED must use {field_name} = NONE")
+        return issues
+    if any(
+        clean_cell(row.get(field_name, "")) == AWS_TEARDOWN_PRECALL_RESULT
+        for field_name in direct_fields
+    ):
+        issues.append("AWS-50 terminal evidence cannot reuse the pre-call sentinel")
     if status == "SUCCEEDED":
         if residuals:
             issues.append("matching SUCCEEDED AWS-50 attempt cannot retain residuals")
         if set(removed) != set(resources):
-            issues.append("matching SUCCEEDED AWS-50 attempt must reconcile every removal")
+            issues.append(
+                "matching SUCCEEDED AWS-50 attempt must reconcile every removal"
+            )
     return issues
+
+
+def _teardown_basis_authorization(row: Mapping[str, str]) -> str | None:
+    parts = [
+        clean_cell(item)
+        for item in clean_cell(row.get("REQ / DES / AUTH", "")).split(" / ")
+    ]
+    if (
+        len(parts) != 3
+        or re.fullmatch(r"REQ-\d{4,}", parts[0]) is None
+        or re.fullmatch(r"DES-\d{4,}", parts[1]) is None
+        or re.fullmatch(r"AUTH-\d{4,}", parts[2]) is None
+    ):
+        return None
+    return parts[2]
+
+
+def _teardown_attempt_timing_issues(
+    started: Mapping[str, str], fields: Mapping[str, str], provenance: Mapping[str, str]
+) -> list[str]:
+    """Prove the one-operation receipt was current when STARTED was appended."""
+
+    issues: list[str] = []
+    started_at = _iso_datetime(started.get("Observed at", ""))
+    authorized_at = _iso_datetime(provenance.get("Observed at", ""))
+    valid_until = clean_cell(fields.get("Valid until", ""))
+    expires_at = None if valid_until == "ONE_OPERATION" else _iso_datetime(valid_until)
+    if started_at is None:
+        issues.append("teardown STARTED timestamp is invalid")
+    if authorized_at is None:
+        issues.append("teardown authorization timestamp is invalid")
+    elif started_at is not None and started_at < authorized_at:
+        issues.append("teardown STARTED precedes its authorization provenance")
+    if valid_until != "ONE_OPERATION" and expires_at is None:
+        issues.append("teardown authority has a noncanonical validity boundary")
+    elif started_at is not None and expires_at is not None and started_at > expires_at:
+        issues.append("teardown STARTED occurred after authority expiry")
+    return issues
+
+
+def _teardown_read_row_issues(
+    row: Mapping[str, str],
+    authority: Mapping[str, Any] | None,
+    *,
+    require_authority: bool,
+    require_exact_scope: bool = False,
+) -> list[str]:
+    """Validate durable AWS-40 read provenance without reviving old authority."""
+
+    evidence_id = clean_cell(row.get("Evidence ID", "")) or "AWS-40 row"
+    read_id = clean_cell(row.get("Read authorization", ""))
+    read_role = clean_cell(row.get("Read role or profile", ""))
+    read_digest = clean_cell(row.get("Read receipt digest", ""))
+    read_valid_until = clean_cell(row.get("Read valid until", ""))
+    read_source_proof = clean_cell(row.get("Read authority source", ""))
+    source_match = AWS_TEARDOWN_READ_PROVENANCE.fullmatch(read_source_proof)
+    read_source = clean_cell(source_match.group("source")) if source_match else ""
+    read_authorized_at_value = (
+        clean_cell(source_match.group("authorized_at")) if source_match else ""
+    )
+    observed_at = _iso_datetime(row.get("Observed at", ""))
+    read_authorized_at = _iso_datetime(read_authorized_at_value)
+    expires_at = _iso_datetime(read_valid_until)
+    issues: list[str] = []
+    if AWS_READ_AUTHORIZATION_ID.fullmatch(read_id) is None:
+        issues.append(f"{evidence_id} AWS-40 requires a canonical read authorization")
+    if not explicit_value(read_role, allow_none=False) or "*" in read_role:
+        issues.append(f"{evidence_id} AWS-40 requires a concrete read role")
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", read_digest) is None:
+        issues.append(f"{evidence_id} AWS-40 requires an exact read receipt digest")
+    if read_valid_until == "ONE_OPERATION" or expires_at is None:
+        issues.append(f"{evidence_id} AWS-40 requires reusable ISO read validity")
+    elif observed_at is not None and observed_at > expires_at:
+        issues.append(f"{evidence_id} AWS-40 was observed after read authority expiry")
+    if (
+        source_match is None
+        or not explicit_value(read_source, allow_none=False)
+        or "*" in read_source
+        or read_authorized_at is None
+    ):
+        issues.append(
+            f"{evidence_id} AWS-40 requires a durable read authority source "
+            "and ISO authorization timestamp"
+        )
+    elif observed_at is not None and observed_at < read_authorized_at:
+        issues.append(f"{evidence_id} AWS-40 observation precedes read authorization")
+    if authority is None:
+        if require_authority:
+            issues.append(
+                f"{evidence_id} AWS-40 requires its exact current read receipt"
+            )
+        return issues
+
+    expected_scope = (
+        f"ACCOUNT: {authority.get('account')}; REGION: {authority.get('region')}; "
+        f"ENVIRONMENT: {authority.get('environment')}"
+    )
+    if read_id != clean_cell(authority.get("authorization_id", "")):
+        issues.append(
+            f"{evidence_id} read authorization does not match current authority"
+        )
+    if read_role != clean_cell(authority.get("role_or_profile", "")):
+        issues.append(f"{evidence_id} read role does not match its receipt")
+    if read_digest != clean_cell(authority.get("receipt_digest", "")):
+        issues.append(f"{evidence_id} read receipt digest is tampered")
+    if read_valid_until != clean_cell(authority.get("expiration", "")):
+        issues.append(f"{evidence_id} read validity is tampered")
+    if read_source != clean_cell(authority.get("authority_source", "")):
+        issues.append(f"{evidence_id} read authority source is tampered")
+    if read_authorized_at_value != clean_cell(authority.get("authorized_at", "")):
+        issues.append(f"{evidence_id} read authorization timestamp is tampered")
+    if clean_cell(row.get("Account / Region / environment", "")) != expected_scope:
+        issues.append(f"{evidence_id} read account boundary is stale")
+    authority_authorized_at = _iso_datetime(authority.get("authorized_at", ""))
+    if authority_authorized_at is None:
+        issues.append(f"{evidence_id} read authorization timestamp is invalid")
+    elif observed_at is not None and observed_at < authority_authorized_at:
+        issues.append(f"{evidence_id} AWS-40 observation precedes read authorization")
+    try:
+        observed_resources: set[str] = set()
+        for field_name in (
+            "Resources proposed to remove",
+            "Resources retained",
+            "Shared dependencies",
+            "Residual resources",
+        ):
+            observed_resources.update(
+                _teardown_values(row.get(field_name, ""), field_name, allow_none=True)
+            )
+        observed_operations = _teardown_values(
+            row.get("Post-teardown verification", ""),
+            "Post-teardown verification",
+            allow_none=clean_cell(row.get("Status", ""))
+            in {"RUNNING", "BLOCKED", "STALE"},
+        )
+    except ValueError as exc:
+        issues.append(str(exc))
+        observed_resources, observed_operations = set(), []
+    authorized_resources = set(authority.get("resources", []))
+    authorized_operations = set(authority.get("operations", []))
+    if require_exact_scope and observed_resources != authorized_resources:
+        issues.append(f"{evidence_id} recorded resources do not match exact read scope")
+    elif observed_resources and not observed_resources.issubset(authorized_resources):
+        issues.append(f"{evidence_id} observed resources exceed read scope")
+    if require_exact_scope and set(observed_operations) != authorized_operations:
+        issues.append(
+            f"{evidence_id} recorded operations do not match exact read scope"
+        )
+    elif observed_operations and not set(observed_operations).issubset(
+        authorized_operations
+    ):
+        issues.append(f"{evidence_id} observed operations exceed read scope")
+    return issues
+
+
+def _teardown_reconciliation_read_authority(
+    verify_text: str,
+    cost_posture: str,
+    group: list[dict[str, str]],
+    attempt_id: str,
+    *,
+    restricted_closure: bool,
+) -> dict[str, Any] | None:
+    """Project current read authority for one immutable teardown attempt."""
+
+    if not group:
+        return None
+    try:
+        receipt = marked_receipt(verify_text, "aws-read-preflight")
+    except ValueError:
+        return None
+    fields = _exact_receipt_fields(
+        receipt,
+        "AUTHORIZE AWS READ-ONLY PREFLIGHT",
+        AWS_READ_PREFLIGHT_RECEIPT_FIELDS,
+    )
+    if fields is None:
+        return None
+    synthetic_group = [
+        {
+            **row,
+            "Artifact digest": fields["Artifact digest"],
+            "Resources": row.get("Resources proposed to remove", ""),
+        }
+        for row in group
+    ]
+    authority = _deployment_reconciliation_read_authority(
+        verify_text,
+        cost_posture,
+        synthetic_group,
+        allow_expired=False,
+        require_post_action_freshness=restricted_closure,
+    )
+    if authority is None:
+        return None
+    return {
+        **authority,
+        "attempt_id": attempt_id,
+        "reconciliation_only": restricted_closure,
+    }
+
 
 def derive_teardown_sequence_state(
     verify_text: str,
@@ -11709,24 +17488,50 @@ def derive_teardown_sequence_state(
     design_revision: str,
     construction_authorization: str,
     envelope: Mapping[str, str],
+    restricted_closure: bool = False,
+    cost_posture: str = "",
+    active_artifact: str = "",
 ) -> dict[str, Any]:
-    """Derive teardown sequencing from current evidence without granting authority."""
+    """Derive append-only AWS-40/AWS-50 sequencing without replay authority."""
 
     base: dict[str, Any] = {
         "status": "NOT_ACTIVE",
+        "attempt_id": "NONE",
         "evidence_id": "NONE",
+        "observed_at": "NONE",
+        "ready_evidence_id": "NONE",
+        "read_authorization": "NONE",
+        "read_role_or_profile": "NONE",
+        "read_receipt_digest": "NONE",
+        "read_valid_until": "NONE",
+        "read_authority_source": "NONE",
+        "expected_manifest_or_stack": "NONE",
+        "account": "NONE",
+        "region": "NONE",
+        "environment": "NONE",
         "phase": "NONE",
+        "action_status": "NONE",
+        "review_status": "NONE",
         "issues": [],
         "resources_to_remove": [],
         "allowed_operations": [],
         "resources_to_retain": [],
         "shared_dependencies": [],
+        "resources_removed": [],
+        "residual_resources": [],
         "cost_effect": "NONE",
         "post_action_verification": "NONE",
+        "terminal_status": "NONE",
+        "snapshots_and_backups": "NONE",
+        "inventory_limits": "NONE",
         "identity_and_boundary_match": "NONE",
         "teardown_authorization": "NONE",
         "teardown_receipt_digest": "NONE",
         "blocker_or_stale_reason": "NONE",
+        "basis_stale": False,
+        "post_action_bound": False,
+        "current_mutation_authority_status": "UNAVAILABLE",
+        "reconciliation_read_authority": {},
     }
     try:
         rows = parse_teardown_reconciliation_evidence(verify_text)
@@ -11737,7 +17542,7 @@ def derive_teardown_sequence_state(
     for row in rows:
         evidence_id = clean_cell(row.get("Evidence ID", ""))
         if re.fullmatch(r"EV-\d{4,}", evidence_id):
-            concrete.append(row)
+            concrete.append({key: clean_cell(value) for key, value in row.items()})
             continue
         status = clean_cell(row.get("Status", ""))
         placeholder = (
@@ -11762,29 +17567,44 @@ def derive_teardown_sequence_state(
         }
     if not concrete:
         return base
-    identifiers = [clean_cell(row["Evidence ID"]) for row in concrete]
-    if len(identifiers) != len(set(identifiers)):
-        return {
-            **base,
-            "status": "BLOCKED",
-            "issues": ["Teardown reconciliation evidence contains duplicate IDs"],
-        }
-    timestamps: list[datetime] = []
+    identifiers = [row["Evidence ID"] for row in concrete]
     structural_issues: list[str] = []
+    if len(identifiers) != len(set(identifiers)):
+        structural_issues.append(
+            "Teardown reconciliation evidence contains duplicate IDs"
+        )
+    timestamps: list[datetime] = []
+    attempts: dict[str, list[dict[str, str]]] = {}
+    attempt_order: list[str] = []
+    closed_attempts: set[str] = set()
+    active_attempt = ""
     for row in concrete:
-        evidence_id = clean_cell(row["Evidence ID"])
-        phase = clean_cell(row.get("Phase", ""))
-        status = clean_cell(row.get("Status", ""))
+        evidence_id = row["Evidence ID"]
+        attempt_id = row.get("Attempt ID", "")
+        phase = row.get("Phase", "")
+        status = row.get("Status", "")
         observed_at = _iso_datetime(row.get("Observed at", ""))
-        if phase == "AWS-40" and status not in AWS_TEARDOWN_REVIEW_STATUSES:
-            structural_issues.append(
-                f"{evidence_id} has invalid AWS-40 status {status or 'EMPTY'}"
+        if phase == "AWS-40":
+            if status not in AWS_TEARDOWN_REVIEW_STATUSES:
+                structural_issues.append(
+                    f"{evidence_id} has invalid AWS-40 status {status or 'EMPTY'}"
+                )
+            if (
+                attempt_id != "NONE"
+                and AWS_TEARDOWN_ATTEMPT_ID.fullmatch(attempt_id) is None
+            ):
+                structural_issues.append(f"{evidence_id} has a noncanonical Attempt ID")
+            structural_issues.extend(
+                _teardown_read_row_issues(row, None, require_authority=False)
             )
-        elif phase == "AWS-50" and status not in AWS_TEARDOWN_ACTION_STATUSES:
-            structural_issues.append(
-                f"{evidence_id} has invalid AWS-50 status {status or 'EMPTY'}"
-            )
-        elif phase not in {"AWS-40", "AWS-50"}:
+        elif phase == "AWS-50":
+            if status not in AWS_TEARDOWN_ACTION_STATUSES:
+                structural_issues.append(
+                    f"{evidence_id} has invalid AWS-50 status {status or 'EMPTY'}"
+                )
+            if AWS_TEARDOWN_ATTEMPT_ID.fullmatch(attempt_id) is None:
+                structural_issues.append(f"{evidence_id} has a noncanonical Attempt ID")
+        else:
             structural_issues.append(
                 f"{evidence_id} phase must be exactly AWS-40 or AWS-50"
             )
@@ -11796,7 +17616,7 @@ def derive_teardown_sequence_state(
             timestamps.append(observed_at)
         if not explicit_value(row.get("Durable source", ""), allow_none=False):
             structural_issues.append(f"{evidence_id} requires a durable source")
-        blocker_reason = clean_cell(row.get("Blocker or stale reason", ""))
+        blocker_reason = row.get("Blocker or stale reason", "")
         if phase == "AWS-40" and status in {"BLOCKED", "STALE"}:
             if not explicit_value(blocker_reason, allow_none=False):
                 structural_issues.append(
@@ -11806,107 +17626,216 @@ def derive_teardown_sequence_state(
             structural_issues.append(
                 f"{evidence_id} must use Blocker or stale reason = NONE"
             )
+        if attempt_id != "NONE":
+            if attempt_id != active_attempt:
+                if attempt_id in closed_attempts:
+                    structural_issues.append(
+                        f"{evidence_id} reopens a noncontiguous teardown attempt"
+                    )
+                if active_attempt:
+                    closed_attempts.add(active_attempt)
+                active_attempt = attempt_id
+                attempt_order.append(attempt_id)
+            attempts.setdefault(attempt_id, []).append(row)
+        elif phase == "AWS-50":
+            structural_issues.append(
+                f"{evidence_id} AWS-50 requires a canonical Attempt ID"
+            )
+        elif active_attempt:
+            active_rows = attempts.get(active_attempt, [])
+            active_has_terminal_review = any(
+                item.get("Phase") == "AWS-40"
+                and item.get("Status")
+                in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN", "BLOCKED"}
+                for item in active_rows
+            )
+            if phase == "AWS-40" and not active_has_terminal_review:
+                structural_issues.append(
+                    f"{evidence_id} AWS-40 cannot erase active teardown attempt "
+                    f"binding {active_attempt}"
+                )
+            closed_attempts.add(active_attempt)
+            active_attempt = ""
     if len(timestamps) != len(set(timestamps)):
         structural_issues.append(
             "Teardown reconciliation evidence timestamps must be unique"
         )
+    if len(timestamps) == len(concrete) and timestamps != sorted(timestamps):
+        structural_issues.append(
+            "Teardown reconciliation evidence must be appended in observed-time order"
+        )
+    replayed_authorizations: set[str] = set()
+    replayed_digests: set[str] = set()
+    for index, attempt_id in enumerate(attempt_order):
+        group = attempts[attempt_id]
+        starts = [
+            row
+            for row in group
+            if row.get("Phase") == "AWS-50" and row.get("Status") == "STARTED"
+        ]
+        terminals = [
+            row
+            for row in group
+            if row.get("Phase") == "AWS-50"
+            and row.get("Status") in AWS_TEARDOWN_TERMINAL_STATUSES
+        ]
+        reviews = [row for row in group if row.get("Phase") == "AWS-40"]
+        if len(starts) != 1 or group[0] not in starts:
+            structural_issues.append(
+                f"{attempt_id} requires exactly one first AWS-50 STARTED row"
+            )
+        if len(terminals) > 1:
+            structural_issues.append(
+                f"{attempt_id} has more than one AWS-50 terminal row"
+            )
+        if terminals and group.index(terminals[0]) != 1:
+            structural_issues.append(
+                f"{attempt_id} AWS-50 terminal row must immediately follow STARTED"
+            )
+        if reviews and len(terminals) != 1:
+            structural_issues.append(
+                f"{attempt_id} AWS-40 requires one prior AWS-50 terminal row"
+            )
+        if (
+            reviews
+            and terminals
+            and any(group.index(row) < group.index(terminals[0]) for row in reviews)
+        ):
+            structural_issues.append(
+                f"{attempt_id} AWS-40 must follow the AWS-50 terminal row"
+            )
+        if len(reviews) > 2:
+            structural_issues.append(
+                f"{attempt_id} exceeds the bounded AWS-40 retry sequence"
+            )
+        if (
+            len(reviews) == 2
+            and reviews[0].get("Status") == "STALE"
+            and reviews[0].get("Read authorization")
+            == reviews[1].get("Read authorization")
+        ):
+            structural_issues.append(
+                f"{attempt_id} AWS-40 recovery requires fresh read authority"
+            )
+        if len(reviews) == 2 and (
+            reviews[0].get("Status") not in {"RUNNING", "STALE"}
+            or reviews[1].get("Status")
+            not in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN", "BLOCKED"}
+        ):
+            structural_issues.append(
+                f"{attempt_id} AWS-40 recovery must be RUNNING or STALE then terminal"
+            )
+        immutable_fields = (
+            "REQ / DES / AUTH",
+            "Read authorization",
+            "Read role or profile",
+            "Read receipt digest",
+            "Read valid until",
+            "Read authority source",
+            "Teardown authorization",
+            "Teardown receipt digest",
+            "Role or profile",
+            "Expected manifest or stack",
+            "Resources proposed to remove",
+            "Allowed deletion operations",
+            "Resources retained",
+            "Shared dependencies",
+            "Cost effect",
+            "Post-teardown verification",
+            "Account / Region / environment",
+        )
+        action_rows = [row for row in group if row.get("Phase") == "AWS-50"]
+        if action_rows:
+            first = action_rows[0]
+            for row in action_rows[1:]:
+                for field_name in immutable_fields:
+                    if row.get(field_name) != first.get(field_name):
+                        structural_issues.append(
+                            f"{attempt_id} changes immutable {field_name}"
+                        )
+        authority_row = starts[0] if starts else group[0]
+        authorization_id = authority_row.get("Teardown authorization", "")
+        receipt_digest = authority_row.get("Teardown receipt digest", "")
+        if authorization_id in replayed_authorizations:
+            structural_issues.append(
+                f"{attempt_id} replays a teardown authorization ID"
+            )
+        replayed_authorizations.add(authorization_id)
+        if receipt_digest in replayed_digests:
+            structural_issues.append(f"{attempt_id} replays a teardown receipt digest")
+        replayed_digests.add(receipt_digest)
+        if index < len(attempt_order) - 1:
+            terminal_reviews = [
+                row
+                for row in reviews
+                if row.get("Status")
+                in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN", "BLOCKED"}
+            ]
+            if len(terminals) != 1 or len(terminal_reviews) != 1:
+                structural_issues.append(
+                    f"{attempt_id} was not reconciled before the next teardown attempt"
+                )
     if structural_issues:
         return {**base, "status": "BLOCKED", "issues": structural_issues}
-    if (
-        read_authority is None
-        or read_authority.get("validity") != "CURRENT"
-        or construction_authorization == "NONE"
-    ):
-        return base
+
     expected_basis = (
         f"{requirements_revision} / {design_revision} / {construction_authorization}"
     )
-    expected_read = clean_cell(read_authority.get("authorization_id", ""))
-    current_rows = [
-        row
-        for row in concrete
-        if clean_cell(row.get("REQ / DES / AUTH", "")) == expected_basis
-    ]
-    if not current_rows:
-        return {**base, "status": "STALE"}
-    latest = max(
-        current_rows,
-        key=lambda row: _iso_datetime(row["Observed at"]) or datetime.min.replace(
-            tzinfo=timezone.utc
-        ),
+    current_read = bool(
+        read_authority is not None and read_authority.get("validity") == "CURRENT"
     )
-    evidence_id = clean_cell(latest["Evidence ID"])
-    phase = clean_cell(latest["Phase"])
-    status = clean_cell(latest["Status"])
-    expected_scope = (
-        f"ACCOUNT: {read_authority.get('account')}; "
-        f"REGION: {read_authority.get('region')}; "
-        f"ENVIRONMENT: {read_authority.get('environment')}"
-    )
-    common_issues: list[str] = []
-    latest_time = _iso_datetime(latest.get("Observed at", ""))
-    latest_read = clean_cell(latest.get("Read authorization", ""))
-    if phase == "AWS-40":
-        if latest_read != expected_read:
-            common_issues.append(f"{evidence_id} read authorization is stale")
-        if latest.get("Role or profile") != read_authority.get("role_or_profile"):
-            common_issues.append(f"{evidence_id} role or profile is stale")
-    elif AWS_READ_AUTHORIZATION_ID.fullmatch(latest_read) is None:
-        common_issues.append(f"{evidence_id} read authorization is not canonical")
-    else:
-        earlier_attempts = [
-            row
-            for row in current_rows
-            if clean_cell(row.get("Phase", "")) == "AWS-50"
-            and _iso_datetime(row.get("Observed at", "")) is not None
-            and latest_time is not None
-            and (_iso_datetime(row.get("Observed at", "")) or latest_time) < latest_time
-        ]
-        latest_prior_attempt_time = max(
-            (_iso_datetime(row.get("Observed at", "")) for row in earlier_attempts),
-            default=None,
+    selected_attempt_id = clean_cell(concrete[-1].get("Attempt ID", ""))
+    if selected_attempt_id != "NONE":
+        if selected_attempt_id not in attempts:
+            return {
+                **base,
+                "status": "BLOCKED",
+                "issues": ["Latest teardown epoch is malformed"],
+            }
+        attempt_id = selected_attempt_id
+        group = attempts[attempt_id]
+        started = group[0]
+        terminal = next(
+            (
+                row
+                for row in group
+                if row.get("Phase") == "AWS-50"
+                and row.get("Status") in AWS_TEARDOWN_TERMINAL_STATUSES
+            ),
+            None,
         )
-        earlier_matching_attempts = [
-            row
-            for row in current_rows
-            if clean_cell(row.get("Phase", "")) == "AWS-50"
-            and clean_cell(row.get("Teardown authorization", ""))
-            == clean_cell(latest.get("Teardown authorization", ""))
-            and clean_cell(row.get("Teardown receipt digest", ""))
-            == clean_cell(latest.get("Teardown receipt digest", ""))
-            and _iso_datetime(row.get("Observed at", "")) is not None
-            and latest_time is not None
-            and (_iso_datetime(row.get("Observed at", "")) or latest_time) < latest_time
-        ]
-        if earlier_matching_attempts:
-            common_issues.append(
-                f"{evidence_id} replays a teardown authorization already attempted"
+        reviews = [row for row in group if row.get("Phase") == "AWS-40"]
+        latest = reviews[-1] if reviews else terminal or started
+        group_basis = started.get("REQ / DES / AUTH", "")
+        basis_authorization = _teardown_basis_authorization(started)
+        basis_stale = group_basis != expected_basis
+        historical = (
+            restricted_closure or basis_stale or construction_authorization == "NONE"
+        )
+        issues: list[str] = []
+        if basis_authorization is None:
+            issues.append(f"{attempt_id} has a noncanonical REQ / DES / AUTH basis")
+        started_index = concrete.index(started)
+        ready = concrete[started_index - 1] if started_index > 0 else None
+        if not (
+            ready is not None
+            and ready.get("Phase") == "AWS-40"
+            and ready.get("Attempt ID") == "NONE"
+            and ready.get("Status") == "READY_FOR_TEARDOWN"
+        ):
+            issues.append(
+                f"{attempt_id} must immediately follow the latest READY_FOR_TEARDOWN evidence"
             )
-        earlier_ready = [
-            row
-            for row in current_rows
-            if clean_cell(row.get("Phase", "")) == "AWS-40"
-            and clean_cell(row.get("Status", "")) == "READY_FOR_TEARDOWN"
-            and clean_cell(row.get("Read authorization", "")) == latest_read
-            and _iso_datetime(row.get("Observed at", "")) is not None
-            and latest_time is not None
-            and (_iso_datetime(row.get("Observed at", "")) or latest_time) < latest_time
-            and (
-                latest_prior_attempt_time is None
-                or (_iso_datetime(row.get("Observed at", "")) or latest_time) > latest_prior_attempt_time
-            )
-        ]
-        if not earlier_ready:
-            common_issues.append(
-                f"{evidence_id} does not follow matching READY_FOR_TEARDOWN evidence"
-            )
+            ready = None
         else:
-            ready = max(
-                earlier_ready,
-                key=lambda row: _iso_datetime(row.get("Observed at", ""))
-                or datetime.min.replace(tzinfo=timezone.utc),
-            )
             for field_name in (
+                "REQ / DES / AUTH",
+                "Read authorization",
+                "Read role or profile",
+                "Read receipt digest",
+                "Read valid until",
+                "Read authority source",
+                "Role or profile",
                 "Expected manifest or stack",
                 "Resources proposed to remove",
                 "Allowed deletion operations",
@@ -11916,369 +17845,379 @@ def derive_teardown_sequence_state(
                 "Post-teardown verification",
                 "Account / Region / environment",
             ):
-                if clean_cell(ready.get(field_name, "")) != clean_cell(
-                    latest.get(field_name, "")
-                ):
-                    common_issues.append(
-                        f"{evidence_id} does not match its READY_FOR_TEARDOWN {field_name}"
+                if ready.get(field_name) != started.get(field_name):
+                    issues.append(
+                        f"{attempt_id} does not match READY_FOR_TEARDOWN {field_name}"
                     )
-    if latest.get("Account / Region / environment") != expected_scope:
-        common_issues.append(f"{evidence_id} account boundary is stale")
-    if status in {"READY_FOR_TEARDOWN", "VERIFIED_CLEAN", "RESIDUALS_REMAIN"}:
-        if clean_cell(latest.get("Identity and boundary match", "")) not in {
-            "PASS", "VERIFIED"
-        }:
-            common_issues.append(
-                f"{evidence_id} requires a verified identity and boundary match"
+            issues.extend(
+                _teardown_read_row_issues(ready, None, require_authority=False)
             )
-    if common_issues:
-        return {
-            **base,
-            "status": "BLOCKED",
-            "evidence_id": evidence_id,
-            "phase": phase,
-            "issues": common_issues,
-        }
-    projection = {
-        **base,
-        "status": status,
-        "evidence_id": evidence_id,
-        "phase": phase,
-        "role_or_profile": read_authority.get("role_or_profile"),
-        "account": read_authority.get("account"),
-        "region": read_authority.get("region"),
-        "environment": read_authority.get("environment"),
-        "identity_and_boundary_match": clean_cell(
-            latest.get("Identity and boundary match", "")
-        ),
-        "blocker_or_stale_reason": clean_cell(
-            latest.get("Blocker or stale reason", "")
-        ),
-    }
-    teardown_authorization = clean_cell(latest.get("Teardown authorization", ""))
-    teardown_receipt_digest = clean_cell(latest.get("Teardown receipt digest", ""))
-    if phase == "AWS-40":
-        if (teardown_authorization == "NONE") != (teardown_receipt_digest == "NONE"):
-            return {
-                **projection,
-                "status": "BLOCKED",
-                "issues": ["AWS-40 teardown authorization and digest must both be NONE or both be exact"],
-            }
-        if teardown_authorization != "NONE" and (
-            re.fullmatch(r"TEARDOWN-AUTH-\d{4,}", teardown_authorization) is None
-            or re.fullmatch(r"sha256:[0-9a-f]{64}", teardown_receipt_digest) is None
-        ):
-            return {
-                **projection,
-                "status": "BLOCKED",
-                "issues": [
-                    "AWS-40 teardown authorization and digest must use canonical exact values"
-                ],
-            }
-        if status not in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN"} and (
-            teardown_authorization != "NONE" or teardown_receipt_digest != "NONE"
-        ):
-            return {
-                **projection,
-                "status": "BLOCKED",
-                "issues": ["pre-action AWS-40 evidence cannot claim teardown authority"],
-            }
-    if phase == "AWS-40" and status in {"RUNNING", "STALE"}:
-        return projection
-    if phase == "AWS-40" and status == "BLOCKED":
-        blocker_reason = projection["blocker_or_stale_reason"]
-        return {
-            **projection,
-            "issues": [f"AWS-40 residual review blocked: {blocker_reason}"],
-        }
-
-    terminal = status in {
-        "VERIFIED_CLEAN", "RESIDUALS_REMAIN", "SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN"
-    }
-    allow_empty_scope = status in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN"}
-    try:
-        resources = _teardown_values(
-            latest.get("Resources proposed to remove", ""),
-            "Resources proposed to remove",
-            allow_none=allow_empty_scope,
-        )
-        operations = _teardown_values(
-            latest.get("Allowed deletion operations", ""),
-            "Allowed deletion operations",
-            allow_none=allow_empty_scope,
-        )
-        retained = _teardown_values(
-            latest.get("Resources retained", ""),
-            "Resources retained",
-            allow_none=True,
-        )
-        shared = _teardown_values(
-            latest.get("Shared dependencies", ""),
-            "Shared dependencies",
-            allow_none=True,
-        )
-        removed = (
-            _teardown_values(
-                latest.get("Resources removed", ""),
-                "Resources removed",
-                allow_none=True,
+        if basis_authorization is not None:
+            fields, digest, receipt_issues = _teardown_receipt_row_issues(
+                started,
+                verify_text,
+                construction_authorization=basis_authorization,
+                envelope=envelope,
+                historical=historical,
             )
-            if terminal else []
-        )
-        residuals = (
-            _teardown_values(
-                latest.get("Residual resources", ""),
-                "Residual resources",
-                allow_none=True,
+            issues.extend(receipt_issues)
+            provenance = _action_authorization_rows(verify_text).get("Teardown")
+            if fields is not None and provenance is not None:
+                issues.extend(
+                    _teardown_attempt_timing_issues(started, fields, provenance)
+                )
+            if digest != started.get("Teardown receipt digest"):
+                issues.append(f"{attempt_id} has a stale teardown receipt digest")
+        issues.extend(
+            _teardown_action_attempt_row_issues(
+                started, envelope, historical=historical
             )
-            if terminal else []
         )
-    except ValueError as exc:
-        return {**projection, "status": "BLOCKED", "issues": [str(exc)]}
-
-    overlap = (
-        set(resources).intersection(retained)
-        or set(resources).intersection(shared)
-        or set(retained).intersection(shared)
-    )
-    cost_effect = clean_cell(latest.get("Cost effect", ""))
-    post_check = clean_cell(latest.get("Post-teardown verification", ""))
-    manifest = clean_cell(latest.get("Expected manifest or stack", ""))
-    terminal_status = clean_cell(latest.get("Stack events and terminal status", ""))
-    snapshots = clean_cell(latest.get("Snapshots and backups", ""))
-    inventory_limits = clean_cell(latest.get("Inventory or discovery limits", ""))
-    issues: list[str] = []
-    if bool(resources) != bool(operations):
-        issues.append("Removal resources and deletion operations must both be present or NONE")
-    elif resources and not _receipt_scope_within_gate_b(resources, operations, envelope):
-        issues.append(f"{phase} removal scope exceeds Gate B")
-    if overlap:
-        issues.append(f"{phase} removal, retention, and shared sets overlap")
-    if not explicit_value(manifest, allow_none=False):
-        issues.append(f"{phase} requires an exact expected manifest or stack")
-    if not explicit_value(cost_effect, allow_none=False):
-        issues.append(f"{phase} requires an explicit cost effect")
-    if not explicit_value(post_check, allow_none=False):
-        issues.append(f"{phase} requires exact post-teardown verification")
-
-    if phase == "AWS-50":
-        try:
-            receipt = marked_receipt(verify_text, "aws-teardown")
-        except ValueError:
-            receipt = ""
-        fields = _exact_receipt_fields(
-            receipt,
-            "AUTHORIZE AWS TEARDOWN",
-            AWS_TEARDOWN_RECEIPT_FIELDS,
-            allow_none_fields=frozenset(
-                {"Resources and data to retain", "Shared dependencies"}
-            ),
-        )
-        provenance = _action_authorization_rows(verify_text).get("Teardown")
-        digest = (
-            "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
-            if receipt else "NONE"
-        )
-        action_authorization = clean_cell(
-            latest.get("Teardown authorization", "")
-        )
-        action_digest = clean_cell(latest.get("Teardown receipt digest", ""))
-        if fields is None or provenance is None or unresolved(receipt):
-            issues.append("AWS-50 requires one exact owner-authored teardown receipt")
-        else:
-            expected_scope = (
-                f"ACCOUNT: {fields['Account']}; REGION: {fields['Region']}; "
-                f"ENVIRONMENT: {fields['Environment']}"
+        if terminal is not None:
+            issues.extend(
+                _teardown_action_attempt_row_issues(
+                    terminal, envelope, historical=historical
+                )
             )
-            if (
-                action_authorization != fields["Teardown authorization"]
-                or action_digest != digest
-                or fields["Construction authorization"] != construction_authorization
-                or fields["Profile or role"] != latest.get("Role or profile")
-                or fields["Stack, application, and resources to remove"]
-                != latest.get("Resources proposed to remove")
-                or fields["Resources and data to retain"]
-                != latest.get("Resources retained")
-                or fields["Allowed deletion operations"]
-                != latest.get("Allowed deletion operations")
-                or fields["Shared dependencies"] != latest.get("Shared dependencies")
-                or fields["Cost effect"] != cost_effect
-                or fields["Post-teardown verification"] != post_check
-                or not _receipt_identity_matches_gate_b(fields, envelope)
-                or provenance.get("Authorization ID") != action_authorization
-                or provenance.get("Construction AUTH") != construction_authorization
-                or provenance.get("Role or profile") != fields["Profile or role"]
-                or provenance.get("Account / Region / environment") != expected_scope
-                or provenance.get("Approver") != fields["Approver"]
-                or not explicit_human_approver(fields["Approver"])
-                or clean_cell(provenance.get("Verbatim receipt SHA-256", "")) != digest
-                or not explicit_value(provenance.get("Stable owner-message source", ""))
-                or not explicit_timestamp(provenance.get("Observed at", ""))
-                or clean_cell(provenance.get("Identity and boundary match", ""))
-                not in {"PASS", "VERIFIED"}
-                or clean_cell(provenance.get("Result", ""))
-                not in {"AUTHORIZED", "RUNNING", "READY"}
-            ):
-                issues.append("AWS-50 evidence does not bind the exact teardown receipt")
-        for field_name, value, allow_none in (
-            ("Stack events and terminal status", terminal_status, False),
-            ("Resources removed", clean_cell(latest.get("Resources removed", "")), True),
-            ("Snapshots and backups", snapshots, True),
-            ("Residual resources", clean_cell(latest.get("Residual resources", "")), True),
-            ("Inventory or discovery limits", inventory_limits, False),
-        ):
-            if not explicit_value(value, allow_none=allow_none):
-                issues.append(f"AWS-50 requires {field_name}")
-        if status == "SUCCEEDED":
-            if residuals:
-                issues.append("SUCCEEDED teardown evidence cannot retain unexpected residuals")
-            if set(removed) != set(resources):
-                issues.append("SUCCEEDED teardown evidence must reconcile every removal")
         if issues:
             return {
-                **projection,
+                **base,
                 "status": "BLOCKED",
-                "action_status": status,
+                "attempt_id": attempt_id,
+                "evidence_id": latest.get("Evidence ID", "NONE"),
+                "phase": latest.get("Phase", "NONE"),
+                "action_status": terminal.get("Status", "STARTED")
+                if terminal
+                else "STARTED",
+                "basis_stale": basis_stale,
                 "issues": issues,
             }
-        return {
-            **projection,
-            "status": "POST_ACTION_REVIEW",
-            "action_status": status,
-            "teardown_authorization": action_authorization,
-            "teardown_receipt_digest": action_digest,
+        try:
+            resources = _teardown_values(
+                started["Resources proposed to remove"],
+                "Resources proposed to remove",
+                allow_none=False,
+            )
+            operations = _teardown_values(
+                started["Allowed deletion operations"],
+                "Allowed deletion operations",
+                allow_none=False,
+            )
+            retained = _teardown_values(
+                started["Resources retained"], "Resources retained", allow_none=True
+            )
+            shared = _teardown_values(
+                started["Shared dependencies"], "Shared dependencies", allow_none=True
+            )
+            removed = _teardown_values(
+                latest["Resources removed"], "Resources removed", allow_none=True
+            )
+            residuals = _teardown_values(
+                latest["Residual resources"], "Residual resources", allow_none=True
+            )
+        except ValueError as exc:
+            return {
+                **base,
+                "status": "BLOCKED",
+                "attempt_id": attempt_id,
+                "issues": [str(exc)],
+            }
+        reconciliation_read_authority: dict[str, Any] = {}
+        if terminal is not None:
+            restricted_read = (
+                restricted_closure
+                or basis_stale
+                or construction_authorization == "NONE"
+            )
+            candidate = None if restricted_read else read_authority
+            if candidate is not None and candidate.get("validity") == "CURRENT":
+                reconciliation_read_authority = {
+                    **dict(candidate),
+                    "attempt_id": attempt_id,
+                    "reconciliation_only": False,
+                }
+            else:
+                recovered = _teardown_reconciliation_read_authority(
+                    verify_text,
+                    cost_posture,
+                    group,
+                    attempt_id,
+                    restricted_closure=restricted_read,
+                )
+                if recovered is not None:
+                    reconciliation_read_authority = recovered
+        projection = {
+            **base,
+            "attempt_id": attempt_id,
+            "evidence_id": latest.get("Evidence ID", "NONE"),
+            "observed_at": latest.get("Observed at", "NONE"),
+            "ready_evidence_id": ready.get("Evidence ID", "NONE"),
+            "read_authorization": started["Read authorization"],
+            "read_role_or_profile": started["Read role or profile"],
+            "read_receipt_digest": started["Read receipt digest"],
+            "read_valid_until": started["Read valid until"],
+            "read_authority_source": started["Read authority source"],
+            "expected_manifest_or_stack": started["Expected manifest or stack"],
+            "account": fields["Account"],
+            "region": fields["Region"],
+            "environment": fields["Environment"],
+            "phase": latest.get("Phase", "NONE"),
+            "action_status": terminal.get("Status", "STARTED")
+            if terminal
+            else "STARTED",
+            "basis_stale": basis_stale,
+            "teardown_authorization": started["Teardown authorization"],
+            "teardown_receipt_digest": started["Teardown receipt digest"],
+            "role_or_profile": started["Role or profile"],
             "resources_to_remove": resources,
             "allowed_operations": operations,
             "resources_to_retain": retained,
             "shared_dependencies": shared,
             "resources_removed": removed,
             "residual_resources": residuals,
-            "cost_effect": cost_effect,
-            "post_action_verification": post_check,
-            "terminal_status": terminal_status,
-            "snapshots_and_backups": snapshots,
-            "inventory_limits": inventory_limits,
+            "cost_effect": started["Cost effect"],
+            "post_action_verification": started["Post-teardown verification"],
+            "terminal_status": latest["Stack events and terminal status"],
+            "snapshots_and_backups": latest["Snapshots and backups"],
+            "inventory_limits": latest["Inventory or discovery limits"],
+            "identity_and_boundary_match": latest["Identity and boundary match"],
+            "blocker_or_stale_reason": latest["Blocker or stale reason"],
+            "current_mutation_authority_status": "CONSUMED",
+            "reconciliation_read_authority": reconciliation_read_authority,
+        }
+        if terminal is None:
+            return {**projection, "status": "ACTION_TERMINAL_REQUIRED"}
+        if not reviews:
+            return {**projection, "status": "POST_ACTION_REVIEW"}
+        review = reviews[-1]
+        review_issues: list[str] = []
+        terminal_time = _iso_datetime(terminal.get("Observed at", ""))
+        review_time = _iso_datetime(review.get("Observed at", ""))
+        if terminal_time is None or review_time is None or review_time <= terminal_time:
+            review_issues.append(
+                "post-action AWS-40 evidence must follow the terminal AWS-50 row"
+            )
+        if review.get("Teardown authorization") != started.get(
+            "Teardown authorization"
+        ):
+            review_issues.append("post-action AWS-40 changes teardown authorization")
+        if review.get("Teardown receipt digest") != started.get(
+            "Teardown receipt digest"
+        ):
+            review_issues.append("post-action AWS-40 changes teardown receipt digest")
+        for field_name in (
+            "REQ / DES / AUTH",
+            "Role or profile",
+            "Expected manifest or stack",
+            "Resources proposed to remove",
+            "Allowed deletion operations",
+            "Resources retained",
+            "Shared dependencies",
+            "Cost effect",
+            "Post-teardown verification",
+            "Account / Region / environment",
+        ):
+            if review.get(field_name) != started.get(field_name):
+                review_issues.append(
+                    f"post-action AWS-40 changes immutable {field_name}"
+                )
+        review_status = review.get("Status", "")
+        review_authority = (
+            reconciliation_read_authority
+            if clean_cell(reconciliation_read_authority.get("authorization_id", ""))
+            == clean_cell(review.get("Read authorization", ""))
+            else None
+        )
+        review_issues.extend(
+            _teardown_read_row_issues(
+                review,
+                review_authority,
+                require_authority=review_status in {"RUNNING", "STALE"},
+                require_exact_scope=(
+                    review_status in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN", "BLOCKED"}
+                    and review_authority is not None
+                ),
+            )
+        )
+        if review_status in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN"} and review.get(
+            "Identity and boundary match"
+        ) not in {"PASS", "VERIFIED"}:
+            review_issues.append(
+                "post-action AWS-40 requires verified identity and boundary"
+            )
+        if review_status == "VERIFIED_CLEAN":
+            if residuals:
+                review_issues.append(
+                    "VERIFIED_CLEAN requires Residual resources = NONE"
+                )
+            if set(removed) != set(resources):
+                review_issues.append(
+                    "VERIFIED_CLEAN must reconcile every proposed removal"
+                )
+        if review_status == "RESIDUALS_REMAIN" and not residuals:
+            review_issues.append(
+                "RESIDUALS_REMAIN requires an exact residual-resource list"
+            )
+        if review_issues:
+            return {**projection, "status": "BLOCKED", "issues": review_issues}
+        common_review = {
+            **projection,
+            "review_status": review_status,
+            "evidence_id": review["Evidence ID"],
+            "observed_at": review["Observed at"],
+            "phase": "AWS-40",
+            "read_authorization": review["Read authorization"],
+            "read_role_or_profile": review["Read role or profile"],
+            "read_receipt_digest": review["Read receipt digest"],
+            "read_valid_until": review["Read valid until"],
+            "read_authority_source": review["Read authority source"],
+            "identity_and_boundary_match": review["Identity and boundary match"],
+            "blocker_or_stale_reason": review["Blocker or stale reason"],
+        }
+        if review_status in {"RUNNING", "STALE"}:
+            return {**common_review, "status": "POST_ACTION_REVIEW"}
+        return {
+            **common_review,
+            "status": review_status,
+            "post_action_bound": review_status
+            in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN", "BLOCKED"},
         }
 
-    if terminal:
-        for field_name, value, allow_none in (
-            ("Stack events and terminal status", terminal_status, False),
-            ("Resources removed", clean_cell(latest.get("Resources removed", "")), True),
-            ("Snapshots and backups", snapshots, True),
-            ("Residual resources", clean_cell(latest.get("Residual resources", "")), True),
-            ("Inventory or discovery limits", inventory_limits, False),
-        ):
-            if not explicit_value(value, allow_none=allow_none):
-                issues.append(f"AWS-40 requires {field_name}")
-        if status == "VERIFIED_CLEAN":
-            if residuals:
-                issues.append("VERIFIED_CLEAN requires Residual resources = NONE")
-            if set(removed) != set(resources):
-                issues.append("VERIFIED_CLEAN must reconcile every proposed removal")
-        elif status == "RESIDUALS_REMAIN" and not residuals:
-            issues.append("RESIDUALS_REMAIN requires an exact residual-resource list")
-    current_basis_attempts = [
-        row
-        for row in concrete
-        if clean_cell(row.get("Phase", "")) == "AWS-50"
-        and clean_cell(row.get("REQ / DES / AUTH", "")) == expected_basis
-    ]
+    standalone_rows = [row for row in concrete if row.get("Attempt ID") == "NONE"]
+    if not standalone_rows:
+        return base
+    latest = standalone_rows[-1]
+    evidence_id = latest["Evidence ID"]
+    status = latest["Status"]
+    basis_stale = latest.get("REQ / DES / AUTH") != expected_basis
+    authority_for_row = read_authority if current_read and not basis_stale else None
+    require_current_read = bool(not basis_stale and status not in {"BLOCKED", "STALE"})
+    issues = _teardown_read_row_issues(
+        latest,
+        authority_for_row,
+        require_authority=require_current_read,
+    )
     if (
-        phase == "AWS-40"
-        and terminal
-        and teardown_authorization == "NONE"
-        and current_basis_attempts
+        latest.get("Teardown authorization") != "NONE"
+        or latest.get("Teardown receipt digest") != "NONE"
     ):
-        return {**projection, "status": "BLOCKED", "issues": [
-            "terminal AWS-40 evidence cannot erase a current AWS-50 attempt binding"
-        ]}
-    post_action_bound = False
-    if phase == "AWS-40" and terminal and teardown_authorization != "NONE":
-        _fields, receipt_digest, binding_issues = _teardown_receipt_row_issues(
-            latest,
-            verify_text,
-            construction_authorization=construction_authorization,
-            envelope=envelope,
-            require_row_role_match=False,
+        issues.append("pre-action AWS-40 evidence cannot claim teardown authority")
+    if status in {
+        "READY_FOR_TEARDOWN",
+        "VERIFIED_CLEAN",
+        "RESIDUALS_REMAIN",
+    } and latest.get("Identity and boundary match") not in {"PASS", "VERIFIED"}:
+        issues.append(f"{evidence_id} requires a verified identity and boundary match")
+    if issues:
+        return {
+            **base,
+            "status": "BLOCKED",
+            "evidence_id": evidence_id,
+            "phase": "AWS-40",
+            "basis_stale": basis_stale,
+            "issues": issues,
+        }
+    projection = {
+        **base,
+        "status": status,
+        "evidence_id": evidence_id,
+        "observed_at": latest["Observed at"],
+        "phase": "AWS-40",
+        "read_authorization": latest["Read authorization"],
+        "read_role_or_profile": latest["Read role or profile"],
+        "read_receipt_digest": latest["Read receipt digest"],
+        "read_valid_until": latest["Read valid until"],
+        "read_authority_source": latest["Read authority source"],
+        "expected_manifest_or_stack": latest["Expected manifest or stack"],
+        "role_or_profile": latest["Role or profile"],
+        "account": authority_for_row.get("account", "NONE")
+        if authority_for_row
+        else "NONE",
+        "region": authority_for_row.get("region", "NONE")
+        if authority_for_row
+        else "NONE",
+        "environment": authority_for_row.get("environment", "NONE")
+        if authority_for_row
+        else "NONE",
+        "identity_and_boundary_match": latest["Identity and boundary match"],
+        "blocker_or_stale_reason": latest["Blocker or stale reason"],
+        "basis_stale": basis_stale,
+    }
+    if basis_stale or not current_read or construction_authorization == "NONE":
+        return {**projection, "status": "BLOCKED" if status == "BLOCKED" else "STALE"}
+    if status in {"RUNNING", "STALE"}:
+        return projection
+    if status == "BLOCKED":
+        return projection
+    allow_empty = status in {"VERIFIED_CLEAN", "RESIDUALS_REMAIN"}
+    try:
+        resources = _teardown_values(
+            latest["Resources proposed to remove"],
+            "Resources proposed to remove",
+            allow_none=allow_empty,
         )
-        latest_time = _iso_datetime(latest.get("Observed at", ""))
-        attempt_times = [
-            (_iso_datetime(row.get("Observed at", "")), row)
-            for row in current_basis_attempts
-        ]
-        if latest_time is not None and attempt_times:
-            latest_attempt_time, latest_attempt = max(
-                attempt_times,
-                key=lambda item: item[0]
-                or datetime.min.replace(tzinfo=timezone.utc),
-            )
-            if latest_attempt_time is None or latest_attempt_time >= latest_time:
-                binding_issues.append(
-                    "post-action AWS-40 evidence must be later than the latest AWS-50 attempt"
-                )
-            elif (
-                clean_cell(latest_attempt.get("Teardown authorization", ""))
-                != teardown_authorization
-                or clean_cell(latest_attempt.get("Teardown receipt digest", ""))
-                != teardown_receipt_digest
-            ):
-                binding_issues.append(
-                    "post-action AWS-40 evidence binds an older AWS-50 attempt"
-                )
-        prior_attempts = [
-            row
-            for row in concrete
-            if clean_cell(row.get("Phase", "")) == "AWS-50"
-            and clean_cell(row.get("REQ / DES / AUTH", "")) == expected_basis
-            and clean_cell(row.get("Teardown authorization", ""))
-            == teardown_authorization
-            and clean_cell(row.get("Teardown receipt digest", ""))
-            == teardown_receipt_digest
-            and _iso_datetime(row.get("Observed at", "")) is not None
-            and latest_time is not None
-            and (_iso_datetime(row.get("Observed at", "")) or latest_time) < latest_time
-        ]
-        if receipt_digest != teardown_receipt_digest:
-            binding_issues.append("AWS-40 teardown receipt digest is not current")
-        if len(prior_attempts) != 1:
-            binding_issues.append(
-                "post-action AWS-40 evidence requires exactly one earlier matching AWS-50 attempt"
-            )
-        else:
-            prior = prior_attempts[0]
-            _prior_fields, prior_digest, prior_binding_issues = (
-                _teardown_receipt_row_issues(
-                    prior,
-                    verify_text,
-                    construction_authorization=construction_authorization,
-                    envelope=envelope,
-                )
-            )
-            binding_issues.extend(prior_binding_issues)
-            if prior_digest != teardown_receipt_digest:
-                binding_issues.append("matching AWS-50 attempt has a stale receipt digest")
-            binding_issues.extend(_teardown_action_attempt_row_issues(prior, envelope))
-        if binding_issues:
-            return {**projection, "status": "BLOCKED", "issues": binding_issues}
-        post_action_bound = True
+        operations = _teardown_values(
+            latest["Allowed deletion operations"],
+            "Allowed deletion operations",
+            allow_none=allow_empty,
+        )
+        retained = _teardown_values(
+            latest["Resources retained"], "Resources retained", allow_none=True
+        )
+        shared = _teardown_values(
+            latest["Shared dependencies"], "Shared dependencies", allow_none=True
+        )
+        removed = _teardown_values(
+            latest["Resources removed"], "Resources removed", allow_none=True
+        )
+        residuals = _teardown_values(
+            latest["Residual resources"], "Residual resources", allow_none=True
+        )
+    except ValueError as exc:
+        return {**projection, "status": "BLOCKED", "issues": [str(exc)]}
+    if bool(resources) != bool(operations):
+        issues.append(
+            "Removal resources and deletion operations must both be present or NONE"
+        )
+    elif resources and not _receipt_scope_within_gate_b(
+        resources, operations, envelope
+    ):
+        issues.append("AWS-40 removal scope exceeds Gate B")
+    if (
+        set(resources).intersection(retained)
+        or set(resources).intersection(shared)
+        or set(retained).intersection(shared)
+    ):
+        issues.append("AWS-40 removal, retention, and shared sets overlap")
+    for field_name, allow_none in (
+        ("Expected manifest or stack", False),
+        ("Cost effect", False),
+        ("Post-teardown verification", False),
+    ):
+        if not explicit_value(latest.get(field_name, ""), allow_none=allow_none):
+            issues.append(f"AWS-40 requires {field_name}")
+    if status == "VERIFIED_CLEAN":
+        if residuals:
+            issues.append("VERIFIED_CLEAN requires Residual resources = NONE")
+        if set(removed) != set(resources):
+            issues.append("VERIFIED_CLEAN must reconcile every proposed removal")
+    if status == "RESIDUALS_REMAIN" and not residuals:
+        issues.append("RESIDUALS_REMAIN requires an exact residual-resource list")
     if issues:
         return {**projection, "status": "BLOCKED", "issues": issues}
     return {
         **projection,
-        "teardown_authorization": teardown_authorization,
-        "teardown_receipt_digest": teardown_receipt_digest,
-        "post_action_bound": post_action_bound,
         "resources_to_remove": resources,
         "allowed_operations": operations,
         "resources_to_retain": retained,
         "shared_dependencies": shared,
         "resources_removed": removed,
         "residual_resources": residuals,
-        "cost_effect": cost_effect,
-        "post_action_verification": post_check,
-        "terminal_status": terminal_status if terminal else "NONE",
-        "snapshots_and_backups": snapshots if terminal else "NONE",
-        "inventory_limits": inventory_limits if terminal else "NONE",
+        "cost_effect": latest["Cost effect"],
+        "post_action_verification": latest["Post-teardown verification"],
+        "terminal_status": latest["Stack events and terminal status"],
+        "snapshots_and_backups": latest["Snapshots and backups"],
+        "inventory_limits": latest["Inventory or discovery limits"],
     }
 
 
@@ -12301,9 +18240,7 @@ def derive_read_preflight_state(
         ),
         "account": authority.get("account", "NONE") if authority else "NONE",
         "region": authority.get("region", "NONE") if authority else "NONE",
-        "environment": (
-            authority.get("environment", "NONE") if authority else "NONE"
-        ),
+        "environment": (authority.get("environment", "NONE") if authority else "NONE"),
         "account_access": "NOT_OBSERVED",
         "evidence_ids": [],
         "issues": [],
@@ -12338,7 +18275,9 @@ def derive_read_preflight_state(
         return {
             **base,
             "status": "BLOCKED",
-            "issues": ["Expected exactly one preflight row for the current read authorization"],
+            "issues": [
+                "Expected exactly one preflight row for the current read authorization"
+            ],
         }
     row = candidates[0]
     preflight_id = clean_cell(row["Preflight ID"])
@@ -12366,14 +18305,18 @@ def derive_read_preflight_state(
         else None
     )
     if authorized_artifact != artifact_binding:
-        issues.append("Read receipt artifact binding does not match the current artifact")
+        issues.append(
+            "Read receipt artifact binding does not match the current artifact"
+        )
     resources = _split_authority_values(row.get("Resources", ""))
     operations = _split_authority_values(row.get("Operations observed", ""))
     if len(operations) != len(set(operations)):
         issues.append("Operations observed must not contain duplicates")
     if resources != list(authority.get("resources", [])):
         issues.append("Resources do not exactly match current read scope")
-    if not operations or not set(operations).issubset(set(authority.get("operations", []))):
+    if not operations or not set(operations).issubset(
+        set(authority.get("operations", []))
+    ):
         issues.append("Operations observed are empty or exceed current read scope")
     try:
         evidence_ids = _canonical_id_list(
@@ -12399,7 +18342,10 @@ def derive_read_preflight_state(
     if result == "READY":
         if completed is None or (started is not None and completed < started):
             issues.append("Completed at must be current and not precede Started at")
-        if clean_cell(row.get("Identity and boundary match", "")) not in {"PASS", "VERIFIED"}:
+        if clean_cell(row.get("Identity and boundary match", "")) not in {
+            "PASS",
+            "VERIFIED",
+        }:
             issues.append("Identity and boundary match must be PASS or VERIFIED")
     if issues:
         return {
@@ -12439,8 +18385,7 @@ def derive_aws_execution_projection(
     active = release_decision == "READY_TO_DEPLOY"
     preflight_projection = dict(preflight)
     read_scope_current = bool(
-        read_authority is not None
-        and read_authority.get("validity") == "CURRENT"
+        read_authority is not None and read_authority.get("validity") == "CURRENT"
     )
     if not active:
         progress = "NOT_ACTIVE"
@@ -12490,7 +18435,9 @@ def derive_aws_execution_projection(
             "status": (
                 "NOT_APPLICABLE"
                 if lane == "documentation-only"
-                else "CURRENT" if read_scope_current else "REQUIRED"
+                else "CURRENT"
+                if read_scope_current
+                else "REQUIRED"
             ),
             "authorization_id": (
                 read_authority.get("authorization_id", "NONE")
@@ -12521,9 +18468,7 @@ def _receipt_external_authority(
     gate = "aws-deployment" if deployment else "aws-teardown"
     title = "AUTHORIZE AWS DEPLOYMENT" if deployment else "AUTHORIZE AWS TEARDOWN"
     expected_fields = (
-        AWS_DEPLOYMENT_RECEIPT_FIELDS
-        if deployment
-        else AWS_TEARDOWN_RECEIPT_FIELDS
+        AWS_DEPLOYMENT_RECEIPT_FIELDS if deployment else AWS_TEARDOWN_RECEIPT_FIELDS
     )
     allow_none_fields = (
         frozenset({"Rollback boundary"})
@@ -12560,7 +18505,9 @@ def _receipt_external_authority(
         if deployment
         else "Stack, application, and resources to remove"
     )
-    operations_field = "Allowed operations" if deployment else "Allowed deletion operations"
+    operations_field = (
+        "Allowed operations" if deployment else "Allowed deletion operations"
+    )
     resources = _split_authority_values(fields[resources_field])
     operations = _split_authority_values(fields[operations_field])
     expected_resources = (
@@ -12576,10 +18523,13 @@ def _receipt_external_authority(
         or row.get("Approver") != fields.get("Approver")
         or not explicit_human_approver(fields.get("Approver", ""))
         or clean_cell(row.get("Verbatim receipt SHA-256", "")) != digest
-        or clean_cell(row.get("Identity and boundary match", "")) not in {"PASS", "VERIFIED"}
+        or clean_cell(row.get("Identity and boundary match", ""))
+        not in {"PASS", "VERIFIED"}
         or row.get("Account / Region / environment") != expected_scope
         or row.get("Resources and operations") != expected_resources
-        or not explicit_value(row.get("Stable owner-message source", ""), allow_none=False)
+        or not explicit_value(
+            row.get("Stable owner-message source", ""), allow_none=False
+        )
         or not explicit_timestamp(observed_at)
         or valid_until is None
         or result not in {"AUTHORIZED", "READY"}
@@ -12609,12 +18559,8 @@ def _receipt_external_authority(
             or row.get("Cost ceiling and validity") != expected_cost_validity
             or row.get("Rollback boundary") != rollback
             or AWS_PLAN_BINDING.fullmatch(plan) is None
-            or not _receipt_artifact_matches_gate_b(
-                artifact, envelope, active_artifact
-            )
-            or not _mutation_cost_within_gate_b(
-                cost_ceiling, envelope, cost_posture
-            )
+            or not _receipt_artifact_matches_gate_b(artifact, envelope, active_artifact)
+            or not _mutation_cost_within_gate_b(cost_ceiling, envelope, cost_posture)
             or rollback != _gate_b_rollback_value(envelope)
         ):
             return None
@@ -12623,26 +18569,21 @@ def _receipt_external_authority(
         shared_dependencies: list[str] = []
         cost_effect = "NONE"
         post_action_verification = "NONE"
+        teardown_ready_binding = None
     else:
         teardown_review = teardown_review or {}
         evidence_id = clean_cell(teardown_review.get("evidence_id", ""))
         retained_resources = _split_authority_values(
             fields["Resources and data to retain"]
         )
-        shared_dependencies = _split_authority_values(
-            fields["Shared dependencies"]
-        )
+        shared_dependencies = _split_authority_values(fields["Shared dependencies"])
         cost_effect = fields["Cost effect"]
         post_action_verification = fields["Post-teardown verification"]
         expected_cost_validity = (
             f"COST: {cost_effect}; VALID_UNTIL: {fields['Valid until']}"
         )
-        teardown_artifact = (
-            "NOT_APPLICABLE — teardown binds the observed inventory"
-        )
-        teardown_plan = (
-            "NOT_APPLICABLE — teardown uses its removal/retention manifest"
-        )
+        teardown_artifact = "NOT_APPLICABLE — teardown binds the observed inventory"
+        teardown_plan = "NOT_APPLICABLE — teardown uses its removal/retention manifest"
         overlap = (
             set(resources).intersection(retained_resources)
             or set(resources).intersection(shared_dependencies)
@@ -12650,7 +18591,10 @@ def _receipt_external_authority(
         )
         unsafe_lists = any(
             "*" in item
-            for item in resources + operations + retained_resources + shared_dependencies
+            for item in resources
+            + operations
+            + retained_resources
+            + shared_dependencies
         )
         if (
             teardown_review.get("status") != "READY_FOR_TEARDOWN"
@@ -12691,6 +18635,29 @@ def _receipt_external_authority(
         ):
             return None
         kind = "AWS_TEARDOWN"
+        teardown_ready_binding = {
+            "evidence_id": evidence_id,
+            "read_authorization": clean_cell(
+                teardown_review.get("read_authorization", "")
+            ),
+            "read_role_or_profile": clean_cell(
+                teardown_review.get("read_role_or_profile", "")
+            ),
+            "read_receipt_digest": clean_cell(
+                teardown_review.get("read_receipt_digest", "")
+            ),
+            "read_valid_until": clean_cell(teardown_review.get("read_valid_until", "")),
+            "read_authority_source": clean_cell(
+                teardown_review.get("read_authority_source", "")
+            ),
+            "expected_manifest_or_stack": clean_cell(
+                teardown_review.get("expected_manifest_or_stack", "")
+            ),
+            "resources_retained": retained_resources,
+            "shared_dependencies": shared_dependencies,
+            "cost_effect": cost_effect,
+            "post_teardown_verification": post_action_verification,
+        }
     return {
         "kind": kind,
         "validity": "CURRENT",
@@ -12710,6 +18677,7 @@ def _receipt_external_authority(
         "shared_dependencies": shared_dependencies,
         "cost_effect": cost_effect,
         "post_action_verification": post_action_verification,
+        "teardown_ready_binding": teardown_ready_binding,
     }
 
 
@@ -12725,6 +18693,7 @@ def derive_external_authority(
     preflight: Mapping[str, Any] | None = None,
     aws_action_phase: str | None = None,
     teardown_review: Mapping[str, Any] | None = None,
+    deployment_sequence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project exact current AWS authority without creating new authority."""
 
@@ -12744,15 +18713,57 @@ def derive_external_authority(
         "rollback_boundary": "NONE",
         "expiration": "NONE",
     }
-    if ctx.has_errors or construction_authorization == "NONE":
-        return empty
     verify_text = ctx.texts.get(VERIFY_FILE, "")
-    if aws_action_phase not in {"AWS-10", "AWS-20", "AWS-30", "AWS-40", "AWS-50"}:
+    if aws_action_phase == "AWS-30" and deployment_sequence is not None:
+        if ctx.has_errors or deployment_sequence.get("issues"):
+            return empty
+        reconciliation_authority = deployment_sequence.get(
+            "reconciliation_read_authority"
+        )
+        if (
+            isinstance(reconciliation_authority, Mapping)
+            and reconciliation_authority.get("kind") == "AWS_READ_ONLY"
+            and reconciliation_authority.get("validity") == "CURRENT"
+            and reconciliation_authority.get("reconciliation_only") in {True, False}
+            and reconciliation_authority.get("attempt_id")
+            == deployment_sequence.get("attempt_id")
+        ):
+            return dict(reconciliation_authority)
+        if (
+            clean_cell(deployment_sequence.get("status", ""))
+            == "RECONCILIATION_REQUIRED"
+        ):
+            required = dict(empty)
+            required["kind"] = "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
+            required["validity"] = "REQUIRED"
+            return required
         return empty
     if (
-        aws_action_phase == "AWS-10"
-        and aws_progress_state == "AWS_READ_SCOPE_REQUIRED"
+        aws_action_phase == "AWS-40"
+        and teardown_review is not None
+        and clean_cell(teardown_review.get("status", "")) == "POST_ACTION_REVIEW"
     ):
+        if ctx.has_errors or teardown_review.get("issues"):
+            return empty
+        reconciliation_authority = teardown_review.get("reconciliation_read_authority")
+        if (
+            isinstance(reconciliation_authority, Mapping)
+            and reconciliation_authority.get("kind") == "AWS_READ_ONLY"
+            and reconciliation_authority.get("validity") == "CURRENT"
+            and reconciliation_authority.get("reconciliation_only") in {True, False}
+            and reconciliation_authority.get("attempt_id")
+            == teardown_review.get("attempt_id")
+        ):
+            return dict(reconciliation_authority)
+        required = dict(empty)
+        required["kind"] = "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
+        required["validity"] = "REQUIRED"
+        return required
+    if ctx.has_errors or construction_authorization == "NONE":
+        return empty
+    if aws_action_phase not in {"AWS-10", "AWS-20", "AWS-30", "AWS-40", "AWS-50"}:
+        return empty
+    if aws_action_phase == "AWS-10" and aws_progress_state == "AWS_READ_SCOPE_REQUIRED":
         required = dict(empty)
         required["kind"] = "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
         required["validity"] = "REQUIRED"
@@ -12807,6 +18818,14 @@ def derive_external_authority(
         # owner-authored preflight receipt required for authenticated reads.
         return empty
     if aws_action_phase == "AWS-50":
+        if clean_cell((teardown_review or {}).get("status", "")) in {
+            "ACTION_TERMINAL_REQUIRED",
+            "POST_ACTION_REVIEW",
+            "VERIFIED_CLEAN",
+            "RESIDUALS_REMAIN",
+            "BLOCKED",
+        }:
+            return empty
         authority = _receipt_external_authority(
             verify_text,
             "Teardown",
@@ -12850,7 +18869,18 @@ def derive_external_authority(
             if item is not None
         ]
         if len(candidates) == 1:
-            return candidates[0]
+            candidate = candidates[0]
+            consumed = deployment_sequence or {}
+            same_consumed_authority = (
+                clean_cell(consumed.get("status", "")) == "CONSUMED"
+                and clean_cell(consumed.get("deployment_authorization", ""))
+                == clean_cell(candidate.get("authorization_id", ""))
+                and clean_cell(consumed.get("deployment_receipt_digest", ""))
+                == clean_cell(candidate.get("receipt_digest", ""))
+            )
+            if not same_consumed_authority:
+                return candidate
+            candidates = []
         required = dict(empty)
         required["kind"] = "AWS_ACTION_RECEIPT_REQUIRED"
         required["validity"] = "REQUIRED" if not candidates else "CONFLICTING"
@@ -12873,9 +18903,17 @@ def derive_external_authority(
     region = _envelope_scalar(envelope, "AWS Region", "REGION")
     role = _envelope_scalar(envelope, "AWS role or profile", "ROLE")
     resources = _envelope_values(envelope, "AWS resource allowlist", "RESOURCES")
-    operations = _envelope_values(envelope, "AWS allowed operations", "OPERATIONS")
+    allowed_operations = _envelope_values(
+        envelope, "AWS allowed operations", "OPERATIONS"
+    )
+    operations = [
+        operation
+        for operation in allowed_operations
+        if AWS_READ_ONLY_OPERATION.fullmatch(operation) is None
+    ]
     if (
         account is None
+        or not operations
         or region is None
         or role is None
         or clean_cell(preflight.get("account", "")) != account
@@ -12970,7 +19008,9 @@ def _machine_cost(value: Any) -> dict[str, str] | None:
     normalized = _machine_value(value)
     if normalized is None:
         return None
-    match = re.fullmatch(r"(?P<currency>[A-Z]{3}):\s*(?P<amount>\d+(?:\.\d{1,2})?)", normalized)
+    match = re.fullmatch(
+        r"(?P<currency>[A-Z]{3}):\s*(?P<amount>\d+(?:\.\d{1,2})?)", normalized
+    )
     if match is None:
         return None
     try:
@@ -13075,7 +19115,9 @@ def _reviewed_script_contract(
     valid_bindings = [item for item in bindings if digest_pattern.fullmatch(item[1])]
     other_values = [value for _kind, value in bindings if value != "NONE"]
     if len(valid_bindings) != 1 or len(other_values) != 1:
-        issues.append("exactly one reviewed script or immutable artifact digest is required")
+        issues.append(
+            "exactly one reviewed script or immutable artifact digest is required"
+        )
 
     valid_until = _iso_datetime(row["Valid until"])
     authority_expiry = _iso_datetime(request_match.get("expires_at") or "")
@@ -13112,9 +19154,14 @@ def _reviewed_script_contract(
 
 def derive_request_match(ctx: Context, authority: dict[str, Any]) -> dict[str, Any]:
     raw_validity = clean_cell(str(authority.get("validity", "NONE")))
-    validity = raw_validity if raw_validity in {"CURRENT", "NONE", "STALE", "BLOCKED"} else "BLOCKED"
+    validity = (
+        raw_validity
+        if raw_validity in {"CURRENT", "NONE", "STALE", "BLOCKED"}
+        else "BLOCKED"
+    )
     binding = authority.get("artifact_plan_binding")
     binding = binding if isinstance(binding, dict) else {}
+    raw_teardown_binding = authority.get("teardown_ready_binding")
     request_match: dict[str, Any] = {
         "schema_version": 1,
         "validity": validity,
@@ -13130,11 +19177,48 @@ def derive_request_match(ctx: Context, authority: dict[str, Any]) -> dict[str, A
         "artifact_digest": _machine_value(binding.get("artifact"), "EXACT_DIGEST"),
         "plan_binding": _machine_value(binding.get("plan"), "STACK"),
         "cost_ceiling": _machine_cost(authority.get("cost_ceiling")),
-        "rollback_boundary": _machine_value(authority.get("rollback_boundary"), "ROLLBACK"),
+        "rollback_boundary": _machine_value(
+            authority.get("rollback_boundary"), "ROLLBACK"
+        ),
         "expires_at": _machine_value(authority.get("expiration")),
         "allowed_execution_lanes": [],
         "reviewed_script": None,
+        "teardown_ready_binding": None,
     }
+    if request_match["authority_kind"] == "AWS_TEARDOWN" and isinstance(
+        raw_teardown_binding, Mapping
+    ):
+        request_match["teardown_ready_binding"] = {
+            "evidence_id": _machine_value(raw_teardown_binding.get("evidence_id")),
+            "read_authorization": _machine_value(
+                raw_teardown_binding.get("read_authorization")
+            ),
+            "read_role_or_profile": _machine_value(
+                raw_teardown_binding.get("read_role_or_profile"), "ROLE"
+            ),
+            "read_receipt_digest": _machine_value(
+                raw_teardown_binding.get("read_receipt_digest")
+            ),
+            "read_valid_until": _machine_value(
+                raw_teardown_binding.get("read_valid_until")
+            ),
+            "read_authority_source": _machine_value(
+                raw_teardown_binding.get("read_authority_source")
+            ),
+            "expected_manifest_or_stack": _machine_value(
+                raw_teardown_binding.get("expected_manifest_or_stack")
+            ),
+            "resources_retained": _machine_list(
+                raw_teardown_binding.get("resources_retained"), "RESOURCES"
+            ),
+            "shared_dependencies": _machine_list(
+                raw_teardown_binding.get("shared_dependencies"), "RESOURCES"
+            ),
+            "cost_effect": _machine_value(raw_teardown_binding.get("cost_effect")),
+            "post_teardown_verification": _machine_value(
+                raw_teardown_binding.get("post_teardown_verification")
+            ),
+        }
     if validity != "CURRENT":
         return request_match
     request_match["allowed_execution_lanes"] = ["STRUCTURED_API"]
@@ -13143,6 +19227,127 @@ def derive_request_match(ctx: Context, authority: dict[str, Any]) -> dict[str, A
         request_match["allowed_execution_lanes"].append("REVIEWED_SCRIPT")
         request_match["reviewed_script"] = reviewed_script
     return request_match
+
+
+def _aws_action_transition_projection(
+    request_match: Mapping[str, Any] | None,
+    sequence: Mapping[str, Any],
+    *,
+    authority_kind: str,
+    authorization_field: str,
+    receipt_digest_field: str,
+) -> dict[str, Any]:
+    """Bind one consumed journal attempt to its exact pre-call request ceiling.
+
+    This projection is not mutation authority. It exists only so the optional
+    hook can prove that the same-session call following STARTED is identical to
+    the request that was current immediately before the journal append.
+    """
+
+    empty: dict[str, Any] = {
+        "schema_version": 1,
+        "status": "NONE",
+        "attempt_id": "NONE",
+        "authority_kind": "NONE",
+        "request_match_sha256": "NONE",
+        "request_match": {},
+    }
+    if (
+        clean_cell(sequence.get("status", "")) != "ACTION_TERMINAL_REQUIRED"
+        or sequence.get("issues")
+        or not isinstance(request_match, Mapping)
+        or request_match.get("schema_version") != 1
+        or request_match.get("validity") != "CURRENT"
+        or request_match.get("authority_kind") != authority_kind
+        or clean_cell(request_match.get("authorization_id", ""))
+        != clean_cell(sequence.get(authorization_field, ""))
+        or clean_cell(request_match.get("receipt_digest", ""))
+        != clean_cell(sequence.get(receipt_digest_field, ""))
+    ):
+        return empty
+    attempt_id = clean_cell(sequence.get("attempt_id", ""))
+    pattern = (
+        AWS_TEARDOWN_ATTEMPT_ID
+        if authority_kind == "AWS_TEARDOWN"
+        else AWS_DEPLOYMENT_ATTEMPT_ID
+    )
+    if pattern.fullmatch(attempt_id) is None:
+        return empty
+    normalized = dict(request_match)
+    digest = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                normalized,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+    )
+    return {
+        **empty,
+        "status": "BOUND",
+        "attempt_id": attempt_id,
+        "authority_kind": authority_kind,
+        "request_match_sha256": digest,
+        "request_match": normalized,
+    }
+
+
+PROMPT_DOCS_ONLY_AWS_MODES = frozenset({"REQ-10", "DESIGN-10", "BUG-10"})
+PROMPT_READ_ONLY_AWS_MODES = frozenset({"AWS-10", "AWS-30", "AWS-40"})
+PROMPT_MUTATION_AWS_MODES = frozenset({"AWS-20", "AWS-50"})
+
+
+def derive_current_prompt_aws_mode(next_prompt: str) -> str:
+    """Return the maximum phase mode; authority is projected separately."""
+
+    if next_prompt in PROMPT_DOCS_ONLY_AWS_MODES:
+        return "DOCS_ONLY"
+    if next_prompt in PROMPT_READ_ONLY_AWS_MODES:
+        return "READ_ONLY"
+    if next_prompt in PROMPT_MUTATION_AWS_MODES:
+        return "MUTATION"
+    return "NONE"
+
+
+def derive_aws_mode_boundary(
+    lane: str | None,
+    envelope: Mapping[str, str],
+    next_prompt: str,
+    external_authority: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Separate planned ceilings, prompt capability, and current authority."""
+
+    project_lane = lane if lane in AWS_LANES else "NONE"
+    proposed_gate_b = clean_cell(envelope.get("AWS boundary", "NONE")).upper()
+    gate_b_maximum = proposed_gate_b if proposed_gate_b in AWS_BOUNDARIES else "NONE"
+    local_task_modes = ["NONE"] if gate_b_maximum == "NONE" else ["NONE", "DOCS_ONLY"]
+    current_prompt_mode = derive_current_prompt_aws_mode(next_prompt)
+    external_kind = clean_cell(external_authority.get("kind", "NONE")) or "NONE"
+    external_validity = clean_cell(external_authority.get("validity", "NONE")) or "NONE"
+    read_authorized = (
+        current_prompt_mode == "READ_ONLY"
+        and external_kind == "AWS_READ_ONLY"
+        and external_validity == "CURRENT"
+    )
+    mutation_authorized = (
+        current_prompt_mode == "MUTATION"
+        and external_kind in {"AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}
+        and external_validity == "CURRENT"
+    )
+    return {
+        "project_lane": project_lane,
+        "local_task_modes": local_task_modes,
+        "current_prompt_mode": current_prompt_mode,
+        "gate_b_maximum": gate_b_maximum,
+        "external_authority_kind": external_kind,
+        "external_authority_validity": external_validity,
+        "account_access_authorized": read_authorized or mutation_authorized,
+        "mutation_authorized": mutation_authorized,
+    }
+
 
 def build_report(
     ctx: Context,
@@ -13165,7 +19370,12 @@ def build_report(
     aws_execution: Mapping[str, Any] | None = None,
     owner_stage_hint: str | None = None,
     active_artifact: str = "",
+    deployment_sequence: Mapping[str, Any] | None = None,
     teardown_sequence: Mapping[str, Any] | None = None,
+    release_evidence_cutoff: str = "NONE",
+    req_aws_core_materiality: str = "OPTIONAL",
+    req_aws_core_ready: bool = True,
+    aws_lifecycle_intent_record: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = manifest or {}
     state = state or {}
@@ -13176,7 +19386,35 @@ def build_report(
     )
     envelope = envelope or {}
     aws_execution_projection = dict(aws_execution or {})
+    deployment_sequence_projection = dict(deployment_sequence or {})
     teardown_sequence_projection = dict(teardown_sequence or {})
+    aws_sequence_conflict = aws_deployment_teardown_sequence_conflict(
+        deployment_sequence_projection, teardown_sequence_projection
+    )
+    if aws_sequence_conflict:
+        if not any(
+            item.code == "AWS_DEPLOYMENT_TEARDOWN_CONFLICT" for item in ctx.diagnostics
+        ):
+            ctx.error(
+                "AWS_DEPLOYMENT_TEARDOWN_CONFLICT",
+                "Open deployment and teardown journal epochs cannot coexist; close one sequence before continuing",
+                VERIFY_FILE,
+            )
+        lifecycle_state, next_prompt = "BLOCKED", "STOP"
+    lifecycle_intent_projection = dict(
+        aws_lifecycle_intent_record
+        or {
+            "value": "NONE",
+            "source": "NONE",
+            "recorded_at": "NONE",
+            "provenance_status": "CURRENT",
+            "authorizes_aws_access": False,
+            "authorizes_mutation": False,
+        }
+    )
+    residual_disposition_projection = derive_aws_residual_disposition(
+        lifecycle_intent_projection, teardown_sequence_projection
+    )
     aws_progress_state = (
         str(aws_execution_projection.get("progress_state"))
         if aws_execution_projection.get("active") is True
@@ -13185,8 +19423,7 @@ def build_report(
     if design_contract is None:
         design_contract = DesignContract(
             design_revision=(
-                prd_fields.get("design_revision")
-                or lifecycle.get("design_revision")
+                prd_fields.get("design_revision") or lifecycle.get("design_revision")
             )
         )
     if coverage_contract is None:
@@ -13227,52 +19464,182 @@ def build_report(
         if owner_stage_hint in {"DEFINE", "DESIGN", "DELIVER"}
         else _owner_stage_from_gates(gate_a, gate_b)
     )
-    authorization_id = (
-        prd_fields.get("construction_authorization")
-        or lifecycle.get("construction_authorization")
+    authorization_id = prd_fields.get("construction_authorization") or lifecycle.get(
+        "construction_authorization"
     )
-    construction_authorization = (
+    gate_b_authorization = (
         authorization_id
         if not ctx.has_errors and gate_b == "APPROVED_FOR_CONSTRUCTION"
         else "NONE"
     )
+    deployment_status = clean_cell(deployment_sequence_projection.get("status", ""))
+    auditable_status = (
+        deployment_status
+        in {
+            "ACTION_TERMINAL_REQUIRED",
+            "RECONCILIATION_REQUIRED",
+            "RECONCILED",
+            "BLOCKED",
+        }
+        or (deployment_status == "CONSUMED" and release_decision != "READY_TO_DEPLOY")
+        or (
+            deployment_status == "NOT_ACTIVE" and release_decision == "RELEASE_VERIFIED"
+        )
+    )
+    deployment_authority_restricted = bool(
+        not ctx.has_errors
+        and not deployment_sequence_projection.get("issues")
+        and auditable_status
+    )
+    teardown_status = clean_cell(teardown_sequence_projection.get("status", ""))
+    teardown_attempt_id = clean_cell(teardown_sequence_projection.get("attempt_id", ""))
+    teardown_action_status = clean_cell(
+        teardown_sequence_projection.get("action_status", "")
+    )
+    teardown_attempt_unreconciled = bool(
+        AWS_TEARDOWN_ATTEMPT_ID.fullmatch(teardown_attempt_id)
+        and teardown_action_status in {"STARTED", *AWS_TEARDOWN_TERMINAL_STATUSES}
+        and teardown_status
+        in {"ACTION_TERMINAL_REQUIRED", "POST_ACTION_REVIEW", "BLOCKED"}
+    )
+    teardown_authority_restricted = bool(teardown_attempt_unreconciled)
+    restricted_construction_authorization = (
+        "NONE"
+        if deployment_authority_restricted or teardown_authority_restricted
+        else gate_b_authorization
+    )
     aws_authorization = "NONE"
-    write_authority = derive_write_authority(
-        ctx, envelope, tasks, construction_authorization
+    deployment_journal_closure_authority = derive_deployment_journal_closure_authority(
+        deployment_sequence_projection,
+        next_prompt,
+        restricted_closure=deployment_authority_restricted,
+    )
+    teardown_journal_closure_authority = derive_teardown_journal_closure_authority(
+        teardown_sequence_projection,
+        next_prompt,
+        restricted_closure=teardown_authority_restricted,
     )
     external_authority = derive_external_authority(
         ctx,
         envelope,
         lane,
-        construction_authorization,
+        restricted_construction_authorization,
         cost_posture=str(project.get("cost_posture", "")),
         aws_progress_state=aws_progress_state,
         active_artifact=active_artifact,
         aws_action_phase=next_prompt,
         teardown_review=teardown_sequence_projection,
+        deployment_sequence=deployment_sequence_projection,
         preflight=(
             aws_execution_projection.get("preflight")
             if isinstance(aws_execution_projection.get("preflight"), Mapping)
             else None
         ),
     )
-    if (
-        external_authority.get("validity") == "CURRENT"
-        and external_authority.get("kind")
-        in {"AWS_READ_ONLY", "AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}
-    ):
+    aws_lifecycle_intent_write_authority = derive_aws_lifecycle_intent_write_authority(
+        ctx,
+        tasks,
+        release_decision,
+        deployment_sequence_projection,
+        teardown_sequence_projection,
+        external_authority,
+        lifecycle_intent=lifecycle_intent_projection,
+    )
+    construction_authorization = (
+        "NONE"
+        if aws_lifecycle_intent_write_authority.get("valid") is True
+        else restricted_construction_authorization
+    )
+    write_authority = derive_write_authority(
+        ctx, envelope, tasks, construction_authorization
+    )
+    if external_authority.get("validity") == "CURRENT" and external_authority.get(
+        "kind"
+    ) in {"AWS_READ_ONLY", "AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}:
         projected_authorization = external_authority.get("authorization_id")
         if isinstance(projected_authorization, str):
             aws_authorization = projected_authorization
-    external_authority["request_match"] = derive_request_match(
-        ctx, external_authority
+    external_authority["request_match"] = derive_request_match(ctx, external_authority)
+    transition_authority: dict[str, Any] = {
+        "kind": "NONE",
+        "validity": "NONE",
+        "request_match": {},
+    }
+    transition_sequence: Mapping[str, Any] = {}
+    transition_kind = "NONE"
+    transition_authorization_field = ""
+    transition_receipt_field = ""
+    if not aws_sequence_conflict and deployment_status == "ACTION_TERMINAL_REQUIRED":
+        transition_authority = derive_external_authority(
+            ctx,
+            envelope,
+            lane,
+            gate_b_authorization,
+            cost_posture=str(project.get("cost_posture", "")),
+            aws_progress_state=aws_progress_state,
+            active_artifact=active_artifact,
+            aws_action_phase="AWS-20",
+            teardown_review=teardown_sequence_projection,
+            deployment_sequence={},
+            preflight=(
+                aws_execution_projection.get("preflight")
+                if isinstance(aws_execution_projection.get("preflight"), Mapping)
+                else None
+            ),
+        )
+        transition_sequence = deployment_sequence_projection
+        transition_kind = clean_cell(transition_authority.get("kind", ""))
+        transition_authorization_field = "deployment_authorization"
+        transition_receipt_field = "deployment_receipt_digest"
+    elif not aws_sequence_conflict and teardown_status == "ACTION_TERMINAL_REQUIRED":
+        transition_review = {
+            **teardown_sequence_projection,
+            "status": "READY_FOR_TEARDOWN",
+            "evidence_id": teardown_sequence_projection.get(
+                "ready_evidence_id", "NONE"
+            ),
+        }
+        transition_authority = derive_external_authority(
+            ctx,
+            envelope,
+            lane,
+            gate_b_authorization,
+            cost_posture=str(project.get("cost_posture", "")),
+            aws_progress_state=aws_progress_state,
+            active_artifact=active_artifact,
+            aws_action_phase="AWS-50",
+            teardown_review=transition_review,
+            deployment_sequence=deployment_sequence_projection,
+            preflight=(
+                aws_execution_projection.get("preflight")
+                if isinstance(aws_execution_projection.get("preflight"), Mapping)
+                else None
+            ),
+        )
+        transition_sequence = teardown_sequence_projection
+        transition_kind = "AWS_TEARDOWN"
+        transition_authorization_field = "teardown_authorization"
+        transition_receipt_field = "teardown_receipt_digest"
+    transition_request_match = (
+        derive_request_match(ctx, transition_authority)
+        if transition_kind != "NONE"
+        else None
+    )
+    aws_action_transition = _aws_action_transition_projection(
+        transition_request_match,
+        transition_sequence,
+        authority_kind=transition_kind,
+        authorization_field=transition_authorization_field,
+        receipt_digest_field=transition_receipt_field,
     )
     diagnostic_codes = [item.code for item in ctx.diagnostics]
-    aws_mutation_authority_ready = (
-        external_authority.get("validity") == "CURRENT"
-        and external_authority.get("kind")
-        in {"AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}
-    )
+    aws_mutation_authority_ready = external_authority.get(
+        "validity"
+    ) == "CURRENT" and external_authority.get("kind") in {
+        "AWS_DEPLOYMENT",
+        "AWS_TEARDOWN",
+        "FAST_DEV_GATE_B",
+    }
     remediation = derive_remediation(
         ctx,
         classification=classification,
@@ -13299,6 +19666,8 @@ def build_report(
         aws_read_authority_required=(
             external_authority.get("kind") == "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
         ),
+        req_aws_core_materiality=req_aws_core_materiality,
+        req_aws_core_ready=req_aws_core_ready,
     )
     if (
         classification == "UNCONFIGURED_TEMPLATE"
@@ -13311,6 +19680,8 @@ def build_report(
         tasks,
         coverage_contract,
         next_prompt=next_prompt,
+        restricted_deployment_closure=deployment_authority_restricted,
+        restricted_teardown_closure=teardown_authority_restricted,
         source_texts=ctx.texts,
     )
     context_issues = context_plan.pop("_resolution_issues", [])
@@ -13327,6 +19698,18 @@ def build_report(
         construction_authorization = "NONE"
         aws_authorization = "NONE"
         write_authority = derive_write_authority(ctx, envelope, tasks, "NONE")
+        deployment_journal_closure_authority = (
+            derive_deployment_journal_closure_authority(
+                deployment_sequence_projection,
+                next_prompt,
+                restricted_closure=False,
+            )
+        )
+        teardown_journal_closure_authority = derive_teardown_journal_closure_authority(
+            teardown_sequence_projection,
+            next_prompt,
+            restricted_closure=False,
+        )
         external_authority = derive_external_authority(
             ctx,
             envelope,
@@ -13337,6 +19720,7 @@ def build_report(
             active_artifact=active_artifact,
             aws_action_phase=next_prompt,
             teardown_review=teardown_sequence_projection,
+            deployment_sequence=deployment_sequence_projection,
             preflight=(
                 aws_execution_projection.get("preflight")
                 if isinstance(aws_execution_projection.get("preflight"), Mapping)
@@ -13345,6 +19729,17 @@ def build_report(
         )
         external_authority["request_match"] = derive_request_match(
             ctx, external_authority
+        )
+        aws_lifecycle_intent_write_authority = (
+            derive_aws_lifecycle_intent_write_authority(
+                ctx,
+                tasks,
+                release_decision,
+                deployment_sequence_projection,
+                teardown_sequence_projection,
+                external_authority,
+                lifecycle_intent=lifecycle_intent_projection,
+            )
         )
         diagnostic_codes = [item.code for item in ctx.diagnostics]
         remediation = derive_remediation(
@@ -13371,6 +19766,8 @@ def build_report(
             aws_mutation_authority_ready=False,
             aws_lane=lane,
             aws_read_authority_required=False,
+            req_aws_core_materiality=req_aws_core_materiality,
+            req_aws_core_ready=req_aws_core_ready,
         )
         if (
             classification == "UNCONFIGURED_TEMPLATE"
@@ -13383,9 +19780,17 @@ def build_report(
             tasks,
             coverage_contract,
             next_prompt=next_prompt,
+            restricted_deployment_closure=False,
+            restricted_teardown_closure=False,
             source_texts=ctx.texts,
         )
         context_plan.pop("_resolution_issues", None)
+    aws_mode_boundary = derive_aws_mode_boundary(
+        lane,
+        envelope,
+        next_prompt,
+        external_authority,
+    )
     return {
         "schema_version": 2,
         "bootstrap_version": manifest.get(
@@ -13409,11 +19814,13 @@ def build_report(
         },
         "git_baseline": inspect_git_baseline(ctx.root),
         "aws_access": aws_access,
+        "aws_mode_boundary": aws_mode_boundary,
         "gates": {
             "gate_a": gate_a,
             "gate_b": gate_b,
         },
         "evidence_state": release_decision,
+        "release_evidence_cutoff": release_evidence_cutoff,
         "aws_core_evidence": {
             "aws_execution_planning": (
                 "READY" if aws_execution_planning_ready else "BLOCKED"
@@ -13425,13 +19832,32 @@ def build_report(
             "aws": aws_authorization,
         },
         "write_authority": write_authority,
+        "deployment_journal_closure_authority": (deployment_journal_closure_authority),
+        "teardown_journal_closure_authority": (teardown_journal_closure_authority),
+        "aws_lifecycle_intent": lifecycle_intent_projection,
+        "aws_residual_disposition": residual_disposition_projection,
+        "aws_lifecycle_intent_write_authority": aws_lifecycle_intent_write_authority,
         "external_authority": external_authority,
+        "hook_constraints": {
+            "GitHub boundary": envelope.get("GitHub boundary", "NONE"),
+            "GitHub repository, branch, and merge constraints": envelope.get(
+                "GitHub repository, branch, and merge constraints", "NONE"
+            ),
+        },
+        "aws_action_transition": aws_action_transition,
         "aws_execution": aws_execution_projection,
+        "aws_deployment": deployment_sequence_projection,
         "aws_teardown": teardown_sequence_projection,
         "basis": {
             "requirements_revision": prd_fields.get("requirements_revision"),
             "design_revision": prd_fields.get("design_revision"),
             "construction_authorization": prd_fields.get("construction_authorization"),
+            "prd_snapshot_sha256": (
+                "sha256:"
+                + hashlib.sha256(ctx.texts[PRD_FILE].encode("utf-8")).hexdigest()
+                if PRD_FILE in ctx.texts
+                else "NONE"
+            ),
         },
         "intake_foundation": intake_contract.to_dict(),
         "requirements_contract": requirements_contract.to_dict(),
@@ -13447,6 +19873,12 @@ def build_report(
             "ready_ids": tasks.ready,
             "active_ids": tasks.active,
             "blocked_ids": tasks.blocked,
+            "requirement_coverage_complete": tasks.requirement_coverage_complete,
+            "requirement_coverage": [
+                tasks.requirement_coverage[requirement_id]
+                for requirement_id in sorted(tasks.requirement_coverage)
+            ],
+            "missing_requirement_ids": tasks.missing_requirement_ids,
         },
         "diagnostics": [
             item.to_dict(f"DGN-{index:04d}")
@@ -13484,23 +19916,40 @@ def print_human(report: dict[str, Any]) -> None:
         print(f"{item['severity']} {item['code']}{location}: {item['message']}")
 
 
-def _parse_current_intake_response(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+def _parse_current_intake_response(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], int]:
     report = inspect_project(args.root, template_source=args.template_source)
     if not report["ok"]:
         return {
             "schema_version": 1,
             "status": "FAIL",
-            "errors": [{"code": "INTAKE_PROJECT_INVALID", "message": "Project must pass the Fastlane Engine before an intake response can be parsed"}],
+            "errors": [
+                {
+                    "code": "INTAKE_PROJECT_INVALID",
+                    "message": "Project must pass the Fastlane Engine before an intake response can be parsed",
+                }
+            ],
         }, 1
     pending_card = report["intake_foundation"].get("pending_card")
     if not isinstance(pending_card, dict):
         return {
             "schema_version": 1,
             "status": "FAIL",
-            "errors": [{"code": "INTAKE_CARD_INVALID", "message": "Project has no valid pending intake card"}],
+            "errors": [
+                {
+                    "code": "INTAKE_CARD_INVALID",
+                    "message": "Project has no valid pending intake card",
+                }
+            ],
         }, 1
     try:
-        text = (args.root.resolve() / PRD_FILE).read_text(encoding="utf-8")
+        basis = report.get("basis")
+        if not isinstance(basis, Mapping):
+            raise ValueError("Current project basis is missing")
+        text, _ = bounded_prd_snapshot(
+            args.root, clean_cell(basis.get("prd_snapshot_sha256", ""))
+        )
         response_table = contract_table_after_heading(
             text, INTAKE_RESPONSE_REGISTER_HEADING, INTAKE_RESPONSE_REGISTER_HEADERS
         )
@@ -13516,9 +19965,16 @@ def _parse_current_intake_response(args: argparse.Namespace) -> tuple[dict[str, 
         return {
             "schema_version": 1,
             "status": "FAIL",
-            "errors": [{"code": "INTAKE_PROJECT_INVALID", "message": "Current intake contract cannot be parsed safely"}],
+            "errors": [
+                {
+                    "code": "INTAKE_PROJECT_INVALID",
+                    "message": "Current intake contract cannot be parsed safely",
+                }
+            ],
         }, 1
-    numbers = [int(response.owner_response_id.rsplit("-", 1)[1]) for response in responses]
+    numbers = [
+        int(response.owner_response_id.rsplit("-", 1)[1]) for response in responses
+    ]
     result = parse_intake_owner_response(
         sys.stdin.read(MAX_RESPONSE_CHARACTERS + 1),
         pending_card,
@@ -13528,6 +19984,50 @@ def _parse_current_intake_response(args: argparse.Namespace) -> tuple[dict[str, 
         owner_response_id=f"OWNER-MSG-{max(numbers, default=0) + 1:04d}",
     )
     return result.to_dict(), 0 if result.status == "PASS" else 2
+
+
+def _validate_current_gate_receipt(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], int]:
+    """Validate a pending Gate A/B candidate without changing project files."""
+
+    report = inspect_project(args.root, template_source=args.template_source)
+    if not report["ok"]:
+        return {
+            "schema_version": 1,
+            "status": "FAIL",
+            "candidate_accepted": False,
+            "project_state_changed": False,
+            "errors": [
+                {
+                    "code": "GATE_RECEIPT_PROJECT_INVALID",
+                    "message": (
+                        "Project must pass the Fastlane Engine before a gate "
+                        "receipt can be validated"
+                    ),
+                }
+            ],
+        }, 1
+    try:
+        contract = current_gate_receipt_contract(args.root, report)
+    except ValueError:
+        return {
+            "schema_version": 1,
+            "status": "FAIL",
+            "candidate_accepted": False,
+            "project_state_changed": False,
+            "lifecycle_state": report.get("lifecycle_state", "BLOCKED"),
+            "next_prompt": report.get("next_prompt", "STOP"),
+            "errors": [
+                {
+                    "code": "GATE_RECEIPT_NOT_PENDING",
+                    "message": "The project is not waiting for an owner gate receipt",
+                }
+            ],
+        }, 1
+    candidate = sys.stdin.read(MAX_GATE_RECEIPT_CHARACTERS + 1)
+    result = validate_gate_receipt_candidate(candidate, contract)
+    return result, 0 if result["status"] == "PASS" else 2
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -13550,15 +20050,38 @@ def main(argv: list[str] | None = None) -> int:
         help="Prior sha256 remediation fingerprint for one bounded retry",
     )
     parser.add_argument("--parse-intake-response", action="store_true")
+    parser.add_argument("--validate-gate-receipt", action="store_true")
     parser.add_argument("--input-stdin", action="store_true")
     parser.add_argument("--presented-card-id")
     parser.add_argument("--presented-card-revision", type=int)
     parser.add_argument("--presented-card-sha256")
     args = parser.parse_args(argv)
-    if args.prior_remediation_fingerprint is not None and re.fullmatch(
-        r"sha256:[0-9a-f]{64}", args.prior_remediation_fingerprint
-    ) is None:
-        parser.error("--prior-remediation-fingerprint must be sha256:<64 lowercase hex>")
+    if (
+        args.prior_remediation_fingerprint is not None
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", args.prior_remediation_fingerprint)
+        is None
+    ):
+        parser.error(
+            "--prior-remediation-fingerprint must be sha256:<64 lowercase hex>"
+        )
+    if args.parse_intake_response and args.validate_gate_receipt:
+        print(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "status": "FAIL",
+                    "errors": [
+                        {
+                            "code": "OWNER_INPUT_USAGE",
+                            "message": "Select exactly one owner-input parser mode",
+                        }
+                    ],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 1
     if args.parse_intake_response:
         if (
             not args.input_stdin
@@ -13572,7 +20095,12 @@ def main(argv: list[str] | None = None) -> int:
                     {
                         "schema_version": 1,
                         "status": "FAIL",
-                        "errors": [{"code": "INTAKE_PARSE_USAGE", "message": "Parsing requires stdin, JSON, and the presented card ID, revision, and digest"}],
+                        "errors": [
+                            {
+                                "code": "INTAKE_PARSE_USAGE",
+                                "message": "Parsing requires stdin, JSON, and the presented card ID, revision, and digest",
+                            }
+                        ],
                     },
                     indent=2,
                     sort_keys=True,
@@ -13580,6 +20108,30 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         result, exit_code = _parse_current_intake_response(args)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return exit_code
+    if args.validate_gate_receipt:
+        if not args.input_stdin or not args.json:
+            print(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "status": "FAIL",
+                        "errors": [
+                            {
+                                "code": "GATE_RECEIPT_USAGE",
+                                "message": (
+                                    "Gate receipt validation requires stdin and JSON"
+                                ),
+                            }
+                        ],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 1
+        result, exit_code = _validate_current_gate_receipt(args)
         print(json.dumps(result, indent=2, sort_keys=True))
         return exit_code
     report = inspect_project(

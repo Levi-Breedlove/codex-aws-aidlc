@@ -36,15 +36,15 @@ def report(**updates: object) -> dict[str, object]:
     return {"interaction": interaction}
 
 
-
 def intake_foundation() -> dict[str, object]:
     digest = "sha256:" + "a" * 64
     token = presenter.intake_reply_token("INTAKE-CARD-0001", 1, digest)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "FOUNDATION_REQUIRED",
         "repository_mode": "GREENFIELD",
         "owner_work_context": None,
+        "current_understanding": [],
         "basis_ids": [],
         "missing_fields": ["OWNER_WORK_CONTEXT", "PRIMARY_USERS"],
         "grandfathered_approved_gate_a": False,
@@ -158,7 +158,9 @@ def aws_teardown_report(
         state=(
             "AWAITING_APPROVAL"
             if formal_receipt_required
-            else "NEEDS_INPUT" if owner_action_required else "WORKING"
+            else "NEEDS_INPUT"
+            if owner_action_required
+            else "WORKING"
         ),
         route_reason_code=reason,
         owner_action_required=owner_action_required,
@@ -166,9 +168,14 @@ def aws_teardown_report(
         automatic_continuation_allowed=automatic_continuation_allowed,
         formal_receipt_required=formal_receipt_required,
     )
-    current["next_prompt"] = (
-        "AWS-50" if reason == "WAITING_AWS_TEARDOWN_AUTH" else "AWS-40"
-    )
+    if reason in {"AWS_RESIDUALS_REMAIN", "AWS_RESIDUALS_RETAINED"}:
+        current["next_prompt"] = "STOP"
+    else:
+        current["next_prompt"] = (
+            "AWS-50"
+            if reason in {"WAITING_AWS_TEARDOWN_AUTH", "AWS_TEARDOWN_ACTION_TERMINAL"}
+            else "AWS-40"
+        )
     current["aws_execution"] = {
         "schema_version": 1,
         "active": False,
@@ -180,6 +187,73 @@ def aws_teardown_report(
             "blocker_or_stale_reason": "caller identity could not be verified"
         }
     return current
+
+
+def teardown_terminal_closure_report() -> dict[str, object]:
+    current = aws_teardown_report("AWS_TEARDOWN_ACTION_TERMINAL")
+    current["aws_teardown"] = {
+        "status": "ACTION_TERMINAL_REQUIRED",
+        "attempt_id": "AWS-TEARDOWN-0001",
+        "evidence_id": "EV-7001",
+        "action_status": "STARTED",
+    }
+    current["authorizations"] = {"construction": "NONE", "aws": "NONE"}
+    current["write_authority"] = {"valid": False}
+    current["external_authority"] = {"kind": "NONE", "validity": "NONE"}
+    current["teardown_journal_closure_authority"] = {
+        "valid": True,
+        "kind": "AWS_TEARDOWN_JOURNAL_CLOSURE",
+        "authorization_id": "AWS_TEARDOWN_JOURNAL_CLOSURE",
+        "mode": "BOUNDED_EVIDENCE_CLOSURE",
+        "allowed_write_paths": ["docs/project/VERIFY.md"],
+        "allowed_sections": ["## AWS teardown action and residual evidence"],
+        "allowed_operations": ["APPEND_TEARDOWN_TERMINAL_ROW"],
+        "attempt_id": "AWS-TEARDOWN-0001",
+        "evidence_id": "EV-7001",
+        "construction_authorization": "NONE",
+        "aws_mutation_authority": "NONE",
+    }
+    return current
+
+
+def lifecycle_intent(
+    value: str,
+    *,
+    source: str = "owner-message MSG-AWS-LIFECYCLE-0001",
+    recorded_at: str = "2026-07-29T12:00:00+00:00",
+    provenance_status: str = "CURRENT",
+) -> dict[str, object]:
+    return {
+        "value": value,
+        "source": "NONE" if value == "NONE" else source,
+        "recorded_at": "NONE" if value == "NONE" else recorded_at,
+        "provenance_status": provenance_status,
+        "authorizes_aws_access": False,
+        "authorizes_mutation": False,
+    }
+
+
+def residual_disposition(
+    status: str,
+    value: str,
+    *,
+    basis_status: str = "RESIDUALS_REMAIN",
+    recorded_at: str | None = None,
+) -> dict[str, object]:
+    if recorded_at is None:
+        recorded_at = "2026-07-29T12:00:00+00:00" if status == "CURRENT" else "NONE"
+    return {
+        "status": status,
+        "value": value,
+        "basis_evidence_id": "EV-7002",
+        "basis_status": basis_status,
+        "basis_observed_at": "2026-07-29T11:00:00+00:00",
+        "recorded_at": recorded_at,
+        "authorizes_aws_access": False,
+        "authorizes_mutation": False,
+        "issues": [],
+    }
+
 
 class FastlanePresenterTests(unittest.TestCase):
     def test_owner_update_has_one_action_and_no_internal_prompt_id(self) -> None:
@@ -206,7 +280,6 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("FASTLANE \u00b7 DESIGN", rendered)
         self.assertIn("Need from you: Nothing.", rendered)
         self.assertIn("compare complete architecture candidates", rendered)
-
 
     def test_aws_guidance_is_automatic_and_credential_free(self) -> None:
         rendered = presenter.render_owner_update(
@@ -305,6 +378,7 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn(expected, side_question)
         self.assertIn("No mutation was performed.", rendered)
         self.assertNotIn("without changing AWS resources", rendered)
+
     def test_preflight_ready_rejects_lane_continuation_mismatch(self) -> None:
         cases = (
             ("documentation-only", True, "NOT_APPLICABLE", "NOT_USED"),
@@ -335,7 +409,6 @@ class FastlanePresenterTests(unittest.TestCase):
                 ):
                     presenter.render_owner_update(current)
 
-
     def test_blocked_or_stale_preflight_renders_the_safety_stop(self) -> None:
         for preflight_status in ("BLOCKED", "STALE"):
             with self.subTest(preflight_status=preflight_status):
@@ -365,7 +438,9 @@ class FastlanePresenterTests(unittest.TestCase):
                 self.assertNotIn("preflight is complete", rendered)
                 self.assertNotIn("preflight is in progress", rendered)
 
-    def test_current_mutation_authority_reports_automatic_bounded_execution(self) -> None:
+    def test_current_mutation_authority_reports_automatic_bounded_execution(
+        self,
+    ) -> None:
         current = aws_progress_report(
             "WAITING_AWS_MUTATION_AUTH",
             preflight_status="READY",
@@ -378,7 +453,9 @@ class FastlanePresenterTests(unittest.TestCase):
             answer="The accepted receipt remains limited to its exact resource boundary.",
         )
         self.assertIn("exact deployment authorization are current", rendered)
-        self.assertIn("Codex will perform only the exact authorized AWS mutation.", rendered)
+        self.assertIn(
+            "Codex will perform only the exact authorized AWS mutation.", rendered
+        )
         self.assertNotIn("needs separate authorization", rendered)
         self.assertNotIn("After authorization", rendered)
         self.assertIn(
@@ -495,6 +572,204 @@ class FastlanePresenterTests(unittest.TestCase):
         )
         self.assertNotIn("deployment authorization", rendered)
 
+    def test_teardown_terminal_closure_is_verify_only_and_automatic(self) -> None:
+        current = teardown_terminal_closure_report()
+        current["aws_lifecycle_intent"] = lifecycle_intent("TEARDOWN")
+
+        rendered = presenter.render_owner_update(current)
+        side_question = presenter.render_side_question_response(
+            current,
+            answer="The interrupted teardown remains journaled as STARTED.",
+        )
+
+        self.assertIn(
+            "Status: An interrupted AWS teardown attempt needs a terminal journal result.",
+            rendered,
+        )
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn(
+            "Next: Codex will append UNKNOWN for the interrupted teardown attempt "
+            "before read-only residual review.",
+            rendered,
+        )
+        self.assertIn(
+            "Audit: Teardown attempt AWS-TEARDOWN-0001 is append-only journaled "
+            "with action status STARTED.",
+            rendered,
+        )
+        self.assertIn(
+            "append only terminal UNKNOWN to the teardown evidence in VERIFY.md",
+            rendered,
+        )
+        self.assertIn("construction and AWS mutation remain unauthorized", rendered)
+        self.assertIn("Owner chose REMOVE at 2026-07-29T12:00:00+00:00", rendered)
+        self.assertIn("Pending next action: Nothing.", side_question)
+        self.assertIn(
+            "Next: Codex will append UNKNOWN for the interrupted teardown attempt "
+            "before read-only residual review.",
+            side_question,
+        )
+
+    def test_teardown_terminal_closure_fails_closed_on_broadened_authority(
+        self,
+    ) -> None:
+        cases = [
+            (
+                "kind",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"kind": "AWS_DEPLOYMENT_JOURNAL_CLOSURE"}
+                ),
+            ),
+            (
+                "authorization",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"authorization_id": "AWS-TEARDOWN-0001"}
+                ),
+            ),
+            (
+                "mode",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"mode": "MUTATION"}
+                ),
+            ),
+            (
+                "closure-construction",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"construction_authorization": "AUTH-0001"}
+                ),
+            ),
+            (
+                "closure-mutation",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"aws_mutation_authority": "AWS-TEARDOWN-0001"}
+                ),
+            ),
+            (
+                "path",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"allowed_write_paths": ["docs/project/RUNBOOK.md"]}
+                ),
+            ),
+            (
+                "section",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"allowed_sections": ["## Current release decision"]}
+                ),
+            ),
+            (
+                "operation",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"allowed_operations": ["DELETE_RESOURCE"]}
+                ),
+            ),
+            (
+                "construction",
+                lambda current: current["authorizations"].update(
+                    {"construction": "AUTH-0001"}
+                ),
+            ),
+            (
+                "write",
+                lambda current: current["write_authority"].update({"valid": True}),
+            ),
+            (
+                "deployment",
+                lambda current: current["external_authority"].update(
+                    {"kind": "AWS_DEPLOYMENT", "validity": "CURRENT"}
+                ),
+            ),
+            (
+                "teardown",
+                lambda current: current["external_authority"].update(
+                    {"kind": "AWS_TEARDOWN", "validity": "CURRENT"}
+                ),
+            ),
+            (
+                "fast-dev",
+                lambda current: current["external_authority"].update(
+                    {"kind": "FAST_DEV_GATE_B", "validity": "CURRENT"}
+                ),
+            ),
+            (
+                "unknown-authority",
+                lambda current: current["external_authority"].update(
+                    {"kind": "UNKNOWN", "validity": "CURRENT"}
+                ),
+            ),
+        ]
+        for label, mutate in cases:
+            current = teardown_terminal_closure_report()
+            mutate(current)
+            with (
+                self.subTest(label=label),
+                self.assertRaises(presenter.PresentationError),
+            ):
+                presenter.render_owner_update(current)
+
+    def test_teardown_terminal_closure_fails_closed_on_mismatched_projection(
+        self,
+    ) -> None:
+        cases = [
+            (
+                "invalid-type",
+                lambda current: current.update(
+                    {"teardown_journal_closure_authority": "INVALID"}
+                ),
+            ),
+            (
+                "not-current",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"valid": False}
+                ),
+            ),
+            (
+                "missing",
+                lambda current: current.pop("teardown_journal_closure_authority"),
+            ),
+            (
+                "attempt",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"attempt_id": "AWS-TEARDOWN-9999"}
+                ),
+            ),
+            (
+                "evidence",
+                lambda current: current["teardown_journal_closure_authority"].update(
+                    {"evidence_id": "EV-9999"}
+                ),
+            ),
+            (
+                "status",
+                lambda current: current["aws_teardown"].update(
+                    {"status": "POST_ACTION_REVIEW"}
+                ),
+            ),
+            (
+                "invalid-attempt-identifier",
+                lambda current: (
+                    current["teardown_journal_closure_authority"].update(
+                        {"attempt_id": "AWS-TEARDOWN-X"}
+                    ),
+                    current["aws_teardown"].update({"attempt_id": "AWS-TEARDOWN-X"}),
+                ),
+            ),
+            ("prompt", lambda current: current.update({"next_prompt": "AWS-40"})),
+            (
+                "route",
+                lambda current: current["interaction"].update(
+                    {"route_reason_code": "AWS_RESIDUAL_REVIEW"}
+                ),
+            ),
+        ]
+        for label, mutate in cases:
+            current = teardown_terminal_closure_report()
+            mutate(current)
+            with (
+                self.subTest(label=label),
+                self.assertRaises(presenter.PresentationError),
+            ):
+                presenter.render_owner_update(current)
+
     def test_terminal_residual_and_teardown_states_are_explicit(self) -> None:
         cases = (
             (
@@ -530,10 +805,11 @@ class FastlanePresenterTests(unittest.TestCase):
     def test_residuals_remaining_require_one_owner_disposition(self) -> None:
         current = aws_teardown_report(
             "AWS_RESIDUALS_REMAIN",
-            action_kind="REVIEW_AWS_RESIDUALS",
+            action_kind="CHOOSE_AWS_RESIDUAL_DISPOSITION",
             owner_action_required=True,
             automatic_continuation_allowed=False,
         )
+        current["aws_residual_disposition"] = residual_disposition("PENDING", "NONE")
 
         rendered = presenter.render_owner_update(current)
         side_question = presenter.render_side_question_response(
@@ -542,14 +818,40 @@ class FastlanePresenterTests(unittest.TestCase):
         )
 
         expected = (
-            "Review the remaining AWS resources and decide which to retain, remove, "
-            "or investigate."
+            "Choose one outcome for the current residual set: RETAIN, INVESTIGATE, "
+            "or REMOVE."
         )
-        self.assertIn("residual resources that need your decision", rendered)
+        self.assertIn("residual-resource set that needs one decision", rendered)
         self.assertIn(f"Need from you: {expected}", rendered)
         self.assertIn("Copyable reply:", rendered)
-        self.assertIn("RETAIN, REMOVE under new authorization, or INVESTIGATE", rendered)
+        self.assertIn(
+            "AWS residual decision: <RETAIN | INVESTIGATE | REMOVE>", rendered
+        )
+        self.assertIn("separate authorization for that path", rendered)
         self.assertIn(f"Pending next action: {expected}", side_question)
+        self.assertIn(
+            "AWS residual decision: <RETAIN | INVESTIGATE | REMOVE>", side_question
+        )
+        self.assertNotIn("For each listed residual", rendered)
+
+    def test_retained_residuals_are_terminal_and_non_authorizing(self) -> None:
+        current = aws_teardown_report(
+            "AWS_RESIDUALS_RETAINED",
+            automatic_continuation_allowed=False,
+        )
+        current["interaction"]["state"] = "COMPLETE"
+        current["aws_lifecycle_intent"] = lifecycle_intent("RETAIN")
+        current["aws_residual_disposition"] = residual_disposition("CURRENT", "RETAIN")
+
+        rendered = presenter.render_owner_update(current)
+
+        self.assertIn("retain the listed residual AWS resources", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("may continue to incur cost", rendered)
+        self.assertIn("no AWS access or mutation was authorized", rendered)
+        self.assertIn("Owner chose RETAIN", rendered)
+        self.assertNotIn("no unexpected resources remain", rendered)
+        self.assertNotIn("resources were removed", rendered)
 
     def test_blocked_residual_review_requires_safety_review(self) -> None:
         current = aws_teardown_report(
@@ -558,9 +860,7 @@ class FastlanePresenterTests(unittest.TestCase):
             owner_action_required=True,
             automatic_continuation_allowed=False,
         )
-        current["interaction"].update(
-            {"response_mode": "BLOCKER", "state": "BLOCKED"}
-        )
+        current["interaction"].update({"response_mode": "BLOCKER", "state": "BLOCKED"})
 
         rendered = presenter.render_owner_update(current)
         side_question = presenter.render_side_question_response(
@@ -624,6 +924,151 @@ class FastlanePresenterTests(unittest.TestCase):
                 with self.assertRaises(presenter.PresentationError):
                     presenter.render_side_question_response(current, answer="Explain.")
 
+    def test_lifecycle_intent_audit_is_explicit_and_non_authorizing(self) -> None:
+        cases = (
+            (
+                "RESIDUAL_REVIEW",
+                "AWS_RESIDUAL_REVIEW",
+                "Owner chose INVESTIGATE at 2026-07-29T12:00:00+00:00; "
+                "this selects AWS-40 and grants no AWS access or mutation.",
+            ),
+            (
+                "TEARDOWN",
+                "WAITING_AWS_TEARDOWN_AUTH",
+                "Owner chose REMOVE at 2026-07-29T12:00:00+00:00; this requests "
+                "the teardown path but grants no AWS access or mutation; AWS-50 "
+                "still requires the exact teardown authorization.",
+            ),
+        )
+        for value, reason, expected in cases:
+            with self.subTest(value=value, reason=reason):
+                current = aws_teardown_report(reason)
+                current["aws_lifecycle_intent"] = lifecycle_intent(value)
+                rendered = presenter.render_owner_update(current)
+                self.assertIn(f"Audit: {expected}", rendered)
+                self.assertNotIn("authorized AWS access", rendered)
+
+    def test_side_question_restores_lifecycle_intent_audit(self) -> None:
+        current = aws_teardown_report("AWS_RESIDUAL_REVIEW")
+        current["aws_lifecycle_intent"] = lifecycle_intent("TEARDOWN")
+
+        rendered = presenter.render_side_question_response(
+            current,
+            answer="The review remains read-only.",
+        )
+
+        self.assertIn(
+            "Audit: Owner chose REMOVE at 2026-07-29T12:00:00+00:00; this "
+            "requests the teardown path but grants no AWS access or mutation; "
+            "AWS-50 still requires the exact teardown authorization.",
+            rendered,
+        )
+
+    def test_none_lifecycle_intent_adds_no_audit_copy(self) -> None:
+        for provenance_status in ("CURRENT", "LEGACY_NONE"):
+            with self.subTest(provenance_status=provenance_status):
+                current = report()
+                current["aws_lifecycle_intent"] = lifecycle_intent(
+                    "NONE", provenance_status=provenance_status
+                )
+
+                rendered = presenter.render_owner_update(current)
+
+                self.assertNotIn("AWS lifecycle intent", rendered)
+                self.assertNotIn("selects AWS-40", rendered)
+
+    def test_lifecycle_intent_projection_fails_closed(self) -> None:
+        cases: list[tuple[str, dict[str, object]]] = []
+        bad_source = aws_teardown_report("AWS_RESIDUAL_REVIEW")
+        bad_source["aws_lifecycle_intent"] = lifecycle_intent(
+            "RESIDUAL_REVIEW", source="agent-generated"
+        )
+        cases.append(("source", bad_source))
+
+        unzoned = aws_teardown_report("AWS_RESIDUAL_REVIEW")
+        unzoned["aws_lifecycle_intent"] = lifecycle_intent(
+            "RESIDUAL_REVIEW", recorded_at="2026-07-29T12:00:00"
+        )
+        cases.append(("timestamp", unzoned))
+
+        access = aws_teardown_report("AWS_RESIDUAL_REVIEW")
+        access_intent = lifecycle_intent("RESIDUAL_REVIEW")
+        access_intent["authorizes_aws_access"] = True
+        access["aws_lifecycle_intent"] = access_intent
+        cases.append(("access", access))
+
+        mutation = aws_teardown_report("AWS_RESIDUAL_REVIEW")
+        mutation_intent = lifecycle_intent("RESIDUAL_REVIEW")
+        mutation_intent["authorizes_mutation"] = True
+        mutation["aws_lifecycle_intent"] = mutation_intent
+        cases.append(("mutation", mutation))
+
+        legacy_non_none = aws_teardown_report("AWS_RESIDUAL_REVIEW")
+        legacy_non_none["aws_lifecycle_intent"] = lifecycle_intent(
+            "RESIDUAL_REVIEW", provenance_status="LEGACY_NONE"
+        )
+        cases.append(("legacy", legacy_non_none))
+
+        route_mismatch = aws_teardown_report("WAITING_AWS_TEARDOWN_AUTH")
+        route_mismatch["aws_lifecycle_intent"] = lifecycle_intent("RESIDUAL_REVIEW")
+        cases.append(("route", route_mismatch))
+
+        malformed_none = report()
+        none_intent = lifecycle_intent("NONE")
+        none_intent["recorded_at"] = "2026-07-29T12:00:00+00:00"
+        malformed_none["aws_lifecycle_intent"] = none_intent
+        cases.append(("none", malformed_none))
+
+        for label, current in cases:
+            with (
+                self.subTest(label=label),
+                self.assertRaises(presenter.PresentationError),
+            ):
+                presenter.render_owner_update(current)
+
+    def test_residual_disposition_projection_fails_closed(self) -> None:
+        cases: list[tuple[str, dict[str, object]]] = []
+        missing = aws_teardown_report(
+            "AWS_RESIDUALS_REMAIN",
+            action_kind="CHOOSE_AWS_RESIDUAL_DISPOSITION",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+        )
+        cases.append(("missing", missing))
+
+        for label, field, bad_value in (
+            ("access", "authorizes_aws_access", True),
+            ("mutation", "authorizes_mutation", True),
+            ("evidence", "basis_evidence_id", "EV-bad"),
+            ("timestamp", "basis_observed_at", "2026-07-29T11:00:00"),
+            ("basis", "basis_status", "VERIFIED_CLEAN"),
+        ):
+            current = aws_teardown_report(
+                "AWS_RESIDUALS_REMAIN",
+                action_kind="CHOOSE_AWS_RESIDUAL_DISPOSITION",
+                owner_action_required=True,
+                automatic_continuation_allowed=False,
+            )
+            projection = residual_disposition("PENDING", "NONE")
+            projection[field] = bad_value
+            current["aws_residual_disposition"] = projection
+            cases.append((label, current))
+
+        mismatch = aws_teardown_report(
+            "AWS_RESIDUALS_RETAINED",
+            automatic_continuation_allowed=False,
+        )
+        mismatch["interaction"]["state"] = "COMPLETE"
+        mismatch["aws_residual_disposition"] = residual_disposition("CURRENT", "REMOVE")
+        cases.append(("route", mismatch))
+
+        for label, current in cases:
+            with (
+                self.subTest(label=label),
+                self.assertRaises(presenter.PresentationError),
+            ):
+                presenter.render_owner_update(current)
+
     def test_legacy_aws_preflight_reason_remains_renderable(self) -> None:
         rendered = presenter.render_owner_update(
             report(
@@ -635,7 +1080,9 @@ class FastlanePresenterTests(unittest.TestCase):
                 automatic_continuation_allowed=True,
             )
         )
-        self.assertIn("documentation evidence without accessing an AWS account", rendered)
+        self.assertIn(
+            "documentation evidence without accessing an AWS account", rendered
+        )
 
     def test_aws_core_audit_requires_observed_doctor_projection(self) -> None:
         current = report(
@@ -675,6 +1122,31 @@ class FastlanePresenterTests(unittest.TestCase):
             rendered,
         )
 
+        requirements = report(
+            owner_stage="DEFINE",
+            state="WORKING",
+            route_reason_code="REQUIREMENTS_ANALYSIS",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+            aws_core={"materiality": "MATERIAL", "evidence_status": "CURRENT"},
+        )
+        requirements["next_prompt"] = "REQ-10"
+        requirements["aws_core_evidence"] = {
+            "observed_usage": {
+                "REQ-10": {
+                    **current["aws_core_evidence"]["observed_usage"]["DESIGN-10"],
+                    "phase": "REQ-10",
+                }
+            }
+        }
+        requirements_rendered = presenter.render_owner_update(requirements)
+        self.assertIn(
+            "Audit: AWS Core returned aws-architecture", requirements_rendered
+        )
+        self.assertIn("No AWS account was accessed.", requirements_rendered)
+        self.assertNotIn("DESIGN-10", requirements_rendered)
+
         current["aws_core_evidence"]["observed_usage"]["DESIGN-10"] = {
             "status": "UNOBSERVED",
             "phase": "DESIGN-10",
@@ -712,6 +1184,12 @@ class FastlanePresenterTests(unittest.TestCase):
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(current)
 
+        current["interaction"]["aws_core"] = {
+            "materiality": "NOT_MATERIAL",
+            "evidence_status": "CURRENT",
+        }
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
 
     def test_agent_correction_needs_nothing_and_continues(self) -> None:
         current = report(
@@ -809,6 +1287,7 @@ class FastlanePresenterTests(unittest.TestCase):
         }
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(invalid)
+
     def test_formal_receipt_cannot_use_routine_presenter(self) -> None:
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(
@@ -874,9 +1353,7 @@ class FastlanePresenterTests(unittest.TestCase):
             "blocked_ids": [],
         }
         rendered = presenter.render_owner_update(current)
-        self.assertIn(
-            "Status: 3 of 7 tasks complete; working on TASK-0004.", rendered
-        )
+        self.assertIn("Status: 3 of 7 tasks complete; working on TASK-0004.", rendered)
         self.assertIn("Next: Codex will finish and validate TASK-0004.", rendered)
 
     def test_invalid_delivery_progress_fails_closed(self) -> None:
@@ -939,7 +1416,9 @@ class FastlanePresenterTests(unittest.TestCase):
             answer="No architecture decision changed.",
         )
         self.assertIn("Pending next action: Nothing.", rendered)
-        self.assertIn("Next: Codex will compare complete architecture candidates.", rendered)
+        self.assertIn(
+            "Next: Codex will compare complete architecture candidates.", rendered
+        )
 
     def test_public_cli_reads_one_json_object_from_stdin(self) -> None:
         payload = {
@@ -1035,6 +1514,7 @@ class FastlanePresenterTests(unittest.TestCase):
             "2: <your answer>; 3: <your answer>",
             rendered,
         )
+        self.assertIn("Keep the reply token at the start", rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("INTAKE-CARD", rendered)
         self.assertNotIn("sha256:", rendered)
@@ -1081,7 +1561,10 @@ class FastlanePresenterTests(unittest.TestCase):
             card[field] = value
             current = report(turn_boundary_required=True)
             current["intake_foundation"] = foundation
-            with self.subTest(field=field), self.assertRaises(presenter.PresentationError):
+            with (
+                self.subTest(field=field),
+                self.assertRaises(presenter.PresentationError),
+            ):
                 presenter.render_owner_update(current)
 
     def test_side_question_explains_without_resolving_or_replacing_card(self) -> None:
@@ -1107,6 +1590,62 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn(
             "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
             rendered,
+        )
+
+    def test_current_understanding_is_bounded_restored_and_backward_compatible(
+        self,
+    ) -> None:
+        foundation = intake_foundation()
+        foundation["current_understanding"] = [
+            "Starting point: a new application.",
+            "Users and problem: invited testers — scattered project decisions",
+        ]
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = foundation
+
+        rendered = presenter.render_owner_update(
+            current, updated="I recorded two confirmed facts."
+        )
+        self.assertIn("Current understanding:", rendered)
+        self.assertIn("- Starting point: a new application.", rendered)
+        self.assertLess(
+            rendered.index("Updated:"), rendered.index("Current understanding:")
+        )
+        self.assertLess(
+            rendered.index("Current understanding:"), rendered.index("Need from you:")
+        )
+
+        side = presenter.render_side_question_response(
+            current,
+            answer="That choice changes which existing behavior must be preserved.",
+        )
+        self.assertIn("Current understanding:", side)
+        self.assertLess(
+            side.index("Current understanding:"), side.index("Pending next action:")
+        )
+
+        for invalid in (
+            "not-a-list",
+            [""],
+            ["one", "two", "three", "four", "five", "six"],
+        ):
+            malformed = intake_foundation()
+            malformed["current_understanding"] = invalid
+            malformed_report = report(turn_boundary_required=True)
+            malformed_report["intake_foundation"] = malformed
+            with (
+                self.subTest(invalid=invalid),
+                self.assertRaises(presenter.PresentationError),
+            ):
+                presenter.render_owner_update(malformed_report)
+
+        legacy = intake_foundation()
+        legacy["schema_version"] = 1
+        legacy.pop("current_understanding")
+        legacy_report = report(turn_boundary_required=True)
+        legacy_report["intake_foundation"] = legacy
+        self.assertNotIn(
+            "Current understanding:", presenter.render_owner_update(legacy_report)
         )
 
     def test_intake_status_uses_exact_singular_and_plural_question_copy(self) -> None:
@@ -1179,14 +1718,104 @@ class FastlanePresenterTests(unittest.TestCase):
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(current)
 
-
     def test_unknown_or_conflicting_state_fails_closed(self) -> None:
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(report(route_reason_code="UNKNOWN"))
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(
-                report(owner_action_required=False, owner_action_kind="ANSWER_OPEN_DECISIONS")
+                report(
+                    owner_action_required=False,
+                    owner_action_kind="ANSWER_OPEN_DECISIONS",
+                )
             )
+
+    def test_deployment_reconciliation_is_read_only_and_restores_one_action(
+        self,
+    ) -> None:
+        current = aws_progress_report(
+            "AWS_DEPLOYMENT_RECONCILIATION",
+            lane="explicit-gate",
+        )
+        current["next_prompt"] = "AWS-30"
+        current["aws_deployment"] = {
+            "status": "RECONCILIATION_REQUIRED",
+            "attempt_id": "AWS-DEPLOY-0001",
+            "action_status": "SUCCEEDED",
+            "reconciliation_status": "NONE",
+        }
+        current["external_authority"] = {
+            "kind": "AWS_READ_ONLY",
+            "validity": "CURRENT",
+        }
+        rendered = presenter.render_owner_update(current)
+        normalized = rendered.casefold()
+        self.assertIn("deployment", normalized)
+        self.assertIn("reconciliation", normalized)
+        self.assertIn("read-only", normalized)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("no further mutation", normalized)
+        self.assertNotIn("Review the exact AWS deployment receipt", rendered)
+
+        missing_read = aws_progress_report(
+            "AWS_DEPLOYMENT_RECONCILIATION",
+            action_kind="AUTHORIZE_AWS_READ_PREFLIGHT",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+            formal_receipt_required=True,
+            lane="explicit-gate",
+        )
+        missing_read["next_prompt"] = "AWS-30"
+        missing_read["aws_deployment"] = current["aws_deployment"]
+        missing_read["external_authority"] = {
+            "kind": "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED",
+            "validity": "REQUIRED",
+        }
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(missing_read)
+        side = presenter.render_side_question_response(
+            missing_read,
+            answer="Reconciliation verifies the observed deployment result.",
+        )
+        self.assertIn(
+            "Pending next action: Review the exact read-only AWS preflight receipt. "
+            "It grants no mutation.",
+            side,
+        )
+        self.assertNotIn("Review the exact AWS deployment receipt", side)
+
+    def test_release_closure_projects_only_allowed_release_states(self) -> None:
+        current = aws_progress_report("RELEASE_REVIEW", lane="explicit-gate")
+        current["next_prompt"] = "RELEASE-10"
+        current["aws_deployment"] = {
+            "status": "BLOCKED",
+            "attempt_id": "AWS-DEPLOY-0001",
+            "basis_stale": False,
+        }
+        current["authorizations"] = {"construction": "NONE", "aws": "NONE"}
+        current["write_authority"] = {"valid": False}
+        current["external_authority"] = {"kind": "NONE", "validity": "NONE"}
+        current["deployment_journal_closure_authority"] = {
+            "valid": True,
+            "kind": "AWS_DEPLOYMENT_JOURNAL_CLOSURE",
+            "authorization_id": "AWS_DEPLOYMENT_JOURNAL_CLOSURE",
+            "mode": "BOUNDED_EVIDENCE_CLOSURE",
+            "allowed_write_paths": ["docs/project/VERIFY.md"],
+            "allowed_sections": ["## Current release decision"],
+            "allowed_operations": ["UPDATE_RELEASE_DECISION_AND_EVIDENCE_CUTOFF"],
+            "allowed_release_states": ["NOT_READY"],
+            "attempt_id": "AWS-DEPLOY-0001",
+            "evidence_id": "EV-9733",
+            "construction_authorization": "NONE",
+            "aws_mutation_authority": "NONE",
+        }
+        rendered = presenter.render_owner_update(current)
+        self.assertIn("allowed release states NOT_READY", rendered)
+
+        current["deployment_journal_closure_authority"]["allowed_release_states"] = [
+            "RELEASE_VERIFIED"
+        ]
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(current)
 
 
 if __name__ == "__main__":

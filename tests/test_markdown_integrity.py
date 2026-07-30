@@ -95,16 +95,29 @@ class MarkdownIntegrityTests(unittest.TestCase):
                 if " " in target and not raw.strip().startswith("<"):
                     target = target.split()[0]
                 path_part, separator, fragment = target.partition("#")
-                destination = source if not path_part else (source.parent / unquote(path_part)).resolve()
+                destination = (
+                    source
+                    if not path_part
+                    else (source.parent / unquote(path_part)).resolve()
+                )
                 try:
                     destination.relative_to(REPOSITORY_ROOT)
                 except ValueError:
-                    failures.append(f"{source.relative_to(REPOSITORY_ROOT)} -> {target} escapes root")
+                    failures.append(
+                        f"{source.relative_to(REPOSITORY_ROOT)} -> {target} escapes root"
+                    )
                     continue
                 if not destination.exists():
-                    failures.append(f"{source.relative_to(REPOSITORY_ROOT)} -> {target} missing")
+                    failures.append(
+                        f"{source.relative_to(REPOSITORY_ROOT)} -> {target} missing"
+                    )
                     continue
-                if separator and fragment and destination.is_file() and destination.suffix.casefold() == ".md":
+                if (
+                    separator
+                    and fragment
+                    and destination.is_file()
+                    and destination.suffix.casefold() == ".md"
+                ):
                     if unquote(fragment).casefold() not in headings(destination):
                         failures.append(
                             f"{source.relative_to(REPOSITORY_ROOT)} -> {target} fragment missing"
@@ -115,7 +128,9 @@ class MarkdownIntegrityTests(unittest.TestCase):
         failures: list[str] = []
         for path in self.markdown_files():
             active: str | None = None
-            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), 1
+            ):
                 match = re.match(r"^\s*(```+|~~~+)", line)
                 if not match:
                     continue
@@ -131,9 +146,7 @@ class MarkdownIntegrityTests(unittest.TestCase):
     def test_mermaid_blocks_have_supported_structural_declarations(self) -> None:
         failures: list[str] = []
         for path in self.markdown_files():
-            for failure in mermaid_structure_failures(
-                path.read_text(encoding="utf-8")
-            ):
+            for failure in mermaid_structure_failures(path.read_text(encoding="utf-8")):
                 failures.append(f"{path.relative_to(REPOSITORY_ROOT)}: {failure}")
         self.assertEqual(failures, [])
 
@@ -162,7 +175,9 @@ sequenceDiagram
             ],
         )
 
-    def test_project_documents_are_canonical_and_removed_surfaces_stay_removed(self) -> None:
+    def test_project_documents_are_canonical_and_removed_surfaces_stay_removed(
+        self,
+    ) -> None:
         required = ("BUGFIX.md", "PRD.md", "RUNBOOK.md", "TASKS.md", "VERIFY.md")
         for name in required:
             self.assertTrue((REPOSITORY_ROOT / "docs" / "project" / name).is_file())
@@ -170,7 +185,9 @@ sequenceDiagram
         for removed in ("CHANGELOG.md", "CONTRIBUTING.md", "VERSION"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
         self.assertFalse((REPOSITORY_ROOT / "scripts" / "run_demo.py").exists())
-        combined = "\n".join(path.read_text(encoding="utf-8") for path in self.markdown_files())
+        combined = "\n".join(
+            path.read_text(encoding="utf-8") for path in self.markdown_files()
+        )
         self.assertNotIn("docs/demo/", combined)
         self.assertNotIn("scripts/run_demo.py", combined)
 

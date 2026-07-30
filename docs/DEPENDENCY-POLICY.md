@@ -36,6 +36,34 @@ evidence.
 ## Authority and privacy
 
 AWS Core is an advisor. It cannot approve Gate A, Gate B, or an AWS mutation.
-Tool availability never grants AWS authority. Fastlane never stores plugin
-state, trust state, usernames, client paths, credentials, account identifiers,
-or local setup history.
+Tool availability never grants AWS authority. Prerequisite checks do not
+persist plugin state, trust state, usernames, client paths, credentials,
+account identifiers, or local setup history. Later gated and AWS operations
+intentionally retain the minimum audit metadata required by the approved
+Fastlane evidence contracts; protect those records before publication.
+
+## Deterministic Python quality checks
+
+Fastlane fixes Ruff at `0.16.0` for repository lint and formatting checks. The
+configuration selects only `E4`, `E7`, `E9`, and `F`, so a future change to
+Ruff's defaults cannot silently expand the Fastlane contract. Markdown is
+excluded because Fastlane's contract documents are governed by their own
+integrity validators rather than a Python formatter.
+
+CI runs read-only Ruff lint and format checks over `bootstrap.py`, `scripts`,
+`tests`, and `.codex/hooks`. The Ruff action is pinned to an immutable commit.
+Ruff checks Fastlane's Python; it does not replace AWS Core, access an AWS
+account, or change Fastlane's product, architecture, gate, or authority model.
+
+## GitHub Actions monitoring
+
+Dependabot checks only GitHub Actions dependencies each week and targets
+`fast-lane-maint`. Its proposals require human review; Fastlane configures no
+automatic merge, custom registry, credential, or write token.
+
+GitHub security updates target the repository default branch when
+`target-branch` is configured. If the default branch ever differs from
+`fast-lane-maint`, maintainers must explicitly reconcile urgent security pin
+updates into the customer branch. Dependabot proposals never replace the
+required cross-platform validation, immutable action pin, or publication
+authority.

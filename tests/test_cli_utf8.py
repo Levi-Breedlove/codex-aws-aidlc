@@ -78,10 +78,12 @@ class FastlaneCliUtf8Tests(unittest.TestCase):
         completed = run_cli("scripts/setup_assistant.py", "welcome")
         self.assertEqual(completed.returncode, 0, completed.stderr)
         stdout = self.assert_utf8_without_local_root(completed.stdout)
-        self.assertIn("automatically—they require", stdout)
+        self.assertIn("Setup never authorizes AWS changes", stdout)
         self.assertEqual(completed.stderr, b"")
 
-    def test_bootstrap_argparse_error_is_utf8_under_legacy_windows_encoding(self) -> None:
+    def test_bootstrap_argparse_error_is_utf8_under_legacy_windows_encoding(
+        self,
+    ) -> None:
         completed = run_cli(
             "bootstrap.py",
             "--target",
@@ -95,7 +97,9 @@ class FastlaneCliUtf8Tests(unittest.TestCase):
         self.assertIn("--unknown—option", stderr)
         self.assertEqual(completed.stdout, b"")
 
-    def test_dependency_argparse_error_is_utf8_under_legacy_windows_encoding(self) -> None:
+    def test_dependency_argparse_error_is_utf8_under_legacy_windows_encoding(
+        self,
+    ) -> None:
         completed = run_cli("scripts/bootstrap_dependencies.py", "--unknown—option")
         self.assertEqual(completed.returncode, 2)
         stderr = self.assert_utf8_without_local_root(completed.stderr)
@@ -116,7 +120,6 @@ class FastlaneCliUtf8Tests(unittest.TestCase):
         self.assertIn("Read-only AWS Codex Fastlane Engine", stdout)
         self.assertNotIn("project doctor", stdout.casefold())
         self.assertEqual(completed.stderr, b"")
-
 
     def test_engine_human_banner_is_utf8_and_public(self) -> None:
         completed = run_cli(

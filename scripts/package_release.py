@@ -11,10 +11,16 @@ import os
 import re
 import stat
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Sequence
+
+try:
+    from fastlane_process import resolve_trusted_git
+except ModuleNotFoundError:  # Loaded as scripts.package_release in tests.
+    from scripts.fastlane_process import resolve_trusted_git
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIRECTORY = "."
@@ -37,9 +43,15 @@ REQUIRED_CONTROL_FILES = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_process.py",
+    "scripts/fastlane_project_identity.py",
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
+}
+DARWIN_SYSTEM_ROOT_ALIASES = {
+    "/tmp": "/private/tmp",
+    "/var": "/private/var",
 }
 
 
@@ -51,6 +63,60 @@ def checksum_path(archive_path: Path) -> Path:
     """Return the checksum sidecar path for an archive."""
 
     return archive_path.with_name(f"{archive_path.name}.sha256")
+
+
+def lexical_absolute_path(path: Path) -> Path:
+    """Return an absolute output path without resolving filesystem links."""
+
+    return Path(os.path.abspath(os.fspath(path.expanduser())))
+
+
+def _is_link_or_reparse_point(path: Path) -> bool:
+    """Return whether an existing path is a link or Windows reparse point."""
+
+    try:
+        metadata = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    file_attributes = getattr(metadata, "st_file_attributes", 0)
+    return stat.S_ISLNK(metadata.st_mode) or bool(file_attributes & reparse_flag)
+
+
+def _canonicalize_darwin_system_root_alias(absolute: Path) -> Path:
+    """Canonicalize only verified macOS root aliases, never their descendants."""
+
+    if sys.platform != "darwin" or absolute.anchor != "/" or len(absolute.parts) < 2:
+        return absolute
+    alias = Path(absolute.anchor) / absolute.parts[1]
+    expected_target = DARWIN_SYSTEM_ROOT_ALIASES.get(alias.as_posix())
+    if expected_target is None or not _is_link_or_reparse_point(alias):
+        return absolute
+    if Path(os.path.realpath(alias)) != Path(expected_target):
+        return absolute
+    return Path(expected_target).joinpath(*absolute.parts[2:])
+
+
+def validate_output_path(path: Path) -> Path:
+    """Reject a release destination that names or traverses a filesystem link."""
+
+    absolute = _canonicalize_darwin_system_root_alias(lexical_absolute_path(path))
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if _is_link_or_reparse_point(current):
+            raise PackagingError(
+                "Unsafe release output path contains a symlink or reparse point"
+            )
+    return absolute
+
+
+def prepare_output_path(path: Path) -> Path:
+    """Create a safe output parent and revalidate it before artifact writes."""
+
+    absolute = validate_output_path(path)
+    absolute.parent.mkdir(parents=True, exist_ok=True)
+    return validate_output_path(absolute)
 
 
 def validate_relative_path(raw: object) -> str:
@@ -67,8 +133,7 @@ def validate_relative_path(raw: object) -> str:
         raise PackagingError(f"Unsafe manifest path: {raw!r}")
     path = PurePosixPath(raw)
     if path.is_absolute() or any(
-        part in {"", ".", ".."} or part.casefold() == ".git"
-        for part in path.parts
+        part in {"", ".", ".."} or part.casefold() == ".git" for part in path.parts
     ):
         raise PackagingError(f"Unsafe manifest path: {raw!r}")
     canonical = path.as_posix()
@@ -204,9 +269,7 @@ def release_manifest_values(manifest: object) -> tuple[str, list[str]]:
     if paths != sorted(seen):
         raise PackagingError("Manifest required_files must be sorted canonically")
     if MANIFEST_FILE not in seen:
-        raise PackagingError(
-            f"Manifest required_files must include {MANIFEST_FILE}"
-        )
+        raise PackagingError(f"Manifest required_files must include {MANIFEST_FILE}")
     if tuple(int(part) for part in version.split(".")) >= (1, 1, 0):
         missing_setup = sorted(REQUIRED_SETUP_ASSETS - set(paths))
         if missing_setup:
@@ -222,13 +285,15 @@ def _git_bytes(repo_root: Path, *arguments: str) -> bytes:
 
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo_root), *arguments],
+            [resolve_trusted_git(repo_root), "-C", str(repo_root), *arguments],
             check=False,
             capture_output=True,
             timeout=30,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise PackagingError("Git is unavailable for read-only package comparison") from exc
+        raise PackagingError(
+            "Git is unavailable for read-only package comparison"
+        ) from exc
     if result.returncode != 0:
         raise PackagingError(
             "Exact base commit is unavailable in this checkout; provide sufficient "
@@ -248,7 +313,9 @@ def load_release_files_from_commit(
     repo_root = repo_root.resolve()
     resolved = _git_bytes(repo_root, "rev-parse", "--verify", f"{commit}^{{commit}}")
     if resolved.decode("ascii", errors="strict").strip() != commit:
-        raise PackagingError("Base commit does not resolve to the exact supplied object ID")
+        raise PackagingError(
+            "Base commit does not resolve to the exact supplied object ID"
+        )
     _git_bytes(repo_root, "merge-base", "--is-ancestor", commit, "HEAD")
     manifest_bytes = _git_bytes(repo_root, "show", f"{commit}:{MANIFEST_FILE}")
     try:
@@ -264,14 +331,18 @@ def load_release_files_from_commit(
     return version, files
 
 
-def load_release_files(repo_root: Path = REPOSITORY_ROOT) -> tuple[str, list[tuple[str, bytes]]]:
+def load_release_files(
+    repo_root: Path = REPOSITORY_ROOT,
+) -> tuple[str, list[tuple[str, bytes]]]:
     """Load the manifest version and exact release file bytes."""
 
     repo_root = repo_root.resolve()
     template_root = (repo_root / TEMPLATE_DIRECTORY).resolve()
     manifest_path = template_root / MANIFEST_FILE
     if template_root.is_symlink() or not template_root.is_dir():
-        raise PackagingError(f"Template directory is missing or unsafe: {template_root}")
+        raise PackagingError(
+            f"Template directory is missing or unsafe: {template_root}"
+        )
     if manifest_path.is_symlink() or not manifest_path.is_file():
         raise PackagingError(f"Manifest is missing or unsafe: {manifest_path}")
 
@@ -356,7 +427,7 @@ def checksum_line(payload: bytes, archive_name: str = ARCHIVE_NAME) -> bytes:
 def atomic_write(path: Path, content: bytes) -> None:
     """Replace one artifact atomically without following an output symlink."""
 
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = prepare_output_path(path)
     descriptor, temporary_name = tempfile.mkstemp(
         dir=path.parent,
         prefix=f".{path.name}.",
@@ -368,6 +439,7 @@ def atomic_write(path: Path, content: bytes) -> None:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
+        validate_output_path(path)
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
@@ -386,9 +458,13 @@ def expected_artifacts(
 def write_release(repo_root: Path, archive_path: Path) -> str:
     """Write the deterministic archive and checksum and return its digest."""
 
+    archive_path = lexical_absolute_path(archive_path)
+    sidecar_path = checksum_path(archive_path)
     payload, sidecar = expected_artifacts(repo_root, archive_path.name)
+    prepare_output_path(archive_path)
+    prepare_output_path(sidecar_path)
     atomic_write(archive_path, payload)
-    atomic_write(checksum_path(archive_path), sidecar)
+    atomic_write(sidecar_path, sidecar)
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -434,21 +510,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--base-commit",
-        help=("Exact existing ancestor commit used to enforce package version identity"),
+        help=(
+            "Exact existing ancestor commit used to enforce package version identity"
+        ),
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=REPOSITORY_ROOT / DEFAULT_OUTPUT_DIRECTORY / ARCHIVE_NAME,
         help=(
-            "Archive output path "
-            f"(default: {DEFAULT_OUTPUT_DIRECTORY}/{ARCHIVE_NAME})"
+            f"Archive output path (default: {DEFAULT_OUTPUT_DIRECTORY}/{ARCHIVE_NAME})"
         ),
     )
     args = parser.parse_args(argv)
     if args.base_commit and not args.check:
         parser.error("--base-commit requires --check")
-    archive_path = args.output.expanduser().resolve()
+    archive_path = lexical_absolute_path(args.output)
     try:
         if args.check:
             digest = check_release(REPOSITORY_ROOT)

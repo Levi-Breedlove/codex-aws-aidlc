@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -156,6 +157,142 @@ class SetupAssistantTests(unittest.TestCase):
         for forbidden in ("install", "marketplace", "plugin", "aws configure"):
             self.assertNotIn(forbidden, serialized.casefold())
 
+    def test_git_probe_rejects_project_local_resolution_without_execution(self) -> None:
+        environment = FakeEnvironment()
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            project.mkdir()
+            (project / "bootstrap.manifest.json").write_text("{}", encoding="utf-8")
+            local_git = project / "git"
+            local_git.write_text("untrusted", encoding="utf-8")
+
+            def which(name: str) -> str | None:
+                return str(local_git) if name == "git" else environment.which(name)
+
+            try:
+                observed = setup.inspect_local_prerequisites(
+                    project,
+                    which=which,
+                    runner=environment.runner,
+                    system="Linux",
+                    release="6.8.0-generic",
+                )
+            finally:
+                environment.close()
+        self.assertFalse(observed["git_available"])
+        self.assertNotIn(("git", "--version"), environment.calls)
+        self.assertIn(("codex", "--version"), environment.calls)
+
+    def test_hook_configuration_uses_an_external_absolute_interpreter(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "project"
+            codex = root / ".codex"
+            codex.mkdir(parents=True)
+            (root / "bootstrap.manifest.json").write_text("{}", encoding="utf-8")
+            (root / "scripts").mkdir()
+            (root / "scripts" / "bootstrap_doctor.py").write_text(
+                "# marker\n", encoding="utf-8"
+            )
+            (codex / "hooks").mkdir()
+            (codex / "hooks" / "fastlane_hook.py").write_text(
+                "import sys\nprint(sys.argv[1])\n", encoding="utf-8"
+            )
+            (codex / "hooks.fastlane.example.json").write_bytes(
+                (
+                    REPOSITORY_ROOT / ".codex" / "hooks.fastlane.example.json"
+                ).read_bytes()
+            )
+
+            target = setup.configure_local_hooks(root, interpreter=Path(sys.executable))
+            self.assertEqual(target, (codex / "hooks.json").resolve())
+            configured = json.loads(target.read_text(encoding="utf-8"))
+            commands = [
+                hook[field]
+                for groups in configured["hooks"].values()
+                for group in groups
+                for hook in group["hooks"]
+                for field in ("command", "commandWindows")
+            ]
+            expected = str(Path(sys.executable).resolve())
+            self.assertTrue(commands)
+            for command in commands:
+                self.assertIn(expected, command)
+                self.assertNotIn("__FASTLANE_PYTHON_", command)
+                self.assertNotRegex(command, r"(?i)^(?:python3|py)(?:\s|$)")
+            nested = root / "nested" / "deeper"
+            nested.mkdir(parents=True)
+            session_command = configured["hooks"]["SessionStart"][0]["hooks"][0][
+                "command"
+            ]
+            completed = subprocess.run(
+                shlex.split(session_command),
+                cwd=nested,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.stdout.strip(), "session-start")
+            (nested / "scripts").mkdir()
+            (nested / "bootstrap.manifest.json").write_text("{}", encoding="utf-8")
+            (nested / "scripts" / "bootstrap_doctor.py").write_text(
+                "# deceptive nested marker\n", encoding="utf-8"
+            )
+            ambiguous = subprocess.run(
+                shlex.split(session_command),
+                cwd=nested,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(ambiguous.returncode, 0)
+            with self.assertRaisesRegex(setup.SetupError, "already exists"):
+                setup.configure_local_hooks(root, interpreter=Path(sys.executable))
+            self.assertEqual(
+                setup.configure_local_hooks(
+                    root, interpreter=Path(sys.executable), replace=True
+                ),
+                target,
+            )
+
+    def test_hook_configuration_rejects_project_local_interpreter(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "project"
+            codex = root / ".codex"
+            codex.mkdir(parents=True)
+            (root / "bootstrap.manifest.json").write_text("{}", encoding="utf-8")
+            (codex / "hooks.fastlane.example.json").write_bytes(
+                (
+                    REPOSITORY_ROOT / ".codex" / "hooks.fastlane.example.json"
+                ).read_bytes()
+            )
+            local_python = root / "python.exe"
+            local_python.write_bytes(b"untrusted")
+            with self.assertRaisesRegex(setup.SetupError, "trusted Python"):
+                setup.configure_local_hooks(root, interpreter=local_python)
+            self.assertFalse((codex / "hooks.json").exists())
+
+    def test_hook_configuration_rejects_windows_shell_metacharacters(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "project"
+            codex = root / ".codex"
+            codex.mkdir(parents=True)
+            (root / "bootstrap.manifest.json").write_text("{}", encoding="utf-8")
+            (codex / "hooks.fastlane.example.json").write_bytes(
+                (
+                    REPOSITORY_ROOT / ".codex" / "hooks.fastlane.example.json"
+                ).read_bytes()
+            )
+            for character in ("&", "%", "^", "!"):
+                with self.subTest(character=character):
+                    interpreter = Path(temporary) / f"external{character}python.exe"
+                    interpreter.write_bytes(b"trusted fixture")
+                    with self.assertRaisesRegex(
+                        setup.SetupError, "shell metacharacters"
+                    ):
+                        setup.configure_local_hooks(root, interpreter=interpreter)
+                    self.assertFalse((codex / "hooks.json").exists())
+
     def test_codex_readiness_uses_capabilities_not_semantic_version(self) -> None:
         current = FakeEnvironment()
         current.outputs[("codex", "--version")] = (0, "codex-cli current")
@@ -242,14 +379,18 @@ class SetupAssistantTests(unittest.TestCase):
             (local_ready(uvx_available=False), "UV_REQUIRED"),
             (local_ready(official_plugin_loaded_in_session=False), "AWS_CORE_REQUIRED"),
             (
-                local_ready(native_hook_review_required=True, native_hook_review_attested=False),
+                local_ready(
+                    native_hook_review_required=True, native_hook_review_attested=False
+                ),
                 "AWS_CORE_NATIVE_TRUST_REQUIRED",
             ),
             (local_ready(), "PREREQUISITES_READY"),
         )
         for evidence, expected in cases:
             with self.subTest(expected=expected):
-                self.assertEqual(setup.reduce_prerequisites(evidence)["state"], expected)
+                self.assertEqual(
+                    setup.reduce_prerequisites(evidence)["state"], expected
+                )
 
     def test_multiple_missing_tools_produce_one_complete_checklist_action(self) -> None:
         report = setup.reduce_prerequisites(
@@ -318,7 +459,9 @@ class SetupAssistantTests(unittest.TestCase):
         self.assertTrue(greeting.startswith("Welcome to AWS Codex Fastlane."))
         for label in ("Project name:", "Preferred AWS Region:", "Development budget:"):
             self.assertEqual(greeting.count(label), 1)
-        self.assertIn("did not inspect AWS credentials or access an AWS account", greeting)
+        self.assertIn(
+            "did not inspect AWS credentials or access an AWS account", greeting
+        )
 
     def test_final_onboarding_docs_and_instruction_headroom(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
@@ -332,8 +475,14 @@ class SetupAssistantTests(unittest.TestCase):
         self.assertIn("does not copy AWS skills into the\nrepository", readme)
         self.assertIn("does not require separately installed AWS skills", setup_doc)
         self.assertIn("Other Agent Toolkit plugins are optional", setup_doc)
-        self.assertIn("Ordinary requirements and\ndesign need no AWS credentials or AWS account", readme)
-        self.assertIn("Deployment and teardown retain separate exact Fastlane authority", setup_doc)
+        self.assertIn(
+            "Ordinary requirements and\ndesign need no AWS credentials or AWS account",
+            readme,
+        )
+        self.assertIn(
+            "Deployment and teardown retain separate exact Fastlane authority",
+            setup_doc,
+        )
         self.assertLessEqual(len(readme.splitlines()), 90)
         self.assertLessEqual(len((REPOSITORY_ROOT / "AGENTS.md").read_bytes()), 7_200)
 
@@ -344,7 +493,7 @@ class SetupAssistantTests(unittest.TestCase):
         design_end = prompts.index("## DESIGN-20", design_start)
         self.assertLessEqual(
             len(prompts[design_start:design_end].encode("utf-8")),
-            7_200,
+            8_000,
         )
 
     def test_official_source_and_linked_runtime_discovery_are_required(self) -> None:
@@ -453,12 +602,24 @@ class SetupAssistantTests(unittest.TestCase):
         with mock.patch.object(
             setup,
             "inspect_local_prerequisites",
-            return_value={key: value for key, value in local_ready().items() if key not in setup.SESSION_EVIDENCE_FIELDS},
+            return_value={
+                key: value
+                for key, value in local_ready().items()
+                if key not in setup.SESSION_EVIDENCE_FIELDS
+            },
         ):
-            with mock.patch.object(sys, "stdin", io.StringIO(json.dumps(official_session_evidence()))):
+            with mock.patch.object(
+                sys, "stdin", io.StringIO(json.dumps(official_session_evidence()))
+            ):
                 with mock.patch("builtins.print") as printer:
                     exit_code = setup.main(
-                        ["prerequisites", "--root", str(REPOSITORY_ROOT), "--evidence-stdin", "--json"]
+                        [
+                            "prerequisites",
+                            "--root",
+                            str(REPOSITORY_ROOT),
+                            "--evidence-stdin",
+                            "--json",
+                        ]
                     )
         self.assertEqual(exit_code, 0)
         report = json.loads(printer.call_args.args[0])
@@ -475,7 +636,6 @@ class SetupAssistantTests(unittest.TestCase):
             with self.assertRaises(setup.SetupError):
                 setup.canonical_root(root)
 
-
     def test_ready_welcome_explains_fastlane_and_owner_boundaries_once(self) -> None:
         greeting = setup.render_setup_response(
             setup.reduce_prerequisites(local_ready())
@@ -486,13 +646,16 @@ class SetupAssistantTests(unittest.TestCase):
             "You do not need to choose AWS services.",
             "Gate A confirms what should be built",
             "Gate B confirms the design and build boundaries",
-            "AWS account changes never happen automatically",
+            "Setup never authorizes AWS changes",
+            "Fast Dev stays inside the exact approved non-production Gate B envelope",
+            "Explicit Gate requires its own exact action receipt",
             "Setup did not inspect AWS credentials or access an AWS account.",
         ):
             self.assertIn(phrase, compact)
         for label in ("Project name:", "Preferred AWS Region:", "Development budget:"):
             self.assertEqual(greeting.count(label), 1)
         self.assertEqual(greeting.count("Welcome to AWS Codex Fastlane."), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

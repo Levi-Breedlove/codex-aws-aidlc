@@ -1,4 +1,4 @@
-# My AWS Project — Executable Tasks
+# {{PROJECT_NAME}} — Executable Tasks
 
 `docs/project/TASKS.md` is the live construction ledger after Gate B. Task blocks are the
 only authoritative task records. GitHub Issues are conditional mirrors when the
@@ -65,6 +65,41 @@ observed revision blocker, checkpoint and commit the stale ledger, then stop all
 claims. After a new Gate B, TASK-10 archives the stale plan by commit, replaces
 its graph with tasks for the current IDs, and sets the new plan `CURRENT`.
 
+## Derived requirement disposition contract
+
+This ledger does not store a second manually maintained coverage table. For a
+`CURRENT` plan based on a modern, non-grandfathered requirements schema, the
+Engine projects the approved first-release requirements, task `Requirements`
+traces, and current `docs/project/VERIFY.md` no-task evidence into exactly one
+derived disposition per requirement:
+
+- `TASK_COVERED` — one or more non-`SKIPPED` `BACKLOG`, `READY`,
+  `IN_PROGRESS`, `BLOCKED`, or `DONE` task cards contain the current `REQ-*`
+  identity and the exact requirement ID plus its canonical `AC-*` ID.
+- `ALREADY_SATISFIED` — no task is needed because a current-scoped concrete
+  Verification matrix row has `Task IDs` equal to `NONE`, binds exactly that
+  requirement and canonical acceptance ID, and has status `LOCAL_PASS` or
+  `VERIFIED`.
+- `NOT_APPLICABLE` — no task is needed only when the approved EARS form is
+  `OPTIONAL_FEATURE` and a current-scoped concrete Verification matrix row
+  binds the exact requirement and canonical acceptance ID with status
+  `NOT_APPLICABLE`.
+
+Multiple task IDs or evidence IDs may support one derived disposition. A
+`SKIPPED` task never supplies requirement coverage, and task coverage conflicts
+with `NOT_APPLICABLE` evidence. Missing pairs, unknown or duplicate traces,
+conflicting evidence, stale scope, and uncovered requirement IDs are Codex-owned
+task replanning, not an owner decision or approval gate. Only a genuine change
+to the approved requirement, design, envelope, or authority uses the existing
+gate invalidation rules.
+
+The additive Engine JSON under `tasks` reports
+`requirement_coverage_complete`, `requirement_coverage`, and
+`missing_requirement_ids`. Each `requirement_coverage` item contains
+`requirement_id`, `acceptance_id`, `disposition`, `task_ids`, and
+`evidence_ids`. These fields are a deterministic projection, never a new source
+of truth or authorization.
+
 ## Coordinator contract
 
 - One coordinator owns task selection, claims, implementation, checkpoints, and
@@ -81,8 +116,11 @@ its graph with tasks for the current IDs, and sets the new plan `CURRENT`.
   commands/results, evidence IDs, external actions, and deviations before DONE.
 - GitHub writes occur only when the current AUTH names the repository and
   operation. Otherwise retain `PENDING_SYNC`.
-- AWS mutations occur only within a complete current AUTH or action-specific AWS
-  authorization. Exactly one named AWS operator may mutate AWS at a time.
+- Local tasks use only AWS mode `NONE` or `DOCS_ONLY`. If a task reaches
+  authenticated AWS work, checkpoint its local state and route account reads
+  through AWS-10, deployment mutations through AWS-20, and teardown mutations
+  through AWS-50. Task metadata never carries authenticated read or mutation
+  authority; Gate B remains only the maximum planned AWS ceiling.
 ## Fastlane task methodology
 
 Task cards trace to approved EARS requirement IDs; they are not written in EARS
@@ -207,7 +245,7 @@ routes to `TASK-10`, not construction.
 | `Risk` | Objective task risk classification |
 | `Write set` | Exact paths or narrow globs |
 | `External state` | Exact mutable targets or `NONE` |
-| `AWS mode` | `NONE`, `DOCS_ONLY`, `READ_ONLY`, or `MUTATION` |
+| `AWS mode` | `NONE` or `DOCS_ONLY`; authenticated AWS work routes outside TASK/BUILD |
 | `Attempt budget` | Positive integer from AUTH |
 | `Attempts used` | Non-negative integer not exceeding the budget |
 | `Evidence` | Evidence IDs or `NONE` before evidence exists |
@@ -216,6 +254,12 @@ routes to `TASK-10`, not construction.
 | `GitHub issue` | Authorized issue URL or `PENDING_SYNC` |
 | `Last checkpoint` | Coordinator checkpoint ID or `NONE` |
 | `Last updated` | ISO 8601 timestamp or `TODO` before initialization |
+
+For every modern approved requirement cited by a task, `Requirements` contains
+the exact requirement ID and its canonical acceptance ID together; neither may
+appear without the other. The current `REQ-*` identity remains mandatory on
+every task card. A task may cover several approved pairs, and an approved pair
+may be implemented by several non-skipped tasks.
 
 When a task implements or verifies an approved property, include its `PROP-*`
 IDs in `Requirements` and copy its complete PRD Property execution row into one
@@ -328,12 +372,16 @@ property coverage.
 - A waiver cannot broaden scope, weaken an acceptance criterion, or conceal a
   missing security, data, migration, recovery, or release obligation. If it
   would, stop and revise Gate A or Gate B as applicable.
-- Tasks in one structural wave may run concurrently only when their write sets,
-  external state, dependencies, generated outputs, and tool operations are
-  demonstrably disjoint. Otherwise serialize them.
-- Every AWS mutation is serialized even when local task paths are disjoint.
-- BUILD-10 and BUILD-20 stop at an AWS mutation boundary. Preflight through
-  AWS-10, mutate only through AWS-20, and reconcile live evidence through AWS-30.
+- Structural waves express dependency order; they do not authorize concurrent
+  mutable work. The coordinator claims and executes one mutable task at a time.
+  Read-only analysis may run outside task claims, but it cannot write files or
+  mutable external state.
+- No local task uses authenticated `READ_ONLY` or `MUTATION` mode. BUILD-10 and
+  BUILD-20 checkpoint and stop at an authenticated AWS boundary: preflight
+  through AWS-10, deploy only through AWS-20, reconcile deployment evidence
+  through AWS-30, review residuals through AWS-40, and tear down only through
+  AWS-50. Later AWS mutations remain serialized even when local paths are
+  disjoint.
 
 ### Dependency waiver registry
 

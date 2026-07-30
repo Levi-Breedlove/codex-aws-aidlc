@@ -46,6 +46,33 @@ class PackageReleaseTests(unittest.TestCase):
         )
         return result.stdout.strip()
 
+    def _create_directory_link(self, link: Path, target: Path) -> None:
+        """Create a directory symlink or a Windows junction for link tests."""
+
+        try:
+            link.symlink_to(target, target_is_directory=True)
+            return
+        except OSError as symlink_error:
+            if os.name != "nt":
+                self.skipTest(f"Directory links are unavailable: {symlink_error}")
+        result = subprocess.run(
+            ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            self.skipTest("Directory symlinks and Windows junctions are unavailable")
+
+    @staticmethod
+    def _remove_directory_link(link: Path) -> None:
+        """Remove a test link without traversing its target."""
+
+        if link.is_symlink():
+            link.unlink()
+        elif link.exists():
+            link.rmdir()
+
     def _write_synthetic_package(
         self,
         root: Path,
@@ -58,9 +85,10 @@ class PackageReleaseTests(unittest.TestCase):
         controls = set(package_release.REQUIRED_CONTROL_FILES)
         if historical_controls:
             controls.remove("scripts/fastlane_stdio.py")
+            controls.remove("scripts/fastlane_process.py")
+            controls.remove("scripts/fastlane_project_identity.py")
         contents = {
-            relative: f"{relative}: {marker}\n".encode("utf-8")
-            for relative in controls
+            relative: f"{relative}: {marker}\n".encode("utf-8") for relative in controls
         }
         contents["README.md"] = f"synthetic package: {marker}\n".encode("utf-8")
         if extra_path:
@@ -88,7 +116,9 @@ class PackageReleaseTests(unittest.TestCase):
             (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
         )
 
-    def _synthetic_repository(self, *, historical_controls: bool = False) -> tuple[Path, tempfile.TemporaryDirectory[str], str]:
+    def _synthetic_repository(
+        self, *, historical_controls: bool = False
+    ) -> tuple[Path, tempfile.TemporaryDirectory[str], str]:
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name)
         self._git(root, "init", "-b", "maintenance")
@@ -108,13 +138,12 @@ class PackageReleaseTests(unittest.TestCase):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(
             encoding="utf-8"
         )
-        checkout = (
-            "actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 "
-            "# v6.0.1"
-        )
+        checkout = "actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1"
         setup_python = (
-            "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 "
-            "# v6.3.0"
+            "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0"
+        )
+        ruff_action = (
+            "astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0"
         )
         action_uses = [
             line.split("uses:", 1)[1].strip()
@@ -124,7 +153,7 @@ class PackageReleaseTests(unittest.TestCase):
 
         self.assertEqual(
             action_uses,
-            [checkout, setup_python] * 4,
+            [checkout, setup_python, ruff_action] + [checkout, setup_python] * 3,
         )
         self.assertEqual(workflow.count("persist-credentials: false"), 4)
         self.assertIn("permissions:\n  contents: read\n", workflow)
@@ -175,6 +204,8 @@ class PackageReleaseTests(unittest.TestCase):
         )
         ordered_steps = (
             "Validate Python syntax and indentation",
+            "Run Ruff lint",
+            "Verify Ruff formatting",
             "Run repository governance monitors",
             "Verify template manifest hashes",
             "Enforce customer package version identity",
@@ -182,6 +213,20 @@ class PackageReleaseTests(unittest.TestCase):
         )
         positions = [workflow.index(f"name: {name}") for name in ordered_steps]
         self.assertEqual(positions, sorted(positions))
+        self.assertEqual(workflow.count('version: "0.16.0"'), 1)
+        self.assertIn("args: check --no-cache", workflow)
+        self.assertIn(
+            "src: >-\n"
+            "            bootstrap.py\n"
+            "            scripts\n"
+            "            tests\n"
+            "            .codex/hooks\n",
+            workflow,
+        )
+        self.assertIn(
+            "ruff format --check --no-cache bootstrap.py scripts tests .codex/hooks",
+            workflow,
+        )
         for forbidden in (
             "git fetch",
             "git tag",
@@ -204,11 +249,9 @@ class PackageReleaseTests(unittest.TestCase):
 
     def test_manifest_is_the_only_internal_version_source(self) -> None:
         manifest = json.loads(
-            (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(
-                encoding="utf-8"
-            )
+            (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.0.2")
+        self.assertEqual(manifest["bootstrap_version"], "1.0.3")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -223,9 +266,13 @@ class PackageReleaseTests(unittest.TestCase):
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        linked_versions = re.findall(r"releases/(?:download|tag)/v(\d+\.\d+\.\d+)", readme)
+        linked_versions = re.findall(
+            r"releases/(?:download|tag)/v(\d+\.\d+\.\d+)", readme
+        )
         self.assertTrue(
-            all(version == manifest["bootstrap_version"] for version in linked_versions),
+            all(
+                version == manifest["bootstrap_version"] for version in linked_versions
+            ),
             linked_versions,
         )
 
@@ -239,6 +286,8 @@ class PackageReleaseTests(unittest.TestCase):
             "docs/WORKFLOW.md",
             "scripts/setup_assistant.py",
             "tests/test_setup_assistant.py",
+            ".github/dependabot.yml",
+            "pyproject.toml",
         ):
             self.assertIn(required, inventory)
 
@@ -250,6 +299,7 @@ class PackageReleaseTests(unittest.TestCase):
             if path.is_file()
             and ".git" not in path.parts
             and "__pycache__" not in path.parts
+            and ".ruff_cache" not in path.parts
             and path.suffix != ".pyc"
             and "dist" not in path.parts
         }
@@ -393,7 +443,9 @@ class PackageReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             archive_path = Path(temporary) / package_release.ARCHIVE_NAME
             digest = package_release.write_release(REPOSITORY_ROOT, archive_path)
-            self.assertEqual(digest, hashlib.sha256(archive_path.read_bytes()).hexdigest())
+            self.assertEqual(
+                digest, hashlib.sha256(archive_path.read_bytes()).hexdigest()
+            )
             self.assertEqual(
                 package_release.checksum_path(archive_path).read_text(encoding="ascii"),
                 f"{digest}  {archive_path.name}\n",
@@ -442,9 +494,7 @@ class PackageReleaseTests(unittest.TestCase):
             shutil.copytree(
                 REPOSITORY_ROOT,
                 root,
-                ignore=shutil.ignore_patterns(
-                    ".git", "__pycache__", "*.pyc", "dist"
-                ),
+                ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", "dist"),
             )
             refresh = subprocess.run(
                 [sys.executable, "scripts/update_manifest.py", "--write"],
@@ -478,9 +528,7 @@ class PackageReleaseTests(unittest.TestCase):
             shutil.copytree(
                 REPOSITORY_ROOT,
                 root,
-                ignore=shutil.ignore_patterns(
-                    ".git", "__pycache__", "*.pyc", "dist"
-                ),
+                ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", "dist"),
             )
             refresh = subprocess.run(
                 [sys.executable, "scripts/update_manifest.py", "--write"],
@@ -528,6 +576,174 @@ class PackageReleaseTests(unittest.TestCase):
                     package_release.checksum_path(archive_path).read_bytes(),
                 ),
             )
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symbolic links are unavailable")
+    def test_cli_rejects_direct_symlink_output_without_touching_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            outside = root / "outside-sentinel.txt"
+            outside.write_bytes(b"outside sentinel")
+            output = root / "release.zip"
+            try:
+                output.symlink_to(outside)
+            except OSError as exc:
+                self.skipTest(f"File symlinks are unavailable: {exc}")
+
+            with (
+                mock.patch.object(
+                    package_release,
+                    "expected_artifacts",
+                    return_value=(b"archive", b"checksum"),
+                ),
+                mock.patch("builtins.print"),
+            ):
+                result = package_release.main(["--output", str(output)])
+
+            self.assertEqual(result, 1)
+            self.assertEqual(outside.read_bytes(), b"outside sentinel")
+            self.assertTrue(output.is_symlink())
+            self.assertFalse(outside.with_name(f"{outside.name}.sha256").exists())
+
+    def test_cli_writes_an_explicit_external_output_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "external" / "release.zip"
+            with (
+                mock.patch.object(
+                    package_release,
+                    "expected_artifacts",
+                    return_value=(b"archive", b"checksum"),
+                ),
+                mock.patch("builtins.print"),
+            ):
+                result = package_release.main(["--output", str(output)])
+
+            self.assertEqual(result, 0)
+            self.assertEqual(output.read_bytes(), b"archive")
+            self.assertEqual(
+                package_release.checksum_path(output).read_bytes(),
+                b"checksum",
+            )
+
+    @unittest.skipIf(os.name == "nt", "POSIX path semantics are required")
+    def test_verified_darwin_root_alias_is_canonicalized_without_descendants(
+        self,
+    ) -> None:
+        self.assertEqual(
+            package_release.DARWIN_SYSTEM_ROOT_ALIASES,
+            {"/tmp": "/private/tmp", "/var": "/private/var"},
+        )
+        source = Path("/var/folders/example/linked-output/release.zip")
+
+        with (
+            mock.patch.object(package_release.sys, "platform", "darwin"),
+            mock.patch.object(
+                package_release,
+                "_is_link_or_reparse_point",
+                side_effect=lambda path: path == Path("/var"),
+            ),
+            mock.patch.object(
+                package_release.os.path,
+                "realpath",
+                return_value="/private/var",
+            ) as realpath,
+        ):
+            validated = package_release.validate_output_path(source)
+
+        self.assertEqual(
+            validated,
+            Path("/private/var/folders/example/linked-output/release.zip"),
+        )
+        realpath.assert_called_once_with(Path("/var"))
+
+    @unittest.skipIf(os.name == "nt", "POSIX path semantics are required")
+    def test_unexpected_darwin_root_alias_target_remains_rejected(self) -> None:
+        with (
+            mock.patch.object(package_release.sys, "platform", "darwin"),
+            mock.patch.object(
+                package_release,
+                "_is_link_or_reparse_point",
+                side_effect=lambda path: path == Path("/var"),
+            ),
+            mock.patch.object(
+                package_release.os.path,
+                "realpath",
+                return_value="/unexpected/var",
+            ),
+            self.assertRaisesRegex(
+                package_release.PackagingError,
+                "symlink or reparse point",
+            ),
+        ):
+            package_release.validate_output_path(Path("/var/folders/release.zip"))
+
+    def test_cli_rejects_linked_output_ancestor_without_writing_outside(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "sentinel.txt"
+            sentinel.write_bytes(b"outside sentinel")
+            linked_parent = root / "linked-output"
+            self._create_directory_link(linked_parent, outside)
+            try:
+                output = linked_parent / "release.zip"
+                with (
+                    mock.patch.object(
+                        package_release,
+                        "expected_artifacts",
+                        return_value=(b"archive", b"checksum"),
+                    ),
+                    mock.patch("builtins.print"),
+                ):
+                    result = package_release.main(["--output", str(output)])
+
+                self.assertEqual(result, 1)
+                self.assertEqual(sentinel.read_bytes(), b"outside sentinel")
+                self.assertFalse((outside / "release.zip").exists())
+                self.assertFalse((outside / "release.zip.sha256").exists())
+            finally:
+                self._remove_directory_link(linked_parent)
+
+    def test_atomic_write_rechecks_output_path_before_replace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output_parent = root / "output"
+            output_parent.mkdir()
+            displaced_parent = root / "displaced-output"
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "sentinel.txt"
+            sentinel.write_bytes(b"outside sentinel")
+            output = output_parent / "release.zip"
+            real_validate = package_release.validate_output_path
+            validation_calls = 0
+
+            def link_before_final_validation(path: Path) -> Path:
+                nonlocal validation_calls
+                validation_calls += 1
+                if validation_calls == 3:
+                    output_parent.rename(displaced_parent)
+                    self._create_directory_link(output_parent, outside)
+                return real_validate(path)
+
+            try:
+                with (
+                    mock.patch.object(
+                        package_release,
+                        "validate_output_path",
+                        side_effect=link_before_final_validation,
+                    ),
+                    self.assertRaisesRegex(
+                        package_release.PackagingError,
+                        "symlink or reparse point",
+                    ),
+                ):
+                    package_release.atomic_write(output, b"archive")
+                self.assertEqual(validation_calls, 3)
+                self.assertEqual(sentinel.read_bytes(), b"outside sentinel")
+                self.assertFalse((outside / "release.zip").exists())
+            finally:
+                self._remove_directory_link(output_parent)
 
     def test_unsafe_manifest_path_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -583,10 +799,14 @@ class PackageReleaseTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(package_release.PackagingError, "semantic version"):
+            with self.assertRaisesRegex(
+                package_release.PackagingError, "semantic version"
+            ):
                 package_release.load_release_files(root)
 
-    def test_package_version_guard_requires_a_strict_bump_for_changed_bytes(self) -> None:
+    def test_package_version_guard_requires_a_strict_bump_for_changed_bytes(
+        self,
+    ) -> None:
         root, temporary, base = self._synthetic_repository()
         self.addCleanup(temporary.cleanup)
         self.assertFalse(package_release.check_versioned_package_change(root, base))
@@ -601,7 +821,9 @@ class PackageReleaseTests(unittest.TestCase):
         self._write_synthetic_package(root, "1.0.2", "changed")
         self.assertTrue(package_release.check_versioned_package_change(root, base))
 
-    def test_package_version_guard_detects_inventory_changes_and_regression(self) -> None:
+    def test_package_version_guard_detects_inventory_changes_and_regression(
+        self,
+    ) -> None:
         root, temporary, base = self._synthetic_repository()
         self.addCleanup(temporary.cleanup)
         self._write_synthetic_package(
@@ -650,7 +872,12 @@ class PackageReleaseTests(unittest.TestCase):
 
     def test_current_release_text_rejects_stale_versions_except_fixtures(self) -> None:
         stale_product_version = "1" + ".2.0"
-        stale_versions = ("1" + ".0.0", PREVIOUS_PACKAGE_VERSION, "2" + ".0.0", stale_product_version)
+        stale_versions = (
+            "1" + ".0.0",
+            PREVIOUS_PACKAGE_VERSION,
+            "2" + ".0.0",
+            stale_product_version,
+        )
         negative_fixture_marker = f'"bootstrap_version": "{stale_versions[0]}"'
         text_suffixes = {".md", ".json", ".yaml", ".yml", ".py", ".txt"}
         allowed_negative_fixtures = 0

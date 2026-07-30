@@ -135,7 +135,10 @@ def _normalized_detail(value: str) -> str:
 
 
 def _contains_unsupported_whitespace(value: str) -> bool:
-    return any(character.isspace() and character not in ALLOWED_WHITESPACE for character in value)
+    return any(
+        character.isspace() and character not in ALLOWED_WHITESPACE
+        for character in value
+    )
 
 
 def _contains_unsupported_control(value: str) -> bool:
@@ -171,7 +174,9 @@ def intake_detail_safety_code(detail: str) -> str | None:
     return None
 
 
-def _question_contracts(pending_card: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+def _question_contracts(
+    pending_card: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     errors: list[dict[str, str]] = []
     raw_questions = pending_card.get("questions")
     if (
@@ -179,14 +184,23 @@ def _question_contracts(pending_card: Mapping[str, Any]) -> tuple[list[dict[str,
         or isinstance(raw_questions, (str, bytes))
         or not 1 <= len(raw_questions) <= 3
     ):
-        return [], [_error("INTAKE_CARD_INVALID", "Current card must contain one to three questions")]
+        return [], [
+            _error(
+                "INTAKE_CARD_INVALID",
+                "Current card must contain one to three questions",
+            )
+        ]
 
     questions: list[dict[str, Any]] = []
     seen_reply_keys: set[str] = set()
     seen_question_ids: set[str] = set()
     for raw in raw_questions:
         if not isinstance(raw, Mapping):
-            errors.append(_error("INTAKE_CARD_INVALID", "Current card contains an invalid question"))
+            errors.append(
+                _error(
+                    "INTAKE_CARD_INVALID", "Current card contains an invalid question"
+                )
+            )
             continue
         reply_key = raw.get("reply_key")
         question_id = raw.get("question_id")
@@ -208,7 +222,12 @@ def _question_contracts(pending_card: Mapping[str, Any]) -> tuple[list[dict[str,
             or not isinstance(required_detail_for, Sequence)
             or isinstance(required_detail_for, (str, bytes))
         ):
-            errors.append(_error("INTAKE_CARD_INVALID", "Current card contains an invalid question contract"))
+            errors.append(
+                _error(
+                    "INTAKE_CARD_INVALID",
+                    "Current card contains an invalid question contract",
+                )
+            )
             continue
         seen_reply_keys.add(reply_key)
         seen_question_ids.add(question_id)
@@ -222,7 +241,11 @@ def _question_contracts(pending_card: Mapping[str, Any]) -> tuple[list[dict[str,
                 or any(item not in {"A", "B", "C"} for item in required_detail_for)
             ):
                 errors.append(
-                    _error("INTAKE_CARD_INVALID", "Decision question has invalid choices or detail rules", reply_key=reply_key)
+                    _error(
+                        "INTAKE_CARD_INVALID",
+                        "Decision question has invalid choices or detail rules",
+                        reply_key=reply_key,
+                    )
                 )
                 continue
         elif (
@@ -231,7 +254,11 @@ def _question_contracts(pending_card: Mapping[str, Any]) -> tuple[list[dict[str,
             or tuple(required_detail_for) != ("RESPONSE",)
         ):
             errors.append(
-                _error("INTAKE_CARD_INVALID", "Factual question has invalid choice or detail rules", reply_key=reply_key)
+                _error(
+                    "INTAKE_CARD_INVALID",
+                    "Factual question has invalid choice or detail rules",
+                    reply_key=reply_key,
+                )
             )
             continue
         questions.append(
@@ -256,16 +283,32 @@ def _question_contracts(pending_card: Mapping[str, Any]) -> tuple[list[dict[str,
     return questions, errors
 
 
-def _parse_entry(entry: str, question: Mapping[str, Any]) -> tuple[str | None, str | None, dict[str, str] | None]:
+def _parse_entry(
+    entry: str, question: Mapping[str, Any]
+) -> tuple[str | None, str | None, dict[str, str] | None]:
     key = str(question["reply_key"])
     remainder = _ascii_strip(entry[len(key) :])
     kind = question["kind"]
     if kind == "FACT":
         if not remainder.startswith(":"):
-            return None, None, _error("INTAKE_FACT_FORMAT", "Factual answers must use '<key>: <answer>'", reply_key=key)
+            return (
+                None,
+                None,
+                _error(
+                    "INTAKE_FACT_FORMAT",
+                    "Factual answers must use '<key>: <answer>'",
+                    reply_key=key,
+                ),
+            )
         detail = _normalized_detail(remainder[1:])
         if not detail:
-            return None, None, _error("INTAKE_DETAIL_REQUIRED", "Factual answer is empty", reply_key=key)
+            return (
+                None,
+                None,
+                _error(
+                    "INTAKE_DETAIL_REQUIRED", "Factual answer is empty", reply_key=key
+                ),
+            )
         return "RESPONSE", detail, None
 
     choice: str | None = None
@@ -281,23 +324,47 @@ def _parse_entry(entry: str, question: Mapping[str, Any]) -> tuple[str | None, s
         trailing = _ascii_strip(remainder[1:])
         if trailing:
             if not trailing.startswith(":"):
-                return None, None, _error(
-                    "INTAKE_DECISION_FORMAT",
-                    "Decision detail must follow a colon",
-                    reply_key=key,
+                return (
+                    None,
+                    None,
+                    _error(
+                        "INTAKE_DECISION_FORMAT",
+                        "Decision detail must follow a colon",
+                        reply_key=key,
+                    ),
                 )
             detail = _normalized_detail(trailing[1:]) or None
     if choice is None:
-        return None, None, _error(
-            "INTAKE_DECISION_FORMAT",
-            "Decision answers must choose A, B, or C",
-            reply_key=key,
+        return (
+            None,
+            None,
+            _error(
+                "INTAKE_DECISION_FORMAT",
+                "Decision answers must choose A, B, or C",
+                reply_key=key,
+            ),
         )
     required = choice in question["required_detail_for"]
     if required and detail is None:
-        return None, None, _error("INTAKE_DETAIL_REQUIRED", "This choice requires supporting detail", reply_key=key)
+        return (
+            None,
+            None,
+            _error(
+                "INTAKE_DETAIL_REQUIRED",
+                "This choice requires supporting detail",
+                reply_key=key,
+            ),
+        )
     if not required and detail is not None:
-        return None, None, _error("INTAKE_DETAIL_UNEXPECTED", "This choice does not accept supporting detail", reply_key=key)
+        return (
+            None,
+            None,
+            _error(
+                "INTAKE_DETAIL_UNEXPECTED",
+                "This choice does not accept supporting detail",
+                reply_key=key,
+            ),
+        )
     return choice, detail, None
 
 
@@ -337,7 +404,11 @@ def parse_intake_owner_response(
         and OWNER_RESPONSE_ID.fullmatch(owner_response_id) is not None
     )
     if not valid_owner_response_id:
-        errors.append(_error("OWNER_RESPONSE_ID_INVALID", "Owner response ID must use OWNER-MSG-nnnn"))
+        errors.append(
+            _error(
+                "OWNER_RESPONSE_ID_INVALID", "Owner response ID must use OWNER-MSG-nnnn"
+            )
+        )
     if (
         not isinstance(card_id, str)
         or CARD_ID.fullmatch(card_id) is None
@@ -350,7 +421,9 @@ def parse_intake_owner_response(
         or REPLY_TOKEN.fullmatch(reply_token) is None
         or not isinstance(pending_card.get("accept_all_allowed"), bool)
     ):
-        errors.append(_error("INTAKE_CARD_INVALID", "Current intake card identity is invalid"))
+        errors.append(
+            _error("INTAKE_CARD_INVALID", "Current intake card identity is invalid")
+        )
     elif (
         expected_card_id != card_id
         or expected_revision != card_revision
@@ -369,9 +442,19 @@ def parse_intake_owner_response(
     if not isinstance(raw_response, str) or not _ascii_strip(raw_response):
         errors.append(_error("INTAKE_RESPONSE_EMPTY", "Owner response is empty"))
     elif len(raw_response) > MAX_RESPONSE_CHARACTERS:
-        errors.append(_error("INTAKE_RESPONSE_TOO_LONG", "Owner response exceeds the bounded intake limit"))
+        errors.append(
+            _error(
+                "INTAKE_RESPONSE_TOO_LONG",
+                "Owner response exceeds the bounded intake limit",
+            )
+        )
     elif _contains_unsupported_whitespace(raw_response):
-        errors.append(_error("INTAKE_RESPONSE_WHITESPACE", "Owner response contains unsupported Unicode whitespace"))
+        errors.append(
+            _error(
+                "INTAKE_RESPONSE_WHITESPACE",
+                "Owner response contains unsupported Unicode whitespace",
+            )
+        )
     elif _contains_unsupported_control(raw_response):
         errors.append(
             _error(
@@ -384,7 +467,9 @@ def parse_intake_owner_response(
             status="FAIL",
             owner_response_id=owner_response_id if valid_owner_response_id else None,
             card_id=card_id if isinstance(card_id, str) else None,
-            card_revision=card_revision if isinstance(card_revision, int) and not isinstance(card_revision, bool) else None,
+            card_revision=card_revision
+            if isinstance(card_revision, int) and not isinstance(card_revision, bool)
+            else None,
             card_sha256=card_sha256 if isinstance(card_sha256, str) else None,
             errors=tuple(errors),
         )
@@ -402,10 +487,12 @@ def parse_intake_owner_response(
             card_id=card_id,
             card_revision=card_revision,
             card_sha256=card_sha256,
-            errors=(_error(
-                "INTAKE_CARD_STALE",
-                "This reply is not bound to the latest intake card; use its copyable reply",
-            ),),
+            errors=(
+                _error(
+                    "INTAKE_CARD_STALE",
+                    "This reply is not bound to the latest intake card; use its copyable reply",
+                ),
+            ),
         )
     normalized = _ascii_strip(normalized[len(token_prefix) :])
     if not normalized:
@@ -413,7 +500,12 @@ def parse_intake_owner_response(
     selected: dict[str, tuple[str, str | None]] = {}
     if normalized == ACCEPT_ALL_RECOMMENDATIONS:
         if not pending_card.get("accept_all_allowed"):
-            errors.append(_error("INTAKE_ACCEPT_ALL_NOT_ALLOWED", "Current card does not allow accepting all recommendations"))
+            errors.append(
+                _error(
+                    "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
+                    "Current card does not allow accepting all recommendations",
+                )
+            )
         else:
             for question in questions:
                 recommended = question["recommended"]
@@ -422,14 +514,31 @@ def parse_intake_owner_response(
                     or recommended not in {"A", "B", "C"}
                     or recommended in question["required_detail_for"]
                 ):
-                    errors.append(_error("INTAKE_ACCEPT_ALL_NOT_ALLOWED", "Current card recommendations are not independently complete"))
+                    errors.append(
+                        _error(
+                            "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
+                            "Current card recommendations are not independently complete",
+                        )
+                    )
                     break
                 selected[str(question["reply_key"])] = (str(recommended), None)
     else:
         if normalized.casefold() == ACCEPT_ALL_RECOMMENDATIONS.casefold():
-            errors.append(_error("INTAKE_ACCEPT_ALL_EXACT", "Use the exact phrase 'Accept all recommendations.'"))
-        elif normalized.startswith(";") or normalized.endswith(";") or ";;" in normalized:
-            errors.append(_error("INTAKE_RESPONSE_FORMAT", "Reply contains an empty or trailing entry"))
+            errors.append(
+                _error(
+                    "INTAKE_ACCEPT_ALL_EXACT",
+                    "Use the exact phrase 'Accept all recommendations.'",
+                )
+            )
+        elif (
+            normalized.startswith(";") or normalized.endswith(";") or ";;" in normalized
+        ):
+            errors.append(
+                _error(
+                    "INTAKE_RESPONSE_FORMAT",
+                    "Reply contains an empty or trailing entry",
+                )
+            )
         else:
             entries = re.split(r"(?:;|\r?\n)+", normalized)
             by_key = {str(question["reply_key"]): question for question in questions}
@@ -437,14 +546,30 @@ def parse_intake_owner_response(
                 entry = _ascii_strip(raw_entry)
                 match = re.match(r"([0-9]+)", entry)
                 if match is None:
-                    errors.append(_error("INTAKE_RESPONSE_EXTRA_TEXT", "Reply contains unparsed text"))
+                    errors.append(
+                        _error(
+                            "INTAKE_RESPONSE_EXTRA_TEXT", "Reply contains unparsed text"
+                        )
+                    )
                     continue
                 key = match.group(1)
                 if key not in by_key:
-                    errors.append(_error("INTAKE_REPLY_KEY_UNKNOWN", "Reply key is not on the current card", reply_key=key))
+                    errors.append(
+                        _error(
+                            "INTAKE_REPLY_KEY_UNKNOWN",
+                            "Reply key is not on the current card",
+                            reply_key=key,
+                        )
+                    )
                     continue
                 if key in selected:
-                    errors.append(_error("INTAKE_REPLY_KEY_DUPLICATE", "Reply key appears more than once", reply_key=key))
+                    errors.append(
+                        _error(
+                            "INTAKE_REPLY_KEY_DUPLICATE",
+                            "Reply key appears more than once",
+                            reply_key=key,
+                        )
+                    )
                     continue
                 selection, detail, entry_error = _parse_entry(entry, by_key[key])
                 if entry_error is not None:
@@ -453,7 +578,13 @@ def parse_intake_owner_response(
                 assert selection is not None
                 if detail is not None:
                     if len(detail) > MAX_DETAIL_CHARACTERS:
-                        errors.append(_error("INTAKE_DETAIL_TOO_LONG", "Answer detail exceeds the bounded intake limit", reply_key=key))
+                        errors.append(
+                            _error(
+                                "INTAKE_DETAIL_TOO_LONG",
+                                "Answer detail exceeds the bounded intake limit",
+                                reply_key=key,
+                            )
+                        )
                         continue
                     safety_code = intake_detail_safety_code(detail)
                     if safety_code is not None:
@@ -465,7 +596,9 @@ def parse_intake_owner_response(
                                 "remove it and rotate it if real"
                             ),
                         }
-                        errors.append(_error(safety_code, messages[safety_code], reply_key=key))
+                        errors.append(
+                            _error(safety_code, messages[safety_code], reply_key=key)
+                        )
                         continue
                 selected[key] = (selection, detail)
 

@@ -11,11 +11,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import re
+import shlex
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -27,11 +31,34 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from fastlane_stdio import configure_utf8_standard_streams
 from fastlane_presenter import PresentationError, render_prerequisite_update
+from fastlane_process import resolve_trusted_git
 
 
 OFFICIAL_AWS_MARKETPLACE = "aws/agent-toolkit-for-aws"
 OFFICIAL_AWS_MARKETPLACE_NAME = "agent-toolkit-for-aws"
 OFFICIAL_AWS_CORE_IDENTITY = "aws-core@agent-toolkit-for-aws"
+HOOK_EXAMPLE_RELATIVE = Path(".codex/hooks.fastlane.example.json")
+HOOK_CONFIG_RELATIVE = Path(".codex/hooks.json")
+MAX_HOOK_CONFIG_BYTES = 128 * 1024
+HOOK_EVENT_MODES = {
+    "SessionStart": "session-start",
+    "PreToolUse": "pre-tool-use",
+    "PermissionRequest": "permission-request",
+    "PostToolUse": "post-tool-use",
+    "Stop": "stop",
+}
+HOOK_LAUNCHER_CODE = (
+    "import pathlib,runpy,sys; "
+    "roots=[p for p in (pathlib.Path.cwd(),*pathlib.Path.cwd().parents) "
+    "if (p/'bootstrap.manifest.json').is_file() and "
+    "(p/'scripts/bootstrap_doctor.py').is_file()]; "
+    "len(roots)==1 or sys.exit('Fastlane root is missing or ambiguous'); "
+    "hook=roots[0]/'.codex/hooks/fastlane_hook.py'; "
+    "hook.is_file() or sys.exit('Fastlane hook is missing'); "
+    "sys.argv=[str(hook),sys.argv[1]]; "
+    "runpy.run_path(str(hook),run_name='__main__')"
+)
+WINDOWS_HOOK_SHELL_META = frozenset('&|<>^%!()"\r\n')
 
 CODEX_GUIDE = "https://learn.chatgpt.com/docs/codex/cli#getting-started"
 UV_GUIDE = "https://docs.astral.sh/uv/getting-started/installation/"
@@ -131,13 +158,22 @@ def _parse_runtime_discovery(value: object) -> dict[str, Any]:
                 raise SetupError(f"stdin evidence field {key!r} must be boolean")
             result[key] = item
         elif key == "discovered_skill_identifiers":
-            if not isinstance(item, list) or not all(isinstance(entry, str) for entry in item):
+            if not isinstance(item, list) or not all(
+                isinstance(entry, str) for entry in item
+            ):
                 raise SetupError(f"stdin evidence field {key!r} must be a string list")
             identifiers = [_safe_text(entry, key) for entry in item]
             if len(identifiers) != len(set(identifiers)):
-                raise SetupError("discovered_skill_identifiers must not contain duplicates")
-            if any(CANONICAL_SKILL_IDENTIFIER.fullmatch(entry) is None for entry in identifiers):
-                raise SetupError("discovered_skill_identifiers must contain canonical identifiers")
+                raise SetupError(
+                    "discovered_skill_identifiers must not contain duplicates"
+                )
+            if any(
+                CANONICAL_SKILL_IDENTIFIER.fullmatch(entry) is None
+                for entry in identifiers
+            ):
+                raise SetupError(
+                    "discovered_skill_identifiers must contain canonical identifiers"
+                )
             result[key] = identifiers
         else:
             if not isinstance(item, str):
@@ -145,10 +181,14 @@ def _parse_runtime_discovery(value: object) -> dict[str, Any]:
             result[key] = _safe_text(item, key)
     for key in ("search_status", "retrieve_status"):
         if result[key] not in CAPABILITY_RESULTS:
-            raise SetupError(f"stdin evidence field {key!r} must be PASS, FAIL, or UNAVAILABLE")
+            raise SetupError(
+                f"stdin evidence field {key!r} must be PASS, FAIL, or UNAVAILABLE"
+            )
     for key in ("selected_skill_identifier", "retrieved_skill_identifier"):
         if CANONICAL_SKILL_IDENTIFIER.fullmatch(result[key]) is None:
-            raise SetupError(f"stdin evidence field {key!r} must be a canonical identifier")
+            raise SetupError(
+                f"stdin evidence field {key!r} must be a canonical identifier"
+            )
     return result
 
 
@@ -202,7 +242,9 @@ def read_session_evidence(stream: Any) -> dict[str, Any]:
         raise SetupError("stdin evidence must be a JSON object")
     unknown = sorted(set(parsed) - SESSION_EVIDENCE_FIELDS)
     if unknown:
-        raise SetupError("stdin evidence contains unknown field(s): " + ", ".join(unknown))
+        raise SetupError(
+            "stdin evidence contains unknown field(s): " + ", ".join(unknown)
+        )
 
     result: dict[str, Any] = {}
     for key, value in parsed.items():
@@ -217,16 +259,22 @@ def read_session_evidence(stream: Any) -> dict[str, Any]:
                 raise SetupError(f"stdin evidence field {key!r} must be a string")
             result[key] = _safe_text(value, key)
         else:
-            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) for item in value
+            ):
                 raise SetupError(f"stdin evidence field {key!r} must be a string list")
             result[key] = [_safe_text(item, key, maximum=2_000) for item in value]
 
     for field in ("retrieve_skill_result", "search_documentation_result"):
         if field in result and result[field] not in CAPABILITY_RESULTS:
-            raise SetupError(f"stdin evidence field {field!r} must be PASS, FAIL, or UNAVAILABLE")
+            raise SetupError(
+                f"stdin evidence field {field!r} must be PASS, FAIL, or UNAVAILABLE"
+            )
     for reference in result.get("search_documentation_references", []):
         if re.fullmatch(r"https://(?:docs\.)?aws\.amazon\.com/\S+", reference) is None:
-            raise SetupError("search_documentation_references must use official AWS HTTPS URLs")
+            raise SetupError(
+                "search_documentation_references must use official AWS HTTPS URLs"
+            )
     return result
 
 
@@ -257,6 +305,143 @@ def is_within(path: Path, root: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _is_link_or_reparse_point(path: Path) -> bool:
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise SetupError("Unable to inspect local hook configuration path") from exc
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    file_attributes = getattr(metadata, "st_file_attributes", 0)
+    return stat.S_ISLNK(metadata.st_mode) or bool(file_attributes & reparse_flag)
+
+
+def _trusted_hook_interpreter(root: Path, interpreter: Path) -> Path:
+    raw = interpreter.expanduser()
+    if not raw.is_absolute():
+        raise SetupError("Fastlane hooks require an absolute trusted Python")
+    try:
+        lexical = Path(os.path.abspath(os.fspath(raw)))
+        resolved = lexical.resolve(strict=True)
+        cwd_lexical = Path(os.path.abspath(os.fspath(Path.cwd())))
+        cwd_resolved = cwd_lexical.resolve(strict=True)
+    except OSError as exc:
+        raise SetupError("Fastlane hooks require an available trusted Python") from exc
+    if not resolved.is_file() or any(
+        is_within(candidate, boundary)
+        for candidate in (lexical, resolved)
+        for boundary in (root, cwd_lexical, cwd_resolved)
+    ):
+        raise SetupError(
+            "Fastlane hooks require trusted Python outside the project and current working directory"
+        )
+    if any(character in WINDOWS_HOOK_SHELL_META for character in str(resolved)):
+        raise SetupError(
+            "Fastlane hooks require a trusted Python path without shell metacharacters"
+        )
+    return resolved
+
+
+def _hook_configuration_text(root: Path, interpreter: Path) -> str:
+    codex_directory = root / ".codex"
+    example = root / HOOK_EXAMPLE_RELATIVE
+    if (
+        not codex_directory.is_dir()
+        or _is_link_or_reparse_point(codex_directory)
+        or not example.is_file()
+        or _is_link_or_reparse_point(example)
+    ):
+        raise SetupError("Fastlane hook template path is missing or unsafe")
+    try:
+        with example.open("rb") as stream:
+            raw = stream.read(MAX_HOOK_CONFIG_BYTES + 1)
+    except OSError as exc:
+        raise SetupError("Fastlane hook template is unreadable") from exc
+    if len(raw) > MAX_HOOK_CONFIG_BYTES:
+        raise SetupError("Fastlane hook template exceeds its size limit")
+    try:
+        configured = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise SetupError("Fastlane hook template is invalid") from exc
+    hooks = configured.get("hooks") if isinstance(configured, dict) else None
+    if not isinstance(hooks, dict):
+        raise SetupError("Fastlane hook template has no hook map")
+
+    trusted = str(_trusted_hook_interpreter(root, interpreter))
+    counts = {"command": 0, "commandWindows": 0}
+    try:
+        if set(hooks) != set(HOOK_EVENT_MODES):
+            raise SetupError("Fastlane hook template event map is invalid")
+        for event, groups in hooks.items():
+            mode = HOOK_EVENT_MODES[event]
+            commands = {
+                "command": shlex.join([trusted, "-c", HOOK_LAUNCHER_CODE, mode]),
+                "commandWindows": subprocess.list2cmdline(
+                    [trusted, "-c", HOOK_LAUNCHER_CODE, mode]
+                ),
+            }
+            for group in groups:
+                for hook in group["hooks"]:
+                    for field, command in commands.items():
+                        if hook[field] != "":
+                            raise SetupError(
+                                "Fastlane hook template command must remain disabled"
+                            )
+                        hook[field] = command
+                        counts[field] += 1
+    except (KeyError, TypeError) as exc:
+        raise SetupError("Fastlane hook template structure is invalid") from exc
+    if not counts["command"] or counts["command"] != counts["commandWindows"]:
+        raise SetupError("Fastlane hook template is incomplete")
+    return json.dumps(configured, indent=2, ensure_ascii=False) + "\n"
+
+
+def configure_local_hooks(
+    root: Path,
+    *,
+    interpreter: Path = Path(sys.executable),
+    replace: bool = False,
+) -> Path:
+    """Generate ignored local hooks with one absolute trusted interpreter."""
+
+    checked_root = canonical_root(root)
+    content = _hook_configuration_text(checked_root, interpreter)
+    codex_directory = checked_root / ".codex"
+    target = checked_root / HOOK_CONFIG_RELATIVE
+    target_is_link = _is_link_or_reparse_point(target)
+    if target_is_link or (target.exists() and not target.is_file()):
+        raise SetupError("Local Fastlane hook configuration path is unsafe")
+    if target.exists() and not replace:
+        raise SetupError("Local Fastlane hook configuration already exists")
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".hooks.", suffix=".tmp", dir=codex_directory
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.chmod(temporary, 0o600)
+        except OSError:
+            pass
+        if _is_link_or_reparse_point(codex_directory):
+            raise SetupError("Local Fastlane hook directory became unsafe")
+        if _is_link_or_reparse_point(target) or (
+            target.exists() and (not replace or not target.is_file())
+        ):
+            raise SetupError("Local Fastlane hook configuration changed before write")
+        os.replace(temporary, target)
+    except OSError as exc:
+        raise SetupError("Unable to write local Fastlane hook configuration") from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+    return target
 
 
 def _default_runner(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -296,6 +481,25 @@ def _probe(
     return True, completed.returncode == 0, encoded.decode("utf-8", errors="replace")
 
 
+def _probe_git(
+    root: Path,
+    *,
+    which: Which,
+    runner: Runner,
+) -> tuple[bool, bool, str]:
+    try:
+        candidate = resolve_trusted_git(root, locator=which)
+    except OSError:
+        return False, False, ""
+    try:
+        completed = runner([candidate, "--version"])
+    except (OSError, subprocess.SubprocessError):
+        return True, False, ""
+    combined = f"{completed.stdout or ''}\n{completed.stderr or ''}".strip()
+    encoded = combined.encode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
+    return True, completed.returncode == 0, encoded.decode("utf-8", errors="replace")
+
+
 def _version_at_least(output: str, minimum: tuple[int, ...]) -> bool:
     match = re.search(r"(?<!\d)(\d+)\.(\d+)(?:\.(\d+))?", output)
     if match is None:
@@ -327,9 +531,7 @@ def inspect_local_prerequisites(
     login_available, login_ok, _ = _probe(
         "codex", ["login", "status"], checked_root, which=which, runner=runner
     )
-    git_available, git_ok, _ = _probe(
-        "git", ["--version"], checked_root, which=which, runner=runner
-    )
+    git_available, git_ok, _ = _probe_git(checked_root, which=which, runner=runner)
 
     python_names = (
         ("python3", "python", "py")
@@ -340,7 +542,9 @@ def inspect_local_prerequisites(
     python_supported = False
     for name in python_names:
         arguments = ["-3", "--version"] if name == "py" else ["--version"]
-        available, ok, output = _probe(name, arguments, checked_root, which=which, runner=runner)
+        available, ok, output = _probe(
+            name, arguments, checked_root, which=which, runner=runner
+        )
         if not available:
             continue
         python_available = True
@@ -370,7 +574,11 @@ def inspect_local_prerequisites(
         "bubblewrap_required": bubblewrap_required,
         "bubblewrap_available": bwrap_available and bwrap_ok,
         "platform_supported": not is_wsl or is_wsl2,
-        "platform_family": "WINDOWS" if system_name.startswith("WINDOWS") else "MACOS" if system_name == "DARWIN" else "LINUX",
+        "platform_family": "WINDOWS"
+        if system_name.startswith("WINDOWS")
+        else "MACOS"
+        if system_name == "DARWIN"
+        else "LINUX",
         "is_wsl2": is_wsl2,
         "pipx_available": bool(which("pipx")),
         "winget_available": bool(which("winget")),
@@ -451,10 +659,14 @@ def _aws_core_step() -> dict[str, Any]:
     )
 
 
-def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+def _missing_categories(
+    evidence: Mapping[str, Any],
+) -> list[tuple[str, dict[str, Any]]]:
     family = str(evidence.get("platform_family", "LINUX"))
     missing: list[tuple[str, dict[str, Any]]] = []
-    if not evidence.get("codex_cli_available") or not evidence.get("codex_cli_supported"):
+    if not evidence.get("codex_cli_available") or not evidence.get(
+        "codex_cli_supported"
+    ):
         missing.append(("CODEX", _codex_step(family)))
     elif not evidence.get("codex_login_ready"):
         missing.append(
@@ -479,7 +691,9 @@ def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str
                 ),
             )
         )
-    if not evidence.get("python_available") or not evidence.get("python_version_supported"):
+    if not evidence.get("python_available") or not evidence.get(
+        "python_version_supported"
+    ):
         python_checks = (
             ["py -3 --version", "python --version"]
             if family == "WINDOWS"
@@ -507,7 +721,9 @@ def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str
                 ),
             )
         )
-    elif evidence.get("bubblewrap_required") and not evidence.get("bubblewrap_available"):
+    elif evidence.get("bubblewrap_required") and not evidence.get(
+        "bubblewrap_available"
+    ):
         missing.append(
             (
                 "SANDBOX",
@@ -531,7 +747,10 @@ def _missing_categories(evidence: Mapping[str, Any]) -> list[tuple[str, dict[str
     )
     if not official_source:
         missing.append(("AWS_CORE", _aws_core_step()))
-    elif evidence.get("native_hook_review_required") is True and evidence.get("native_hook_review_attested") is not True:
+    elif (
+        evidence.get("native_hook_review_required") is True
+        and evidence.get("native_hook_review_attested") is not True
+    ):
         missing.append(
             (
                 "TRUST",
@@ -584,8 +803,12 @@ def reduce_prerequisites(evidence: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "owner_action_required": True,
         "checklist": [step for _, step in missing],
-        "aws_core_status": "AVAILABLE" if state == "PREREQUISITES_READY" else "REQUIRED",
-        "aws_core_runtime_discovery": "CURRENT" if state == "PREREQUISITES_READY" else "REQUIRED",
+        "aws_core_status": "AVAILABLE"
+        if state == "PREREQUISITES_READY"
+        else "REQUIRED",
+        "aws_core_runtime_discovery": "CURRENT"
+        if state == "PREREQUISITES_READY"
+        else "REQUIRED",
         "aws_credentials": "NOT_INSPECTED",
         "aws_access": "NOT_USED",
         "aws_authorization": "NONE",
@@ -605,14 +828,15 @@ and builds inside the boundaries you approve. You do not need to choose AWS
 services.
 
 You approve two checkpoints: Gate A confirms what should be built, and Gate B
-confirms the design and build boundaries. AWS account changes never happen
-automatically—they require a separate, exact approval.
+confirms the design and build boundaries. Setup never authorizes AWS changes:
+Fast Dev stays inside the exact approved non-production Gate B envelope after
+read-only preflight; Explicit Gate requires its own exact action receipt.
 
 Setup did not inspect AWS credentials or access an AWS account.
 
 Reply once with:
-- Project name:
-- Preferred AWS Region: (or "recommend one")
+- Project name: (one line; ordinary punctuation and international text are supported)
+- Preferred AWS Region: (use an ID such as us-west-2, or "recommend one")
 - Development budget: (a currency cap, or "minimize cost; no hard cap")"""
 
 
@@ -657,10 +881,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     prerequisites.add_argument("--root", type=Path, default=Path.cwd())
     prerequisites.add_argument("--json", action="store_true")
     prerequisites.add_argument("--evidence-stdin", action="store_true")
+    configure_hooks = subparsers.add_parser(
+        "configure-hooks",
+        help="Generate ignored local hooks with the current trusted Python",
+    )
+    configure_hooks.add_argument("--root", type=Path, default=Path.cwd())
+    configure_hooks.add_argument("--replace", action="store_true")
 
     args = parser.parse_args(argv)
     if args.command == "welcome":
         print(opening_greeting())
+        return 0
+    if args.command == "configure-hooks":
+        try:
+            configure_local_hooks(args.root, replace=args.replace)
+        except SetupError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(
+            "Configured local Fastlane hooks. Restart Codex and review the native hook trust prompt."
+        )
         return 0
     try:
         evidence = inspect_local_prerequisites(args.root)
