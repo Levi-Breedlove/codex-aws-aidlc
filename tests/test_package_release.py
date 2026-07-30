@@ -624,6 +624,58 @@ class PackageReleaseTests(unittest.TestCase):
                 b"checksum",
             )
 
+    @unittest.skipIf(os.name == "nt", "POSIX path semantics are required")
+    def test_verified_darwin_root_alias_is_canonicalized_without_descendants(
+        self,
+    ) -> None:
+        self.assertEqual(
+            package_release.DARWIN_SYSTEM_ROOT_ALIASES,
+            {"/tmp": "/private/tmp", "/var": "/private/var"},
+        )
+        source = Path("/var/folders/example/linked-output/release.zip")
+
+        with (
+            mock.patch.object(package_release.sys, "platform", "darwin"),
+            mock.patch.object(
+                package_release,
+                "_is_link_or_reparse_point",
+                side_effect=lambda path: path == Path("/var"),
+            ),
+            mock.patch.object(
+                package_release.os.path,
+                "realpath",
+                return_value="/private/var",
+            ) as realpath,
+        ):
+            validated = package_release.validate_output_path(source)
+
+        self.assertEqual(
+            validated,
+            Path("/private/var/folders/example/linked-output/release.zip"),
+        )
+        realpath.assert_called_once_with(Path("/var"))
+
+    @unittest.skipIf(os.name == "nt", "POSIX path semantics are required")
+    def test_unexpected_darwin_root_alias_target_remains_rejected(self) -> None:
+        with (
+            mock.patch.object(package_release.sys, "platform", "darwin"),
+            mock.patch.object(
+                package_release,
+                "_is_link_or_reparse_point",
+                side_effect=lambda path: path == Path("/var"),
+            ),
+            mock.patch.object(
+                package_release.os.path,
+                "realpath",
+                return_value="/unexpected/var",
+            ),
+            self.assertRaisesRegex(
+                package_release.PackagingError,
+                "symlink or reparse point",
+            ),
+        ):
+            package_release.validate_output_path(Path("/var/folders/release.zip"))
+
     def test_cli_rejects_linked_output_ancestor_without_writing_outside(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

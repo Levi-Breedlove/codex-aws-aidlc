@@ -11,6 +11,7 @@ import os
 import re
 import stat
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -48,6 +49,10 @@ REQUIRED_CONTROL_FILES = {
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
 }
+DARWIN_SYSTEM_ROOT_ALIASES = {
+    "/tmp": "/private/tmp",
+    "/var": "/private/var",
+}
 
 
 class PackagingError(ValueError):
@@ -78,10 +83,24 @@ def _is_link_or_reparse_point(path: Path) -> bool:
     return stat.S_ISLNK(metadata.st_mode) or bool(file_attributes & reparse_flag)
 
 
+def _canonicalize_darwin_system_root_alias(absolute: Path) -> Path:
+    """Canonicalize only verified macOS root aliases, never their descendants."""
+
+    if sys.platform != "darwin" or absolute.anchor != "/" or len(absolute.parts) < 2:
+        return absolute
+    alias = Path(absolute.anchor) / absolute.parts[1]
+    expected_target = DARWIN_SYSTEM_ROOT_ALIASES.get(alias.as_posix())
+    if expected_target is None or not _is_link_or_reparse_point(alias):
+        return absolute
+    if Path(os.path.realpath(alias)) != Path(expected_target):
+        return absolute
+    return Path(expected_target).joinpath(*absolute.parts[2:])
+
+
 def validate_output_path(path: Path) -> Path:
     """Reject a release destination that names or traverses a filesystem link."""
 
-    absolute = lexical_absolute_path(path)
+    absolute = _canonicalize_darwin_system_root_alias(lexical_absolute_path(path))
     current = Path(absolute.anchor)
     for part in absolute.parts[1:]:
         current /= part
