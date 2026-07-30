@@ -52,7 +52,7 @@ MAX_SKILL_DESCRIPTION_CHARACTERS = 320
 MAX_REPOSITORY_SKILL_INDEX_CHARACTERS = 1_200
 MAX_BOOT_PROMPT_BYTES = 32 * 1024
 MAX_PHASE_PROMPT_BYTES = 8 * 1024
-MAX_DESIGN_PROMPT_BYTES = 8_000
+MAX_DESIGN_PROMPT_BYTES = 7_000
 
 
 class PromptPackContractTests(unittest.TestCase):
@@ -136,7 +136,7 @@ class PromptPackContractTests(unittest.TestCase):
     ) -> None:
         agent_files = sorted(PROJECT_ROOT.rglob("AGENTS.md"))
         self.assertGreater(len(agent_files), 0)
-        self.assertLessEqual(len((PROJECT_ROOT / "AGENTS.md").read_bytes()), 7_200)
+        self.assertLessEqual(len((PROJECT_ROOT / "AGENTS.md").read_bytes()), 6_500)
 
         for agent_file in agent_files:
             chain: list[Path] = []
@@ -1016,7 +1016,7 @@ Approver: <name/handle>"""
 
         self.assertIn("Lightweight Well-Architected decision review", self.prd)
         self.assertRegex(self.prd, r"not a separate audit or\s+gate")
-        self.assertLessEqual(len(self.root_readme.splitlines()), 90)
+        self.assertLessEqual(len(self.root_readme.splitlines()), 85)
 
     def test_aws_execution_lanes_are_derived_and_do_not_create_authority(self) -> None:
         for document in (self.verify, self.runbook, self.prompts):
@@ -1103,7 +1103,7 @@ Approver: <name/handle>"""
         }
         for name, document in documents.items():
             self.assertRegex(document, r"(?m)^## Agent reference", name)
-        self.assertLessEqual(len(self.root_readme.splitlines()), 90)
+        self.assertLessEqual(len(self.root_readme.splitlines()), 85)
         self.assertIn("## Start", self.root_readme)
         self.assertIn("## What to expect", self.root_readme)
 
@@ -1160,7 +1160,7 @@ Approver: <name/handle>"""
             self.assertIn(path, self.root_readme)
         self.assertNotIn("codex plugin marketplace add", self.root_readme)
         self.assertNotIn("continue setup", self.root_readme)
-        self.assertLessEqual(len(self.root_readme.splitlines()), 90)
+        self.assertLessEqual(len(self.root_readme.splitlines()), 85)
         self.assertFalse((REPOSITORY_ROOT / "my-project" / "README.md").exists())
 
     def test_boot_prompt_has_stable_template_first_contract(self) -> None:
@@ -1170,6 +1170,9 @@ Approver: <name/handle>"""
         self.assertIn("no more than these three values", boot)
         self.assertIn("development budget posture", boot)
         self.assertIn("--in-place-template-instance --dry-run", boot)
+        self.assertEqual(boot.count("--prerequisite-report-stdin"), 2)
+        self.assertIn("exact in-memory `PREREQUISITES_READY` report", boot)
+        self.assertIn("Never save that report", boot)
         self.assertIn("UNCONFIGURED_TEMPLATE", boot)
         self.assertIn("scripts/fastlane_presenter.py", boot)
         for field in ("Status:", "Updated:", "Need from you:", "Next:"):
@@ -1188,6 +1191,22 @@ Approver: <name/handle>"""
         self.assertNotIn("OWNER_ATTESTED_AND_PROBES_VERIFIED", boot)
         self.assertNotIn("hook conflict review", boot)
 
+    def test_hook_docs_use_generated_opt_in_flow_and_discovery_order(self) -> None:
+        hooks = (PROJECT_ROOT / "docs/HOOKS.md").read_text(encoding="utf-8")
+        dependency = (PROJECT_ROOT / "docs/DEPENDENCY-POLICY.md").read_text(
+            encoding="utf-8"
+        )
+        for document in (self.security, hooks):
+            self.assertIn("configure-hooks --root .", document)
+            self.assertIn("/hooks", document)
+            self.assertIn(".codex/hooks.json", document)
+            self.assertIn("restart", document.casefold())
+        self.assertNotIn("manually copies", self.security)
+        self.assertIn("copying the example does\nnot activate", self.security)
+        self.assertLess(
+            dependency.index("search_documentation"),
+            dependency.index("retrieve_skill"),
+        )
     def test_boot_setup_first_and_resume_are_single_action_contracts(self) -> None:
         boot = self.prompt_section("BOOT-00")
         for phrase in (
@@ -1756,9 +1775,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.0.3")
+        self.assertEqual(manifest["bootstrap_version"], "1.0.4")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.0.3", self.prompts)
+        self.assertIn("**Pack version:** 1.0.4", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -1810,6 +1829,9 @@ Approver: <name/handle>"""
         verify = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(encoding="utf-8")
         self.assertIn("maximum_initial_bytes", coordinator)
         self.assertIn("Never silently truncate a row", coordinator)
+        self.assertIn("not an implicit initial load", coordinator)
+        self.assertIn("resolved_initial_slices", coordinator)
+        self.assertIn("resolved_on_demand_slices", coordinator)
         for label in (
             "Decision:",
             "Recommendation:",
@@ -2128,6 +2150,9 @@ Approver: <name/handle>"""
         self.assertIn("RTO: TODO; RPO: TODO", self.prd)
         self.assertIn("Project state changed: No.", owner)
         self.assertIn("clarification, not learning mode", " ".join(coordinator.split()))
+        self.assertIn("tokenless copyable reply", intake_compact)
+        self.assertIn("plain `owner_reply`", owner)
+        self.assertNotIn("R-*; Accept all recommendations.", intake)
 
         for surface in (requirements, define, coordinator, challenger):
             self.assertIn("complete", surface.lower())
