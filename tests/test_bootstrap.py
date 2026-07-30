@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -32,6 +33,11 @@ def load_module(name: str, path: Path):
 
 
 bootstrap = load_module("bootstrap_under_test", REPOSITORY_ROOT / "bootstrap.py")
+setup_assistant = sys.modules["scripts.setup_assistant"]
+
+
+def ready_prerequisite_report() -> str:
+    return json.dumps(setup_assistant.READY_PREREQUISITE_REPORT)
 
 
 def copy_manifest_template(destination: Path) -> None:
@@ -313,6 +319,7 @@ class BootstrapSafetyTests(unittest.TestCase):
                 "validate_repository_dependencies",
                 side_effect=ValueError("dependency policy mismatch"),
             ) as dependency_check,
+            mock.patch.object(sys, "stdin", io.StringIO(ready_prerequisite_report())),
             mock.patch.object(bootstrap, "initialize_template_in_place") as initialize,
         ):
             result = bootstrap.main(
@@ -322,11 +329,88 @@ class BootstrapSafetyTests(unittest.TestCase):
                     "--project-name",
                     "Dependency Stop",
                     "--in-place-template-instance",
+                    "--prerequisite-report-stdin",
                 ]
             )
         self.assertEqual(result, 2)
         dependency_check.assert_called_once_with(REPOSITORY_ROOT)
         initialize.assert_not_called()
+
+    def test_main_requires_exact_ready_report_before_dependency_or_write(self) -> None:
+        base = [
+            "--target",
+            str(REPOSITORY_ROOT),
+            "--project-name",
+            "Readiness Boundary",
+            "--in-place-template-instance",
+        ]
+        blocked = [
+            ("missing", base, ""),
+            ("malformed", [*base, "--prerequisite-report-stdin"], "{"),
+            (
+                "non-ready",
+                [*base, "--prerequisite-report-stdin"],
+                json.dumps(
+                    {
+                        **setup_assistant.READY_PREREQUISITE_REPORT,
+                        "state": "AWS_CORE_REQUIRED",
+                    }
+                ),
+            ),
+            (
+                "extra-field",
+                [*base, "--prerequisite-report-stdin"],
+                json.dumps(
+                    {
+                        **setup_assistant.READY_PREREQUISITE_REPORT,
+                        "session": "not-allowed",
+                    }
+                ),
+            ),
+        ]
+        for label, arguments, payload in blocked:
+            with (
+                self.subTest(label=label),
+                mock.patch.object(sys, "stdin", io.StringIO(payload)),
+                mock.patch.object(
+                    bootstrap, "validate_repository_dependencies"
+                ) as dependency_check,
+                mock.patch.object(
+                    bootstrap, "initialize_template_in_place"
+                ) as initialize,
+            ):
+                self.assertEqual(bootstrap.main(arguments), 2)
+                dependency_check.assert_not_called()
+                initialize.assert_not_called()
+
+    def test_current_ready_report_permits_dry_run_and_initialization(self) -> None:
+        for dry_run in (True, False):
+            arguments = [
+                "--target",
+                str(REPOSITORY_ROOT),
+                "--project-name",
+                "Ready Bootstrap",
+                "--in-place-template-instance",
+                "--prerequisite-report-stdin",
+            ]
+            if dry_run:
+                arguments.append("--dry-run")
+            with (
+                self.subTest(dry_run=dry_run),
+                mock.patch.object(
+                    sys, "stdin", io.StringIO(ready_prerequisite_report())
+                ),
+                mock.patch.object(bootstrap, "validate_repository_dependencies"),
+                mock.patch.object(
+                    bootstrap,
+                    "initialize_template_in_place",
+                    return_value=bootstrap.CopyReport(planned=1),
+                ) as initialize,
+            ):
+                self.assertEqual(bootstrap.main(arguments), 0)
+                initialize.assert_called_once_with(
+                    REPOSITORY_ROOT, mock.ANY, dry_run=dry_run
+                )
 
     def test_main_rejects_noncanonical_cost_posture_before_any_setup(self) -> None:
         with (

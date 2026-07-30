@@ -32,9 +32,12 @@ authority to invoke them.
 ## Optional hook guardrails
 
 Fastlane does not install or enable repository hooks by default. The reviewed
-example in `.codex/hooks.fastlane.example.json` is opt-in and becomes active
-only when an owner manually copies it to `.codex/hooks.json` and accepts the
-native Codex trust prompt after review.
+example in `.codex/hooks.fastlane.example.json` is opt-in. After a current
+Gate B, the owner reviews the example and handler, asks Codex to run
+`python scripts/setup_assistant.py configure-hooks --root .` with a trusted
+Python interpreter, restarts Codex, and reviews the native `/hooks` trust
+prompt. The generated `.codex/hooks.json` is ignored; copying the example does
+not activate the pack.
 
 The handler does not read transcripts, log prompts or tool inputs, persist
 trust or secrets, inspect credentials, or access AWS. It consumes the Fastlane Engine's

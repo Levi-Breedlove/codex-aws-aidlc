@@ -536,6 +536,30 @@ class SetupAssistantTests(unittest.TestCase):
         self.assertNotIn("plugin_commit", json.dumps(ready))
         self.assertNotIn("aws-serverless", json.dumps(ready))
 
+    def test_ready_prerequisite_report_handoff_is_exact_and_ephemeral(self) -> None:
+        ready = setup.reduce_prerequisites(local_ready())
+        self.assertEqual(ready, setup.READY_PREREQUISITE_REPORT)
+        self.assertEqual(setup.validate_ready_prerequisite_report(ready), ready)
+        self.assertEqual(
+            setup.read_ready_prerequisite_report(io.StringIO(json.dumps(ready))),
+            ready,
+        )
+
+        invalid = (
+            {},
+            {**ready, "state": "AWS_CORE_REQUIRED"},
+            {**ready, "repository_writes": "OBSERVED"},
+            {**ready, "aws_access": "USED"},
+            {**ready, "session_identifier": "forbidden"},
+        )
+        for report in invalid:
+            with self.subTest(report=report):
+                with self.assertRaises(setup.SetupError):
+                    setup.validate_ready_prerequisite_report(report)
+
+        with self.assertRaises(setup.SetupError):
+            setup.read_ready_prerequisite_report(io.StringIO("{"))
+
     def test_evidence_stdin_is_strict_ephemeral_and_non_secret(self) -> None:
         parsed = setup.read_session_evidence(
             io.StringIO(json.dumps(official_session_evidence()))

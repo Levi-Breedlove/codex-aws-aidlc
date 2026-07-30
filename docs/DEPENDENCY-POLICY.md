@@ -28,8 +28,9 @@ AWS-specific step and provide one concise owner action.
 ## Evidence
 
 Installation metadata is not design evidence. DESIGN-10 and AWS-10 require
-fresh attributable `retrieve_skill` and `search_documentation` results from
-the official identity. Record the observed current version as metadata, not a
+fresh attributable `search_documentation` followed by matching
+`retrieve_skill` results from the official identity. Record the observed
+current version as metadata, not a
 pin. Generic connectors, cached prose, and model memory do not satisfy required
 evidence.
 

@@ -24,6 +24,10 @@ from scripts.fastlane_project_identity import (
     normalize_project_name,
 )
 from scripts.fastlane_stdio import configure_utf8_standard_streams
+from scripts.setup_assistant import (
+    SetupError,
+    read_ready_prerequisite_report,
+)
 
 
 PLACEHOLDERS = {
@@ -1259,6 +1263,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Preview writes and collision digests without changing the target",
     )
+    parser.add_argument(
+        "--prerequisite-report-stdin",
+        action="store_true",
+        help="Read the current ephemeral PREREQUISITES_READY report from stdin",
+    )
     args = parser.parse_args(argv)
 
     source = Path(__file__).resolve().parent
@@ -1283,7 +1292,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise ValueError(
                     "--cost-posture currency must be a current ISO 4217 List One code"
                 )
+        if not args.prerequisite_report_stdin:
+            raise SetupError(
+                "fresh bootstrap requires --prerequisite-report-stdin with the current setup report"
+            )
+        read_ready_prerequisite_report(sys.stdin)
         validate_repository_dependencies(source)
+
         if args.in_place_template_instance:
             if target != source:
                 raise ValueError(
@@ -1316,7 +1331,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 staging_target=args.staging_target,
                 allowed_files=required_files,
             )
-    except (OSError, ValueError) as exc:
+    except (OSError, SetupError, ValueError) as exc:
         print(f"Bootstrap failed: {exc}", file=sys.stderr)
         return 2
 

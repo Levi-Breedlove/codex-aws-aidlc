@@ -63,7 +63,7 @@ class BootstrapDependencyTests(unittest.TestCase):
         )
         self.assertEqual(
             runtime["required_capabilities"],
-            ["retrieve_skill", "search_documentation"],
+            ["search_documentation", "retrieve_skill"],
         )
         self.assertNotIn("hook_review", toolkit)
         self.assertEqual(report["fastlane_skills"]["status"], "READY")
