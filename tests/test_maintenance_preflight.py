@@ -20,13 +20,35 @@ SPEC.loader.exec_module(preflight)
 
 class MaintenancePreflightTests(unittest.TestCase):
     def repository(self, root: Path) -> str:
-        subprocess.run(["git", "init", "-b", "maintenance"], cwd=root, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
-        subprocess.run(["git", "config", "user.name", "Synthetic Test"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "init", "-b", "maintenance"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.invalid"],
+            cwd=root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Synthetic Test"], cwd=root, check=True
+        )
         (root / "tracked.txt").write_text("baseline\n", encoding="utf-8", newline="\n")
         subprocess.run(["git", "add", "tracked.txt"], cwd=root, check=True)
-        subprocess.run(["git", "commit", "-m", "baseline"], cwd=root, check=True, capture_output=True)
-        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True).stdout.strip()
+        subprocess.run(
+            ["git", "commit", "-m", "baseline"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
 
     def contract(self, commit: str, mode: str = "IMPLEMENT") -> dict[str, object]:
         return {
@@ -56,13 +78,17 @@ class MaintenancePreflightTests(unittest.TestCase):
             (root / "outside.txt").write_text("outside\n", encoding="utf-8")
             result, passed = preflight.validate_contract(self.contract(commit), root)
             self.assertFalse(passed)
-            self.assertTrue(any("exceed the allowlist" in item for item in result["errors"]))
+            self.assertTrue(
+                any("exceed the allowlist" in item for item in result["errors"])
+            )
 
     def test_read_only_modes_and_publication_are_distinct(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             commit = self.repository(root)
-            audit, passed = preflight.validate_contract(self.contract(commit, "AUDIT"), root)
+            audit, passed = preflight.validate_contract(
+                self.contract(commit, "AUDIT"), root
+            )
             self.assertTrue(passed, audit["errors"])
 
             invalid = self.contract(commit, "IMPLEMENT")
@@ -73,7 +99,9 @@ class MaintenancePreflightTests(unittest.TestCase):
             }
             result, passed = preflight.validate_contract(invalid, root)
             self.assertFalse(passed)
-            self.assertTrue(any("must not contain publication" in item for item in result["errors"]))
+            self.assertTrue(
+                any("must not contain publication" in item for item in result["errors"])
+            )
 
             publish = self.contract(commit, "PUBLISH")
             publish["publication"] = {
@@ -104,10 +132,37 @@ class MaintenancePreflightTests(unittest.TestCase):
             root = Path(temporary)
             commit = self.repository(root)
             contract = root / "contract.json"
-            contract.write_text(json.dumps(self.contract(commit, "AUDIT")), encoding="utf-8")
-            before = subprocess.run(["git", "status", "--porcelain"], cwd=root, check=True, capture_output=True, text=True).stdout
-            result = subprocess.run([sys.executable, str(SCRIPT), "--contract", str(contract), "--root", str(root), "--json"], check=False, capture_output=True, text=True)
-            after = subprocess.run(["git", "status", "--porcelain"], cwd=root, check=True, capture_output=True, text=True).stdout
+            contract.write_text(
+                json.dumps(self.contract(commit, "AUDIT")), encoding="utf-8"
+            )
+            before = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--contract",
+                    str(contract),
+                    "--root",
+                    str(root),
+                    "--json",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            after = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
         self.assertEqual(result.returncode, 2)
         self.assertEqual(before, after)
         self.assertEqual(json.loads(result.stdout)["status"], "FAIL")

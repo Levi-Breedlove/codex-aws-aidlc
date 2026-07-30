@@ -14,7 +14,11 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import bootstrap_doctor as doctor
-from fastlane_context import SliceRequest, canonical_source_bytes, resolve_context_packet
+from fastlane_context import (
+    SliceRequest,
+    canonical_source_bytes,
+    resolve_context_packet,
+)
 
 
 def request(
@@ -59,12 +63,12 @@ class ContextPacketTests(unittest.TestCase):
         self.assertTrue(canonical.endswith(b"\n"))
         self.assertFalse(canonical.endswith(b"\n\n"))
 
-    def test_budget_moves_lower_priority_and_reports_one_required_overflow(self) -> None:
+    def test_budget_moves_lower_priority_and_reports_one_required_overflow(
+        self,
+    ) -> None:
         sources = {"a.md": "alpha\n", "b.md": "bravo\n"}
         first = request("a.md", "WHOLE_FILE", "a.md", required=True)
-        second = request(
-            "b.md", "WHOLE_FILE", "b.md", priority=1, required=False
-        )
+        second = request("b.md", "WHOLE_FILE", "b.md", priority=1, required=False)
         packet, issues = resolve_context_packet(
             [first, second],
             [],
@@ -119,6 +123,46 @@ class ContextPacketTests(unittest.TestCase):
         self.assertEqual(invalid["budget_status"], "SOURCE_INVALID")
         self.assertTrue(any("more than one" in item["reason"] for item in issues))
 
+    def test_required_state_precedes_optional_phase_guidance(self) -> None:
+        sources = {
+            "phase.md": "complete procedural guidance\n",
+            "state.md": "state\n",
+        }
+        phase = request(
+            "phase.md",
+            "WHOLE_FILE",
+            "phase.md",
+            priority=0,
+            required=False,
+        )
+        state = request(
+            "state.md",
+            "WHOLE_FILE",
+            "state.md",
+            priority=2,
+            required=True,
+        )
+
+        packet, issues = resolve_context_packet(
+            [phase, state],
+            [],
+            sources,
+            doctor._context_selector_span,
+            maximum_initial_source_bytes=7,
+        )
+
+        self.assertEqual(issues, [])
+        self.assertEqual(packet["budget_status"], "WITHIN_LIMIT")
+        self.assertEqual(
+            [item["path"] for item in packet["resolved_initial_slices"]],
+            ["state.md"],
+        )
+        self.assertEqual(
+            [item["path"] for item in packet["resolved_on_demand_slices"]],
+            ["phase.md"],
+        )
+        self.assertEqual(packet["actual_initial_source_bytes"], 6)
+
     def test_missing_ambiguous_and_overlapping_sources_fail_closed(self) -> None:
         missing, issues = resolve_context_packet(
             [request("missing.md", "WHOLE_FILE", "missing.md", required=True)],
@@ -152,14 +196,39 @@ class ContextPacketTests(unittest.TestCase):
         self.assertEqual(overlapping["budget_status"], "SOURCE_INVALID")
         self.assertTrue(any("overlapping" in item["reason"] for item in issues))
 
-    def test_aws40_and_aws50_context_packets_are_phase_specific(self) -> None:
+    def test_aws40_and_aws50_context_packets_defer_full_procedures(self) -> None:
         tasks = doctor.TaskSummary(
             statuses={"TASK-0001": "DONE"},
         )
+
+        def assert_deferred(plan: dict[str, object], path: str, selector: str) -> None:
+            reference = f"{path}#{selector}"
+            self.assertNotIn(reference, plan["source_slices"])
+            self.assertIn(reference, plan["on_demand_slices"])
+            resolved = next(
+                item
+                for item in plan["resolved_on_demand_slices"]
+                if item["path"] == path and item["selector"] == selector
+            )
+            self.assertGreaterEqual(resolved["start_line"], 1)
+            self.assertGreaterEqual(resolved["end_line"], resolved["start_line"])
+            self.assertRegex(resolved["canonical_sha256"], r"^sha256:[0-9a-f]{64}$")
+            self.assertGreater(resolved["source_bytes"], 0)
+
         coverage = doctor.CoverageContract(
             status="READY",
             basis_ids=("REQ-0001", "SEC-001"),
         )
+        source_texts = {
+            path: (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
+            for path in (
+                ".agents/skills/fastlane/references/deliver.md",
+                doctor.PRD_FILE,
+                doctor.TASKS_FILE,
+                doctor.VERIFY_FILE,
+                doctor.RUNBOOK_FILE,
+            )
+        }
         aws_40 = doctor.derive_context_plan(
             {
                 "owner_stage": "DELIVER",
@@ -169,6 +238,7 @@ class ContextPacketTests(unittest.TestCase):
             tasks,
             coverage,
             next_prompt="AWS-40",
+            source_texts=source_texts,
         )
         aws_50 = doctor.derive_context_plan(
             {
@@ -179,33 +249,25 @@ class ContextPacketTests(unittest.TestCase):
             tasks,
             coverage,
             next_prompt="AWS-50",
+            source_texts=source_texts,
         )
 
         self.assertIn(
             f"{doctor.VERIFY_FILE}#Teardown reconciliation evidence",
             aws_40["source_slices"],
         )
-        self.assertIn(
-            f"{doctor.RUNBOOK_FILE}#14. Residual-resource and billing verification",
-            aws_40["source_slices"],
-        )
-        self.assertIn(
-            f"{doctor.VERIFY_FILE}#Action authorization provenance",
-            aws_50["source_slices"],
+        assert_deferred(
+            aws_40,
+            doctor.RUNBOOK_FILE,
+            "14. Residual-resource and billing verification",
         )
         self.assertIn(
             f"{doctor.VERIFY_FILE}#Teardown reconciliation evidence",
             aws_50["source_slices"],
         )
-        self.assertIn(
-            f"{doctor.RUNBOOK_FILE}#Conditional AWS action receipts",
-            aws_50["source_slices"],
-        )
-        self.assertIn(
-            f"{doctor.RUNBOOK_FILE}#13. Teardown and decommissioning",
-            aws_50["source_slices"],
-        )
-        self.assertNotEqual(aws_40["source_slices"], aws_50["source_slices"])
+        assert_deferred(aws_50, doctor.VERIFY_FILE, "Action authorization provenance")
+        assert_deferred(aws_50, doctor.RUNBOOK_FILE, "Conditional AWS action receipts")
+        assert_deferred(aws_50, doctor.RUNBOOK_FILE, "13. Teardown and decommissioning")
         for reason in (
             "AWS_RESIDUAL_REVIEW_COMPLETE",
             "AWS_RESIDUALS_REMAIN",
@@ -222,14 +284,16 @@ class ContextPacketTests(unittest.TestCase):
                     tasks,
                     coverage,
                     next_prompt="STOP",
+                    source_texts=source_texts,
                 )
                 self.assertIn(
                     f"{doctor.VERIFY_FILE}#Teardown reconciliation evidence",
                     terminal["source_slices"],
                 )
-                self.assertIn(
-                    f"{doctor.RUNBOOK_FILE}#14. Residual-resource and billing verification",
-                    terminal["source_slices"],
+                assert_deferred(
+                    terminal,
+                    doctor.RUNBOOK_FILE,
+                    "14. Residual-resource and billing verification",
                 )
         self.assertEqual(
             len(aws_40["source_slices"]), len(set(aws_40["source_slices"]))
@@ -265,6 +329,64 @@ class ContextPacketTests(unittest.TestCase):
             report["remediation"]["next_action"]["action_kind"],
             "REVIEW_SAFETY_BLOCKER",
         )
+
+    def test_aws30_context_is_deployment_specific_and_read_only(self) -> None:
+        plan = doctor.derive_context_plan(
+            {
+                "owner_stage": "DELIVER",
+                "route_reason_code": "AWS_DEPLOYMENT_RECONCILIATION",
+                "blocking_ids": [],
+            },
+            doctor.TaskSummary(statuses={"TASK-0001": "DONE"}),
+            doctor.CoverageContract(status="READY", basis_ids=("REQ-0001", "SEC-001")),
+            next_prompt="AWS-30",
+        )
+        source_slices = plan["source_slices"]
+        on_demand_slices = plan["on_demand_slices"]
+        for required in (
+            f"{doctor.VERIFY_FILE}#AWS deployment action and reconciliation evidence",
+            f"{doctor.VERIFY_FILE}#Verification matrix",
+            f"{doctor.VERIFY_FILE}#Current release decision",
+        ):
+            self.assertIn(required, source_slices)
+        for historical_authority in (
+            f"{doctor.VERIFY_FILE}#Action authorization provenance",
+            f"{doctor.VERIFY_FILE}#Read-only AWS preflight evidence",
+            f"{doctor.RUNBOOK_FILE}#Conditional AWS action receipts",
+            f"{doctor.RUNBOOK_FILE}#Read-only AWS preflight",
+        ):
+            self.assertIn(historical_authority, on_demand_slices)
+            self.assertNotIn(historical_authority, source_slices)
+        for excluded in (
+            f"{doctor.VERIFY_FILE}#Teardown reconciliation evidence",
+            f"{doctor.RUNBOOK_FILE}#13. Teardown and decommissioning",
+        ):
+            self.assertNotIn(excluded, source_slices)
+            self.assertNotIn(excluded, on_demand_slices)
+        self.assertEqual(len(source_slices), len(set(source_slices)))
+        self.assertEqual(len(on_demand_slices), len(set(on_demand_slices)))
+
+    def test_post_aws30_release_context_preserves_attempt_and_decision_basis(
+        self,
+    ) -> None:
+        plan = doctor.derive_context_plan(
+            {
+                "owner_stage": "DELIVER",
+                "route_reason_code": "RELEASE_REVIEW",
+                "blocking_ids": [],
+            },
+            doctor.TaskSummary(statuses={"TASK-0001": "DONE"}),
+            doctor.CoverageContract(status="READY", basis_ids=("REQ-0001", "SEC-001")),
+            next_prompt="RELEASE-10",
+        )
+        source_slices = plan["source_slices"]
+        for required in (
+            f"{doctor.VERIFY_FILE}#Verification matrix",
+            f"{doctor.VERIFY_FILE}#AWS deployment action and reconciliation evidence",
+            f"{doctor.VERIFY_FILE}#Current release decision",
+        ):
+            self.assertIn(required, source_slices)
+        self.assertEqual(len(source_slices), len(set(source_slices)))
 
 
 if __name__ == "__main__":

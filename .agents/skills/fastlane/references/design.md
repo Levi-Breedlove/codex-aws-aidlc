@@ -15,6 +15,11 @@ Use for DESIGN-10 and Gate B.
 - Installing the plugin or selecting `@AWS-Core` proves availability only.
   Attribute AWS Core use only after the current linked search-then-retrieve
   chain validates; unavailable or unobservable calls are never reported as use.
+- Keep evidence ownership exact: capability unavailability is owner setup;
+  missing, stale, or safely repairable generated evidence is Codex work; and
+  unexplained structural drift or unsafe evidence conflicts require human
+  review. Never turn a missing Codex-authored evidence row into an instruction
+  for the owner to reinstall an already available plugin.
 - External runtime skill content is on-demand context, not repository source
   bytes in the 12,000-byte context packet and never canonical project state.
 - Codex selects and coordinates the proposed product architecture. AWS Core
@@ -25,8 +30,9 @@ Use for DESIGN-10 and Gate B.
 - Apply contract compatibility before rewriting design records. An unchanged approved schema 4 Gate B is grandfathered for its exact design and envelope; do not migrate it, request another approval, or interrupt construction merely because schema 5 exists. A new or unapproved design, or any design-controlled change, requires the complete schema 5 contract, new digests, and fresh Gate B approval.
 - A current approved legacy schema 1.2 Gate A is a valid design-only bridge to schema 5. Codex derives `AC-<requirement ID>` labels from approved rows; legacy `NEW_BUILD` uses first-wave journey `NONE` and binds the end-to-end Harness to the wave plus selected approved requirements. Do not rewrite Part I, synthesize owner facts, or ask the owner to repeat them. Route to REQ-10 only for a missing required owner fact or material requirements change; otherwise show `Need from you: Nothing` and continue to Gate B.
 - Grandfathering never permits invented schema 5 records, expanded authority, or skipped task, Harness, and evidence validation. It adds no lifecycle stage, owner question, or receipt.
-- Follow the current Adaptive Coverage Plan: `SELECT` compares complete
-  architectures, `AMEND` reconsiders every materially affected driver and
+- Follow the current Adaptive Coverage Plan: `SELECT` compares at least two
+  complete, credible, non-straw whole-system candidates, `AMEND` reconsiders
+  every materially affected driver and
   alternative, and `PRESERVE` is valid only when architecture, technology,
   trust, data, recovery, Region, and Harness boundaries are proven unchanged.
 - Derive `DRV-*` records from approved requirements. Compare credible
@@ -39,15 +45,25 @@ Use for DESIGN-10 and Gate B.
   operational burden, cost effect, scaling breakpoint, migration path, revisit
   trigger, and validation method. Use `NO_VIABLE_ALTERNATIVE` only when
   exactly one candidate satisfies the hard constraints.
-- Map every approved requirement to the selected `ARCH-*`, concrete
-  `COMP/API/EVENT/CLI/FILE/DATA/CTRL/BOUNDARY/STATE` IDs, applicable property/test IDs, and `AWS-EV-*` IDs.
+- Map every approved requirement to the selected `ARCH-*`, concrete declared
+  design IDs, applicable declared property/example IDs, and `AWS-EV-*` IDs. In
+  a current schema 5 design, trace IDs resolve only to the selected `ARCH-*`,
+  `API/EVENT/CLI/FILE-*` rows in the interface register, `BOUNDARY-*` rows, and
+  `STATE-*` rows. `COMP-*`, `DATA-*`, and `CTRL-*` have no current declaration
+  surface and therefore fail closed rather than becoming prose-only IDs.
+  Property/test trace IDs resolve only to applicable `PROP-*` records present
+  across applicability, definition, and execution, or exact `EX-*` rows in the
+  Example-based scenarios table. Undeclared `TEST-*` IDs fail closed.
   Each material AWS claim cites its current `AWS-DISC-*`; keep detailed live
   discovery evidence in `docs/project/VERIFY.md`.
 - Complete material interfaces and boundaries with numeric bounds or explicit
   `NOT_APPLICABLE - <reason>`, inward dependencies, and server-side authorization.
   Classify lifecycle, async, retry/resume, approval, migration, and meaningful
   state triggers. For `NEW_BUILD`, bind the first wave and any blocking spike;
-  spikes use `MAX_ATTEMPTS` and one executable exit command. Digest all records.
+  spikes use `MAX_ATTEMPTS` and one executable exit command. Give every
+  referenced `EX-*` one concrete Example-based scenarios row. Bind that table
+  into the modern design digest after Technology and before Property
+  applicability, definitions, and execution. Digest all records.
 
 - Complete the Change impact record for `AMEND` or `PRESERVE`. Bind changed,
   affected, and preserved IDs; use `FULL_REVALIDATION` when impact is
@@ -69,6 +85,15 @@ Use for DESIGN-10 and Gate B.
   trigger and command, or `NOT_APPLICABLE — <technology/risk reason>`.
   Do not add a second Harness table, universal tool package, setup dependency,
   Gate B field, lifecycle state, or owner question.
+- Evaluate the extended concerns through their canonical Harness rows and
+  existing layers: `HARNESS-011` accessibility -> `End-to-end`;
+  `HARNESS-012` visual regression -> `End-to-end`; `HARNESS-013` mutation
+  testing -> `Unit`; `HARNESS-014` SAST -> `Static`; `HARNESS-015` DAST ->
+  `Security and privacy`; and `HARNESS-016` formal/model checking -> `Property`.
+  Give each concern its own row, even when two concerns share a layer. Choosing
+  applicability is procedural review; deterministic validation begins with the
+  recorded row's status, basis, exact command or API, evidence destination, and
+  Gate B scope.
 - Semantic Anchors remain optional internal vocabulary, not a Fastlane
   dependency or public methodology. Fastlane's local contracts and
   deterministic validators remain authoritative.
@@ -77,6 +102,9 @@ Use for DESIGN-10 and Gate B.
   hard-to-reverse decision. Record their conclusions in the existing driver,
   candidate, architecture, ADR, verification, and evidence authorities; do not
   create methodology-specific documents, stages, or gates.
+  Selecting and applying ATAM, ADR, or Fagan review is procedural coordinator
+  review; deterministic validation covers the resulting current PRD records,
+  traceability, and digests, not proof that the review method itself occurred.
 - Keep method names internal. Explain them only when the owner explicitly asks;
   routine owner questions remain short and plain-language.
 - Use the architecture challenger only after the proposal is complete and only

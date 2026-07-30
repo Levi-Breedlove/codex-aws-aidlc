@@ -1,4 +1,4 @@
-# My AWS Project — Deployment and Operations Runbook
+# {{PROJECT_NAME}} — Deployment and Operations Runbook
 
 > `docs/project/RUNBOOK.md` owns repeatable operational procedures. Project work and live status belong in `docs/project/TASKS.md` and mirrored GitHub Issues.
 
@@ -154,6 +154,14 @@ docs/project/VERIFY.md's action-authorization evidence table. The copy and
 mirror do not create or widen authority. A missing durable source, mismatched
 role/profile or approver, or non-resolving receipt blocks the affected action.
 
+A projected deployment authorization is bound to exactly one unused
+`AWS-DEPLOY-nnnn` Attempt ID when its STARTED row is appended. It cannot be
+carried into AWS-30 or replayed for another call. AWS-30 requires independently
+current exact read authority. The AWS-10 read authorization may remain usable
+only when its exact receipt already covers the reconciliation reads, target,
+artifact, and validity; otherwise obtain a new exact read-only receipt before
+account access. Never infer read authority from a deployment receipt.
+
 ## 1. Environments
 
 | Environment | Purpose | AWS account | Region | Deployment method | Owner |
@@ -229,9 +237,25 @@ only through AWS-20, reconcile it through AWS-30, review residual resources
 through AWS-40, and execute teardown only through AWS-50. BUILD-10, BUILD-20,
 and RELEASE-10 never run AWS-changing commands directly.
 
-AWS-30 records deployed evidence and returns to RELEASE-10. Only RELEASE-10 may
-advance `READY_TO_DEPLOY` to `RELEASE_VERIFIED`; failed, partial, stale, or
-pending evidence returns the release to `NOT_READY`.
+AWS-20 always returns the exact Attempt ID to AWS-30. AWS-30 appends
+independently authorized read-only evidence, including the exact read-receipt
+SHA-256, validity boundary, and `Read authority source` in the exact form
+`SOURCE: <stable owner-message source>; AUTHORIZED_AT: <ISO 8601 with timezone>;
+RESOURCES: <exact canonical list>; OPERATIONS: <exact canonical list>`.
+`AUTHORIZED_AT` is the `Observed at` timestamp of the matching Read-only
+preflight row in Action authorization provenance, not the owner-message creation
+time or the AWS-30 evidence-row observation time. Require the AWS observation
+within that authorization window, exact journal-to-envelope resource equality,
+and observed reads within the encoded operations. `COMPLETE` or
+`BLOCKED` returns to RELEASE-10; the first `STALE` remains AWS-30 until current
+read authority and evidence are restored. RELEASE-10 records the terminal
+AWS-30 Evidence ID as VERIFY's Active evidence cutoff while deciding `NOT_READY`, `RELEASE_VERIFIED`,
+or a separately authorized correction path. Once acknowledged, that attempt
+cannot reroute. Retry requires distinct current mutation authority: a new exact
+deployment receipt for explicit-gate or freshly approved construction
+authorization for fast-dev, plus a new Attempt ID. Only RELEASE-10 changes
+release state.
+
 
 Add workload-specific read-only checks:
 
@@ -374,13 +398,58 @@ Deployment commands:
 TODO
 ```
 
-Record:
+Use the canonical `AWS deployment action and reconciliation evidence` table in
+`docs/project/VERIFY.md`. Every row for an Attempt ID preserves immutable
+deployment authorization, receipt digest, valid-until value, and stable source.
+Explicit-gate derives these from its current deployment receipt; fast-dev uses
+the exact current construction `AUTH-*`, digest `NONE`, the expiry timestamp
+parsed from Gate B `AWS authorization validity`, and Gate B owner-authorization
+source. AWS-20 records exact `NONE` in
+all read-authority provenance fields. AWS-30 records the exact read receipt
+digest, validity, and four-field Read authority source envelope defined above.
+A current terminal row must match the current marked read receipt and envelope;
+an acknowledged historical row derives authorized resources and operations only
+from its stored envelope after receipt replacement. COMPLETE acceptance IDs
+each resolve exactly once in the `Verification matrix` to a `VERIFIED` row with
+a concrete Requirement or invariant, concrete AWS/manual evidence, and
+Artifact/environment exactly
+`ARTIFACT: sha256:<64 lowercase>; ACCOUNT: <exact>; REGION: <exact>; ENVIRONMENT: <exact>`.
+Acknowledged history remains auditable from stored deployment and read
+provenance after either marked receipt is replaced. Before any external mutation
+call, append an AWS-20 STARTED row with the unused Attempt ID and exact authorized boundary.
+STARTED is a pre-call journal and is not proof that AWS received or executed
+anything. Immediately after the call resolves or becomes ambiguous, append one
+terminal row for the same Attempt ID with `SUCCEEDED`, `FAILED`, `PARTIAL`, or
+`UNKNOWN`. Copy immutable deployment provenance and write the operation field
+exactly as `IDENTIFIERS: <unique exact list or NONE — concrete reason>; RESULT: <concrete direct result>`.
+Record rollback result, time, and durable source. This grammar structures
+observed evidence but never proves execution by itself. Preserve both rows.
 
-- start time;
-- completion time;
-- deployment result;
-- stack or release identifiers;
-- warnings or deviations.
+Every terminal result routes to AWS-30. A FAILED, PARTIAL, or UNKNOWN attempt
+cannot be retried until AWS-30 has performed separately authorized read-only
+reconciliation and RELEASE-10 has decided the next bounded action. A lingering
+STARTED row is Codex-owned: with owner action NONE, append UNKNOWN, rerun the
+Engine, and only then request AWS-30 read authority. Never rerun the mutation to
+learn what happened. Mutation authority is one-attempt-only and cannot be replayed.
+AWS-30 may append one first STALE reconciliation, followed by one later COMPLETE
+or BLOCKED under a different current read authorization. Do not append a second
+STALE or any row after COMPLETE or BLOCKED; repeated staleness requires human
+safety review.
+
+If the attempt STARTED while its recorded mutation authority was current but
+Gate B expires or becomes legitimately stale before closure, do not reapprove
+or replay the deployment merely to reconcile it. The Engine must keep standard
+construction and write authority invalid and AWS mutation authority NONE. Use
+only its separate `deployment_journal_closure_authority`, whose allowed path is
+`docs/project/VERIFY.md` and whose bounded operation is exactly one of: append
+UNKNOWN for a lone STARTED row; record the canonical marked read
+receipt/provenance and append its AWS-30 journal row; or update the terminal
+AWS-30 Evidence ID as RELEASE-10's Active evidence cutoff. Only deployment
+journal rows are append-only. The fresh read receipt binds the immutable
+historical attempt boundary and
+authorizes only its listed reads; it does not renew Gate B. If STARTED occurred
+after expiry, or any receipt, timing, identity, scope, row, or evidence binding
+is malformed, stop for the reported safety action rather than using closure.
 
 Immediately before mutation, recheck caller identity and prove that the final
 plan is fully contained in the active boundary. Stop on any mismatch, unexpected
@@ -528,8 +597,19 @@ rollback, Gate B fast-dev, or tool authorization does not substitute for this
 teardown authorization.
 
 The optional release field `AWS lifecycle intent` selects one non-authorizing
-route: `NONE` stops, `RESIDUAL_REVIEW` runs AWS-40 and stops with the observed
-result, and `TEARDOWN` runs AWS-40 before any receipt is presented. AWS-50 is
+normal route: `NONE` stops, `RESIDUAL_REVIEW` runs AWS-40 read-only, and
+`TEARDOWN` requests the teardown path. When current READY or residual evidence
+requires a set-level decision, present exactly RETAIN, INVESTIGATE, or REMOVE.
+RETAIN stores `RETAIN` and stops with possible continuing cost; INVESTIGATE
+stores `RESIDUAL_REVIEW` and needs separate read authority; REMOVE stores
+`TEARDOWN`. Follow `aws_residual_disposition`, not the raw lifecycle value.
+Current REMOVE plus READY may present the exact teardown receipt; REMOVE after
+`RESIDUALS_REMAIN` first refreshes AWS-40. Every choice after
+`RESIDUALS_REMAIN` must be strictly newer than that row. After READY, RETAIN and
+INVESTIGATE must be strictly newer, while an earlier owner-provenanced TEARDOWN
+may carry forward as REMOVE. New residual evidence reopens the choice. RETAIN
+without current READY or residual evidence is invalid. None of these values
+authorizes AWS access or mutation. AWS-50 is
 reachable only from a current `READY_FOR_TEARDOWN` AWS-40 row and the exact
 current teardown receipt.
 
@@ -579,6 +659,17 @@ and recompute the safe deletion order before any further mutation.
 Before a teardown decision and after every AWS-50 attempt, AWS-40 performs the
 authenticated read-only verification:
 
+Record `Read authority source` exactly as `SOURCE: <stable owner-message source>;
+AUTHORIZED_AT: <ISO 8601 with timezone>`. `AUTHORIZED_AT` is the `Observed at`
+timestamp of the matching Read-only preflight row in Action authorization
+provenance. Every current row matches the read ID, role, receipt digest, and
+validity, stays inside that authorization window, and does not exceed authorized
+resources or operations. Exact scope equality applies only when the Engine
+requires exact-scope reconciliation; other current rows may observe a subset.
+STALE cannot claim fresh reads. A later receipt expiry or replacement does not
+invalidate a terminal row whose complete durable tuple was proven at append
+time.
+
 ```bash
 # Resource inventory checks
 TODO
@@ -616,6 +707,11 @@ For every deployment, rollback, restore, or teardown, record:
 - relevant test, metric, log, or stack references;
 - linked GitHub issue or pull request;
 - remaining evidence gaps.
+
+Deployment attempts and their AWS-30 observations use only VERIFY's canonical
+append-only deployment action and reconciliation table. Record the pre-call
+STARTED row before the operation, the terminal direct result afterward, and the
+separately authorized read-only reconciliation row without overwriting history.
 
 Also record the current REQ/DES/AUTH and action authorization IDs, coordinator
 checkpoint, exact account/Region/environment, resource and operation boundary,

@@ -16,6 +16,12 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+
+try:
+    from fastlane_process import resolve_trusted_git
+except ModuleNotFoundError:  # pragma: no cover - package-style test import
+    from scripts.fastlane_process import resolve_trusted_git
+
 try:
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # pragma: no cover - package-style test import
@@ -91,7 +97,7 @@ ALLOWED_TRANSITIONS = {
     "DONE": set(),
     "SKIPPED": set(),
 }
-ALLOWED_AWS_MODES = {"NONE", "DOCS_ONLY", "READ_ONLY", "MUTATION"}
+ALLOWED_AWS_MODES = {"NONE", "DOCS_ONLY"}
 ALLOWED_RUN_STATES = {"NOT_STARTED", "RUNNING", "PAUSED", "BLOCKED", "COMPLETE"}
 ALLOWED_PLAN_STATES = {"UNINITIALIZED", "CURRENT", "STALE"}
 UNRESOLVED = {"", "TODO", "TBD", "UNKNOWN", "UNASSIGNED"}
@@ -368,6 +374,8 @@ class ApprovedTaskContract:
     property_execution: dict[str, PropertyExecutionRow]
     harness: dict[str, HarnessExecutionRow]
     delivery: ApprovedDeliveryContract | None = None
+    requirement_rules: dict[str, tuple[str, str]] | None = None
+    requirement_evidence: dict[str, tuple[str, tuple[str, ...]]] | None = None
 
 
 def clean(value: str) -> str:
@@ -532,8 +540,10 @@ def parse_dependency_waivers(task: Task) -> dict[str, str]:
     result: dict[str, str] = {}
     for entry in raw.split(","):
         parts = [part.strip() for part in entry.split("=", 1)]
-        if len(parts) != 2 or not re.fullmatch(r"TASK-\d+", parts[0]) or not re.fullmatch(
-            r"WAIVER-\d+", parts[1]
+        if (
+            len(parts) != 2
+            or not re.fullmatch(r"TASK-\d+", parts[0])
+            or not re.fullmatch(r"WAIVER-\d+", parts[1])
         ):
             raise ValueError(
                 f"{task.task_id}: invalid Dependency waivers entry {entry.strip()!r}"
@@ -599,7 +609,9 @@ def validate_task_sections(task: Task) -> list[str]:
             "NOT STARTED",
             "NO EXECUTION HAS BEEN RECORDED",
         )
-        if not normalized_log or any(marker in normalized_log for marker in placeholders):
+        if not normalized_log or any(
+            marker in normalized_log for marker in placeholders
+        ):
             errors.append(f"{task.task_id}: DONE requires an observed Execution log")
     return errors
 
@@ -694,10 +706,15 @@ def split_markdown_table_row(line: str) -> list[str] | None:
     index = 0
     while index < len(content):
         character = content[index]
-        if character == "\\" and index + 1 < len(content) and content[index + 1] in {
-            "\\",
-            "|",
-        }:
+        if (
+            character == "\\"
+            and index + 1 < len(content)
+            and content[index + 1]
+            in {
+                "\\",
+                "|",
+            }
+        ):
             current.append(content[index + 1])
             index += 2
             continue
@@ -738,7 +755,9 @@ def parse_property_execution_rows(
         or len(separators) != len(PROPERTY_EXECUTION_HEADERS)
         or any(re.fullmatch(r":?-{3,}:?", cell) is None for cell in separators)
     ):
-        raise ValueError(f"{label}: property execution projection separator is malformed")
+        raise ValueError(
+            f"{label}: property execution projection separator is malformed"
+        )
 
     rows: dict[str, PropertyExecutionRow] = {}
     for raw_line, structural_line in zip(
@@ -942,8 +961,7 @@ def validate_property_execution_projection(
         )
     if extra:
         errors.append(
-            f"{task.task_id}: unreferenced property execution rows: "
-            + ", ".join(extra)
+            f"{task.task_id}: unreferenced property execution rows: " + ", ".join(extra)
         )
     if not missing and not extra and list(projected) != property_ids:
         errors.append(
@@ -1108,13 +1126,23 @@ def validate_new_build_delivery_order(
 
     errors: list[str] = []
     delivery = approved_delivery
-    if not current_plan or delivery is None or delivery.grandfathered or delivery.wave_contract_id is None:
+    if (
+        not current_plan
+        or delivery is None
+        or delivery.grandfathered
+        or delivery.wave_contract_id is None
+    ):
         return errors
     wave_id = delivery.wave_contract_id
     references = {task.task_id: task_contract_ids(task) for task in tasks}
 
     def matching_ids(pattern: re.Pattern[str]) -> list[str]:
-        return [identifier for values in references.values() for identifier in values if pattern.fullmatch(identifier)]
+        return [
+            identifier
+            for values in references.values()
+            for identifier in values
+            if pattern.fullmatch(identifier)
+        ]
 
     def reject(condition: bool, message: str) -> bool:
         if condition:
@@ -1122,81 +1150,199 @@ def validate_new_build_delivery_order(
         return condition
 
     def sole_owner(identifier: str, noun: str, skipped: str) -> Task | None:
-        owners = [task for task in tasks for reference in references[task.task_id] if reference == identifier]
+        owners = [
+            task
+            for task in tasks
+            for reference in references[task.task_id]
+            if reference == identifier
+        ]
         if len(owners) != 1:
-            errors.append(f"{identifier}: current NEW_BUILD task plan requires exactly one {noun} task; found {len(owners)}")
+            errors.append(
+                f"{identifier}: current NEW_BUILD task plan requires exactly one {noun} task; found {len(owners)}"
+            )
             return None
         owner = owners[0]
-        return None if reject(owner.status == "SKIPPED", f"{owner.task_id}: {skipped} cannot be SKIPPED") else owner
+        return (
+            None
+            if reject(
+                owner.status == "SKIPPED",
+                f"{owner.task_id}: {skipped} cannot be SKIPPED",
+            )
+            else owner
+        )
 
     unexpected = sorted(set(matching_ids(WAVE_ID_PATTERN)) - {wave_id})
-    reject(bool(unexpected), "Current NEW_BUILD task plan references unapproved first-wave IDs: " + ", ".join(unexpected))
+    reject(
+        bool(unexpected),
+        "Current NEW_BUILD task plan references unapproved first-wave IDs: "
+        + ", ".join(unexpected),
+    )
     walking_task = sole_owner(wave_id, "walking-skeleton", "walking-skeleton task")
     if walking_task is not None:
-        required_ids = {wave_id, *delivery.requirement_ids, *delivery.acceptance_test_ids}
+        required_ids = {
+            wave_id,
+            *delivery.requirement_ids,
+            *delivery.acceptance_test_ids,
+        }
         if delivery.journey_id is not None:
             required_ids.add(delivery.journey_id)
         missing_ids = sorted(required_ids - set(references[walking_task.task_id]))
-        reject(bool(missing_ids), f"{walking_task.task_id}: walking-skeleton Requirements are missing " + ", ".join(missing_ids))
+        reject(
+            bool(missing_ids),
+            f"{walking_task.task_id}: walking-skeleton Requirements are missing "
+            + ", ".join(missing_ids),
+        )
         projected_harness: dict[str, HarnessExecutionRow] = {}
         validation = task_subsection(walking_task, "#### Validation")
         if validation is not None:
             try:
-                projected_harness, _present = parse_harness_projection_rows(validation, walking_task.task_id)
+                projected_harness, _present = parse_harness_projection_rows(
+                    validation, walking_task.task_id
+                )
             except ValueError as exc:
                 errors.append(str(exc))
         harness_id = delivery.harness_id
-        unavailable = harness_id is None or approved_harness is None or harness_id not in approved_harness
-        if not reject(unavailable, f"{wave_id}: approved end-to-end Harness contract is unavailable"):
-            reject(harness_id not in projected_harness, f"{walking_task.task_id}: walking-skeleton Validation must own approved end-to-end {harness_id}")
+        unavailable = (
+            harness_id is None
+            or approved_harness is None
+            or harness_id not in approved_harness
+        )
+        if not reject(
+            unavailable,
+            f"{wave_id}: approved end-to-end Harness contract is unavailable",
+        ):
+            reject(
+                harness_id not in projected_harness,
+                f"{walking_task.task_id}: walking-skeleton Validation must own approved end-to-end {harness_id}",
+            )
 
     approved_spike = delivery.spike
     observed_spike_ids = matching_ids(SPIKE_ID_PATTERN)
     spike_task: Task | None = None
     if approved_spike is None:
-        reject(bool(observed_spike_ids), "Current NEW_BUILD task plan references an unapproved blocking spike: " + ", ".join(sorted(set(observed_spike_ids))))
+        reject(
+            bool(observed_spike_ids),
+            "Current NEW_BUILD task plan references an unapproved blocking spike: "
+            + ", ".join(sorted(set(observed_spike_ids))),
+        )
     else:
         unexpected = sorted(set(observed_spike_ids) - {approved_spike.spike_id})
-        reject(bool(unexpected), "Current NEW_BUILD task plan references unapproved spike IDs: " + ", ".join(unexpected))
+        reject(
+            bool(unexpected),
+            "Current NEW_BUILD task plan references unapproved spike IDs: "
+            + ", ".join(unexpected),
+        )
         spike_task = sole_owner(approved_spike.spike_id, "spike", "blocking spike")
-        same_task = walking_task is not None and spike_task is not None and spike_task.task_id == walking_task.task_id
-        if reject(same_task, f"{approved_spike.spike_id}: spike and walking skeleton must be separate tasks"):
+        same_task = (
+            walking_task is not None
+            and spike_task is not None
+            and spike_task.task_id == walking_task.task_id
+        )
+        if reject(
+            same_task,
+            f"{approved_spike.spike_id}: spike and walking skeleton must be separate tasks",
+        ):
             spike_task = None
     if spike_task is not None and approved_spike is not None:
-        reject(spike_task.attempt_budget > approved_spike.max_attempts, f"{spike_task.task_id}: Attempt budget exceeds approved {approved_spike.spike_id} maximum {approved_spike.max_attempts}")
+        reject(
+            spike_task.attempt_budget > approved_spike.max_attempts,
+            f"{spike_task.task_id}: Attempt budget exceeds approved {approved_spike.spike_id} maximum {approved_spike.max_attempts}",
+        )
         try:
-            spike_writes = validate_write_boundary(spike_task.metadata.get("Write set", ""), spike_task.task_id)
-            outside = [path for path in spike_writes if not any(path_boundary_contains(boundary, path) for boundary in approved_spike.disposable_boundaries)]
-            reject(bool(outside), f"{spike_task.task_id}: spike Write set exceeds the approved disposable boundary: " + ", ".join(outside))
+            spike_writes = validate_write_boundary(
+                spike_task.metadata.get("Write set", ""), spike_task.task_id
+            )
+            outside = [
+                path
+                for path in spike_writes
+                if not any(
+                    path_boundary_contains(boundary, path)
+                    for boundary in approved_spike.disposable_boundaries
+                )
+            ]
+            reject(
+                bool(outside),
+                f"{spike_task.task_id}: spike Write set exceeds the approved disposable boundary: "
+                + ", ".join(outside),
+            )
         except ValueError as exc:
             errors.append(str(exc))
-        reject(clean(spike_task.metadata.get("External state", "")) != "NONE", f"{spike_task.task_id}: blocking spike requires External state NONE")
-        reject(spike_task.aws_mode not in {"NONE", "DOCS_ONLY"}, f"{spike_task.task_id}: blocking spike AWS mode must be NONE or DOCS_ONLY")
+        reject(
+            clean(spike_task.metadata.get("External state", "")) != "NONE",
+            f"{spike_task.task_id}: blocking spike requires External state NONE",
+        )
+        reject(
+            spike_task.aws_mode not in {"NONE", "DOCS_ONLY"},
+            f"{spike_task.task_id}: blocking spike AWS mode must be NONE or DOCS_ONLY",
+        )
         validation = task_subsection(spike_task, "#### Validation") or ""
-        exit_count = fenced_command_lines(validation).count(approved_spike.exit_criterion)
-        reject(exit_count != 1, f"{spike_task.task_id}: approved spike exit criterion must appear unchanged exactly once in Validation code fences; found {exit_count}")
+        exit_count = fenced_command_lines(validation).count(
+            approved_spike.exit_criterion
+        )
+        reject(
+            exit_count != 1,
+            f"{spike_task.task_id}: approved spike exit criterion must appear unchanged exactly once in Validation code fences; found {exit_count}",
+        )
 
-    if walking_task is None or not all(dependency in by_id and dependency != task.task_id for task in tasks for dependency in task.dependencies):
+    if walking_task is None or not all(
+        dependency in by_id and dependency != task.task_id
+        for task in tasks
+        for dependency in task.dependencies
+    ):
         return errors
     try:
         waves = compute_waves(tasks, by_id)
     except ValueError as exc:
         errors.append(str(exc))
         return errors
-    active_tasks = [task for task in tasks if task.status in ALLOWED_STATUSES - {"SKIPPED"}]
-    tasks_in_wave = lambda number: sorted(task.task_id for task in active_tasks if waves[task.task_id] == number)
+    active_tasks = [
+        task for task in tasks if task.status in ALLOWED_STATUSES - {"SKIPPED"}
+    ]
+
+    def tasks_in_wave(number: int) -> list[str]:
+        return sorted(
+            task.task_id for task in active_tasks if waves[task.task_id] == number
+        )
+
     if approved_spike is None:
-        reject(bool(walking_task.dependencies), f"{walking_task.task_id}: walking skeleton without a spike must use Depends on NONE")
-        reject(tasks_in_wave(1) != [walking_task.task_id], f"{wave_id}: walking skeleton must be the sole active structural wave 1 task")
+        reject(
+            bool(walking_task.dependencies),
+            f"{walking_task.task_id}: walking skeleton without a spike must use Depends on NONE",
+        )
+        reject(
+            tasks_in_wave(1) != [walking_task.task_id],
+            f"{wave_id}: walking skeleton must be the sole active structural wave 1 task",
+        )
     elif spike_task is not None:
-        reject(bool(spike_task.dependencies), f"{spike_task.task_id}: blocking spike must use Depends on NONE")
-        reject(walking_task.dependencies != [spike_task.task_id], f"{walking_task.task_id}: walking skeleton must depend directly and only on {spike_task.task_id}")
-        reject(tasks_in_wave(1) != [spike_task.task_id], f"{approved_spike.spike_id}: spike must be the sole active structural wave 1 task")
-        reject(tasks_in_wave(2) != [walking_task.task_id], f"{wave_id}: walking skeleton must be the sole active structural wave 2 task after the spike")
+        reject(
+            bool(spike_task.dependencies),
+            f"{spike_task.task_id}: blocking spike must use Depends on NONE",
+        )
+        reject(
+            walking_task.dependencies != [spike_task.task_id],
+            f"{walking_task.task_id}: walking skeleton must depend directly and only on {spike_task.task_id}",
+        )
+        reject(
+            tasks_in_wave(1) != [spike_task.task_id],
+            f"{approved_spike.spike_id}: spike must be the sole active structural wave 1 task",
+        )
+        reject(
+            tasks_in_wave(2) != [walking_task.task_id],
+            f"{wave_id}: walking skeleton must be the sole active structural wave 2 task after the spike",
+        )
 
     excluded = {walking_task.task_id, *(task.task_id for task in (spike_task,) if task)}
-    bypassing = sorted(task.task_id for task in active_tasks if task.task_id not in excluded and not transitively_depends_on(task, walking_task.task_id, by_id))
-    reject(bool(bypassing), f"{wave_id}: active tasks must be transitively downstream of the walking skeleton: " + ", ".join(bypassing))
+    bypassing = sorted(
+        task.task_id
+        for task in active_tasks
+        if task.task_id not in excluded
+        and not transitively_depends_on(task, walking_task.task_id, by_id)
+    )
+    reject(
+        bool(bypassing),
+        f"{wave_id}: active tasks must be transitively downstream of the walking skeleton: "
+        + ", ".join(bypassing),
+    )
     return errors
 
 
@@ -1301,11 +1447,15 @@ def validate_done_harness_evidence(
         for row in observations:
             label = f"{task.task_id} Harness evidence {row.evidence_id}"
             if row.layer != expected.layer:
-                raise ValueError(f"{label} Layer does not match the approved Harness row")
-            if normalize_harness_command(row.exact_command) != normalize_harness_command(
-                expected.exact_command
-            ):
-                raise ValueError(f"{label} command/API does not match the approved Harness row")
+                raise ValueError(
+                    f"{label} Layer does not match the approved Harness row"
+                )
+            if normalize_harness_command(
+                row.exact_command
+            ) != normalize_harness_command(expected.exact_command):
+                raise ValueError(
+                    f"{label} command/API does not match the approved Harness row"
+                )
             observed_basis = set(
                 re.findall(
                     r"(?:TASK|REQ|DES|AUTH)-\d{3,}|HARNESS-\d{3,}|TECH-\d{4}|PROP-\d{3,}",
@@ -1323,13 +1473,17 @@ def validate_done_harness_evidence(
                 row.observed_result, f"{label} Observed result"
             )
             validate_iso_timestamp(row.observed_at, f"{label} Observed at")
-            observed_time = datetime.fromisoformat(row.observed_at.replace("Z", "+00:00"))
+            observed_time = datetime.fromisoformat(
+                row.observed_at.replace("Z", "+00:00")
+            )
             if prior_time is not None and observed_time <= prior_time:
                 raise ValueError(
                     f"{task.task_id}: {harness_id} evidence must be append-only in chronological order"
                 )
             prior_time = observed_time
-            validate_durable_evidence_source(row.durable_source, f"{label} Durable source")
+            validate_durable_evidence_source(
+                row.durable_source, f"{label} Durable source"
+            )
             if row.status not in {HARNESS_FAILURE_STATUS, *HARNESS_PASS_STATUSES}:
                 raise ValueError(
                     f"{label} Status must be FAILED, LOCAL_PASS, or VERIFIED"
@@ -1370,14 +1524,18 @@ def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]
         )
     header_index = header_indexes[0]
     if header_index + 1 >= len(lines):
-        raise ValueError("VERIFY.md Task completion evidence table has no separator row")
+        raise ValueError(
+            "VERIFY.md Task completion evidence table has no separator row"
+        )
     separators = split_markdown_table_row(lines[header_index + 1])
     if (
         separators is None
         or len(separators) != len(TASK_COMPLETION_EVIDENCE_HEADERS)
         or any(re.fullmatch(r":?-{3,}:?", cell) is None for cell in separators)
     ):
-        raise ValueError("VERIFY.md Task completion evidence has an invalid separator row")
+        raise ValueError(
+            "VERIFY.md Task completion evidence has an invalid separator row"
+        )
 
     rows: list[TaskCompletionEvidenceRow] = []
     for line in lines[header_index + 2 :]:
@@ -1399,7 +1557,9 @@ def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]
 
     identifiers = [row.evidence_id for row in rows]
     duplicates = sorted(
-        identifier for identifier in set(identifiers) if identifiers.count(identifier) > 1
+        identifier
+        for identifier in set(identifiers)
+        if identifiers.count(identifier) > 1
     )
     if duplicates:
         raise ValueError(
@@ -1449,7 +1609,9 @@ def validate_durable_evidence_source(value: str, label: str) -> None:
         return
     candidate = re.sub(r"^artifact\s*:\s*", "", normalized, flags=re.IGNORECASE)
     if (
-        re.fullmatch(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+(?:#[A-Za-z0-9._-]+)?", candidate)
+        re.fullmatch(
+            r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+(?:#[A-Za-z0-9._-]+)?", candidate
+        )
         and ".." not in PurePosixPath(candidate.split("#", 1)[0]).parts
     ):
         return
@@ -1488,7 +1650,10 @@ def validate_property_done_evidence(
             raise ValueError(
                 f"{task.task_id}: {property_id} is not approved by the PRD property execution contract"
             )
-        if contract.framework_selection is None or contract.framework_version_policy is None:
+        if (
+            contract.framework_selection is None
+            or contract.framework_version_policy is None
+        ):
             raise ValueError(
                 f"{task.task_id}: {property_id} approved framework selection and version policy are unavailable"
             )
@@ -1601,27 +1766,38 @@ def validate_snapshot(snapshot: Snapshot) -> None:
     if errors:
         raise ValueError("\n".join(errors))
     if snapshot.get("Run state") not in ALLOWED_RUN_STATES:
-        raise ValueError(f"Execution snapshot: invalid Run state {snapshot.get('Run state')!r}")
+        raise ValueError(
+            f"Execution snapshot: invalid Run state {snapshot.get('Run state')!r}"
+        )
     plan_state = snapshot.get("Task-plan state")
     plan_revision = snapshot.get("Task-plan revision")
     if plan_state not in ALLOWED_PLAN_STATES:
         raise ValueError(f"Execution snapshot: invalid Task-plan state {plan_state!r}")
     if plan_state == "UNINITIALIZED" and plan_revision != "UNINITIALIZED":
-        raise ValueError("Execution snapshot: UNINITIALIZED plan state requires no plan revision")
-    if plan_state in {"CURRENT", "STALE"} and re.fullmatch(
-        r"PLAN-\d{4,}", plan_revision
-    ) is None:
+        raise ValueError(
+            "Execution snapshot: UNINITIALIZED plan state requires no plan revision"
+        )
+    if (
+        plan_state in {"CURRENT", "STALE"}
+        and re.fullmatch(r"PLAN-\d{4,}", plan_revision) is None
+    ):
         raise ValueError(f"Execution snapshot: {plan_state} requires a PLAN revision")
     try:
-        parse_nonnegative_int(snapshot.get("Maximum workers"), minimum=1)
+        maximum_workers = parse_nonnegative_int(
+            snapshot.get("Maximum workers"), minimum=1
+        )
     except ValueError as exc:
         raise ValueError(f"Execution snapshot: invalid Maximum workers: {exc}") from exc
+    if maximum_workers != 1:
+        raise ValueError("Execution snapshot: Maximum workers must be exactly 1")
     active_run = snapshot.get("Active run ID")
     run_state = snapshot.get("Run state")
     coordinator = snapshot.get("Coordinator")
     if run_state == "NOT_STARTED":
         if active_run != "NONE":
-            raise ValueError("Execution snapshot: NOT_STARTED requires Active run ID NONE")
+            raise ValueError(
+                "Execution snapshot: NOT_STARTED requires Active run ID NONE"
+            )
     else:
         if RUN_ID_PATTERN.fullmatch(active_run) is None:
             raise ValueError("Execution snapshot: active run ID is invalid")
@@ -1632,9 +1808,12 @@ def validate_snapshot(snapshot: Snapshot) -> None:
         try:
             parse_nonnegative_int(current_wave, minimum=1)
         except ValueError as exc:
-            raise ValueError(f"Execution snapshot: invalid Current wave: {exc}") from exc
+            raise ValueError(
+                f"Execution snapshot: invalid Current wave: {exc}"
+            ) from exc
     validate_write_boundary(
-        snapshot.get("Protected dirty paths"), "Execution snapshot Protected dirty paths"
+        snapshot.get("Protected dirty paths"),
+        "Execution snapshot Protected dirty paths",
     )
     last_checkpoint = snapshot.get("Last checkpoint")
     if last_checkpoint != "NONE":
@@ -1654,6 +1833,8 @@ def validate(
     approved_property_execution: dict[str, PropertyExecutionRow] | None = None,
     approved_harness: dict[str, HarnessExecutionRow] | None = None,
     approved_delivery: ApprovedDeliveryContract | None = None,
+    approved_requirement_rules: dict[str, tuple[str, str]] | None = None,
+    approved_requirement_evidence: dict[str, tuple[str, tuple[str, ...]]] | None = None,
 ) -> dict[str, Task]:
     by_id: dict[str, Task] = {}
     errors: list[str] = []
@@ -1727,10 +1908,16 @@ def validate(
                         f"{task.task_id}: REQ/DES/AUTH trace does not match execution snapshot"
                     )
                 if snapshot.get("Gate B state") != "APPROVED_FOR_CONSTRUCTION":
-                    errors.append(f"{task.task_id}: Gate B is not approved for construction")
+                    errors.append(
+                        f"{task.task_id}: Gate B is not approved for construction"
+                    )
             try:
-                validate_write_boundary(task.metadata.get("Write set", ""), task.task_id)
-                parse_external_state(task.metadata.get("External state", ""), task.task_id)
+                validate_write_boundary(
+                    task.metadata.get("Write set", ""), task.task_id
+                )
+                parse_external_state(
+                    task.metadata.get("External state", ""), task.task_id
+                )
             except ValueError as exc:
                 errors.append(str(exc))
             if used >= budget and task.status == "READY":
@@ -1753,7 +1940,9 @@ def validate(
                 snapshot.get("Run state") != "RUNNING"
                 or snapshot.get("Active run ID") != task.run_id
             ):
-                errors.append(f"{task.task_id}: Run ID does not match the active RUNNING run")
+                errors.append(
+                    f"{task.task_id}: Run ID does not match the active RUNNING run"
+                )
         elif task.run_id not in {"", "NONE"}:
             errors.append(f"{task.task_id}: non-IN_PROGRESS task must use Run ID NONE")
 
@@ -1799,9 +1988,16 @@ def validate(
             for dependency, waiver_id in declared_waivers.items():
                 waiver = waivers.get(waiver_id)
                 if waiver is None:
-                    errors.append(f"{task.task_id}: unknown dependency waiver {waiver_id}")
-                elif waiver.skipped_task != dependency or waiver.applies_to != task.task_id:
-                    errors.append(f"{task.task_id}: waiver {waiver_id} does not match its task pair")
+                    errors.append(
+                        f"{task.task_id}: unknown dependency waiver {waiver_id}"
+                    )
+                elif (
+                    waiver.skipped_task != dependency
+                    or waiver.applies_to != task.task_id
+                ):
+                    errors.append(
+                        f"{task.task_id}: waiver {waiver_id} does not match its task pair"
+                    )
         except ValueError as exc:
             errors.append(str(exc))
 
@@ -1819,8 +2015,7 @@ def validate(
             approved_delivery,
             approved_harness,
             current_plan=(
-                snapshot is not None
-                and snapshot.get("Task-plan state") == "CURRENT"
+                snapshot is not None and snapshot.get("Task-plan state") == "CURRENT"
             ),
         )
     )
@@ -1834,21 +2029,27 @@ def validate(
         if waiver.skipped_task not in by_id[waiver.applies_to].dependencies:
             errors.append(f"{waiver.waiver_id}: skipped task is not a dependency")
         current_auth = snapshot.get("Construction authorization") if snapshot else ""
-        auth_pattern = re.compile(
-            rf"{re.escape(current_auth)}(?:\s+clause\s+[A-Za-z0-9._:-]+)?"
-        ) if current_auth else None
+        auth_pattern = (
+            re.compile(rf"{re.escape(current_auth)}(?:\s+clause\s+[A-Za-z0-9._:-]+)?")
+            if current_auth
+            else None
+        )
         authority_is_current = bool(
             (auth_pattern and auth_pattern.fullmatch(waiver.authority))
             or OWNER_DECISION_PATTERN.fullmatch(waiver.authority)
         )
         if not authority_is_current:
-            errors.append(f"{waiver.waiver_id}: authority is not an exact current authority")
+            errors.append(
+                f"{waiver.waiver_id}: authority is not an exact current authority"
+            )
         if (
             waiver.rationale.upper() in UNRESOLVED
             or waiver.rationale == "No waivers recorded"
             or EVIDENCE_PATTERN.search(waiver.rationale) is None
         ):
-            errors.append(f"{waiver.waiver_id}: missing rationale or preserved evidence")
+            errors.append(
+                f"{waiver.waiver_id}: missing rationale or preserved evidence"
+            )
         try:
             validate_iso_timestamp(waiver.recorded_at, waiver.waiver_id)
         except ValueError as exc:
@@ -1883,6 +2084,24 @@ def validate(
             errors.append(
                 "Current task plan does not cover approved property execution IDs: "
                 + ", ".join(missing_property_ids)
+            )
+    if (
+        snapshot is not None
+        and snapshot.get("Task-plan state") == "CURRENT"
+        and approved_requirement_rules is not None
+    ):
+        requirement_coverage = load_bootstrap_doctor().derive_task_requirement_coverage(
+            tasks,
+            snapshot.get("Task-plan state"),
+            approved_requirement_rules,
+            approved_requirement_evidence or {},
+        )
+        errors.extend(requirement_coverage.trace_issues)
+        errors.extend(requirement_coverage.evidence_issues)
+        if requirement_coverage.missing_requirement_ids:
+            errors.append(
+                "Current task plan does not cover approved requirement IDs: "
+                + ", ".join(requirement_coverage.missing_requirement_ids)
             )
 
     if errors:
@@ -1945,14 +2164,18 @@ def ready_tasks(
     for task in tasks:
         if task.status != "READY":
             continue
-        if all(dependency_satisfied(task, by_id[dep], waivers) for dep in task.dependencies):
+        if all(
+            dependency_satisfied(task, by_id[dep], waivers) for dep in task.dependencies
+        ):
             ready.append(task)
     return ready
 
 
 def boundary_base(value: str) -> tuple[str, bool]:
     normalized = value.casefold()
-    return (normalized[:-3], True) if normalized.endswith("/**") else (normalized, False)
+    return (
+        (normalized[:-3], True) if normalized.endswith("/**") else (normalized, False)
+    )
 
 
 def write_boundaries_overlap(first: str, second: str) -> bool:
@@ -2008,7 +2231,9 @@ def require_active_coordinator(
     ):
         raise ValueError(f"{action} requires an explicit --coordinator")
     if coordinator != snapshot.get("Coordinator"):
-        raise ValueError(f"{action} coordinator does not match the active run coordinator")
+        raise ValueError(
+            f"{action} coordinator does not match the active run coordinator"
+        )
     return coordinator
 
 
@@ -2076,11 +2301,15 @@ def validate_checkpoint_receipt(
         else -1
     )
     if require_advance and requested_ordinal <= previous_ordinal:
-        raise ValueError(f"{checkpoint_id}: checkpoint must advance and may not be reused")
+        raise ValueError(
+            f"{checkpoint_id}: checkpoint must advance and may not be reused"
+        )
     if rows[-1].checkpoint_id != checkpoint_id:
         raise ValueError(f"{checkpoint_id}: checkpoint must be the newest table row")
     if row.run_id != run_id:
-        raise ValueError(f"{checkpoint_id}: checkpoint row does not match the active run")
+        raise ValueError(
+            f"{checkpoint_id}: checkpoint row does not match the active run"
+        )
     validate_iso_timestamp(row.recorded_at, checkpoint_id)
 
     expected_basis = (
@@ -2093,7 +2322,9 @@ def validate_checkpoint_receipt(
         for prefix in ("REQ", "DES", "AUTH")
     )
     if actual_basis != tuple([value] for value in expected_basis):
-        raise ValueError(f"{checkpoint_id}: checkpoint REQ/DES/AUTH basis is not current")
+        raise ValueError(
+            f"{checkpoint_id}: checkpoint REQ/DES/AUTH basis is not current"
+        )
 
     if not explicit_checkpoint_value(row.commit_and_dirty):
         raise ValueError(f"{checkpoint_id}: commit and dirty paths are unresolved")
@@ -2105,7 +2336,8 @@ def validate_checkpoint_receipt(
     ):
         raise ValueError(f"{checkpoint_id}: checkpoint commit is not explicit/current")
     protected = validate_write_boundary(
-        snapshot.get("Protected dirty paths"), "Execution snapshot Protected dirty paths"
+        snapshot.get("Protected dirty paths"),
+        "Execution snapshot Protected dirty paths",
     )
     if {path.casefold() for path in receipt_dirty} != {
         path.casefold() for path in protected
@@ -2129,25 +2361,34 @@ def validate_checkpoint_receipt(
         if len(segments) != 1:
             raise ValueError(f"{checkpoint_id}: missing outcome for {task.task_id}")
         segment = segments[0]
-        if re.match(
-            rf"^{re.escape(task.task_id)}\s+{re.escape(task.status)}(?:\s|$)",
-            segment,
-        ) is None:
-            raise ValueError(f"{checkpoint_id}: status for {task.task_id} is not current")
+        if (
+            re.match(
+                rf"^{re.escape(task.task_id)}\s+{re.escape(task.status)}(?:\s|$)",
+                segment,
+            )
+            is None
+        ):
+            raise ValueError(
+                f"{checkpoint_id}: status for {task.task_id} is not current"
+            )
         attempt_pattern = re.compile(
             rf"\battempts?(?:\s+used)?\s*[=:]\s*{task.attempts_used}"
             rf"\s*/\s*{task.attempt_budget}(?!\d)\b",
             re.IGNORECASE,
         )
         if attempt_pattern.search(segment) is None:
-            raise ValueError(f"{checkpoint_id}: attempts for {task.task_id} are not explicit")
+            raise ValueError(
+                f"{checkpoint_id}: attempts for {task.task_id} are not explicit"
+            )
 
     if (
         not explicit_checkpoint_value(row.evidence_and_external, allow_none=True)
         or re.search(r"\bevidence\b", row.evidence_and_external, re.IGNORECASE) is None
         or re.search(r"\bexternal\b", row.evidence_and_external, re.IGNORECASE) is None
     ):
-        raise ValueError(f"{checkpoint_id}: evidence and external actions must be explicit")
+        raise ValueError(
+            f"{checkpoint_id}: evidence and external actions must be explicit"
+        )
     evidence_cell = row.evidence_and_external.casefold()
     for task in tasks:
         task_evidence = evidence_references(task.metadata.get("Evidence", ""))
@@ -2160,22 +2401,29 @@ def validate_checkpoint_receipt(
             is None
             for reference in task_evidence
         ):
-            raise ValueError(f"{checkpoint_id}: evidence for {task.task_id} is incomplete")
+            raise ValueError(
+                f"{checkpoint_id}: evidence for {task.task_id} is incomplete"
+            )
     if (
         not explicit_checkpoint_value(row.blockers_and_next, allow_none=True)
         or re.search(r"\bblockers?\b", row.blockers_and_next, re.IGNORECASE) is None
         or re.search(r"\bnext\b", row.blockers_and_next, re.IGNORECASE) is None
     ):
-        raise ValueError(f"{checkpoint_id}: blockers and next safe action must be explicit")
+        raise ValueError(
+            f"{checkpoint_id}: blockers and next safe action must be explicit"
+        )
 
     verify_path = tasks_path.with_name("VERIFY.md")
     if not verify_path.is_file() or verify_path.is_symlink():
         raise ValueError(f"{checkpoint_id}: checkpoint requires a regular VERIFY.md")
     verify_text = without_fenced_code(verify_path.read_text(encoding="utf-8"))
-    if re.search(
-        rf"(?<![A-Za-z0-9-]){re.escape(checkpoint_id)}(?![A-Za-z0-9-])",
-        verify_text,
-    ) is None:
+    if (
+        re.search(
+            rf"(?<![A-Za-z0-9-]){re.escape(checkpoint_id)}(?![A-Za-z0-9-])",
+            verify_text,
+        )
+        is None
+    ):
         raise ValueError(f"{checkpoint_id}: checkpoint is not referenced in VERIFY.md")
     return row
 
@@ -2185,7 +2433,7 @@ def git_read(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
     environment["GIT_OPTIONAL_LOCKS"] = "0"
     return subprocess.run(
         [
-            "git",
+            resolve_trusted_git(root),
             "-c",
             "core.fsmonitor=false",
             "-c",
@@ -2212,7 +2460,10 @@ def reconcile_git_state(
 
     baseline = snapshot.get("Baseline commit")
     known_green = snapshot.get("Last known-green commit")
-    for label, value in (("Baseline commit", baseline), ("Last known-green commit", known_green)):
+    for label, value in (
+        ("Baseline commit", baseline),
+        ("Last known-green commit", known_green),
+    ):
         if re.fullmatch(r"[0-9a-fA-F]{7,64}", value) is None:
             raise ValueError(
                 f"{action} Git reconciliation: {label} is not an explicit commit ID"
@@ -2228,8 +2479,12 @@ def reconcile_git_state(
         inside_result = git_read(root, "rev-parse", "--is-inside-work-tree")
         bare_result = git_read(root, "rev-parse", "--is-bare-repository")
         head_result = git_read(root, "rev-parse", "--verify", "HEAD^{commit}")
-        baseline_result = git_read(root, "rev-parse", "--verify", f"{baseline}^{{commit}}")
-        green_result = git_read(root, "rev-parse", "--verify", f"{known_green}^{{commit}}")
+        baseline_result = git_read(
+            root, "rev-parse", "--verify", f"{baseline}^{{commit}}"
+        )
+        green_result = git_read(
+            root, "rev-parse", "--verify", f"{known_green}^{{commit}}"
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ValueError(f"{action} Git reconciliation unavailable: {exc}") from exc
     if (
@@ -2239,8 +2494,13 @@ def reconcile_git_state(
         or bare_result.stdout.strip() != b"false"
     ):
         raise ValueError(f"{action} Git reconciliation: not a regular Git worktree")
-    if any(result.returncode != 0 for result in (head_result, baseline_result, green_result)):
-        raise ValueError(f"{action} Git reconciliation: checkpoint commits are not resolvable")
+    if any(
+        result.returncode != 0
+        for result in (head_result, baseline_result, green_result)
+    ):
+        raise ValueError(
+            f"{action} Git reconciliation: checkpoint commits are not resolvable"
+        )
     checkpoint_result: subprocess.CompletedProcess[bytes] | None = None
     if checkpoint_commit is not None:
         try:
@@ -2280,7 +2540,9 @@ def reconcile_git_state(
             "--",
             ".",
         )
-        tracked = git_read(root, "diff", "--name-only", "-z", "--relative", "HEAD", "--", ".")
+        tracked = git_read(
+            root, "diff", "--name-only", "-z", "--relative", "HEAD", "--", "."
+        )
         untracked = git_read(
             root, "ls-files", "--others", "--exclude-standard", "-z", "--", "."
         )
@@ -2295,7 +2557,11 @@ def reconcile_git_state(
         raise ValueError(
             f"{action} Git reconciliation: Last known-green commit is not an ancestor of HEAD"
         )
-    if committed.returncode != 0 or tracked.returncode != 0 or untracked.returncode != 0:
+    if (
+        committed.returncode != 0
+        or tracked.returncode != 0
+        or untracked.returncode != 0
+    ):
         raise ValueError(
             f"{action} Git reconciliation: worktree paths cannot be enumerated"
         )
@@ -2319,7 +2585,8 @@ def reconcile_git_state(
     }
     observed_nonledger = observed - coordinator_ledgers
     protected = validate_write_boundary(
-        snapshot.get("Protected dirty paths"), "Execution snapshot Protected dirty paths"
+        snapshot.get("Protected dirty paths"),
+        "Execution snapshot Protected dirty paths",
     )
     if checkpoint_dirty is not None and {
         path.casefold() for path in checkpoint_dirty
@@ -2336,7 +2603,9 @@ def reconcile_git_state(
     unused = sorted(
         boundary
         for boundary in protected
-        if not any(path_boundary_contains(boundary, path) for path in observed_nonledger)
+        if not any(
+            path_boundary_contains(boundary, path) for path in observed_nonledger
+        )
     )
     if uncovered or unused:
         details: list[str] = []
@@ -2352,15 +2621,23 @@ def reconcile_git_state(
 
 def tasks_conflict(first: Task, second: Task) -> bool:
     first_writes = validate_write_boundary(first.metadata["Write set"], first.task_id)
-    second_writes = validate_write_boundary(second.metadata["Write set"], second.task_id)
+    second_writes = validate_write_boundary(
+        second.metadata["Write set"], second.task_id
+    )
     if any(is_control_boundary(path) for path in [*first_writes, *second_writes]):
         return True
     if any(write_boundaries_overlap(a, b) for a in first_writes for b in second_writes):
         return True
 
-    first_external = parse_external_state(first.metadata["External state"], first.task_id)
-    second_external = parse_external_state(second.metadata["External state"], second.task_id)
-    if any(external_targets_overlap(a, b) for a in first_external for b in second_external):
+    first_external = parse_external_state(
+        first.metadata["External state"], first.task_id
+    )
+    second_external = parse_external_state(
+        second.metadata["External state"], second.task_id
+    )
+    if any(
+        external_targets_overlap(a, b) for a in first_external for b in second_external
+    ):
         return True
     if first.aws_mode == "MUTATION" or second.aws_mode == "MUTATION":
         return True
@@ -2374,25 +2651,9 @@ def safe_execution_groups(
     isolated_worktrees: bool,
     maximum_workers: int | None = None,
 ) -> list[list[Task]]:
-    if maximum_workers is not None and maximum_workers < 1:
-        raise ValueError("Maximum workers must be at least 1")
-    if not isolated_worktrees:
-        return [[task] for task in candidates]
-    group_limit = maximum_workers or max(1, len(candidates))
-    groups: list[list[Task]] = []
-    for wave in sorted({waves[task.task_id] for task in candidates}):
-        wave_groups: list[list[Task]] = []
-        for task in [item for item in candidates if waves[item.task_id] == wave]:
-            for group in wave_groups:
-                if len(group) < group_limit and all(
-                    not tasks_conflict(task, peer) for peer in group
-                ):
-                    group.append(task)
-                    break
-            else:
-                wave_groups.append([task])
-        groups.extend(wave_groups)
-    return groups
+    if maximum_workers not in {None, 1}:
+        raise ValueError("Maximum workers must be exactly 1")
+    return [[task] for task in candidates]
 
 
 def replace_metadata(text: str, task: Task, key: str, value: str) -> str:
@@ -2562,8 +2823,7 @@ def validate_gate_b_design_contract_binding(
         and document.get("Gate B derived status") == "APPROVED_FOR_CONSTRUCTION"
         and all(agent.get(key) == value for key, value in expected_revisions.items())
         and agent.get("Construction envelope SHA-256 reviewed") == envelope_digest
-        and agent.get("Agent recommendation")
-        == "READY_FOR_CONSTRUCTION_APPROVAL"
+        and agent.get("Agent recommendation") == "READY_FOR_CONSTRUCTION_APPROVAL"
         and all(
             agent.get(key) == "NONE"
             for key in (
@@ -2574,11 +2834,9 @@ def validate_gate_b_design_contract_binding(
         )
         and owner.get("Owner decision") == "APPROVED"
         and all(
-            owner.get(key) == value
-            for key, value in expected_owner_revisions.items()
+            owner.get(key) == value for key, value in expected_owner_revisions.items()
         )
-        and owner.get("Authorized construction envelope SHA-256")
-        == envelope_digest
+        and owner.get("Authorized construction envelope SHA-256") == envelope_digest
         and owner.get("Derived Gate B state") == "APPROVED_FOR_CONSTRUCTION"
         and owner.get("Verbatim owner receipt") == "RECORDED_BELOW"
         and doctor.explicit_human_approver(owner.get("Approver", ""))
@@ -2590,8 +2848,7 @@ def validate_gate_b_design_contract_binding(
             "APPROVE PRD AND CONSTRUCTION GATE B",
             f"Requirements revision: {snapshot.get('Requirements revision')}",
             f"Design revision: {snapshot.get('Design revision')}",
-            "Construction authorization: "
-            + snapshot.get("Construction authorization"),
+            "Construction authorization: " + snapshot.get("Construction authorization"),
             f"Construction envelope SHA-256: {envelope_digest}",
             "Use the proposed construction envelope above.",
             f"Approver: {owner.get('Approver', '')}",
@@ -2620,7 +2877,9 @@ def approved_contract_for_tasks(
         if (root / "bootstrap.manifest.json").exists() or (
             root / "bootstrap.py"
         ).exists():
-            raise ValueError("docs/project/PRD.md is required for Fastlane task execution")
+            raise ValueError(
+                "docs/project/PRD.md is required for Fastlane task execution"
+            )
         return None
     if not prd_path.is_file() or prd_path.is_symlink():
         raise ValueError("docs/project/PRD.md must be a regular file")
@@ -2638,7 +2897,9 @@ def approved_contract_for_tasks(
             doctor.TECHNOLOGY_DECISION_HEADERS,
         )
     except ValueError as exc:
-        raise ValueError(f"docs/project/PRD.md technology decision register: {exc}") from exc
+        raise ValueError(
+            f"docs/project/PRD.md technology decision register: {exc}"
+        ) from exc
     if technology_table is None:
         raise ValueError(
             "docs/project/PRD.md must contain exactly one technology decision register"
@@ -2686,9 +2947,12 @@ def approved_contract_for_tasks(
             framework.version_policy,
         )
     approved_harness: dict[str, HarnessExecutionRow] = {}
+    requirement_rules: dict[str, tuple[str, str]] | None = None
+    requirement_evidence: dict[str, tuple[str, tuple[str, ...]]] | None = None
     approved_delivery: ApprovedDeliveryContract | None = None
     if (root / "bootstrap.manifest.json").exists():
-        design_revision = parse_snapshot(tasks_text).get("Design revision")
+        execution_snapshot = parse_snapshot(tasks_text)
+        design_revision = execution_snapshot.get("Design revision")
         design_contract, design_issues = doctor.derive_design_contract(
             prd_text,
             design_revision,
@@ -2754,11 +3018,79 @@ def approved_contract_for_tasks(
                 harness_id=first_wave.harness_id,
                 spike=approved_spike,
             )
+        try:
+            requirements_document = doctor.table_after_heading(
+                prd_text, "## Document status"
+            )
+        except ValueError:
+            requirements_document = {}
+        repository_mode = doctor.clean_cell(
+            requirements_document.get("Repository mode", "")
+        ).lower()
+        intake_contract, _intake_issues = doctor.derive_intake_foundation_contract(
+            prd_text,
+            repository_mode if repository_mode in doctor.PROJECT_MODES else None,
+            grandfather_current_gate_a=True,
+        )
+        requirements_contract, requirements_issues = (
+            doctor.derive_requirements_contract(
+                prd_text,
+                doctor.clean_cell(requirements_document.get("Effective risk", ""))
+                or None,
+                intake_contract,
+                required=True,
+                grandfather_current_gate_a=True,
+            )
+        )
+        if requirements_issues or requirements_contract.status not in {
+            "READY",
+            "GRANDFATHERED",
+        }:
+            issue_text = "; ".join(
+                f"{code}: {message}" for code, message in requirements_issues
+            )
+            if not issue_text:
+                issue_text = f"status={requirements_contract.status}"
+            raise ValueError(
+                "docs/project/PRD.md requirements contract is not current: "
+                + issue_text
+            )
+        requirement_rules = doctor.task_requirement_rules(
+            prd_text, requirements_contract
+        )
+        verify_path = tasks_path.with_name("VERIFY.md")
+        verify_text: str | None = None
+        if verify_path.exists():
+            if not verify_path.is_file() or verify_path.is_symlink():
+                raise ValueError("docs/project/VERIFY.md must be a regular file")
+            verify_text = verify_path.read_text(encoding="utf-8")
+        requirement_evidence, evidence_issues = (
+            doctor.task_requirement_evidence_dispositions(
+                verify_text,
+                {
+                    "Requirements revision": execution_snapshot.get(
+                        "Requirements revision"
+                    ),
+                    "Design revision": execution_snapshot.get("Design revision"),
+                    "Construction authorization": execution_snapshot.get(
+                        "Construction authorization"
+                    ),
+                },
+                requirement_rules,
+            )
+        )
+        if evidence_issues:
+            raise ValueError(
+                "docs/project/VERIFY.md requirement evidence is invalid: "
+                + "; ".join(evidence_issues)
+            )
     return ApprovedTaskContract(
         frozenset(approved),
         enriched_property_execution,
         approved_harness,
         approved_delivery,
+        requirement_rules,
+        requirement_evidence,
     )
 
 
@@ -2820,9 +3152,23 @@ def execution_contract_components(
     )
 
 
-def execution_contract_kwargs(contract: ApprovedTaskContract | None) -> dict[str, object]:
-    keys = ("approved_tech_ids", "approved_property_execution", "approved_harness", "approved_delivery")
-    return dict(zip(keys, execution_contract_components(contract)))
+def execution_contract_kwargs(
+    contract: ApprovedTaskContract | None,
+) -> dict[str, object]:
+    keys = (
+        "approved_tech_ids",
+        "approved_property_execution",
+        "approved_harness",
+        "approved_delivery",
+    )
+    kwargs = dict(zip(keys, execution_contract_components(contract)))
+    kwargs["approved_requirement_rules"] = (
+        contract.requirement_rules if contract is not None else None
+    )
+    kwargs["approved_requirement_evidence"] = (
+        contract.requirement_evidence if contract is not None else None
+    )
+    return kwargs
 
 
 def coordinator_ledger_paths(tasks_path: Path) -> set[str]:
@@ -2846,7 +3192,9 @@ def canonical_verify_reference(tasks_path: Path, fragment: str) -> str:
     try:
         relative = verify_path.relative_to(root).as_posix()
     except ValueError as exc:
-        raise ValueError("Verification ledger is outside its derived project root") from exc
+        raise ValueError(
+            "Verification ledger is outside its derived project root"
+        ) from exc
     return f"{relative}#{fragment}"
 
 
@@ -3032,7 +3380,11 @@ def mirror_state_text(
             task.task_id for task in tasks if task.status == "IN_PROGRESS"
         )
         checkpoint = snapshot.get("Last checkpoint")
-        if execution["state"] in {"CHECKPOINTED", "BLOCKED", "COMPLETE"} and checkpoint in {
+        if execution["state"] in {
+            "CHECKPOINTED",
+            "BLOCKED",
+            "COMPLETE",
+        } and checkpoint in {
             "",
             "NONE",
         }:
@@ -3047,13 +3399,13 @@ def mirror_state_text(
                     tasks_path, checkpoint.lower()
                 ),
             }
-    execution["attempts"] = {
-        task.task_id: task.attempts_used for task in tasks
-    }
+    execution["attempts"] = {task.task_id: task.attempts_used for task in tasks}
     return state_path, json.dumps(state, indent=2, sort_keys=False) + "\n"
 
 
-def write_state_mirror(tasks_path: Path, tasks_text: str, *, run_mode: str | None = None) -> None:
+def write_state_mirror(
+    tasks_path: Path, tasks_text: str, *, run_mode: str | None = None
+) -> None:
     mirror = mirror_state_text(tasks_path, tasks_text, run_mode=run_mode)
     atomic_write_text(*mirror)
 
@@ -3092,6 +3444,8 @@ def load_contract(
     approved_property_execution: dict[str, PropertyExecutionRow] | None = None,
     approved_harness: dict[str, HarnessExecutionRow] | None = None,
     approved_delivery: ApprovedDeliveryContract | None = None,
+    approved_requirement_rules: dict[str, tuple[str, str]] | None = None,
+    approved_requirement_evidence: dict[str, tuple[str, tuple[str, ...]]] | None = None,
 ) -> tuple[list[Task], Snapshot, dict[str, Waiver], dict[str, Task]]:
     tasks = parse_tasks(text)
     snapshot = parse_snapshot(text)
@@ -3104,6 +3458,8 @@ def load_contract(
         approved_property_execution=approved_property_execution,
         approved_harness=approved_harness,
         approved_delivery=approved_delivery,
+        approved_requirement_rules=approved_requirement_rules,
+        approved_requirement_evidence=approved_requirement_evidence,
     )
     compute_waves(tasks, by_id)
     return tasks, snapshot, waivers, by_id
@@ -3116,6 +3472,8 @@ def synchronize_current_wave(
     approved_property_execution: dict[str, PropertyExecutionRow] | None = None,
     approved_harness: dict[str, HarnessExecutionRow] | None = None,
     approved_delivery: ApprovedDeliveryContract | None = None,
+    approved_requirement_rules: dict[str, tuple[str, str]] | None = None,
+    approved_requirement_evidence: dict[str, tuple[str, tuple[str, ...]]] | None = None,
 ) -> str:
     """Advance the coordinator snapshot to the lowest runnable/active wave."""
 
@@ -3125,6 +3483,8 @@ def synchronize_current_wave(
         approved_property_execution=approved_property_execution,
         approved_harness=approved_harness,
         approved_delivery=approved_delivery,
+        approved_requirement_rules=approved_requirement_rules,
+        approved_requirement_evidence=approved_requirement_evidence,
     )
     if snapshot.get("Run state") != "RUNNING":
         return text
@@ -3133,7 +3493,9 @@ def synchronize_current_wave(
         *[task for task in tasks if task.status == "IN_PROGRESS"],
         *ready_tasks(tasks, by_id, waivers),
     ]
-    next_wave = str(min(waves[task.task_id] for task in candidates)) if candidates else "NONE"
+    next_wave = (
+        str(min(waves[task.task_id] for task in candidates)) if candidates else "NONE"
+    )
     if snapshot.get("Current wave") == next_wave:
         return text
     return replace_snapshot_field(text, "Current wave", next_wave)
@@ -3141,7 +3503,11 @@ def synchronize_current_wave(
 
 def task_write_set_conflicts_with_paths(task: Task, paths: list[str]) -> bool:
     writes = validate_write_boundary(task.metadata["Write set"], task.task_id)
-    return any(write_boundaries_overlap(write, protected) for write in writes for protected in paths)
+    return any(
+        write_boundaries_overlap(write, protected)
+        for write in writes
+        for protected in paths
+    )
 
 
 def validate_claim_safety(
@@ -3160,26 +3526,27 @@ def validate_claim_safety(
     if coordinator != expected_coordinator:
         raise ValueError("Claim coordinator does not match the active run coordinator")
     maximum_workers = parse_nonnegative_int(snapshot.get("Maximum workers"), minimum=1)
+    if maximum_workers != 1:
+        raise ValueError("Claim requires Maximum workers = 1")
+    if owner != expected_coordinator:
+        raise ValueError("Mutable task claims require coordinator ownership")
     active = [item for item in tasks if item.status == "IN_PROGRESS"]
-    if len(active) >= maximum_workers:
-        raise ValueError("Claim would exceed Maximum workers")
-    if any(clean(item.metadata.get("Owner", "")) == owner for item in active):
-        raise ValueError(f"Owner {owner!r} already has an IN_PROGRESS task")
-    if active and not isolated_worktrees:
-        raise ValueError("Parallel claims require --isolated-worktrees")
-    conflicts = [item.task_id for item in active if tasks_conflict(task, item)]
-    if conflicts:
-        raise ValueError(
-            f"{task.task_id}: conflicts with active tasks: " + ", ".join(conflicts)
-        )
+    if active:
+        raise ValueError("A mutable task is already IN_PROGRESS; serialize task claims")
     protected = validate_write_boundary(
-        snapshot.get("Protected dirty paths"), "Execution snapshot Protected dirty paths"
+        snapshot.get("Protected dirty paths"),
+        "Execution snapshot Protected dirty paths",
     )
     if task_write_set_conflicts_with_paths(task, protected):
         raise ValueError(f"{task.task_id}: Write set overlaps Protected dirty paths")
     writes = validate_write_boundary(task.metadata["Write set"], task.task_id)
-    if any(is_control_boundary(path) for path in writes) and owner != expected_coordinator:
-        raise ValueError(f"{task.task_id}: shared control paths require coordinator ownership")
+    if (
+        any(is_control_boundary(path) for path in writes)
+        and owner != expected_coordinator
+    ):
+        raise ValueError(
+            f"{task.task_id}: shared control paths require coordinator ownership"
+        )
     current_wave = snapshot.get("Current wave")
     task_wave = str(waves[task.task_id])
     if current_wave != task_wave:
@@ -3199,11 +3566,14 @@ def safe_ready_candidates(
 ) -> tuple[list[Task], int]:
     active = [task for task in tasks if task.status == "IN_PROGRESS"]
     maximum_workers = parse_nonnegative_int(snapshot.get("Maximum workers"), minimum=1)
-    available_slots = max(0, maximum_workers - len(active))
-    if not available_slots or (active and not isolated_worktrees):
+    if maximum_workers != 1:
+        raise ValueError("Maximum workers must be exactly 1")
+    available_slots = 0 if active else 1
+    if not available_slots:
         return [], available_slots
     protected = validate_write_boundary(
-        snapshot.get("Protected dirty paths"), "Execution snapshot Protected dirty paths"
+        snapshot.get("Protected dirty paths"),
+        "Execution snapshot Protected dirty paths",
     )
     current_wave = snapshot.get("Current wave")
     candidates = [
@@ -3257,7 +3627,10 @@ def mutate_task_file(
                     )
                 prior_checkpoints = [
                     snapshot.get("Last checkpoint"),
-                    *(clean(item.metadata.get("Last checkpoint", "")) for item in tasks),
+                    *(
+                        clean(item.metadata.get("Last checkpoint", ""))
+                        for item in tasks
+                    ),
                     *(row.checkpoint_id for row in parse_checkpoint_rows(text)),
                 ]
                 if checkpoint_ordinal(next_checkpoint) <= max(
@@ -3273,7 +3646,9 @@ def mutate_task_file(
                 raise ValueError(f"Invalid status {new_status!r}")
             validate_status_transition(task, new_status, by_id, waivers)
             updates = {**updates, "Status": new_status}
-        if all(clean(task.metadata.get(key, "")) == value for key, value in updates.items()):
+        if all(
+            clean(task.metadata.get(key, "")) == value for key, value in updates.items()
+        ):
             return False
         for key, value in updates.items():
             current_tasks = parse_tasks(text)
@@ -3403,10 +3778,15 @@ def claim_task_file(
         if task_id not in by_id:
             raise ValueError(f"Unknown task ID: {task_id}")
         task = by_id[task_id]
-        if snapshot.get("Run state") != "RUNNING" or snapshot.get("Active run ID") != run_id:
+        if (
+            snapshot.get("Run state") != "RUNNING"
+            or snapshot.get("Active run ID") != run_id
+        ):
             raise ValueError("Claim run ID does not match the active RUNNING run")
         snapshot_checkpoint = snapshot.get("Last checkpoint")
-        base_checkpoint = "CP-0000" if snapshot_checkpoint == "NONE" else snapshot_checkpoint
+        base_checkpoint = (
+            "CP-0000" if snapshot_checkpoint == "NONE" else snapshot_checkpoint
+        )
         if checkpoint != base_checkpoint:
             raise ValueError(
                 f"{task_id}: claim checkpoint must equal current base {base_checkpoint}; "
@@ -3435,7 +3815,9 @@ def claim_task_file(
             "Status": "IN_PROGRESS",
         }
         for key, value in updates.items():
-            current = next(item for item in parse_tasks(text) if item.task_id == task_id)
+            current = next(
+                item for item in parse_tasks(text) if item.task_id == task_id
+            )
             text = replace_metadata(text, current, key, value)
         current = next(item for item in parse_tasks(text) if item.task_id == task_id)
         timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -3474,7 +3856,9 @@ def mutate_run_snapshot(
         state = snapshot.get("Run state")
         if operation == "start":
             if snapshot.get("Task-plan revision") == "UNINITIALIZED":
-                raise ValueError("Cannot start a run before TASK-10 creates a task plan")
+                raise ValueError(
+                    "Cannot start a run before TASK-10 creates a task plan"
+                )
             if snapshot.get("Gate B state") != "APPROVED_FOR_CONSTRUCTION":
                 raise ValueError("Cannot start a run without current Gate B")
             if active != "NONE" or state != "NOT_STARTED":
@@ -3530,11 +3914,15 @@ def mutate_run_snapshot(
             if active != run_id or state != "RUNNING":
                 raise ValueError("Run ID does not match the active RUNNING run")
             if any(task.status == "IN_PROGRESS" for task in tasks):
-                raise ValueError("Checkpoint requires all active tasks to be reconciled")
+                raise ValueError(
+                    "Checkpoint requires all active tasks to be reconciled"
+                )
             if not checkpoint or checkpoint == "NONE":
                 raise ValueError("Checkpoint ID is required")
             terminal = operation == "complete"
-            if terminal and any(task.status not in {"DONE", "SKIPPED"} for task in tasks):
+            if terminal and any(
+                task.status not in {"DONE", "SKIPPED"} for task in tasks
+            ):
                 raise ValueError("Cannot complete a run with non-terminal tasks")
             checkpoint_row = validate_checkpoint_receipt(
                 path,
@@ -3551,7 +3939,9 @@ def mutate_run_snapshot(
                 checkpoint_row=checkpoint_row,
             )
             text = replace_snapshot_field(text, "Last checkpoint", checkpoint)
-            text = replace_snapshot_field(text, "Run state", "COMPLETE" if terminal else "PAUSED")
+            text = replace_snapshot_field(
+                text, "Run state", "COMPLETE" if terminal else "PAUSED"
+            )
         load_contract(text, **contract_kwargs)
         write_state_mirror(path, text, run_mode=run_mode)
         atomic_write_text(path, text)
@@ -3569,7 +3959,9 @@ def task_to_dict(task: Task, wave: int) -> dict[str, object]:
         "dependencies": task.dependencies,
         "wave": wave,
         "write_set": validate_write_boundary(task.metadata["Write set"], task.task_id),
-        "external_state": parse_external_state(task.metadata["External state"], task.task_id),
+        "external_state": parse_external_state(
+            task.metadata["External state"], task.task_id
+        ),
         "aws_mode": task.aws_mode,
         "technology_refs": technology_refs,
         "attempts_used": task.attempts_used,
@@ -3666,9 +4058,7 @@ def validate_cli_contract(args: argparse.Namespace) -> None:
         raise ValueError("--start-run requires --coordinator")
     if action == "resume" and not args.coordinator:
         raise ValueError("--resume-run requires --coordinator")
-    if action in {"pause", "complete"} and not all(
-        (args.coordinator, args.checkpoint)
-    ):
+    if action in {"pause", "complete"} and not all((args.coordinator, args.checkpoint)):
         raise ValueError(f"--{action}-run requires --coordinator and --checkpoint")
     if action in {"set-status", "set-issue"} and not args.coordinator:
         raise ValueError(f"--{action} requires --coordinator")
@@ -3685,7 +4075,9 @@ def validate_cli_contract(args: argparse.Namespace) -> None:
             "SKIPPED": {"skip_record"},
         }.get(status, set())
         invalid = [
-            name for name, value in status_aux.items() if value and name not in permitted_by_status
+            name
+            for name, value in status_aux.items()
+            if value and name not in permitted_by_status
         ]
         if invalid:
             raise ValueError(
@@ -3700,28 +4092,40 @@ def main() -> int:
         description="Validate TASKS.md and perform coordinator-owned atomic updates."
     )
     parser.add_argument("tasks_file", type=Path)
-    parser.add_argument("--ready", action="store_true", help="Show runtime-ready candidates")
-    parser.add_argument("--safe-ready", action="store_true", help="Show conservative execution groups")
+    parser.add_argument(
+        "--ready", action="store_true", help="Show runtime-ready candidates"
+    )
+    parser.add_argument(
+        "--safe-ready", action="store_true", help="Show ordered safe candidates"
+    )
     parser.add_argument(
         "--isolated-worktrees",
         action="store_true",
-        help="Attest that concurrent workers use distinct isolated Git worktrees",
+        help="Compatibility flag; never authorizes concurrent mutable task claims",
     )
     parser.add_argument("--task", help="Show one task block")
     parser.add_argument("--json", action="store_true", help="Emit JSON")
     parser.add_argument("--set-status", nargs=2, metavar=("TASK_ID", "STATUS"))
     parser.add_argument("--set-issue", nargs=2, metavar=("TASK_ID", "ISSUE_URL"))
-    parser.add_argument("--evidence", help="Evidence reference required when setting DONE")
+    parser.add_argument(
+        "--evidence", help="Evidence reference required when setting DONE"
+    )
     parser.add_argument("--blocker", help="Observed blocker and next action")
     parser.add_argument("--skip-record", help="Explicit skip decision record")
-    parser.add_argument("--run-id", help="Active RUN-nnnn identity for task reconciliation")
+    parser.add_argument(
+        "--run-id", help="Active RUN-nnnn identity for task reconciliation"
+    )
     parser.add_argument(
         "--checkpoint",
         help="New CP-nnnn ID; pause/complete require its TASKS row and VERIFY reference",
     )
-    parser.add_argument("--claim", metavar="TASK_ID", help="Atomically claim one READY task")
+    parser.add_argument(
+        "--claim", metavar="TASK_ID", help="Atomically claim one READY task"
+    )
     parser.add_argument("--owner", help="Worker identity for a claim")
-    parser.add_argument("--start-run", metavar="RUN_ID", help="Start a new coordinator run")
+    parser.add_argument(
+        "--start-run", metavar="RUN_ID", help="Start a new coordinator run"
+    )
     parser.add_argument(
         "--run-mode",
         choices=("SINGLE_TASK", "AUTONOMOUS"),
@@ -3731,9 +4135,15 @@ def main() -> int:
         "--coordinator",
         help="Exact active coordinator identity; required for every ledger mutation",
     )
-    parser.add_argument("--resume-run", metavar="RUN_ID", help="Resume a safe checkpointed run")
-    parser.add_argument("--pause-run", metavar="RUN_ID", help="Pause a reconciled running run")
-    parser.add_argument("--complete-run", metavar="RUN_ID", help="Complete a terminal running run")
+    parser.add_argument(
+        "--resume-run", metavar="RUN_ID", help="Resume a safe checkpointed run"
+    )
+    parser.add_argument(
+        "--pause-run", metavar="RUN_ID", help="Pause a reconciled running run"
+    )
+    parser.add_argument(
+        "--complete-run", metavar="RUN_ID", help="Complete a terminal running run"
+    )
     args = parser.parse_args()
 
     path: Path = args.tasks_file
@@ -3867,9 +4277,12 @@ def main() -> int:
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:
-                print("Conservative execution groups")
+                print("Ordered safe candidates")
                 for index, group in enumerate(groups, start=1):
-                    print(f"  Group {index}: " + ", ".join(task.task_id for task in group))
+                    print(
+                        f"  Candidate {index}: "
+                        + ", ".join(task.task_id for task in group)
+                    )
         elif args.json:
             print(
                 json.dumps(

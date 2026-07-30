@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "bootstrap_version": "1.0.2",
+  "bootstrap_version": "1.0.3",
   "setup": {
     "status": "{{SETUP_STATUS}}",
     "method": "{{SETUP_METHOD}}"
   },
   "project": {
-    "name": "My AWS Project",
+    "name": "{{PROJECT_NAME}}",
     "region": "{{AWS_REGION}}",
     "cost_posture": "{{COST_POSTURE}}",
     "mode": null,

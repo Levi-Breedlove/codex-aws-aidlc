@@ -21,26 +21,28 @@ SPEC.loader.exec_module(model_roleplay_eval)
 class TemplateCompatibilityTests(unittest.TestCase):
     def test_setup_policy_matches_setup_first_runtime(self) -> None:
         security = (REPOSITORY_ROOT / "SECURITY.md").read_text(encoding="utf-8")
-        dependency = (
-            REPOSITORY_ROOT / "docs" / "DEPENDENCY-POLICY.md"
-        ).read_text(encoding="utf-8")
+        dependency = (REPOSITORY_ROOT / "docs" / "DEPENDENCY-POLICY.md").read_text(
+            encoding="utf-8"
+        )
         combined = security + "\n" + dependency
         stale_missing_policy = "Missing AWS Core never " + "blocks initialization"
         stale_optional_policy = "AWS Core is optional during " + "BOOT-00"
         self.assertNotIn(stale_missing_policy, combined)
         self.assertNotIn(stale_optional_policy, combined)
-        expected = "Fresh templates require current official AWS Core before initialization"
+        expected = (
+            "Fresh templates require current official AWS Core before initialization"
+        )
         self.assertIn(expected, security)
         self.assertIn(expected, dependency)
         self.assertIn("Initialized projects skip the prerequisite gate", combined)
 
-    def test_maintenance_governance_separates_read_edit_and_publish_authority(self) -> None:
+    def test_maintenance_governance_separates_read_edit_and_publish_authority(
+        self,
+    ) -> None:
         skill = (
             REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
         ).read_text(encoding="utf-8")
-        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(
-            encoding="utf-8"
-        )
+        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
         for mode in ("AUDIT", "PLAN", "IMPLEMENT", "PUBLISH"):
             self.assertIn(f"`{mode}`", skill)
             self.assertIn(f"`{mode}`", workflow)
@@ -48,7 +50,9 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn("publication never", workflow)
         self.assertNotIn("Delegate to `$fastlane`", skill)
         self.assertIn("pull requests targeting only that customer branch", workflow)
-        self.assertIn("direct push to `fast-lane-maint` requires explicit emergency", workflow)
+        self.assertIn(
+            "direct push to `fast-lane-maint` requires explicit emergency", workflow
+        )
         self.assertIn("Force pushes and deletion", workflow)
         self.assertIn("live `fast-lane-maint` customer branch", workflow)
         self.assertIn("legacy `Legacy` is not a customer publication target", workflow)
@@ -63,16 +67,32 @@ class TemplateCompatibilityTests(unittest.TestCase):
         ):
             self.assertIn(f"`{check}`", workflow)
 
-    def test_maintenance_preflight_is_read_only_and_routed_only_to_maintenance(self) -> None:
-        skill = (REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md").read_text(encoding="utf-8")
-        script = (REPOSITORY_ROOT / "scripts/maintenance_preflight.py").read_text(encoding="utf-8")
+    def test_maintenance_preflight_is_read_only_and_routed_only_to_maintenance(
+        self,
+    ) -> None:
+        skill = (
+            REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
+        ).read_text(encoding="utf-8")
+        script = (REPOSITORY_ROOT / "scripts/maintenance_preflight.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("maintenance_preflight.py", skill)
-        self.assertIn("Validate a Fastlane maintenance scope contract read-only", script)
-        for forbidden in ("boto3", "openai", "AWS_ACCESS_KEY", "codex login", "git push"):
+        self.assertIn(
+            "Validate a Fastlane maintenance scope contract read-only", script
+        )
+        for forbidden in (
+            "boto3",
+            "openai",
+            "AWS_ACCESS_KEY",
+            "codex login",
+            "git push",
+        ):
             self.assertNotIn(forbidden, script)
 
     def test_deterministic_workflow_corpus_is_the_mandatory_baseline(self) -> None:
-        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(encoding="utf-8")
+        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("Golden Project Corpus", evaluation)
         self.assertIn("tests/test_product_journeys.py", evaluation)
         self.assertRegex(evaluation, r"mandatory deterministic\s+workflow baseline")
@@ -92,7 +112,9 @@ class TemplateCompatibilityTests(unittest.TestCase):
         inventory = json.dumps(manifest, sort_keys=True)
         self.assertNotIn(retired_doc, inventory)
         self.assertNotIn(retired_script, inventory)
-        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(encoding="utf-8")
+        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(
+            encoding="utf-8"
+        )
         workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
         self.assertIn("Codex selects the smallest disposable", evaluation)
         self.assertIn("using current AWS Core guidance", evaluation)
@@ -102,8 +124,12 @@ class TemplateCompatibilityTests(unittest.TestCase):
             "AWS Core does not choose the product architecture or grant authority",
             workflow,
         )
-        self.assertIn("The owner authorizes; IAM enforces; observed evidence proves", workflow)
-        self.assertIn("introduces no scorer, lifecycle stage, gate, or routine", evaluation)
+        self.assertIn(
+            "The owner authorizes; IAM enforces; observed evidence proves", workflow
+        )
+        self.assertIn(
+            "introduces no scorer, lifecycle stage, gate, or routine", evaluation
+        )
         self.assertIn("AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50", evaluation)
 
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
@@ -178,9 +204,7 @@ class TemplateCompatibilityTests(unittest.TestCase):
             )
         self.assertFalse(passed)
         for scenario in model_roleplay_eval.SCENARIOS:
-            self.assertTrue(
-                any(scenario["id"] in error for error in result["errors"])
-            )
+            self.assertTrue(any(scenario["id"] in error for error in result["errors"]))
 
 
 if __name__ == "__main__":

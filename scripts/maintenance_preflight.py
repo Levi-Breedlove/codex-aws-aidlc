@@ -8,6 +8,11 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
 
+try:
+    from fastlane_process import resolve_trusted_git
+except ModuleNotFoundError:  # Loaded as scripts.maintenance_preflight in tests.
+    from scripts.fastlane_process import resolve_trusted_git
+
 
 SCHEMA_VERSION = 1
 MODES = {"AUDIT", "PLAN", "IMPLEMENT", "PUBLISH"}
@@ -40,7 +45,7 @@ REFERENCE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 def _git(root: Path, *args: str) -> str:
     result = subprocess.run(
-        ["git", "-C", str(root), *args],
+        [resolve_trusted_git(root), "-C", str(root), *args],
         check=False,
         capture_output=True,
         text=True,
@@ -51,7 +56,9 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout
 
 
-def _strings(value: object, label: str, errors: list[str], *, required: bool) -> list[str]:
+def _strings(
+    value: object, label: str, errors: list[str], *, required: bool
+) -> list[str]:
     if not isinstance(value, list) or (required and not value):
         errors.append(f"{label} must be {'a non-empty' if required else 'a'} list")
         return []
@@ -86,12 +93,16 @@ def _path(value: str, label: str, errors: list[str]) -> str | None:
 def _changed_files(root: Path) -> list[str]:
     tracked = _git(root, "diff", "--name-only", "HEAD", "--").splitlines()
     untracked = _git(root, "ls-files", "--others", "--exclude-standard").splitlines()
-    return sorted(set(item.replace("\\", "/") for item in [*tracked, *untracked] if item))
+    return sorted(
+        set(item.replace("\\", "/") for item in [*tracked, *untracked] if item)
+    )
 
 
 def _net_production_lines(root: Path, changed: list[str]) -> int:
     net = 0
-    untracked = set(_git(root, "ls-files", "--others", "--exclude-standard").splitlines())
+    untracked = set(
+        _git(root, "ls-files", "--others", "--exclude-standard").splitlines()
+    )
     for line in _git(root, "diff", "--numstat", "HEAD", "--").splitlines():
         added, removed, path = line.split("\t", 2)
         canonical = path.replace("\\", "/")
@@ -115,7 +126,11 @@ def _net_production_lines(root: Path, changed: list[str]) -> int:
 def validate_contract(payload: object, root: Path) -> tuple[dict[str, Any], bool]:
     errors: list[str] = []
     if not isinstance(payload, dict):
-        return {"schema_version": SCHEMA_VERSION, "status": "FAIL", "errors": ["contract must be an object"]}, False
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": "FAIL",
+            "errors": ["contract must be an object"],
+        }, False
     missing = sorted(ROOT_KEYS - set(payload))
     unknown = sorted(set(payload) - ROOT_KEYS)
     if missing:
@@ -129,7 +144,12 @@ def validate_contract(payload: object, root: Path) -> tuple[dict[str, Any], bool
         errors.append("mode must be AUDIT, PLAN, IMPLEMENT, or PUBLISH")
         mode = "UNKNOWN"
     branch = payload.get("branch")
-    if not isinstance(branch, str) or BRANCH.fullmatch(branch) is None or ".." in branch or "//" in branch:
+    if (
+        not isinstance(branch, str)
+        or BRANCH.fullmatch(branch) is None
+        or ".." in branch
+        or "//" in branch
+    ):
         errors.append("branch must be one exact canonical branch name")
     commit = payload.get("commit")
     if not isinstance(commit, str) or COMMIT.fullmatch(commit) is None:
@@ -138,18 +158,39 @@ def validate_contract(payload: object, root: Path) -> tuple[dict[str, Any], bool
     if not isinstance(outcome, str) or not outcome.strip():
         errors.append("outcome must be non-empty text")
     _strings(payload.get("non_goals"), "non_goals", errors, required=True)
-    criteria = _strings(payload.get("acceptance_criteria"), "acceptance_criteria", errors, required=True)
-    raw_allowed = _strings(payload.get("allowed_files"), "allowed_files", errors, required=mode == "IMPLEMENT")
-    allowed = [item for index, item in enumerate(raw_allowed) if _path(item, f"allowed_files[{index}]", errors)]
+    criteria = _strings(
+        payload.get("acceptance_criteria"), "acceptance_criteria", errors, required=True
+    )
+    raw_allowed = _strings(
+        payload.get("allowed_files"),
+        "allowed_files",
+        errors,
+        required=mode == "IMPLEMENT",
+    )
+    allowed = [
+        item
+        for index, item in enumerate(raw_allowed)
+        if _path(item, f"allowed_files[{index}]", errors)
+    ]
     maximum_files = payload.get("maximum_changed_files")
     maximum_lines = payload.get("maximum_net_production_lines")
-    for value, label in ((maximum_files, "maximum_changed_files"), (maximum_lines, "maximum_net_production_lines")):
+    for value, label in (
+        (maximum_files, "maximum_changed_files"),
+        (maximum_lines, "maximum_net_production_lines"),
+    ):
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             errors.append(f"{label} must be a non-negative integer")
     publication = payload.get("publication")
     if mode in {"AUDIT", "PLAN"}:
-        if allowed or maximum_files != 0 or maximum_lines != 0 or publication is not None:
-            errors.append(f"{mode} must be read-only with zero change budget and no publication authority")
+        if (
+            allowed
+            or maximum_files != 0
+            or maximum_lines != 0
+            or publication is not None
+        ):
+            errors.append(
+                f"{mode} must be read-only with zero change budget and no publication authority"
+            )
     elif mode == "IMPLEMENT":
         if publication is not None:
             errors.append("IMPLEMENT must not contain publication authority")
@@ -161,15 +202,28 @@ def validate_contract(payload: object, root: Path) -> tuple[dict[str, Any], bool
         if allowed or maximum_files != 0 or maximum_lines != 0:
             errors.append("PUBLISH must not carry an implementation change budget")
         if not isinstance(publication, dict) or set(publication) != PUBLICATION_KEYS:
-            errors.append("PUBLISH requires exact operations, targets, and authorization_reference")
+            errors.append(
+                "PUBLISH requires exact operations, targets, and authorization_reference"
+            )
         else:
-            operations = _strings(publication.get("operations"), "publication.operations", errors, required=True)
+            operations = _strings(
+                publication.get("operations"),
+                "publication.operations",
+                errors,
+                required=True,
+            )
             if any(item not in PUBLICATION_OPERATIONS for item in operations):
-                errors.append("publication.operations contains an unsupported operation")
-            _strings(publication.get("targets"), "publication.targets", errors, required=True)
+                errors.append(
+                    "publication.operations contains an unsupported operation"
+                )
+            _strings(
+                publication.get("targets"), "publication.targets", errors, required=True
+            )
             reference = publication.get("authorization_reference")
             if not isinstance(reference, str) or REFERENCE.fullmatch(reference) is None:
-                errors.append("publication.authorization_reference must be one non-personal stable reference")
+                errors.append(
+                    "publication.authorization_reference must be one non-personal stable reference"
+                )
 
     root = root.resolve()
     try:
@@ -213,7 +267,9 @@ def validate_contract(payload: object, root: Path) -> tuple[dict[str, Any], bool
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate a Fastlane maintenance scope contract read-only.")
+    parser = argparse.ArgumentParser(
+        description="Validate a Fastlane maintenance scope contract read-only."
+    )
     parser.add_argument("--contract", required=True, type=Path)
     parser.add_argument("--root", default=Path.cwd(), type=Path)
     parser.add_argument("--json", action="store_true", required=True)
@@ -221,7 +277,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         payload = json.loads(args.contract.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        print(json.dumps({"schema_version": SCHEMA_VERSION, "status": "FAIL", "errors": [f"contract could not be read: {exc}"]}, indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "FAIL",
+                    "errors": [f"contract could not be read: {exc}"],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 2
     result, passed = validate_contract(payload, args.root)
     print(json.dumps(result, indent=2, sort_keys=True))

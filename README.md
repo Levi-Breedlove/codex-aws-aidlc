@@ -1,5 +1,5 @@
 # AWS Codex Fastlane 1.0
-Current customer build: **1.0.2**.
+Current customer build: **1.0.3**.
 
 Fastlane 1.0 gives Codex a disciplined way to design and build your AWS application.
 You explain the outcome in plain language. Codex turns it into clear requirements,
@@ -25,7 +25,7 @@ keep you in control, and it asks before anything changes in AWS.
 4. Codex consults AWS Core, compares credible designs, and recommends one.
 5. At Gate B, you approve the complete plan and its construction limits.
 6. Codex creates an organized task plan, builds, tests, and records evidence.
-7. If you want to deploy, Fastlane presents the exact AWS action for approval.
+7. If you deploy, Fastlane journals the approved attempt, verifies the result read-only, and records that review so resume does not repeat it.
 
 Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
 
@@ -79,9 +79,9 @@ Codex chooses the architecture. AWS Core supplies current expertise; it cannot a
 
 ## Safety
 
-Tool availability never grants authority. AWS changes require a separate
-exact authorization naming the account, Region, environment, resources, operations,
-cost ceiling, rollback plan, and expiry. Teardown requires a distinct approval.
+Tool availability never grants authority. `fast-dev` may use only a current Gate B
+non-production mutation envelope after observed preflight; `explicit-gate` requires a separate exact authorization receipt.
+Authenticated AWS reads need current read authority, and teardown remains separately approved.
 Setup, login, plugin, trust, credential, and machine state stay outside the repo.
 
 ## Agent reference

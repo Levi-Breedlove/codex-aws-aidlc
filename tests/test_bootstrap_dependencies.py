@@ -68,7 +68,9 @@ class BootstrapDependencyTests(unittest.TestCase):
         self.assertNotIn("hook_review", toolkit)
         self.assertEqual(report["fastlane_skills"]["status"], "READY")
 
-    def test_optional_challengers_are_read_only_and_do_not_override_model_or_mcp(self) -> None:
+    def test_optional_challengers_are_read_only_and_do_not_override_model_or_mcp(
+        self,
+    ) -> None:
         for name in (
             "fastlane-requirements-challenger",
             "fastlane-architecture-challenger",
@@ -100,6 +102,7 @@ class BootstrapDependencyTests(unittest.TestCase):
                 "plan-fastlane",
             },
         )
+
     def test_coordinator_skill_keeps_plain_language_init_trigger(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary) / "project"

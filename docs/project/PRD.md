@@ -1,4 +1,4 @@
-# My AWS Project — Product Requirements and Technical Design
+# {{PROJECT_NAME}} — Product Requirements and Technical Design
 
 Canonical path: `docs/project/PRD.md`.
 
@@ -101,6 +101,11 @@ either required or omitted with a concrete requirement ID or
 `REPOSITORY_BASELINE` reason. Quick MVP changes depth, never safety. Uncertain
 impact or high/critical risk falls back to full coverage.
 
+The owner-context mapping is deterministic and one-way: when confirmed owner
+work context is `NEW_APPLICATION`, Work kind must be `NEW_BUILD`. Never infer
+the reverse; `NEW_BUILD` does not prove `NEW_APPLICATION`, and repository state
+cannot replace the direct owner fact.
+
 | Work kind | Delivery profile | Architecture disposition | Required sections | Omitted sections and reasons | Basis IDs |
 |---|---|---|---|---|---|
 | TODO | TODO | TODO | TODO | TODO | TODO |
@@ -114,7 +119,7 @@ required whenever an AWS fact is material.
 
 | Field | Value |
 |---|---|
-| Workload | My AWS Project |
+| Workload | {{PROJECT_NAME}} |
 | Business outcome | TODO |
 | Primary owner | TODO |
 | Users | TODO |
@@ -333,6 +338,12 @@ Use only `DISTINCT_PERMISSIONED_ACTORS`,
 `IRREVERSIBLE_ACTION`, `MIGRATION_OR_CUTOVER`, `ASYNCHRONOUS_WORK`,
 `PARTIAL_FAILURE`, or `NONE` in the final column.
 
+Rich-use-case applicability is journey-specific. At low or moderate risk,
+every journey with any trigger other than `NONE` requires a rich use case bound
+to that same journey. At high or critical risk, every declared journey requires
+one. The typed journey rows are authoritative; the applicability summary cannot
+transfer a trigger to a different journey.
+
 ### Rich-use-case applicability
 
 | Applicability | Trigger basis | Use-case IDs |
@@ -348,41 +359,10 @@ Use only `DISTINCT_PERMISSIONED_ACTORS`,
 
 | Rule ID | Rule | Basis IDs | Journey/use-case IDs | Validation ID |
 |---|---|---|---|---|
-### Primary flow
-
-Edit this requirements-level flow in place during intake. Keep it focused on
-the user-visible outcome and approved or rejected behavior; detailed component
-behavior belongs in Part III.
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant Client
-    participant Identity
-    participant Service as Trusted service boundary
-    participant Store
-    participant Telemetry
-
-    User->>Client: Initiate action
-    Client->>Service: Request with untrusted input and identity context
-    opt Sign-in required
-        Service->>Identity: Verify identity
-        Identity-->>Service: Claims or denial
-    end
-    Service->>Service: Authorize, validate, and apply idempotency
-    alt Request rejected
-        Service->>Telemetry: Rejection outcome and correlation ID
-        Service-->>Client: Safe rejection
-    else Request approved
-        Service->>Store: Persist approved data
-        Store-->>Service: Result
-        Service->>Telemetry: Outcome, latency, and correlation ID
-        Service-->>Client: Safe response
-    end
-    Client-->>User: Outcome
-```
-
-Describe the flow in numbered steps.
+Optional Mermaid flow diagrams may illustrate a validated `JOURNEY-*` or
+`STATE-*` record when they improve owner understanding. They are presentation
+aids, not Gate A readiness artifacts; the existing journey and state records
+remain authoritative.
 
 ### Alternate flows
 
@@ -503,7 +483,14 @@ A or architecture. Otherwise replace the row with
 
 Every authoritative first-release requirement appears exactly once in this
 table and traces to its owner-grounded intake basis and approved success
-measure.
+measure. Every declared `ACT-*` and `JOURNEY-*` also appears in at least one
+coverage row. For each requirement, `Acceptance/test IDs` is exactly its
+canonical `AC-*` followed only by `TEST-*`, `PROP-*`, or `EV-*` IDs explicitly
+named in that same requirement's acceptance criterion, in occurrence order.
+For a modern requirements-schema 1.3 approval, these rows define the exact
+first-release requirement universe that TASK-10 must disposition after Gate B.
+The task-plan projection is derived and does not add a second requirements
+table or owner approval.
 
 # Part II — Requirements Analysis and Gate A
 
@@ -777,12 +764,13 @@ overrides a hard constraint.
 
 ### Whole-system candidates
 
-Compare complete, credible designs with the same requirements. For greenfield
-work, one candidate summary begins `MANAGED_SERVERLESS_BASELINE:` unless a
-Gate A hard constraint makes that baseline impossible. Do not create a weak
-straw candidate or use arbitrary numeric scoring. `Eligibility` is exactly
-`ELIGIBLE` or `INELIGIBLE`; an eligible candidate has `Failed constraints`
-`NONE`, while an ineligible candidate names only failed `HARD_CONSTRAINT`
+For `SELECT`, compare at least two complete, credible, non-straw whole-system
+candidates against the same requirements. For greenfield work, one candidate
+summary begins `MANAGED_SERVERLESS_BASELINE:` unless a Gate A hard constraint
+makes that baseline impossible. Do not use arbitrary numeric scoring.
+`Eligibility` is exactly `ELIGIBLE` or `INELIGIBLE`; an eligible candidate has
+`Failed constraints` `NONE`, while an ineligible candidate names only failed
+`HARD_CONSTRAINT`
 driver IDs.
 
 | Candidate ID | Architecture summary | Requirement coverage | AWS evidence | Eligibility | Failed constraints | Tradeoffs |
@@ -793,8 +781,9 @@ driver IDs.
 
 Select exactly one eligible candidate. The selection is an
 `AGENT_RECOMMENDATION` until Gate B. If only one candidate is eligible,
-`Rejected alternatives` may be `NO_VIABLE_ALTERNATIVE`; otherwise enumerate
-every nonselected `CAND-*` in table order.
+`Rejected alternatives` may be `NO_VIABLE_ALTERNATIVE` only when the table
+still contains at least two total candidates and exactly one is eligible;
+otherwise enumerate every nonselected `CAND-*` in table order.
 
 | Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Security impact | Reliability impact | Operational burden | Cost effect | Breakpoints | Migration path | Revisit triggers | Validation |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -802,11 +791,19 @@ every nonselected `CAND-*` in table order.
 
 ### Architecture traceability
 
-Map each current requirement exactly once to the selected `ARCH-*` and at
-least one concrete component, API, data, or control ID. Use exact property or
-test IDs when applicable; otherwise use `NONE - <concrete reason>`.
+Map each current requirement exactly once to the selected `ARCH-*` and at least
+one other declared design ID. In a current schema 5 design, those IDs must be
+declared by the interface register (`API-*`, `EVENT-*`, `CLI-*`, or `FILE-*`),
+layer-boundary register (`BOUNDARY-*`), or state register (`STATE-*`). The
+modern contract has no authoritative `COMP-*`, `DATA-*`, or `CTRL-*`
+declaration surface, so those prefixes fail closed instead of acting as prose
+labels. Property/test IDs must be current applicable `PROP-*` IDs present in
+the applicability, definition, and execution records, or exact `EX-*` IDs
+declared in Example-based scenarios. Undeclared `TEST-*` IDs fail closed. Use
+`NONE - <concrete reason>` only where the field permits it. Exact approved
+schema 4 designs retain their grandfathered digest and membership path.
 
-| Requirement ID | ARCH / COMP / API / DATA / CTRL IDs | Property/test IDs | Evidence IDs |
+| Requirement ID | ARCH / API / EVENT / CLI / FILE / BOUNDARY / STATE IDs | Property/test IDs | Evidence IDs |
 |---|---|---|---|
 | TODO | TODO | TODO | TODO |
 
@@ -818,10 +815,16 @@ authoritative in `docs/project/VERIFY.md`; this PRD table does not duplicate
 tool transcripts or prove invocation by itself. Every material claim cites the
 current `AWS-DISC-*` chain that informed it.
 
+An unavailable official AWS Core capability is owner setup. When the capability
+is available, missing, stale, or safely repairable generated discovery/evidence
+is Codex work and must be refreshed without asking the owner to reinstall.
+Unexplained structural drift or an unsafe evidence conflict requires human
+review.
+
 | Evidence ID | Discovery ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |
 |---|---|---|---|---|---|---|
-| AWS-EV-0001 | AWS-DISC-0001 | TODO | TODO | `retrieve_skill` | TODO | TODO |
-| AWS-EV-0002 | AWS-DISC-0001 | TODO | TODO | `search_documentation` | TODO | TODO |
+| AWS-EV-0001 | AWS-DISC-0002 | TODO | TODO | `retrieve_skill` | TODO | TODO |
+| AWS-EV-0002 | AWS-DISC-0002 | TODO | TODO | `search_documentation` | TODO | TODO |
 
 ### Change impact record
 
@@ -1166,7 +1169,12 @@ when no spike is needed. A spike records learning only and cannot satisfy the
 approved product outcome.
 
 
-`docs/project/TASKS.md` will translate this design into discrete executable tasks.
+`docs/project/TASKS.md` will translate this design into discrete executable
+tasks. For every modern approved first-release requirement, the Engine derives
+exactly one construction disposition: covered by a non-skipped task with its
+canonical acceptance trace, already satisfied by current scoped no-task
+evidence, or not applicable under the optional-feature evidence rule. A missing
+or mismatched disposition is Codex-owned replanning, not another owner gate.
 
 # Part IV — Testing Strategy
 
@@ -1198,14 +1206,27 @@ Use exactly one status per row:
 - `CONDITIONAL — <trigger>`; or
 - `NOT_APPLICABLE — <concrete reason>`.
 
+Choosing applicability, triggers, checks, and tools is procedural coordinator
+design review based on the current requirements, architecture, risk, and
+technology evidence. Deterministic validation begins with the recorded row's
+status; it validates the allowed value and the row fields implied by that
+value, but it does not decide applicability.
+
 A conditional row becomes required when its recorded trigger is present. For
 an inapplicable row, use `NOT_APPLICABLE` for the selected check, command/API,
 and evidence destination while the status records the concrete reason. At Gate
-B, every `CONDITIONAL` row is resolved to `REQUIRED` or
-`NOT_APPLICABLE — <reason>`. Every required row has a stable `HARNESS-*` ID,
-current basis IDs, one exact command or API, the exact
+B, every row is resolved to `REQUIRED` or
+`NOT_APPLICABLE — <concrete reason>`. Every required row has a stable
+`HARNESS-*` ID, current basis IDs, one exact command or API, the exact
 `docs/project/VERIFY.md#harness-execution-evidence` destination, and its ID in
 the Gate B scope.
+
+The extended concern-to-layer routes are fixed: `HARNESS-011` accessibility ->
+`End-to-end`; `HARNESS-012` visual regression -> `End-to-end`; `HARNESS-013`
+mutation testing -> `Unit`; `HARNESS-014` SAST -> `Static`; `HARNESS-015` DAST
+-> `Security and privacy`; and `HARNESS-016` formal/model checking ->
+`Property`. Duplicate layers are intentional because these rows represent
+different applicability decisions and evidence obligations.
 
 | Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | Exact command or API | Evidence destination | Required or conditional status |
 |---|---|---|---|---|---|---|---|
@@ -1219,6 +1240,12 @@ the Gate B scope.
 | HARNESS-008 | Performance and scalability | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
 | HARNESS-009 | IaC and policy | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
 | HARNESS-010 | AWS environment and operations | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
+| HARNESS-011 | End-to-end | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
+| HARNESS-012 | End-to-end | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
+| HARNESS-013 | Unit | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
+| HARNESS-014 | Static | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
+| HARNESS-015 | Security and privacy | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
+| HARNESS-016 | Property | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
 
 TASK-10 copies every required or triggered conditional row into the existing
 task Validation sections without adding task metadata. BUILD records observed
@@ -1253,6 +1280,14 @@ substitute for either observation.
 |---|---|---|---|
 | EX-001 | Known happy path | TODO | Integration |
 | EX-002 | Known boundary or failure | TODO | Unit |
+
+Every `EX-*` referenced by architecture traceability or another current design
+record appears exactly once in this table with a concrete scenario, expected
+result, and layer. The complete Example-based scenarios table is
+design-controlled and participates in the modern design digest after the
+Technology decision register and before Property applicability, Property
+definitions, and Property execution. Exact approved schema 4 designs retain
+their grandfathered digest path.
 
 ## 24. Property-based testing specification
 
@@ -1356,8 +1391,31 @@ Release is acceptable when:
 
 The release lifecycle is `NOT_READY` -> `READY_TO_DEPLOY` ->
 `RELEASE_VERIFIED`. RELEASE-10 is the only prompt that changes this state.
-AWS-10 starts only from READY_TO_DEPLOY, and AWS-30 returns observed evidence to
-RELEASE-10 for the final decision.
+AWS-10 starts only from READY_TO_DEPLOY. Before each AWS-20 mutation call,
+`docs/project/VERIFY.md` receives an append-only STARTED row, followed by one
+terminal direct-result row and an AWS-30 read-only reconciliation row for the
+same Attempt ID. Each row preserves immutable deployment authority and
+provenance: explicit-gate derives them from its deployment receipt; fast-dev
+stores the exact current construction `AUTH-*`, derives its expiry timestamp
+from Gate B `AWS authorization validity`, and uses Gate B's authorization source. Non-STARTED operation evidence uses the canonical unique-
+identifiers/direct-result grammar; that structure alone never proves execution.
+STARTED is not proof of a call. A lone STARTED is completed by Codex as UNKNOWN
+before any owner action or AWS-30 read authorization request. Deployment
+authority binds one attempt and never supplies AWS-30 read authority or permits
+replay. FAILED, PARTIAL, and UNKNOWN require reconciliation before retry;
+COMPLETE or BLOCKED
+returns to RELEASE-10 for the final decision. One first STALE remains at AWS-30
+and may be followed by one later COMPLETE or BLOCKED under a different current
+read authorization. A repeated STALE is a safety-review blocker, and no
+reconciliation row follows COMPLETE or BLOCKED. COMPLETE acceptance IDs must
+satisfy VERIFY's exact current `VERIFIED` matrix-row and target-binding contract.
+RELEASE-10 records the terminal
+AWS-30 Evidence ID as VERIFY's Active evidence cutoff while deciding NOT_READY,
+RELEASE_VERIFIED, or a separately authorized correction path. That acknowledgment
+prevents rerouting the same attempt. Retry requires distinct current mutation
+authority: a new exact deployment receipt for explicit-gate or freshly approved
+construction authorization for fast-dev, plus a new Attempt ID.
+
 
 # Part V — Gate B: PRD and Construction Authorization
 
@@ -1475,8 +1533,9 @@ makes Gate B non-runnable. `Architecture/components` on the readiness card is
 exactly that selected `ARCH-*`.
 `Design contract SHA-256` must exactly equal the Engine's current derived hash
 of the Architecture driver, Candidate, Selection, Traceability, Material AWS
-evidence, Harness, Change impact, Technology decision, Property applicability,
-Property definition, and Property execution tables in that order. The baseline
+evidence, Harness, Change impact, Project design contract, Technology decision,
+Example-based scenarios, Property applicability, Property definition, and
+Property execution records in that order. The baseline
 must resolve in the current local Git repository. Prefix lists are literal argv
 prefixes separated by semicolons, not shell fragments, command substitutions,
 or wildcards. Gate B therefore binds the full design-contract digest. An unchanged,
@@ -1600,10 +1659,10 @@ The design and construction authorization use monotonic IDs (`DES-0001` and
    `READY_FOR_CONSTRUCTION_APPROVAL`.
 4. Every Gate B readiness-card field is explicit, and Outstanding gaps is
    `NONE`.
-5. The Gate B Harness Profile is complete: every row has an allowed status,
-   every required or triggered conditional row has current basis IDs, an exact
-   command or API, and an existing VERIFY evidence destination, and every such
-   `HARNESS-*` ID is in the authorized scope.
+5. The Gate B Harness Profile is complete: every row is resolved to `REQUIRED`
+   or `NOT_APPLICABLE — <concrete reason>`, every required row has current basis
+   IDs, an exact command or API, and an existing VERIFY evidence destination,
+   and every required `HARNESS-*` ID is in the authorized scope.
 6. The envelope's design-contract hash equals the current derived hash, and its
    authorized IDs include every current `TECH-*`, applicable `PROP-*`, and
    required or triggered conditional `HARNESS-*`.
@@ -1633,3 +1692,7 @@ When REQ, DES, or AUTH changes, apply the same task-plan lifecycle:
 `CURRENT` -> reconcile active work and commit -> `STALE` -> new Gate B ->
 TASK-10 replacement and `CURRENT`. `UNINITIALIZED` and `STALE` are never
 runnable.
+Correcting task traceability or no-task evidence structure within unchanged
+REQ/DES/AUTH does not invalidate Gate B. If the correction would change an
+approved requirement, design decision, or construction envelope, use the
+existing invalidation rules instead.

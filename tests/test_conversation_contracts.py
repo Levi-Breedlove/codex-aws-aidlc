@@ -93,7 +93,9 @@ class ConversationContractTests(unittest.TestCase):
         self.assertEqual(report["aws_access"], "NOT_USED")
         self.assertEqual(report["authorizations"]["aws"], "NONE")
 
-    def test_missing_prerequisites_return_one_complete_action_then_ready_welcome(self) -> None:
+    def test_missing_prerequisites_return_one_complete_action_then_ready_welcome(
+        self,
+    ) -> None:
         blocked = setup.reduce_prerequisites(
             ready_evidence(
                 codex_cli_available=False,
@@ -175,10 +177,12 @@ class ConversationContractTests(unittest.TestCase):
             remediation=remediation,
             owner_stage_hint="DESIGN",
         )
-        rendered = presenter.render_owner_update({
-            "interaction": interaction,
-            "remediation": remediation,
-        })
+        rendered = presenter.render_owner_update(
+            {
+                "interaction": interaction,
+                "remediation": remediation,
+            }
+        )
         self.assertEqual(interaction["owner_stage"], "DESIGN")
         self.assertEqual(
             interaction["owner_action_kind"], "NONE_CONTINUE_AUTOMATICALLY"
@@ -189,7 +193,9 @@ class ConversationContractTests(unittest.TestCase):
         self.assertTrue(interaction["automatic_continuation_allowed"])
         self.assertFalse(interaction["formal_receipt_required"])
 
-    def test_golden_define_design_deliver_route_has_only_two_product_stops(self) -> None:
+    def test_golden_define_design_deliver_route_has_only_two_product_stops(
+        self,
+    ) -> None:
         sequence = (
             ("REQUIREMENTS_ANALYSIS", "REQ-10", "DEFINE", "OWNER_UPDATE"),
             ("WAITING_GATE_A", "INTAKE-20", "DEFINE", "GATE_A"),
@@ -303,9 +309,7 @@ class ConversationContractTests(unittest.TestCase):
                 "automatic_correction_allowed": True,
             },
         )
-        self.assertEqual(
-            remediation["items"][1]["responsible_party"], "OWNER"
-        )
+        self.assertEqual(remediation["items"][1]["responsible_party"], "OWNER")
         self.assertEqual(
             remediation["next_action"],
             {
@@ -325,9 +329,7 @@ class ConversationContractTests(unittest.TestCase):
             owner_stage_hint="DELIVER",
         )
         self.assertFalse(routed["owner_action_required"])
-        self.assertEqual(
-            routed["owner_action_kind"], "NONE_CONTINUE_AUTOMATICALLY"
-        )
+        self.assertEqual(routed["owner_action_kind"], "NONE_CONTINUE_AUTOMATICALLY")
         self.assertTrue(routed["automatic_continuation_allowed"])
 
     def test_unknown_and_protected_diagnostics_require_human_review(self) -> None:
@@ -365,11 +367,9 @@ class ConversationContractTests(unittest.TestCase):
                     "REVIEW_SAFETY_BLOCKER",
                 )
 
-
-
-
-
-    def test_incomplete_intake_and_explanation_restore_one_plain_next_action(self) -> None:
+    def test_incomplete_intake_and_explanation_restore_one_plain_next_action(
+        self,
+    ) -> None:
         ctx = doctor.Context(root=REPOSITORY_ROOT)
         ctx.error(
             "PROJECT_SELECTION_REQUIRED",
@@ -424,6 +424,7 @@ class ConversationContractTests(unittest.TestCase):
             "Pending next action: Answer the next one to three project questions.",
         ):
             self.assertIn(phrase, explanation)
+
 
 if __name__ == "__main__":
     unittest.main()

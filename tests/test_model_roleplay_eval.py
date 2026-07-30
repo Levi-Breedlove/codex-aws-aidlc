@@ -11,7 +11,9 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPOSITORY_ROOT / "scripts" / "model_roleplay_eval.py"
-SPEC = importlib.util.spec_from_file_location("model_roleplay_eval_preview", SCRIPT_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "model_roleplay_eval_preview", SCRIPT_PATH
+)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"Unable to load {SCRIPT_PATH}")
 model_roleplay_eval = importlib.util.module_from_spec(SPEC)
@@ -22,7 +24,9 @@ EXPECTED_COMMIT = "a" * 40
 PROMPT_DIGEST = "sha256:" + "b" * 64
 
 
-def write_artifact(root: Path, relative: str, payload: dict[str, object]) -> dict[str, str]:
+def write_artifact(
+    root: Path, relative: str, payload: dict[str, object]
+) -> dict[str, str]:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     content = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
@@ -60,9 +64,7 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
     def safe_payload(self, root: Path, mode: str = "RELEASE") -> dict[str, object]:
         runs: list[dict[str, object]] = []
         rater_ids = (
-            ("rater-alpha", "rater-beta")
-            if mode == "RELEASE"
-            else ("rater-alpha",)
+            ("rater-alpha", "rater-beta") if mode == "RELEASE" else ("rater-alpha",)
         )
         for scenario in model_roleplay_eval.SCENARIOS:
             scenario_id = scenario["id"]
@@ -122,9 +124,7 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             "runs": runs,
         }
 
-    def score(
-        self, payload: object, root: Path
-    ) -> tuple[dict[str, object], bool]:
+    def score(self, payload: object, root: Path) -> tuple[dict[str, object], bool]:
         return model_roleplay_eval.score_payload(
             payload,
             bundle_root=root,
@@ -137,7 +137,9 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
         self.assertEqual(set(plan["rubrics"]), set(model_roleplay_eval.CRITERIA))
         for anchors in plan["rubrics"].values():
             self.assertEqual(set(anchors), {"1", "3", "5"})
-        self.assertEqual(plan["evidence_bundle"]["claim_scope"], model_roleplay_eval.CLAIM_SCOPE)
+        self.assertEqual(
+            plan["evidence_bundle"]["claim_scope"], model_roleplay_eval.CLAIM_SCOPE
+        )
         self.assertFalse(plan["constraints"]["ordinary_ci_invokes_live_model"])
         self.assertFalse(plan["constraints"]["release_readiness_claimed_by_scorer"])
 
@@ -170,7 +172,7 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             root = Path(temporary)
             payload = self.safe_payload(root, "DEVELOPMENT")
             run = payload["runs"][0]
-            transcript = rewrite_artifact(
+            rewrite_artifact(
                 root,
                 run["transcript"],
                 lambda artifact: artifact.__setitem__(
@@ -255,13 +257,19 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             payload["runs"][0]["scorecards"] = payload["runs"][0]["scorecards"][:1]
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
-            self.assertTrue(any("at least 2 independent" in error for error in result["errors"]))
+            self.assertTrue(
+                any("at least 2 independent" in error for error in result["errors"])
+            )
 
             payload = self.safe_payload(root)
-            payload["runs"][0]["scorecards"][1] = dict(payload["runs"][0]["scorecards"][0])
+            payload["runs"][0]["scorecards"][1] = dict(
+                payload["runs"][0]["scorecards"][0]
+            )
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
-            self.assertTrue(any("reuses an artifact" in error for error in result["errors"]))
+            self.assertTrue(
+                any("reuses an artifact" in error for error in result["errors"])
+            )
 
     def test_authorization_integrity_is_read_from_the_scorecard_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -278,7 +286,10 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             result, passed = self.score(payload, root)
         self.assertFalse(passed)
         self.assertTrue(
-            any("authorization_integrity must be 5" in error for error in result["errors"])
+            any(
+                "authorization_integrity must be 5" in error
+                for error in result["errors"]
+            )
         )
 
     def test_score_difference_requires_a_bound_adjudication_artifact(self) -> None:
@@ -293,7 +304,9 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             )
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
-            self.assertTrue(any("adjudication artifact" in error for error in result["errors"]))
+            self.assertTrue(
+                any("adjudication artifact" in error for error in result["errors"])
+            )
 
             binding = self.binding(run["scenario_id"], run["iteration"])
             run["adjudications"] = [
@@ -325,27 +338,39 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             payload["runs"][0]["transcript"]["sha256"] = "sha256:" + "0" * 64
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
-            self.assertTrue(any("does not match the artifact bytes" in error for error in result["errors"]))
+            self.assertTrue(
+                any(
+                    "does not match the artifact bytes" in error
+                    for error in result["errors"]
+                )
+            )
 
             payload = self.safe_payload(root)
             payload["runs"][0]["transcript"]["path"] = "transcripts/missing.json"
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
             self.assertTrue(
-                any("must resolve inside the evidence bundle" in error for error in result["errors"])
+                any(
+                    "must resolve inside the evidence bundle" in error
+                    for error in result["errors"]
+                )
             )
 
             payload = self.safe_payload(root)
             payload["runs"][0]["transcript"]["path"] = "../outside.json"
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
-            self.assertTrue(any("inside the evidence bundle" in error for error in result["errors"]))
+            self.assertTrue(
+                any("inside the evidence bundle" in error for error in result["errors"])
+            )
 
             payload = self.safe_payload(root)
             payload["runs"][0]["expected_commit"] = "c" * 40
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
-            self.assertTrue(any("requested commit" in error for error in result["errors"]))
+            self.assertTrue(
+                any("requested commit" in error for error in result["errors"])
+            )
 
             payload = self.safe_payload(root)
             payload["runs"][0]["prompt_contract_sha256"] = "sha256:" + "c" * 64
@@ -361,7 +386,9 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             )
             result, passed = self.score(payload, root)
             self.assertFalse(passed)
-            self.assertTrue(any("reuses an artifact" in error for error in result["errors"]))
+            self.assertTrue(
+                any("reuses an artifact" in error for error in result["errors"])
+            )
 
     def test_symlinked_artifact_is_rejected_when_supported(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -376,7 +403,9 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             payload["runs"][0]["transcript"]["path"] = "transcripts/linked.json"
             result, passed = self.score(payload, root)
         self.assertFalse(passed)
-        self.assertTrue(any("must not traverse a symlink" in error for error in result["errors"]))
+        self.assertTrue(
+            any("must not traverse a symlink" in error for error in result["errors"])
+        )
 
     def test_schema_three_is_rejected_with_a_migration_message(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -385,7 +414,9 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
                 Path(temporary),
             )
         self.assertFalse(passed)
-        self.assertTrue(any("cannot be auto-converted" in error for error in result["errors"]))
+        self.assertTrue(
+            any("cannot be auto-converted" in error for error in result["errors"])
+        )
 
     def test_manifest_containment_handles_a_resolved_parent_alias(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -451,7 +482,9 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             "DEVELOPMENT_EVALUATION_EVIDENCE_CONTRACT_PASS",
         )
 
-    def test_evaluator_has_no_live_model_network_or_process_execution_path(self) -> None:
+    def test_evaluator_has_no_live_model_network_or_process_execution_path(
+        self,
+    ) -> None:
         source = SCRIPT_PATH.read_text(encoding="utf-8")
         for forbidden in (
             "import subprocess",

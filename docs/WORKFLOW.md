@@ -16,8 +16,8 @@ platform sandbox tools, `uvx`, and official AWS Core. Missing dependencies are
 returned together as one owner-run checklist. After they pass, Codex welcomes
 the owner and asks once for:
 
-1. project name;
-2. preferred AWS Region; and
+1. one-line project name (ordinary punctuation and international text are supported);
+2. canonical AWS Region ID (for example, `us-west-2`); and
 3. development budget posture.
 
 Use a finite cap with currency when one exists, or answer
@@ -77,18 +77,36 @@ facts.
 
 | Phase | Outcome | Owner decision |
 |---|---|---|
-| BOOT-00 | Repository initialized or safely resumed | None |
+| BOOT-00 | Repository initialized or safely resumed | Fresh setup answers; none on resume |
 | INTAKE-10 / REQ-10 | Requirements, assumptions, cost posture, safeguards, and success criteria | Answer questions |
 | Gate A / INTAKE-20 | Exact requirements revision reviewed | Approve requirements for design |
 | DESIGN-10 | Technical PRD, current AWS evidence, and construction envelope | None until ready |
 | Gate B / DESIGN-20 | Exact design and construction boundary reviewed | Approve construction |
 | TASK-10 / BUILD | Dependency-aware tasks run inside the approved boundary | No task-by-task approval |
 | RELEASE-10 | Release evidence evaluated | Only when the release contract requires it |
-| AWS-10 | Read-only deployment preflight | No mutation authority |
-| AWS-20 / AWS-50 | Exact authorized deployment or teardown mutation | Separate expiring action authorization |
-| AWS-30 / AWS-40 | Deployed evidence plus all authenticated residual and teardown reconciliation | Governed by current read authority and the runbook |
+| AWS-10 | Read-only deployment preflight | Authorize the exact read-only account, role or profile, Region, resources, operations, and expiry; no mutation |
+| AWS-20 | Exact authorized deployment mutation | Current fast-dev Gate B envelope or separate exact explicit-gate action receipt, after observed preflight |
+| AWS-30 | Read-only deployment evidence reconciliation | Authorize the exact read scope only when no current reusable read receipt covers it |
+| AWS-40 | Residual-state review, teardown readiness, and terminal reconciliation | Choose a residual disposition when required; authorize the exact read scope when needed |
+| AWS-50 | Exact authorized teardown mutation | Separate exact expiring teardown authorization |
+
+Before a modern task plan becomes `CURRENT`, Fastlane accounts for every
+approved first-release requirement. The Engine derives one disposition per
+requirement from exact task traceability or current no-task evidence. Missing
+or mismatched coverage sends Codex back through task replanning; it does not
+create another owner gate.
 
 Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
+
+BUG-10 and SYNC-10 are current-request-scoped adjunct prompts, not Engine
+routes or extra lifecycle gates. Codex may use BUG-10 only for an explicitly
+requested bounded defect contract and SYNC-10 only for explicitly requested,
+authorized named GitHub reconciliation. It preserves the current Engine route
+and pending owner action, performs only the adjunct's bounded work, reruns the
+Engine, and resumes the derived route. BUILD-10 may advance to BUILD-20 when
+the Engine permits autonomous continuation; BUILD-20 may continue itself until
+RELEASE-10 or a declared stop condition.
+
 ## Internal precision and delivery methods
 
 Owners continue answering short, plain-language questions. Internally, Codex
@@ -119,27 +137,31 @@ Reviewed 2026-07-28 against [Semantic Anchors](https://llm-coding.github.io/Sema
 [spec-driven development](https://llm-coding.github.io/Semantic-Anchors/spec-driven-development/),
 and the [Harness Inventory](https://llm-coding.github.io/Semantic-Anchors/harness-inventory/).
 These are design vocabulary, not a package, runtime dependency, user workflow,
-or additional authority. `NOT_APPLICABLE` means Fastlane does not mandate the
-technique; a project may still select it when approved technology or risk warrants it.
+or additional authority. `ADOPT` means the named official contract is used as
+written; `ADAPT` means Fastlane defines a narrower local contract;
+`CONDITIONAL` activates only on its stated trigger; `NOT_APPLICABLE` means
+Fastlane does not mandate the technique, although an approved project may.
 
 | Profile ID | Local contract | Official basis | Disposition | Fastlane meaning | Authority | Activation trigger / exclusion | Deterministic validation or evidence | Owner-facing effect |
 |---|---|---|---|---|---|---|---|---|
 | FSC-001 | Single source of truth and meaningful human control | SSOT; Meaningful Human Control; Semantic Contracts | ADOPT | One authority per fact; owners approve consequential boundaries | `AGENTS.md`; canonical project records | Always | Engine state, receipt, and authority checks | Two understandable approvals |
 | FSC-002 | Concise, plain-language progressive disclosure | Concise Response; BLUF; Plain English; Progressive Disclosure; Explaining and Teaching | ADAPT | Lead with status, needed action, and what follows; teaching is opt-in | Presenter, prompt pack, explain skill | Always; teaching only on request | Presenter and prompt-contract tests | Concise responses without ledger dumps |
-| FSC-003 | Focused Socratic discovery and completeness | Requirements Discovery; Socratic Method; MECE | ADAPT | Ask at most three related questions and cover non-overlapping product concerns | REQ procedure and intake contract | Define | Intake parser, foundation, and journey checks | Short questions in ordinary language |
-| FSC-004 | Outcome, actor, and first-release traceability | Specification; Actor-Goal List; Impact Mapping; User Story Mapping | ADOPT | Every first-release requirement maps to its owner-grounded outcome | PRD requirements contract | Gate A readiness | Requirements-contract projection | Clear product agreement |
+| FSC-003 | Focused Socratic discovery and completeness | Requirements Discovery; Socratic Method; MECE | ADAPT | Ask at most three related questions and cover non-overlapping product concerns | REQ procedure and intake contract | Define | Procedural: coordinator reviews semantic overlap and completeness; Deterministic: card-size, provenance, seven-field foundation, journey, and requirement-projection checks | Short questions in ordinary language |
+| FSC-004 | Outcome, actor, and first-release traceability | Specification; Actor-Goal List; Impact Mapping; User Story Mapping | ADAPT | Fastlane adopts outcome-to-actor-to-journey traceability but keeps fully dressed use cases and diagrams conditional under FSC-009; every first-release requirement maps to its owner-grounded outcome and canonical acceptance/test bindings | PRD requirements contract | Gate A readiness | Requirements-contract projection and inverse actor/journey coverage | Clear product agreement |
 | FSC-005 | Observable normative requirements and acceptance | Specification; EARS; Gherkin; Quality Attribute Scenario | ADAPT | Normative requirements are observable and testable | PRD normative tables | Gate A; QAS only when material | Requirement and QAS validators | Requirements state what success means |
-| FSC-006 | Whole-system choices, traceability, and layer boundaries | Strategic Architecture Analysis; Layer Boundaries; ADR | ADAPT | Compare viable systems and preserve explicit inward boundaries | PRD design contract | New or materially changed architecture | Candidate, boundary, traceability, and digest checks | One reasoned recommendation |
+| FSC-006 | Whole-system choices, traceability, and layer boundaries | Strategic Architecture Analysis; Layer Boundaries; ADR | ADAPT | Compare viable systems, preserve explicit inward boundaries, and trace only to declared design and validation IDs | PRD design contract | New or materially changed architecture | Candidate, declared-ID traceability, example-scenario binding, boundary, and digest checks | One reasoned recommendation |
 | FSC-007 | Bounded work and the first end-to-end outcome | INVEST; Vertical Slicing; Walking Skeleton; Thin Vertical Slice; Spike Solution | ADAPT | A new build starts with one tested usable path; a blocking spike is disposable | TASKS ledger and first-wave contract | TASK-10 for `NEW_BUILD` | Task graph, wave, and spike checks | Useful progress appears early |
-| FSC-008 | Closed-loop construction and maintenance | Implement Next; Red/Green TDD; Property-Based Testing; Definition of Done; Refactoring; Mikado Method | ADAPT | Construction and maintenance iterate against exact checks and observed evidence | Harness, tasks, VERIFY, maintenance skill | When selected by risk, technology, or bounded repair | Harness/task/evidence validators | Codex corrects safe in-scope failures |
-| FSC-009 | Rich use cases and state machines | Cockburn Use Cases; State Machines | CONDITIONAL | Add failure guarantees or states only when triggered | PRD journey and state contracts | High/critical risk; lifecycle, async, retry/resume, approval, migration, or meaningful-transition trigger | Applicability and record validators | Extra questions only when risk demands them |
-| FSC-010 | Threat and privacy analysis | Quality Review; STRIDE; LINDDUN | CONDITIONAL | Threat and privacy analysis deepen material security work | PRD design and risk records | Material security/privacy trigger | Recorded trigger plus bound findings and validation IDs | Security depth matches exposure |
-| FSC-011 | Consequential decision and review depth | Quality Review; ATAM; ADR; Fagan Inspection | CONDITIONAL | Hard-to-reverse choices receive deeper review | PRD and `docs/adr/` | One-way door, high/critical risk, or material tradeoff | Recorded trigger plus decision/evidence review | Tradeoffs are visible when consequential |
-| FSC-012 | Extended Harness checks | Harness Inventory | CONDITIONAL | Accessibility, visual, mutation, SAST/DAST, and formal checks activate from technology/risk | Gate B Harness Profile | Recorded trigger | Exact command/API and evidence row | No universal scanner burden |
+| FSC-008 | Closed-loop construction and maintenance | Implement Next; Red/Green TDD; Property-Based Testing; Definition of Done; Refactoring; Mikado Method | ADAPT | Construction and maintenance iterate against exact checks and observed evidence | Harness, tasks, VERIFY, maintenance skill | When selected by risk, technology, or bounded repair | Procedural: coordinator selects and applies TDD, refactoring, or Mikado; Deterministic: Harness, property, task/DONE, and observed-evidence checks | Codex corrects safe in-scope failures |
+| FSC-009 | Rich use cases and state machines; optional flow diagrams | Cockburn Use Cases; Activity Diagrams; State Machines | CONDITIONAL | Add rich guarantees to each triggering journey, and to every journey at high/critical risk; use Mermaid flow diagrams only as presentation aids | PRD journey and state contracts; optional diagrams are non-authoritative | High/critical risk; materially branching, async, retry/resume, approval, migration, permissioned, or meaningful-transition trigger | Per-journey rich-use-case and existing state applicability validators | Extra detail only when the flow demands it |
+| FSC-010 | Threat, application-security, and privacy analysis | Quality Review; STRIDE; LINDDUN; OWASP Top 10 | CONDITIONAL | Threat/privacy analysis deepens material security work; applicable web, API, or application surfaces receive an OWASP Top 10 review | PRD security/privacy requirements, design trust boundaries, Harness, and VERIFY | Material security/privacy trigger or applicable web/API/application attack surface | Procedural: trigger review and STRIDE/LINDDUN/OWASP Top 10 application; Deterministic: resulting requirement, control, test, Harness, and evidence-ID traceability | Security depth matches exposure |
+| FSC-011 | Consequential decision and review depth | Quality Review; ATAM; ADR; Fagan Inspection | CONDITIONAL | Hard-to-reverse choices receive deeper review | Current PRD decision; cited ADR rationale/history only | One-way door, high/critical risk, or material tradeoff | Procedural: trigger and ATAM/ADR/Fagan review; Deterministic: candidate, selection, traceability, and digest checks | Tradeoffs are visible when consequential |
+| FSC-012 | Extended Harness checks | Harness Inventory | CONDITIONAL | Accessibility, visual, mutation, SAST/DAST, and formal checks activate from technology/risk | Gate B Harness Profile | Technology/risk applicability review | Procedural: applicability review; Deterministic: every recorded row's status, basis, exact command/API, evidence destination, and scope | No universal scanner burden |
 | FSC-013 | External issue tracking | Backlog Management | CONDITIONAL | Mirror tasks only when authorized and operationally useful | TASKS and GitHub boundary | Current external-write authority | Issue reconciliation checks | No issue ceremony by default |
-| FSC-014 | Mandatory external documentation stack | Architecture Documentation; Docs-as-Code; arc42; AsciiDoc/docToolchain; PlantUML | NOT_APPLICABLE | Repository-native Markdown/Mermaid authorities remain canonical | Fastlane package contract | External stack excluded as mandatory machinery | Manifest and Markdown integrity tests | Familiar repository documents |
+| FSC-014 | Repository-native Docs-as-Code and optional external documentation stack | Docs-as-Code; Architecture Documentation; arc42; AsciiDoc/docToolchain; PlantUML | ADAPT | Markdown documents and Mermaid diagrams are versioned, linked, validated authorities; arc42, AsciiDoc/docToolchain, and PlantUML are not mandatory | Fastlane package and documentation contracts | Always for repository-native docs; external stack only when a project constraint selects it | Manifest, relative-link, Markdown, Mermaid, and package integrity tests | Familiar repository documents without mandatory external tooling |
 | FSC-015 | Extra lifecycle and approval machinery | Pugh Matrix; Backlog Management | NOT_APPLICABLE | No second lifecycle, extra gate, universal scoring, or issue-per-task execution | Workflow and receipt contracts | Excluded from Fastlane | Route and exact-receipt tests | No added approval bureaucracy |
 | FSC-016 | Semantic Anchors package or runtime | Semantic Anchors; Semantic Contracts | NOT_APPLICABLE | The profile is locally defined and dependency-free | This table and local validators | Excluded from runtime/package | Manifest and package inventory checks | No additional installation |
+| FSC-017 | Baseline threat/security boundary and crosscutting quality | Crosscutting Concepts | ADAPT | A lightweight threat surface plus security, testing, observability, and error handling are always addressed; formal STRIDE/LINDDUN/OWASP Top 10 depth remains conditional under FSC-010 | PRD security/privacy requirements and architecture trust boundaries; Harness; RUNBOOK; VERIFY | Always for the baseline; FSC-010 trigger for formal threat/privacy/application-security analysis | Requirement, design, Harness, runbook, and evidence validators | Safe operational defaults without extra lifecycle or approval ceremony |
+| FSC-018 | Complete requirement-to-delivery disposition | Specification; Implement Next; Definition of Done | ADAPT | Every modern approved first-release requirement resolves to task coverage, current no-task proof, or evidence-backed optional non-applicability | PRD requirements contract, TASKS traces, and VERIFY evidence | TASK-10 and every `CURRENT` task-plan check | Engine derives exact requirement/acceptance dispositions and reports missing IDs | No approved requirement disappears and no extra owner gate is added |
 
 ## Framework maintenance
 
@@ -183,9 +205,9 @@ legacy `Legacy` is not a customer publication target.
 
 ## AWS Core throughout Fastlane
 
-Fastlane prefers the current official
-`aws-core@agent-toolkit-for-aws` from `aws/agent-toolkit-for-aws` whenever
-current AWS facts materially affect:
+Fastlane requires the current official
+`aws-core@agent-toolkit-for-aws` from `aws/agent-toolkit-for-aws` at the
+material lifecycle points below whenever current AWS facts affect:
 
 - feasibility and requirements;
 - service and Region fit;
@@ -194,8 +216,11 @@ current AWS facts materially affect:
 - release readiness, deployment, rollback, operations, and teardown.
 
 Official AWS Core is a fresh-template prerequisite and is reused when already
-available. After initialization, missing or stale AWS Core evidence pauses only
-the affected material AWS step and never repeats completed setup or intake.
+available. After initialization, a genuinely unavailable capability is owner
+setup. Missing, stale, or safely repairable generated evidence while that
+capability is available is Codex work; unexplained structural drift or unsafe
+evidence conflict requires human review. Each case pauses only the affected
+material AWS step and never repeats completed setup or intake.
 Fresh setup starts with exactly one credential-free `AWS skills`
 `search_documentation` call followed by `retrieve_skill` for an identifier
 returned by that search. Topic-specific AWS discovery begins later only for a
@@ -233,6 +258,10 @@ checkpoints, GitHub permission, and planned AWS lane.
 After Gate B, Codex can build normally without repeated approvals. A material
 change in requirements, design, scope, risk, cost, or authority makes the
 applicable gate stale and stops affected work.
+A task-coverage omission or trace mismatch by itself is generated-plan drift:
+Codex replans and revalidates inside the unchanged Gate B boundary. Owner input
+is required only when resolving the gap would change an approved requirement,
+design decision, construction boundary, or authority.
 
 ### Legacy contract compatibility
 
@@ -269,14 +298,112 @@ approved envelope, not authority to run every listed operation: AWS-10,
 AWS-30, and AWS-40 remain read-only, while AWS-20 and AWS-50 still require
 their own current phase evidence and action-specific authority.
 
-After a release is verified, the optional `AWS lifecycle intent` records the
-owner's requested follow-up route without granting access or mutation:
+Before an AWS-20 call, Fastlane appends a STARTED row to the canonical
+append-only deployment action and reconciliation table. Every row keeps the
+attempt's deployment authorization, validity, and stable source unchanged;
+fast-dev stores the exact current construction `AUTH-*`, the expiry timestamp
+parsed from Gate B validity, and Gate B's authorization source; explicit-gate
+derives them from its deployment receipt.
+The terminal result uses the canonical identifiers/result grammar, which
+structures evidence but cannot prove execution alone. Fastlane then routes the
+Attempt ID to AWS-30.
+STARTED is not proof that a call occurred. If only STARTED exists on resume,
+owner action remains NONE while Codex appends UNKNOWN and reruns the Engine;
+only then may AWS-30 request read authority. FAILED, PARTIAL, or UNKNOWN cannot
+be retried before read-only reconciliation. AWS-30 requires independently
+current exact read authority; deployment authority cannot supply those reads,
+carry over, or be replayed. While Gate B remains current, an exact matching
+AWS-10 receipt may be reused if it is still current and covers reconciliation.
+Restricted stale or expired closure instead requires fresh post-action read
+authority. COMPLETE or BLOCKED returns to RELEASE-10, while
+one first STALE remains at AWS-30 until its authority and evidence are current.
+That STALE may be followed by one later COMPLETE or BLOCKED under a different
+current read authorization. A repeated STALE is a safety-review blocker; no
+reconciliation row follows COMPLETE or BLOCKED. RELEASE-10 records that
+terminal AWS-30 Evidence ID as VERIFY's Active evidence cutoff when it decides
+NOT_READY, RELEASE_VERIFIED, or a separately authorized correction path. Once
+acknowledged, the attempt cannot reroute. Retry requires distinct current
+mutation authority: a new exact deployment receipt for explicit-gate or freshly
+approved construction authorization for fast-dev, plus a new Attempt ID.
+
+Every AWS-30 row stores `Read authority source` exactly as `SOURCE: <stable
+owner-message source>; AUTHORIZED_AT: <ISO 8601 with timezone>; RESOURCES:
+<exact canonical list>; OPERATIONS: <exact canonical list>`. `AUTHORIZED_AT` is
+the `Observed at` timestamp of the matching Read-only preflight row in Action
+authorization provenance, not the owner-message creation time or the AWS-30
+evidence-row observation time. The AWS observation stays within that
+authorization window, Resources exactly match the encoded resource list, and
+observed operations are a subset of the encoded allowed operations.
+Current terminal evidence matches the current receipt tuple; an acknowledged
+historical row remains auditable from its stored tuple after later expiry or
+replacement.
+
+Gate B expiry or legitimate REQ/DES/Gate B staleness after a valid STARTED row
+does not abandon the attempted action and does not reauthorize normal work.
+Fastlane keeps ordinary construction, repository-write, and AWS mutation
+authority at NONE and exposes a separate
+`deployment_journal_closure_authority`. That closure is limited to
+`docs/project/VERIFY.md` and the Engine-selected bounded operation: append
+UNKNOWN for a lone STARTED row; record the exact marked read receipt/provenance
+and append its AWS-30 reconciliation row; or atomically update RELEASE-10's
+release decision and Active evidence cutoff. BLOCKED permits only `NOT_READY`;
+stale-basis COMPLETE permits only `NOT_READY`; same-basis COMPLETE permits
+`NOT_READY` or `RELEASE_VERIFIED`. Only deployment journal rows are
+append-only; receipt/provenance and release decisions use their canonical
+update contracts. A fresh exact post-action read receipt may close the
+immutable historical attempt boundary without renewing mutation authority.
+The durable original deployment receipt/provenance must also prove that
+STARTED did not precede its authorization. Only a structurally valid attempt
+that STARTED while its authority was current qualifies; malformed or tampered receipts,
+journal rows, timing, identities, boundaries, or evidence remain blockers. A
+consumed attempt never gains closure authority merely because the release is
+later marked READY_TO_DEPLOY; retry still needs fresh mutation authority and a
+new Attempt ID. A consumed `NOT_READY` attempt stops at
+`RELEASE_REVIEW_BLOCKED` unless the owner separately records a current
+non-authorizing lifecycle intent. That intent may select AWS-40 read-only
+residual review, but it never retries deployment or grants account access.
+
+At a settled release boundary, the optional lifecycle-intent record contains
+the value, source, and recorded-at time. A non-`NONE` value requires source
+exactly `owner-message MSG-AWS-LIFECYCLE-nnnn` plus a timezone-aware ISO 8601
+time. `NONE` requires both provenance fields to be `NONE`. The normal profile is
+`NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`. After current
+`READY_FOR_TEARDOWN` or `RESIDUALS_REMAIN` evidence, the choice profile is
+`RETAIN`, `RESIDUAL_REVIEW`, or `TEARDOWN`, shown to the owner as RETAIN,
+INVESTIGATE, or REMOVE. Follow the Engine's `aws_residual_disposition`
+projection rather than inferring a route from the raw value. The three fields
+change atomically and record the owner's requested follow-up route without
+granting access or mutation:
 
 - `NONE` stops the workflow;
-- `RESIDUAL_REVIEW` routes to AWS-40 for one authorized read-only review and
-  then stops with its explicit clean, residual, or blocked result; and
-- `TEARDOWN` routes first to AWS-40, may continue to AWS-50 only after an exact
-  teardown receipt, and always returns to AWS-40 for terminal reconciliation.
+- RETAIN stores `RETAIN`, ends at `AWS_RESIDUALS_RETAINED`, and explicitly warns
+  that retained resources may continue to incur cost;
+- INVESTIGATE stores `RESIDUAL_REVIEW` and requires separate current read
+  authority before AWS-40; and
+- REMOVE stores `TEARDOWN`; with current READY evidence it may present the exact
+  teardown receipt, while after `RESIDUALS_REMAIN` it first refreshes AWS-40.
+  AWS-50 always returns to AWS-40 for terminal reconciliation.
+
+Every choice after `RESIDUALS_REMAIN` must be strictly newer than that row.
+After `READY_FOR_TEARDOWN`, RETAIN and INVESTIGATE must be strictly newer. An
+earlier owner-provenanced TEARDOWN may carry forward as REMOVE. New residual
+evidence reopens the set-level choice. RETAIN without current READY or residual
+evidence is invalid.
+
+A valid AWS-50 STARTED row, its terminal result, required post-action review,
+or an explicit AWS-40 safety blocker always outranks elective intent and cannot
+be hidden by changing intent to `NONE`. Legacy projects without provenance are
+accepted only when their effective intent is `NONE`. Before authenticated read
+authority becomes current, the owner may atomically return the record to
+`NONE`; no lifecycle-intent write can create AWS authority. Every concrete
+AWS-40 row stores `Read authority source` exactly as `SOURCE: <stable
+owner-message source>; AUTHORIZED_AT: <ISO 8601 with timezone>`.
+`AUTHORIZED_AT` is the `Observed at` timestamp of the matching Read-only
+preflight row in Action authorization provenance. Current observations stay
+inside the receipt window and never exceed its resource/operation scope. Exact
+scope equality applies only when the Engine requires exact-scope reconciliation;
+STALE does not claim fresh reads. Later expiry or replacement does not invalidate
+terminal evidence whose durable tuple was proven at append time.
 
 AWS-50 records only the directly observed mutation attempt. All authenticated
 pre- and post-teardown reads—including inventory, retention, operation
@@ -305,9 +432,10 @@ against the 12,000-byte source budget. This measures selected repository
 content, not prompts, tool schemas, conversation history, tokens, or total model
 context.
 
-Lower-priority material moves on demand. One complete required record may exceed
-the remaining budget and is reported honestly without creating an owner action;
-records are never truncated. Missing, ambiguous, or overlapping required source
+Required atomic lifecycle state is selected before non-atomic guidance.
+Procedural guidance may move on demand even when high priority; lower-priority
+material moves first when otherwise equivalent. One complete required record may
+exceed the remaining budget and is reported honestly without creating an owner action; records are never truncated. Missing, ambiguous, or overlapping required source
 fails closed through normal remediation. Packets are ephemeral and untracked.
 
 ## Fast-path expectations
@@ -364,7 +492,9 @@ no customer setup step, scorer, lifecycle stage, gate, or routine owner action.
 The Engine selects the next prompt. Fresh templates require current official
 AWS Core before initialization. Initialized projects skip that prerequisite
 during normal resume; missing or stale AWS Core evidence later pauses only the
-affected material AWS step. Follow the derived remediation action, rerun the
+affected material AWS step. The Engine assigns unavailable capability to owner
+setup, safely repairable generated evidence to Codex, and unexplained unsafe
+structure to human review. Follow that derived remediation action, rerun the
 Engine, and resume the selected route.
 
 Maintainers can run the optional, credential-free-to-validate

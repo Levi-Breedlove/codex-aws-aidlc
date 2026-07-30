@@ -29,6 +29,14 @@
 - A pre-Gate-A AWS example must say:
   `Illustrative architecture candidate — not selected or approved.`
 - Use `explain-fastlane` only for an explicit explanation request.
+- Before writing a Gate A or Gate B owner record, validate the complete
+  candidate with `python scripts/bootstrap_doctor.py --root .
+  --validate-gate-receipt --input-stdin --json`. Only a `PASS` result may be
+  recorded. On `FAIL`, write nothing, tell the owner that no approval was
+  recorded, preserve the same pending gate, and show the unchanged exact
+  current receipt again without echoing the rejected input. A formatting error
+  does not route backward; only an independently reported material change or
+  stale basis returns to requirements or design.
 
 ## Plain-language decisions
 For guided intake, render only the current Engine-validated

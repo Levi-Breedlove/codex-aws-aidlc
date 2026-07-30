@@ -11,7 +11,9 @@ import sys
 import tempfile
 import unittest
 from dataclasses import replace
+from datetime import datetime, timedelta
 from pathlib import Path, PurePosixPath
+from typing import Mapping
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -156,7 +158,7 @@ def exact_legacy_requirements_projection(text: str) -> str:
         heading_start = text.index(heading)
         table_start = text.index("|", heading_start)
         table_end = text.index("\n\n", table_start)
-        text = text[:table_start] + text[table_end + 2:]
+        text = text[:table_start] + text[table_end + 2 :]
     return text
 
 
@@ -167,11 +169,13 @@ def exact_legacy_schema_four_projection(text: str) -> str:
         text,
         count=1,
     )
-    legacy_interface_table = "\n".join([
-        "| Contract ID | Producer | Consumer | Schema or protocol | Authentication | Versioning | Idempotency |",
-        "|---|---|---|---|---|---|---|",
-        "| API-001 | Local client | Trusted application service | Versioned JSON request and response | Approved identity token | Compatible additions only | One idempotent read per request |",
-    ])
+    legacy_interface_table = "\n".join(
+        [
+            "| Contract ID | Producer | Consumer | Schema or protocol | Authentication | Versioning | Idempotency |",
+            "|---|---|---|---|---|---|---|",
+            "| API-001 | Local client | Trusted application service | Versioned JSON request and response | Approved identity token | Compatible additions only | One idempotent read per request |",
+        ]
+    )
     text = put_contract_table(
         text,
         doctor.INTERFACE_HEADING,
@@ -196,7 +200,6 @@ def exact_legacy_schema_four_projection(text: str) -> str:
         "DES-0001, FR-001",
         1,
     )
-
 
 
 def confirm_intake_foundation(
@@ -226,8 +229,12 @@ def complete_intake_foundation(
     initial, initial_issues = doctor.derive_intake_foundation_contract(
         text, "greenfield", grandfather_current_gate_a=False
     )
-    if initial_issues or initial.pending_card is None:
+    if initial_issues:
         raise AssertionError(f"Initial intake card is invalid: {initial_issues}")
+    if initial.pending_card is None:
+        if initial.status == "READY_FOR_REQUIREMENTS":
+            return text
+        raise AssertionError("Initial intake card is unavailable before readiness")
     first_digest = initial.pending_card.canonical_sha256
     context_values = {
         "A": ("NEW_APPLICATION", "NONE"),
@@ -471,11 +478,13 @@ def complete_requirements_contract(text: str) -> str:
         text,
         doctor.RICH_USE_CASE_APPLICABILITY_HEADING,
         doctor.RICH_USE_CASE_APPLICABILITY_HEADERS,
-        [(
-            "NOT_APPLICABLE",
-            "NOT_APPLICABLE - low-risk single-actor synchronous fixture",
-            "NONE",
-        )],
+        [
+            (
+                "NOT_APPLICABLE",
+                "NOT_APPLICABLE - low-risk single-actor synchronous fixture",
+                "NONE",
+            )
+        ],
     )
     text = replace_contract_table(
         text, doctor.RICH_USE_CASE_HEADING, doctor.RICH_USE_CASE_HEADERS, []
@@ -693,10 +702,20 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
         "Project AWS lane": "`documentation-only`",
         "Authorized outcome": "`OUT-001 — Deliver the FR-001 outcome`",
         "Authorized requirement and design IDs": (
-            "`REQ: REQ-0001; DES: DES-0001; SCOPE_IDS: FR-001, "
-            "ARCH-0001, TECH-0001, TECH-0002, TECH-0003, TECH-0004, TECH-0005, "
-            "TECH-0006, TECH-0007, TECH-0008, TECH-0009, PROP-001, HARNESS-004, "
-            "API-001, BOUNDARY-001, WAVE-001`"
+            "`REQ: REQ-0001; DES: DES-0001; SCOPE_IDS: "
+            + ", ".join(
+                (
+                    *MODERN_APPROVED_REQUIREMENT_IDS,
+                    "ARCH-0001",
+                    *(f"TECH-{number:04d}" for number in range(1, 10)),
+                    "PROP-001",
+                    "HARNESS-004",
+                    "API-001",
+                    "BOUNDARY-001",
+                    "WAVE-001",
+                )
+            )
+            + "`"
         ),
         "Design contract SHA-256": f"`{design_contract.canonical_sha256}`",
         "Authorized baseline commit": f"`{baseline}`",
@@ -720,7 +739,9 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
         "Mandatory stop conditions": "`Any boundary, gate, attempt, or evidence mismatch`",
         "Authorization expiry or completion condition": "`Expires at 2099-12-31T23:59:59Z; earlier completion: release review`",
     }
-    aws_not_applicable = "`NOT_APPLICABLE — AWS boundary DOCS_ONLY authorizes no authenticated action`"
+    aws_not_applicable = (
+        "`NOT_APPLICABLE — AWS boundary DOCS_ONLY authorizes no authenticated action`"
+    )
     for field in doctor.AWS_DETAIL_FIELDS:
         envelope_values[field] = aws_not_applicable
     for field, value in envelope_values.items():
@@ -777,9 +798,9 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
 
 
 def rebind_gate_b_envelope(text: str) -> str:
-    design_revision = doctor.table_after_heading(
-        text, "## Document status"
-    )["Current design revision"]
+    design_revision = doctor.table_after_heading(text, "## Document status")[
+        "Current design revision"
+    ]
     design_contract, design_issues = doctor.derive_design_contract(
         text, design_revision, required=True
     )
@@ -836,9 +857,6 @@ def current_greenfield_state(state: dict[str, object], *, gate_b: bool = False) 
     setup.update({"status": "CONFIGURED", "method": "EXTERNAL_COPY"})
     project.update(
         {
-            "name": "Doctor Test Project",
-            "region": "us-west-2",
-            "cost_posture": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
             "mode": "greenfield",
             "delivery_profile": "quick-mvp",
             "effective_risk": "low",
@@ -975,10 +993,32 @@ def current_task_snapshot(
     return text
 
 
+MODERN_APPROVED_REQUIREMENT_IDS = (
+    *(f"COST-{number:03d}" for number in range(1, 6)),
+    *(f"DATA-{number:03d}" for number in range(1, 6)),
+    *(f"FR-{number:03d}" for number in range(1, 3)),
+    *(f"OPS-{number:03d}" for number in range(1, 6)),
+    *(f"PERF-{number:03d}" for number in range(1, 5)),
+    *(f"REL-{number:03d}" for number in range(1, 6)),
+    *(f"SEC-{number:03d}" for number in range(1, 8)),
+    *(f"SUS-{number:03d}" for number in range(1, 5)),
+)
+MODERN_TASK_REQUIREMENT_TRACE = "; ".join(
+    (
+        "REQ-0001",
+        *(
+            identifier
+            for requirement_id in MODERN_APPROVED_REQUIREMENT_IDS
+            for identifier in (requirement_id, f"AC-{requirement_id}")
+        ),
+    )
+)
+
+
 def ready_task(
     write_set: str = "app/main.py",
     *,
-    requirements: str = "REQ-0001; FR-001",
+    requirements: str = MODERN_TASK_REQUIREMENT_TRACE,
     design: str = "DES-0001; TECH: TECH-0001",
     outcome: str = "The authorized slice is implemented without expanding scope.",
     external_state: str = "NONE",
@@ -1202,7 +1242,12 @@ def complete_design_contract(text: str) -> str:
             f"| DRV-0001 | {requirement_list} | HARD_CONSTRAINT | Preserve complete approved requirement coverage with the lowest operational burden | Compare every candidate against all requirement IDs |",
         ]
     )
-    text = put_contract_table(text, doctor.ARCHITECTURE_DRIVER_HEADING, driver_table, doctor.ARCHITECTURE_CANDIDATE_HEADING)
+    text = put_contract_table(
+        text,
+        doctor.ARCHITECTURE_DRIVER_HEADING,
+        driver_table,
+        doctor.ARCHITECTURE_CANDIDATE_HEADING,
+    )
     candidate_table = "\n".join(
         [
             "| Candidate ID | Architecture summary | Requirement coverage | AWS evidence | Eligibility | Failed constraints | Tradeoffs |",
@@ -1211,7 +1256,12 @@ def complete_design_contract(text: str) -> str:
             f"| CAND-0002 | Container service with continuously provisioned compute | {requirement_list} | AWS-EV-0001, AWS-EV-0002 | INELIGIBLE | DRV-0001 | More runtime control but unnecessary fixed operations for this bounded workload |",
         ]
     )
-    text = put_contract_table(text, doctor.ARCHITECTURE_CANDIDATE_HEADING, candidate_table, doctor.ARCHITECTURE_SELECTION_HEADING)
+    text = put_contract_table(
+        text,
+        doctor.ARCHITECTURE_CANDIDATE_HEADING,
+        candidate_table,
+        doctor.ARCHITECTURE_SELECTION_HEADING,
+    )
     selection_table = "\n".join(
         [
             "| Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Security impact | Reliability impact | Operational burden | Cost effect | Breakpoints | Migration path | Revisit triggers | Validation |",
@@ -1219,10 +1269,15 @@ def complete_design_contract(text: str) -> str:
             f"| ARCH-0001 | CAND-0001 | {requirement_list}, DRV-0001 | Meets every hard constraint with the smallest managed surface | CAND-0002 | Managed-service limits | Validate quotas and alarms before deployment | Retains server-side authorization and least-privilege controls | Managed services bound failure domains with tested recovery | No continuously provisioned compute to operate | Pay per request with no intentional idle compute | Reassess at sustained utilization where containers are cheaper | Use versioned APIs and reversible IaC for any later migration | Reassess on quota, residency, or latency changes | Requirement trace and integration tests |",
         ]
     )
-    text = put_contract_table(text, doctor.ARCHITECTURE_SELECTION_HEADING, selection_table, doctor.ARCHITECTURE_TRACEABILITY_HEADING)
+    text = put_contract_table(
+        text,
+        doctor.ARCHITECTURE_SELECTION_HEADING,
+        selection_table,
+        doctor.ARCHITECTURE_TRACEABILITY_HEADING,
+    )
     trace_rows = [
         (
-            f"| {requirement_id} | ARCH-0001, COMP-0001 | "
+            f"| {requirement_id} | ARCH-0001, API-001 | "
             f"{'PROP-001' if requirement_id == 'FR-001' else 'EX-001'} | "
             "AWS-EV-0001, AWS-EV-0002 |"
         )
@@ -1230,12 +1285,17 @@ def complete_design_contract(text: str) -> str:
     ]
     trace_table = "\n".join(
         [
-            "| Requirement ID | ARCH / COMP / API / EVENT / CLI / FILE / DATA / CTRL / BOUNDARY / STATE IDs | Property/test IDs | Evidence IDs |",
+            "| " + " | ".join(doctor.ARCHITECTURE_TRACEABILITY_HEADERS) + " |",
             "|---|---|---|---|",
             *trace_rows,
         ]
     )
-    text = put_contract_table(text, doctor.ARCHITECTURE_TRACEABILITY_HEADING, trace_table, doctor.MATERIAL_AWS_EVIDENCE_HEADING)
+    text = put_contract_table(
+        text,
+        doctor.ARCHITECTURE_TRACEABILITY_HEADING,
+        trace_table,
+        doctor.MATERIAL_AWS_EVIDENCE_HEADING,
+    )
     evidence_table = "\n".join(
         [
             "| Evidence ID | Discovery ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |",
@@ -1256,7 +1316,31 @@ def complete_design_contract(text: str) -> str:
         change_impact_table,
         "## 14. Architecture overview",
     )
-    text = put_contract_table(text, doctor.MATERIAL_AWS_EVIDENCE_HEADING, evidence_table, "## 14. Architecture overview")
+    text = put_contract_table(
+        text,
+        doctor.MATERIAL_AWS_EVIDENCE_HEADING,
+        evidence_table,
+        "## 14. Architecture overview",
+    )
+    text = replace_contract_table(
+        text,
+        "## 23. Example-based scenarios",
+        ("Test ID", "Scenario", "Expected result", "Layer"),
+        [
+            (
+                "EX-001",
+                "Known happy path",
+                "Approved outcome is returned",
+                "Integration",
+            ),
+            (
+                "EX-002",
+                "Known boundary or failure",
+                "Safe rejection preserves approved state",
+                "Unit",
+            ),
+        ],
+    )
     technology_rows = (
         ("TECH-0001", "APPLICATION_RUNTIME", "Python", "CURRENT_LTS_AS_OF: 2026-07-01"),
         ("TECH-0002", "APPLICATION_FRAMEWORK", "FastAPI", "COMPATIBLE_MAJOR: 1"),
@@ -1268,7 +1352,12 @@ def complete_design_contract(text: str) -> str:
         ),
         ("TECH-0004", "INFRASTRUCTURE_AS_CODE", "AWS SAM", "COMPATIBLE_MAJOR: 1"),
         ("TECH-0005", "PACKAGE_BUILD_TOOLING", "pip", "MINIMUM: 24.0"),
-        ("TECH-0006", "TEST_TOOLING", "unittest", "ORG_MANAGED: Python standard library"),
+        (
+            "TECH-0006",
+            "TEST_TOOLING",
+            "unittest",
+            "ORG_MANAGED: Python standard library",
+        ),
         ("TECH-0007", "PROPERTY_TESTING", "Hypothesis", "MINIMUM: 6.0"),
         ("TECH-0008", "SECURITY_VALIDATION", "Bandit", "EXACT: 1.7.9"),
         ("TECH-0009", "DEPLOYMENT_TOOLING", "AWS SAM CLI", "MINIMUM: 1.120"),
@@ -1304,9 +1393,7 @@ def complete_design_contract(text: str) -> str:
                         "No stable generated-input oracle is approved for this requirement |"
                     )
                 )
-                for requirement_id in sorted(
-                    doctor.authoritative_requirement_ids(text)
-                )
+                for requirement_id in sorted(doctor.authoritative_requirement_ids(text))
             ),
         ]
     )
@@ -1372,7 +1459,9 @@ def complete_design_contract(text: str) -> str:
 
 
 def complete_legacy_design_bridge(text: str) -> str:
-    text = exact_legacy_requirements_projection(complete_design_contract(approve_gate_a(text)))
+    text = exact_legacy_requirements_projection(
+        complete_design_contract(approve_gate_a(text))
+    )
     text = text.replace(
         "DES-0001, FR-001, JOURNEY-001, WAVE-001",
         "DES-0001, FR-001, WAVE-001",
@@ -1388,20 +1477,35 @@ def complete_legacy_design_bridge(text: str) -> str:
         text,
         doctor.STATE_REGISTER_HEADING,
         doctor.STATE_REGISTER_HEADERS,
-        [(
-            "STATE-001", "RESOURCE-001", "PENDING, READY", "PENDING",
-            "PENDING to READY", "READY", "Reject invalid transitions",
-            "FR-001", "AC-FR-001",
-        )],
+        [
+            (
+                "STATE-001",
+                "RESOURCE-001",
+                "PENDING, READY",
+                "PENDING",
+                "PENDING to READY",
+                "READY",
+                "Reject invalid transitions",
+                "FR-001",
+                "AC-FR-001",
+            )
+        ],
     )
     return replace_contract_table(
         text,
         doctor.FIRST_WAVE_HEADING,
         doctor.FIRST_WAVE_HEADERS,
-        [(
-            "WAVE-001", "NEW_BUILD", "NONE", "FR-001", "AC-FR-001",
-            "HARNESS-004", "NONE",
-        )],
+        [
+            (
+                "WAVE-001",
+                "NEW_BUILD",
+                "NONE",
+                "FR-001",
+                "AC-FR-001",
+                "HARNESS-004",
+                "NONE",
+            )
+        ],
     )
 
 
@@ -1488,6 +1592,79 @@ def task_completion_evidence_section(
     )
 
 
+def no_task_requirement_evidence_row(
+    requirement_id: str,
+    *,
+    evidence_id: str,
+    status: str,
+    acceptance_id: str | None = None,
+) -> tuple[str, ...]:
+    acceptance_id = acceptance_id or f"AC-{requirement_id}"
+    return (
+        evidence_id,
+        f"{requirement_id}, {acceptance_id}",
+        "NONE",
+        f"Current evidence satisfies {requirement_id} and {acceptance_id}",
+        "Focused current evidence was reviewed and passed",
+        "NOT_APPLICABLE - local or applicability evidence",
+        "Current REQ-0001 / DES-0001 / AUTH-0001 evidence set",
+        status,
+    )
+
+
+def requirement_evidence_verify(
+    *rows: tuple[str, ...],
+    requirements_revision: str = "REQ-0001",
+    design_revision: str = "DES-0001",
+    construction_authorization: str = "AUTH-0001",
+    source: str | None = None,
+) -> str:
+    text = source or (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(
+        encoding="utf-8"
+    )
+    for field, value in (
+        ("Requirements revision", requirements_revision),
+        ("Design revision", design_revision),
+        ("Construction authorization", construction_authorization),
+    ):
+        text = set_table_value(
+            text,
+            "## Active evidence scope",
+            "## Evidence status vocabulary",
+            field,
+            f"`{value}`",
+        )
+    return replace_contract_table(
+        text,
+        doctor.VERIFICATION_MATRIX_HEADING,
+        doctor.VERIFICATION_MATRIX_HEADERS,
+        list(rows),
+    )
+
+
+def modern_task_requirement_rules() -> dict[str, tuple[str, str]]:
+    text = complete_design_contract(
+        (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+    )
+    intake, intake_issues = doctor.derive_intake_foundation_contract(
+        text,
+        "greenfield",
+        grandfather_current_gate_a=False,
+    )
+    if intake_issues:
+        raise AssertionError(intake_issues)
+    requirements, requirement_issues = doctor.derive_requirements_contract(
+        text,
+        "low",
+        intake,
+        required=True,
+        grandfather_current_gate_a=False,
+    )
+    if requirement_issues:
+        raise AssertionError(requirement_issues)
+    return doctor.task_requirement_rules(text, requirements)
+
+
 def refresh_control_hashes(project: Path) -> None:
     manifest_path = project / "bootstrap.manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -1515,9 +1692,7 @@ def aws_authority_envelope(
         "AWS role or profile": f"ROLE: {role}",
         "AWS account": f"ACCOUNT: {account}",
         "AWS Region": f"REGION: {region}",
-        "AWS environment": (
-            f"ENVIRONMENT: {environment}; CLASS: NON_PRODUCTION"
-        ),
+        "AWS environment": (f"ENVIRONMENT: {environment}; CLASS: NON_PRODUCTION"),
         "AWS stack or application": "STACK: fastlane-stack",
         "AWS resource allowlist": "RESOURCES: " + ", ".join(resources),
         "AWS allowed operations": "OPERATIONS: " + ", ".join(operations),
@@ -1529,16 +1704,13 @@ def aws_authority_envelope(
             "earlier completion: authorized AWS action ends"
         ),
         "Authorization expiry or completion condition": (
-            "Expires at 2099-12-31T23:59:59Z; "
-            "earlier completion: release review"
+            "Expires at 2099-12-31T23:59:59Z; earlier completion: release review"
         ),
         "Authorized baseline commit": "a" * 40,
     }
 
 
-def ready_preflight(
-    *, account: str, region: str, environment: str
-) -> dict[str, str]:
+def ready_preflight(*, account: str, region: str, environment: str) -> dict[str, str]:
     return {
         "status": "READY",
         "preflight_id": "AWS-PREFLIGHT-0001",
@@ -1550,6 +1722,392 @@ def ready_preflight(
 
 
 class BootstrapDoctorTests(unittest.TestCase):
+    def test_required_project_text_has_per_file_and_aggregate_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "first.txt").write_text("1234", encoding="utf-8")
+            (root / "second.txt").write_text("56", encoding="utf-8")
+
+            original_file_limit = doctor.MAX_REQUIRED_FILE_BYTES
+            original_project_limit = doctor.MAX_PROJECT_SOURCE_BYTES
+            try:
+                doctor.MAX_REQUIRED_FILE_BYTES = 3
+                doctor.MAX_PROJECT_SOURCE_BYTES = 20
+                per_file = doctor.Context(root)
+                self.assertIsNone(doctor.safe_read_text(per_file, "first.txt"))
+                self.assertEqual(
+                    [item.code for item in per_file.diagnostics],
+                    ["REQUIRED_FILE_TOO_LARGE"],
+                )
+
+                doctor.MAX_REQUIRED_FILE_BYTES = 10
+                doctor.MAX_PROJECT_SOURCE_BYTES = 5
+                aggregate = doctor.Context(root)
+                self.assertEqual(
+                    doctor.safe_read_text(aggregate, "first.txt"),
+                    "1234",
+                )
+                self.assertIsNone(doctor.safe_read_text(aggregate, "second.txt"))
+                self.assertEqual(
+                    [item.code for item in aggregate.diagnostics],
+                    ["PROJECT_SOURCE_LIMIT"],
+                )
+            finally:
+                doctor.MAX_REQUIRED_FILE_BYTES = original_file_limit
+                doctor.MAX_PROJECT_SOURCE_BYTES = original_project_limit
+
+    def test_required_project_text_is_cached_and_counted_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "record.txt").write_text("record", encoding="utf-8")
+            context = doctor.Context(root)
+
+            self.assertEqual(doctor.safe_read_text(context, "record.txt"), "record")
+            first_count = context.source_bytes_read
+            self.assertEqual(doctor.safe_read_text(context, "record.txt"), "record")
+            self.assertEqual(context.source_bytes_read, first_count)
+
+    def test_prd_snapshot_is_bounded_normalized_and_content_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prd = root / doctor.PRD_FILE
+            prd.parent.mkdir(parents=True)
+            prd.write_bytes(b"first\r\nsecond\r")
+
+            text, digest = doctor.bounded_prd_snapshot(root)
+            self.assertEqual(text, "first\nsecond\n")
+            self.assertEqual(
+                digest,
+                "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            )
+            self.assertEqual(doctor.bounded_prd_snapshot(root, digest)[0], text)
+
+            prd.write_text("changed\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "snapshot changed"):
+                doctor.bounded_prd_snapshot(root, digest)
+
+            original_limit = doctor.MAX_REQUIRED_FILE_BYTES
+            try:
+                doctor.MAX_REQUIRED_FILE_BYTES = 3
+                with self.assertRaisesRegex(ValueError, "bounded PRD snapshot"):
+                    doctor.bounded_prd_snapshot(root)
+            finally:
+                doctor.MAX_REQUIRED_FILE_BYTES = original_limit
+
+    def test_manifest_rejects_excessive_required_file_inventory(self) -> None:
+        context = doctor.Context(PROJECT_ROOT)
+        manifest = {
+            "schema_version": 1,
+            "bootstrap_version": "1.0.3",
+            "python_requires": ">=3.11",
+            "required_files": [
+                f"docs/record-{index}.md"
+                for index in range(doctor.MAX_REQUIRED_FILES + 1)
+            ],
+            "canonical_prompt_ids": [],
+            "template_placeholders": [],
+            "control_sha256": {},
+            "source_sha256": {},
+        }
+
+        doctor.validate_manifest(context, manifest)
+
+        self.assertIn(
+            "MANIFEST_REQUIRED_FILES_LIMIT",
+            [item.code for item in context.diagnostics],
+        )
+        self.assertEqual(context.texts, {})
+
+    def test_manifest_control_hashes_cannot_reference_omitted_required_file(
+        self,
+    ) -> None:
+        manifest = json.loads(
+            (PROJECT_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
+        )
+        omitted = "scripts/fastlane_process.py"
+        manifest["required_files"].remove(omitted)
+        manifest["source_sha256"].pop(omitted)
+        context = doctor.Context(PROJECT_ROOT)
+
+        doctor.validate_manifest(context, manifest)
+
+        self.assertIn(
+            "MANIFEST_CONTROL_REQUIRED_FILES",
+            [item.code for item in context.diagnostics],
+        )
+
+    def test_legacy_authenticated_task_modes_fail_closed_and_require_replan(
+        self,
+    ) -> None:
+        self.assertEqual(doctor.TASK_AWS_MODES, {"NONE", "DOCS_ONLY"})
+        context = doctor.Context(PROJECT_ROOT)
+        doctor.record_task_graph_validation_errors(
+            context,
+            "\n".join(
+                (
+                    "TASK-001: invalid AWS mode 'READ_ONLY'",
+                    "TASK-002: invalid AWS mode 'MUTATION'",
+                )
+            ),
+        )
+        self.assertEqual(
+            [item.code for item in context.diagnostics],
+            ["TASK_AWS_MODE_REPLAN_REQUIRED"],
+        )
+        self.assertIn("preserve every DONE completion", context.diagnostics[0].message)
+        self.assertIn("append-only VERIFY evidence", context.diagnostics[0].message)
+
+        remediation = doctor.derive_remediation(
+            context,
+            classification="ACTIVE_GREENFIELD",
+            gate_a="APPROVED_FOR_DESIGN",
+            gate_b="APPROVED_FOR_CONSTRUCTION",
+            envelope={
+                "Allowed repository write set": "PATHS: docs/project/TASKS.md",
+                "Excluded or owner-only write set": "NONE",
+                "Protected dirty paths": "NONE",
+            },
+            tasks=doctor.TaskSummary(),
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            owner_stage_hint="DELIVER",
+        )
+        self.assertEqual(remediation["items"][0]["category"], "AGENT_REPLAN")
+        self.assertEqual(remediation["next_action"]["action_kind"], "REPLAN_TASKS")
+        self.assertTrue(remediation["next_action"]["preserve_done_evidence"])
+        self.assertTrue(remediation["next_action"]["automatic_continuation_allowed"])
+
+        mixed = doctor.Context(PROJECT_ROOT)
+        doctor.record_task_graph_validation_errors(
+            mixed,
+            "TASK-001: invalid AWS mode 'READ_ONLY'\n"
+            "TASK-003: invalid attempt counters",
+        )
+        self.assertEqual(
+            [item.code for item in mixed.diagnostics],
+            ["TASK_AWS_MODE_REPLAN_REQUIRED", "TASK_GRAPH_INVALID"],
+        )
+
+    def test_aws_lifecycle_intent_record_is_exact_non_authorizing_and_migratable(
+        self,
+    ) -> None:
+        def validate(lines: list[str]) -> tuple[object, dict[str, object]]:
+            context = doctor.Context(PROJECT_ROOT)
+            context.texts[doctor.VERIFY_FILE] = "\n".join(
+                (
+                    "## Current release decision",
+                    "",
+                    "- Release state: `RELEASE_VERIFIED`",
+                    *lines,
+                    "- Active evidence cutoff: NONE",
+                    "",
+                    "## Evidence status vocabulary",
+                )
+            )
+            return context, doctor.validate_aws_lifecycle_intent_record(context)
+
+        for lines in ([], ["- AWS lifecycle intent: `NONE`"]):
+            with self.subTest(lines=lines):
+                context, record = validate(lines)
+                self.assertFalse(context.has_errors)
+                self.assertEqual(record["provenance_status"], "LEGACY_NONE")
+                self.assertEqual(record["value"], "NONE")
+                self.assertFalse(record["authorizes_aws_access"])
+                self.assertFalse(record["authorizes_mutation"])
+
+        current_cases = (
+            (
+                [
+                    "- AWS lifecycle intent: `NONE`",
+                    "- AWS lifecycle intent source: `NONE`",
+                    "- AWS lifecycle intent recorded at: `NONE`",
+                ],
+                "NONE",
+            ),
+            (
+                [
+                    "- AWS lifecycle intent: `RESIDUAL_REVIEW`",
+                    "- AWS lifecycle intent source: `owner-message MSG-AWS-LIFECYCLE-0001`",
+                    "- AWS lifecycle intent recorded at: `2026-07-29T12:00:00+00:00`",
+                ],
+                "RESIDUAL_REVIEW",
+            ),
+        )
+        for lines, expected in current_cases:
+            with self.subTest(expected=expected):
+                context, record = validate(lines)
+                self.assertFalse(context.has_errors)
+                self.assertEqual(record["provenance_status"], "CURRENT")
+                self.assertEqual(record["value"], expected)
+                self.assertFalse(record["authorizes_aws_access"])
+                self.assertFalse(record["authorizes_mutation"])
+
+        malformed_cases = (
+            [
+                "- AWS lifecycle intent: `TEARDOWN`",
+                "- AWS lifecycle intent recorded at: `2026-07-29T12:00:00Z`",
+            ],
+            [
+                "- AWS lifecycle intent: `TEARDOWN`",
+                "- AWS lifecycle intent source: `conversation inference`",
+                "- AWS lifecycle intent recorded at: `2026-07-29T12:00:00Z`",
+            ],
+            [
+                "- AWS lifecycle intent: `TEARDOWN`",
+                "- AWS lifecycle intent source: `owner-message MSG-AWS-LIFECYCLE-0002`",
+                "- AWS lifecycle intent recorded at: `2026-07-29T12:00:00`",
+            ],
+            [
+                "- AWS lifecycle intent source: `owner-message MSG-AWS-LIFECYCLE-0003`",
+                "- AWS lifecycle intent: `TEARDOWN`",
+                "- AWS lifecycle intent recorded at: `2026-07-29T12:00:00Z`",
+            ],
+            [
+                "- AWS lifecycle intent: `TEARDOWN`",
+                "- AWS lifecycle intent source: `owner-message MSG-AWS-LIFECYCLE-0004`",
+                "- AWS lifecycle intent recorded at: `2026-07-29T12:00:00Z`",
+                "- AWS lifecycle intent: `TEARDOWN`",
+            ],
+        )
+        for lines in malformed_cases:
+            with self.subTest(lines=lines):
+                context, record = validate(lines)
+                self.assertIn(
+                    "AWS_LIFECYCLE_INTENT_PROVENANCE",
+                    codes(
+                        {
+                            "diagnostics": [
+                                item.to_dict() for item in context.diagnostics
+                            ]
+                        }
+                    ),
+                )
+                self.assertEqual(record["provenance_status"], "LEGACY_NONE")
+                self.assertEqual(record["value"], "NONE")
+
+    def test_lifecycle_intent_write_authority_requires_a_settled_release_boundary(
+        self,
+    ) -> None:
+        terminal = doctor.TaskSummary(
+            plan_revision="PLAN-0001",
+            plan_state="CURRENT",
+            statuses={"TASK-001": "DONE"},
+        )
+        no_external = {"kind": "NONE", "validity": "NONE"}
+        not_active = {"status": "NOT_ACTIVE", "issues": []}
+        consumed = {"status": "CONSUMED", "issues": []}
+        teardown = {"status": "NOT_ACTIVE", "issues": []}
+
+        denied = doctor.derive_aws_lifecycle_intent_write_authority(
+            doctor.Context(PROJECT_ROOT),
+            terminal,
+            "NOT_READY",
+            not_active,
+            teardown,
+            no_external,
+        )
+        self.assertFalse(denied["valid"])
+
+        for release_state, deployment in (
+            ("NOT_READY", consumed),
+            ("RELEASE_VERIFIED", not_active),
+            ("RELEASE_VERIFIED", consumed),
+        ):
+            with self.subTest(
+                release_state=release_state, deployment=deployment["status"]
+            ):
+                authority = doctor.derive_aws_lifecycle_intent_write_authority(
+                    doctor.Context(PROJECT_ROOT),
+                    terminal,
+                    release_state,
+                    deployment,
+                    teardown,
+                    no_external,
+                )
+                self.assertEqual(authority["kind"], "AWS_LIFECYCLE_INTENT_RECORD")
+                self.assertTrue(authority["valid"])
+                self.assertEqual(authority["allowed_write_paths"], [doctor.VERIFY_FILE])
+                self.assertEqual(
+                    authority["allowed_sections"], ["## Current release decision"]
+                )
+                self.assertEqual(
+                    authority["allowed_operations"], ["UPDATE_AWS_LIFECYCLE_INTENT"]
+                )
+                self.assertEqual(
+                    authority["allowed_values"], ["NONE", "RESIDUAL_REVIEW", "TEARDOWN"]
+                )
+                self.assertEqual(authority["construction_authorization"], "NONE")
+                self.assertEqual(authority["aws_mutation_authority"], "NONE")
+
+        current_external = doctor.derive_aws_lifecycle_intent_write_authority(
+            doctor.Context(PROJECT_ROOT),
+            terminal,
+            "RELEASE_VERIFIED",
+            not_active,
+            teardown,
+            {"kind": "AWS_READ_ONLY", "validity": "CURRENT"},
+        )
+        self.assertFalse(current_external["valid"])
+        pending_action = doctor.derive_aws_lifecycle_intent_write_authority(
+            doctor.Context(PROJECT_ROOT),
+            terminal,
+            "RELEASE_VERIFIED",
+            not_active,
+            {"status": "POST_ACTION_REVIEW", "issues": []},
+            no_external,
+        )
+        self.assertFalse(pending_action["valid"])
+        active_intent_route = doctor.derive_aws_lifecycle_intent_write_authority(
+            doctor.Context(PROJECT_ROOT),
+            terminal,
+            "RELEASE_VERIFIED",
+            not_active,
+            teardown,
+            no_external,
+            lifecycle_intent={"value": "RESIDUAL_REVIEW"},
+        )
+        self.assertFalse(active_intent_route["valid"])
+        for terminal_status, expected_values in (
+            ("VERIFIED_CLEAN", ["NONE", "RESIDUAL_REVIEW", "TEARDOWN"]),
+            ("READY_FOR_TEARDOWN", ["RETAIN", "RESIDUAL_REVIEW", "TEARDOWN"]),
+            ("RESIDUALS_REMAIN", ["RETAIN", "RESIDUAL_REVIEW", "TEARDOWN"]),
+        ):
+            with self.subTest(
+                terminal_intent_status=terminal_status,
+                expected_values=expected_values,
+            ):
+                terminal_intent_update = (
+                    doctor.derive_aws_lifecycle_intent_write_authority(
+                        doctor.Context(PROJECT_ROOT),
+                        terminal,
+                        "RELEASE_VERIFIED",
+                        not_active,
+                        {"status": terminal_status, "issues": []},
+                        no_external,
+                        lifecycle_intent={"value": "RESIDUAL_REVIEW"},
+                    )
+                )
+                self.assertTrue(terminal_intent_update["valid"])
+                self.assertEqual(
+                    terminal_intent_update["allowed_values"], expected_values
+                )
+
+        self.assertFalse(
+            doctor.aws_lifecycle_intent_route_is_eligible(
+                "TEARDOWN",
+                "RELEASE_REVIEW",
+                "NOT_READY",
+                terminal,
+                not_active,
+                teardown,
+            )
+        )
+        self.assertTrue(
+            doctor.aws_lifecycle_intent_route_is_eligible(
+                "TEARDOWN", "RELEASE_REVIEW", "NOT_READY", terminal, consumed, teardown
+            )
+        )
+
     def copy_project(self, destination: Path) -> Path:
         project = destination / "project"
         project.mkdir()
@@ -1564,7 +2122,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         values = dict(bootstrap_runtime.PLACEHOLDERS)
         values.update(
             {
-                "My AWS Project": "Doctor Test Project",
+                "{{PROJECT_NAME}}": "Doctor Test Project",
                 "{{AWS_REGION}}": "us-west-2",
                 "{{COST_POSTURE}}": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
             }
@@ -1573,7 +2131,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             if not bootstrap_runtime.should_render_path(relative):
                 continue
             path = project.joinpath(*PurePosixPath(relative).parts)
-            rendered = bootstrap_runtime.rendered_bytes(path, values, render=True)
+            rendered = bootstrap_runtime.rendered_bytes(
+                path, values, relative=relative, render=True
+            )
             if rendered != path.read_bytes():
                 path.write_bytes(rendered)
         return project
@@ -1582,13 +2142,25 @@ class BootstrapDoctorTests(unittest.TestCase):
         baseline = "a" * 40
         if gate_b:
             subprocess.run(["git", "init", "-q", str(project)], check=True)
-            subprocess.run(["git", "-C", str(project), "config", "user.name", "Doctor Test"], check=True)
             subprocess.run(
-                ["git", "-C", str(project), "config", "user.email", "doctor@example.test"],
+                ["git", "-C", str(project), "config", "user.name", "Doctor Test"],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(project),
+                    "config",
+                    "user.email",
+                    "doctor@example.test",
+                ],
                 check=True,
             )
             subprocess.run(["git", "-C", str(project), "add", "."], check=True)
-            subprocess.run(["git", "-C", str(project), "commit", "-qm", "baseline"], check=True)
+            subprocess.run(
+                ["git", "-C", str(project), "commit", "-qm", "baseline"], check=True
+            )
             baseline = subprocess.run(
                 ["git", "-C", str(project), "rev-parse", "HEAD"],
                 check=True,
@@ -1618,6 +2190,150 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
             verify_path.write_text(verify_text, encoding="utf-8")
 
+    def set_non_material_req_evidence(self, project: Path) -> None:
+        prd_path = project / "docs/project/PRD.md"
+        text = prd_path.read_text(encoding="utf-8")
+        for field, value in {
+            "AWS Core materiality": "`NOT_MATERIAL`",
+            "AWS materiality basis IDs": (
+                "`NONE — no AWS-specific fact affects Gate A`"
+            ),
+            "AWS Core discovery IDs": (
+                "`NONE — AWS evidence is not material to Gate A`"
+            ),
+            "Unresolved material AWS fact IDs": "`NONE`",
+        }.items():
+            text = set_table_value(
+                text,
+                "### Gate A — agent analysis record",
+                "### Gate A — owner acceptance record",
+                field,
+                value,
+            )
+        prd_path.write_text(text, encoding="utf-8")
+
+    def pending_gate_a(self, project: Path) -> str:
+        self.approve_project(project, gate_b=False)
+        self.set_non_material_req_evidence(project)
+        prd_path = project / "docs/project/PRD.md"
+        text = prd_path.read_text(encoding="utf-8")
+        text = set_table_value(
+            text,
+            "## Document status",
+            "## 1. Workload profile",
+            "Gate A derived status",
+            "`PENDING_OWNER_APPROVAL`",
+        )
+        for field, value in {
+            "Approver": "TODO",
+            "Owner decision": "`PENDING`",
+            "Authorized requirements revision": "TODO",
+            "Authorized cost posture": "TODO",
+            "Explicitly accepted assumption IDs": "TODO / `NONE`",
+            "Authorization provided at": "TODO (ISO 8601 with timezone)",
+            "Authorization source": "TODO (message, issue, meeting record, or commit link)",
+            "Verbatim owner receipt": "`TODO`",
+            "Derived Gate A state": "`PENDING_OWNER_APPROVAL`",
+        }.items():
+            text = set_table_value(
+                text,
+                "### Gate A — owner acceptance record",
+                "### Gate A validation and invalidation rules",
+                field,
+                value,
+            )
+        proposal = "\n".join(
+            [
+                "APPROVE REQUIREMENTS GATE A",
+                "Requirements revision: REQ-0001",
+                "Cost posture: MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
+                "Accepted assumptions: NONE",
+                "Approver: <name/handle>",
+            ]
+        )
+        prd_path.write_text(set_receipt(text, "gate-a", proposal), encoding="utf-8")
+        state_path = project / "bootstrap.yaml"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["lifecycle"]["gate_a"] = "PENDING_OWNER_APPROVAL"
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        refresh_control_hashes(project)
+        report = doctor.inspect_project(project)
+        self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["lifecycle_state"], "WAITING_GATE_A")
+        self.assertEqual(report["next_prompt"], "INTAKE-20")
+        return proposal.replace("<name/handle>", "alice")
+
+    def pending_gate_b(self, project: Path) -> str:
+        self.approve_project(project)
+        self.set_non_material_req_evidence(project)
+        prd_path = project / "docs/project/PRD.md"
+        text = prd_path.read_text(encoding="utf-8")
+        text = set_table_value(
+            text,
+            "## Document status",
+            "## 1. Workload profile",
+            "Gate B derived status",
+            "`PENDING_OWNER_APPROVAL`",
+        )
+        for field, value in {
+            "Approver": "TODO",
+            "Owner decision": "`PENDING`",
+            "Authorized requirements revision": "TODO",
+            "Authorized design revision": "TODO",
+            "Authorized construction authorization ID": "TODO",
+            "Authorized construction envelope SHA-256": "TODO",
+            "Authorization provided at": "TODO (ISO 8601 with timezone)",
+            "Authorization source": "TODO (message, issue, meeting record, or commit link)",
+            "Verbatim owner receipt": "`TODO`",
+            "Derived Gate B state": "`PENDING_OWNER_APPROVAL`",
+        }.items():
+            text = set_table_value(
+                text,
+                "## 29. Gate B owner authorization record",
+                "## 30. Gate B validation and invalidation rules",
+                field,
+                value,
+            )
+        digest = doctor.canonical_envelope_sha256(text)
+        proposal = "\n".join(
+            [
+                "APPROVE PRD AND CONSTRUCTION GATE B",
+                "Requirements revision: REQ-0001",
+                "Design revision: DES-0001",
+                "Construction authorization: AUTH-0001",
+                f"Construction envelope SHA-256: {digest}",
+                "Use the proposed construction envelope above.",
+                "Approver: <name/handle>",
+            ]
+        )
+        prd_path.write_text(set_receipt(text, "gate-b", proposal), encoding="utf-8")
+        state_path = project / "bootstrap.yaml"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["lifecycle"]["gate_b"] = "PENDING_OWNER_APPROVAL"
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        tasks_path = project / "docs/project/TASKS.md"
+        tasks = set_table_value(
+            tasks_path.read_text(encoding="utf-8"),
+            "## Active execution snapshot",
+            "## Coordinator contract",
+            "Gate B state",
+            "`PENDING_OWNER_APPROVAL`",
+        )
+        tasks = set_table_value(
+            tasks,
+            "## Active execution snapshot",
+            "## Coordinator contract",
+            "Next safe action",
+            "Complete Gate B; when current, run `TASK-10`.",
+        )
+        tasks_path.write_text(tasks, encoding="utf-8")
+        refresh_control_hashes(project)
+        report = doctor.inspect_project(project)
+        self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["lifecycle_state"], "WAITING_GATE_B")
+        self.assertEqual(report["next_prompt"], "DESIGN-20")
+        return proposal.replace("<name/handle>", "alice")
+
     def initialize_task_plan(self, project: Path, task_text: str) -> None:
         state_path = project / "bootstrap.yaml"
         state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -1641,7 +2357,9 @@ class BootstrapDoctorTests(unittest.TestCase):
     def pause_project_at_real_checkpoint(self, project: Path) -> str:
         """Create a coherent paused checkpoint with coordinator ledgers dirty."""
 
-        subprocess.run(["git", "-C", str(project), "add", "docs/project/PRD.md"], check=True)
+        subprocess.run(
+            ["git", "-C", str(project), "add", "docs/project/PRD.md"], check=True
+        )
         subprocess.run(
             ["git", "-C", str(project), "commit", "-qm", "approve gate b prd"],
             check=True,
@@ -1727,9 +2445,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertFalse(report["ok"])
         self.assertEqual(report["status"], "BLOCKED")
         self.assertEqual(report["classification"], "UNCONFIGURED_TEMPLATE")
-        self.assertEqual(
-            report["gates"], {"gate_a": "BLOCKED", "gate_b": "BLOCKED"}
-        )
+        self.assertEqual(report["gates"], {"gate_a": "BLOCKED", "gate_b": "BLOCKED"})
         self.assertEqual(report["authorizations"]["construction"], "NONE")
         self.assertEqual(report["authorizations"]["aws"], "NONE")
         self.assertEqual(
@@ -1760,7 +2476,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.0.2")
+        self.assertEqual(report["bootstrap_version"], "1.0.3")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         self.assertEqual(report["next_prompt"], "INTAKE-10")
         self.assertEqual(
@@ -1815,16 +2531,24 @@ class BootstrapDoctorTests(unittest.TestCase):
         measurable = "A bounded test confirms the observable result."
         cases = {
             "missing SHALL": (
-                "The system records the approved result.", "UBIQUITOUS", measurable,
+                "The system records the approved result.",
+                "UBIQUITOUS",
+                measurable,
             ),
             "clause order": (
-                "The system SHALL record the approved result.", "EVENT_DRIVEN", measurable,
+                "The system SHALL record the approved result.",
+                "EVENT_DRIVEN",
+                measurable,
             ),
             "requirement subject": (
-                "The thing SHALL record the approved result.", "UBIQUITOUS", measurable,
+                "The thing SHALL record the approved result.",
+                "UBIQUITOUS",
+                measurable,
             ),
             "requirement is unresolved": (
-                "TODO", "UBIQUITOUS", measurable,
+                "TODO",
+                "UBIQUITOUS",
+                measurable,
             ),
         }
         for expected, (requirement, ears_form, acceptance) in cases.items():
@@ -1913,9 +2637,13 @@ class BootstrapDoctorTests(unittest.TestCase):
             1,
         )
         issues = doctor.quality_attribute_scenario_issues(broken, requirement_ids)
-        self.assertTrue(any("QAS-001: Response measure is unresolved" in issue for issue in issues))
+        self.assertTrue(
+            any("QAS-001: Response measure is unresolved" in issue for issue in issues)
+        )
 
-    def test_fastlane_ears_migration_is_complete_and_grandfathers_only_current_gate_a(self) -> None:
+    def test_fastlane_ears_migration_is_complete_and_grandfathers_only_current_gate_a(
+        self,
+    ) -> None:
         legacy = """| ID | Requirement | Acceptance criteria |
 |---|---|---|
 | FR-001 | Existing approved behavior | Existing approved observation |
@@ -1943,11 +2671,14 @@ class BootstrapDoctorTests(unittest.TestCase):
             unapproved.diagnostics,
         )
 
-        partial = legacy + """
+        partial = (
+            legacy
+            + """
 | ID | Requirement | EARS form | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|
 | FR-002 | The worker SHALL preserve the approved result. | UBIQUITOUS | A bounded test confirms every approved result is preserved. | MEASURABLE |
 """
+        )
         mixed = doctor.Context(Path("."))
         doctor.validate_gate_a_method_contract(
             mixed,
@@ -1978,7 +2709,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertIn("REQUIREMENT_METHOD_CONTRACT", codes(report))
             messages = [item["message"] for item in report["diagnostics"]]
             self.assertTrue(
-                any("FR-001: requirement is unresolved" in message for message in messages),
+                any(
+                    "FR-001: requirement is unresolved" in message
+                    for message in messages
+                ),
                 messages,
             )
 
@@ -2084,9 +2818,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
         self.assertFalse(doctor.valid_property_execution_command("PENDING"))
-        self.assertFalse(
-            doctor.valid_property_execution_command("Run property tests")
-        )
+        self.assertFalse(doctor.valid_property_execution_command("Run property tests"))
 
         technology_header = (
             "| Decision ID | Concern | Selection | Version policy | Source | Basis IDs | "
@@ -2101,7 +2833,11 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(normalized_issues, [])
         self.assertEqual(normalized.canonical_sha256, ready.canonical_sha256)
         changed, changed_issues = doctor.derive_design_contract(
-            complete.replace("| TECH-0007 | PROPERTY_TESTING | Hypothesis |", "| TECH-0007 | PROPERTY_TESTING | Hypothesis 7 |", 1),
+            complete.replace(
+                "| TECH-0007 | PROPERTY_TESTING | Hypothesis |",
+                "| TECH-0007 | PROPERTY_TESTING | Hypothesis 7 |",
+                1,
+            ),
             "DES-0001",
         )
         self.assertEqual(changed_issues, [])
@@ -2121,11 +2857,17 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "headers must be exactly",
             ),
             "duplicate stable ID": (
-                complete.replace(technology_row, technology_row + "\n" + technology_row, 1),
+                complete.replace(
+                    technology_row, technology_row + "\n" + technology_row, 1
+                ),
                 "Duplicate technology decision ID",
             ),
             "unresolved cell": (
-                complete.replace("| TECH-0007 | PROPERTY_TESTING | Hypothesis |", "| TECH-0007 | PROPERTY_TESTING | TODO |", 1),
+                complete.replace(
+                    "| TECH-0007 | PROPERTY_TESTING | Hypothesis |",
+                    "| TECH-0007 | PROPERTY_TESTING | TODO |",
+                    1,
+                ),
                 "unresolved technology decision cell",
             ),
             "pending selection sentinel": (
@@ -2233,7 +2975,9 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "Basis IDs must be exact comma-separated stable IDs",
             ),
             "wrong framework cross-reference": (
-                complete.replace(property_row, property_row.replace("TECH-0007", "TECH-0006"), 1),
+                complete.replace(
+                    property_row, property_row.replace("TECH-0007", "TECH-0006"), 1
+                ),
                 "PROPERTY_TESTING decision",
             ),
             "replay format has no machine-checkable mode": (
@@ -2314,7 +3058,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         }
         for label, (text, expected) in cases.items():
             with self.subTest(label=label):
-                contract, contract_issues = doctor.derive_design_contract(text, "DES-0001")
+                contract, contract_issues = doctor.derive_design_contract(
+                    text, "DES-0001"
+                )
                 self.assertEqual(contract.status, "BLOCKED")
                 self.assertIn(expected, "\n".join(contract_issues))
 
@@ -2327,6 +3073,11 @@ class BootstrapDoctorTests(unittest.TestCase):
             r"(?m)^\| PROP-001 \|.*\|\r?\n?",
             "",
             no_applicable_properties,
+        )
+        no_applicable_properties = no_applicable_properties.replace(
+            "| FR-001 | ARCH-0001, API-001 | PROP-001 |",
+            "| FR-001 | ARCH-0001, API-001 | EX-001 |",
+            1,
         )
         no_applicable_properties = put_contract_table(
             no_applicable_properties,
@@ -2447,9 +3198,36 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(amend_issues, [])
         self.assertEqual(amend_contract.architecture_disposition, "AMEND")
 
-        unsafe_table = preserve_table.replace(
-            "SECURITY_PRIVACY, ", "", 1
-        ).replace(
+        new_app_selected, new_app_selected_issues = doctor.derive_coverage_contract(
+            selected,
+            "REQ-0001",
+            "quick-mvp",
+            "low",
+            "documentation-only",
+            required=True,
+            grandfather_current_gate_a=False,
+            owner_work_context="NEW_APPLICATION",
+        )
+        self.assertEqual(new_app_selected_issues, [])
+        self.assertEqual(new_app_selected.status, "READY")
+
+        new_app_mismatch, new_app_mismatch_issues = doctor.derive_coverage_contract(
+            amended,
+            "REQ-0001",
+            "quick-mvp",
+            "low",
+            "documentation-only",
+            required=True,
+            grandfather_current_gate_a=False,
+            owner_work_context="NEW_APPLICATION",
+        )
+        self.assertEqual(new_app_mismatch.status, "BLOCKED")
+        self.assertIn(
+            "NEW_APPLICATION owner work context requires work kind NEW_BUILD",
+            new_app_mismatch_issues,
+        )
+
+        unsafe_table = preserve_table.replace("SECURITY_PRIVACY, ", "", 1).replace(
             "ARCHITECTURE_COMPARISON:",
             "SECURITY_PRIVACY: SEC-001 is still material; ARCHITECTURE_COMPARISON:",
             1,
@@ -2475,8 +3253,11 @@ class BootstrapDoctorTests(unittest.TestCase):
             blocked_issues,
         )
 
-    def test_change_impact_is_design_bound_and_falls_back_to_full_revalidation(self) -> None:
+    def test_change_impact_is_design_bound_and_falls_back_to_full_revalidation(
+        self,
+    ) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        template = complete_intake_foundation(template, work_context_choice="B")
         amended = complete_design_contract(template)
         amended = complete_coverage_plan(
             amended, work_kind="FEATURE", disposition="AMEND"
@@ -2541,7 +3322,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(invalid_preserve.status, "BLOCKED")
         self.assertTrue(
-            any("PRESERVE cannot change architecture-controlled IDs" in issue for issue in invalid_issues),
+            any(
+                "PRESERVE cannot change architecture-controlled IDs" in issue
+                for issue in invalid_issues
+            ),
             invalid_issues,
         )
 
@@ -2572,9 +3356,13 @@ class BootstrapDoctorTests(unittest.TestCase):
                     coverage,
                 )
                 self.assertEqual(plan["maximum_initial_bytes"], 12_000)
-                self.assertTrue(any(reference in item for item in plan["source_slices"]))
+                self.assertTrue(
+                    any(reference in item for item in plan["source_slices"])
+                )
                 self.assertIn("CURRENT_BLOCKER", plan["active_ids"])
-                self.assertEqual(len(plan["source_slices"]), len(set(plan["source_slices"])))
+                self.assertEqual(
+                    len(plan["source_slices"]), len(set(plan["source_slices"]))
+                )
 
         aws_plan = doctor.derive_context_plan(
             {
@@ -2586,9 +3374,59 @@ class BootstrapDoctorTests(unittest.TestCase):
             coverage,
         )
         self.assertTrue(
-            any("Action authorization provenance" in item for item in aws_plan["source_slices"])
+            any(
+                "Action authorization provenance" in item
+                for item in aws_plan["source_slices"]
+            )
         )
         self.assertEqual(aws_plan["active_ids"], ["TASK-0001"])
+
+        for phase, reason in (
+            ("AWS-40", "AWS_RESIDUAL_REVIEW"),
+            ("AWS-50", "WAITING_AWS_TEARDOWN_AUTH"),
+        ):
+            with self.subTest(teardown_phase=phase):
+                teardown_plan = doctor.derive_context_plan(
+                    {
+                        "owner_stage": "DELIVER",
+                        "route_reason_code": reason,
+                        "blocking_ids": [],
+                    },
+                    tasks,
+                    coverage,
+                    next_prompt=phase,
+                )
+                self.assertEqual(len(teardown_plan["source_slices"]), 2)
+                self.assertTrue(
+                    any(
+                        "references/deliver.md" in item
+                        for item in teardown_plan["source_slices"]
+                    )
+                )
+                self.assertTrue(
+                    any(
+                        "Teardown reconciliation evidence" in item
+                        for item in teardown_plan["source_slices"]
+                    )
+                )
+                self.assertTrue(
+                    any(
+                        "Action authorization provenance" in item
+                        for item in teardown_plan["on_demand_slices"]
+                    )
+                )
+                self.assertTrue(
+                    any(
+                        "Read-only AWS preflight evidence" in item
+                        for item in teardown_plan["on_demand_slices"]
+                    )
+                )
+                self.assertTrue(
+                    any(
+                        "AWS deployment action" in item
+                        for item in teardown_plan["on_demand_slices"]
+                    )
+                )
 
         report = doctor.inspect_project(PROJECT_ROOT, template_source=True)
         resolved = report["context_plan"]
@@ -2607,10 +3445,14 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertGreaterEqual(item["start_line"], 1)
             self.assertGreaterEqual(item["end_line"], item["start_line"])
 
-    def test_approved_schema_two_architecture_is_grandfathered_until_design_change(self) -> None:
+    def test_approved_schema_two_architecture_is_grandfathered_until_design_change(
+        self,
+    ) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(template)
-        requirement_list = ", ".join(sorted(doctor.authoritative_requirement_ids(complete)))
+        requirement_list = ", ".join(
+            sorted(doctor.authoritative_requirement_ids(complete))
+        )
         legacy_selection = "\n".join(
             [
                 "| Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Cost effect | Breakpoints | Revisit triggers | Validation |",
@@ -2652,8 +3494,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             invalidated_issues,
         )
 
-
-    def test_architecture_contract_is_traceable_fail_closed_and_digest_bound(self) -> None:
+    def test_architecture_contract_is_traceable_fail_closed_and_digest_bound(
+        self,
+    ) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(template)
         ready, issues = doctor.derive_design_contract(
@@ -2681,6 +3524,35 @@ class BootstrapDoctorTests(unittest.TestCase):
             ready.architecture.canonical_sha256 or "",
             r"^sha256:[0-9a-f]{64}$",
         )
+        one_candidate = re.sub(
+            r"(?m)^\| CAND-0002 \|.*\r?\n",
+            "",
+            complete,
+            count=1,
+        )
+        one_candidate_contract, one_candidate_issues = doctor.derive_design_contract(
+            one_candidate,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(one_candidate_contract.status, "BLOCKED")
+        self.assertIn(
+            "SELECT requires at least two complete non-straw whole-system candidates",
+            one_candidate_issues,
+        )
+
+        no_viable_alternative = complete.replace(
+            "Meets every hard constraint with the smallest managed surface | CAND-0002 |",
+            "Meets every hard constraint with the smallest managed surface | NO_VIABLE_ALTERNATIVE |",
+            1,
+        )
+        no_viable_contract, no_viable_issues = doctor.derive_design_contract(
+            no_viable_alternative,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(no_viable_issues, [])
+        self.assertEqual(no_viable_contract.status, "READY")
 
         cases: dict[str, tuple[str, str]] = {
             "hard-constraint failure selected": (
@@ -2693,7 +3565,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
             "missing requirement trace": (
                 re.sub(
-                    r"(?m)^\| FR-001 \| ARCH-0001, COMP-0001 \|.*\r?\n",
+                    r"(?m)^\| FR-001 \| ARCH-0001, API-001 \|.*\r?\n",
                     "",
                     complete,
                     count=1,
@@ -2786,8 +3658,186 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(invalidated.status, "BLOCKED")
         self.assertTrue(
-            any("Project design contract schema 5" in issue for issue in invalidated_issues),
+            any(
+                "Project design contract schema 5" in issue
+                for issue in invalidated_issues
+            ),
             invalidated_issues,
+        )
+
+    def test_architecture_traceability_rejects_undeclared_design_ids(self) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(template)
+        baseline, baseline_issues = doctor.derive_design_contract(
+            complete,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(baseline_issues, [])
+        self.assertEqual(baseline.status, "READY")
+
+        undeclared_ids = (
+            "ARCH-9999",
+            "COMP-001",
+            "API-999",
+            "EVENT-999",
+            "CLI-999",
+            "FILE-999",
+            "DATA-001",
+            "CTRL-999",
+            "BOUNDARY-999",
+            "STATE-999",
+        )
+        trace_pattern = re.compile(
+            r"(?m)^(\| FR-001 \| )ARCH-0001, API-001( \| PROP-001 \|)"
+        )
+        for undeclared_id in undeclared_ids:
+            with self.subTest(undeclared_id=undeclared_id):
+                changed, count = trace_pattern.subn(
+                    lambda match: (
+                        f"{match.group(1)}ARCH-0001, {undeclared_id}{match.group(2)}"
+                    ),
+                    complete,
+                    count=1,
+                )
+                self.assertEqual(count, 1)
+                blocked, blocked_issues = doctor.derive_design_contract(
+                    changed,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(blocked.status, "BLOCKED")
+                self.assertIn(
+                    "FR-001: architecture traceability references undeclared "
+                    f"design IDs: {undeclared_id}",
+                    blocked_issues,
+                )
+
+    def test_architecture_traceability_rejects_undeclared_property_and_test_ids(
+        self,
+    ) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(template)
+        trace_pattern = re.compile(
+            r"(?m)^(\| FR-001 \| ARCH-0001, API-001 \| )PROP-001( \|)"
+        )
+        for undeclared_id in ("PROP-999", "EX-999", "TEST-999"):
+            with self.subTest(undeclared_id=undeclared_id):
+                changed, count = trace_pattern.subn(
+                    lambda match: f"{match.group(1)}{undeclared_id}{match.group(2)}",
+                    complete,
+                    count=1,
+                )
+                self.assertEqual(count, 1)
+                blocked, blocked_issues = doctor.derive_design_contract(
+                    changed,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(blocked.status, "BLOCKED")
+                self.assertIn(
+                    "FR-001: architecture traceability references undeclared "
+                    f"property/test IDs: {undeclared_id}",
+                    blocked_issues,
+                )
+
+    def test_architecture_traceability_accepts_declared_contract_ids(self) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(template)
+        design_pattern = re.compile(
+            r"(?m)^(\| FR-001 \| )ARCH-0001, API-001( \| PROP-001 \|)"
+        )
+        test_pattern = re.compile(
+            r"(?m)^(\| FR-001 \| ARCH-0001, API-001 \| )PROP-001( \|)"
+        )
+        cases = {
+            "declared API and property": complete,
+            "declared boundary": design_pattern.sub(
+                lambda match: (
+                    f"{match.group(1)}ARCH-0001, BOUNDARY-001{match.group(2)}"
+                ),
+                complete,
+                count=1,
+            ),
+            "declared example": test_pattern.sub(
+                lambda match: f"{match.group(1)}EX-001{match.group(2)}",
+                complete,
+                count=1,
+            ),
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                ready, issues = doctor.derive_design_contract(
+                    text,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(issues, [])
+                self.assertEqual(ready.status, "READY")
+
+    def test_example_scenarios_are_bound_to_the_modern_design_digest(self) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(template)
+        baseline, baseline_issues = doctor.derive_design_contract(
+            complete,
+            "DES-0001",
+            required=True,
+        )
+        changed_text = complete.replace(
+            "Approved outcome is returned",
+            "Approved outcome is returned with its current version",
+            1,
+        )
+        changed, changed_issues = doctor.derive_design_contract(
+            changed_text,
+            "DES-0001",
+            required=True,
+        )
+
+        self.assertEqual(baseline_issues, [])
+        self.assertEqual(changed_issues, [])
+        self.assertEqual(baseline.status, "READY")
+        self.assertEqual(changed.status, "READY")
+        self.assertNotEqual(changed.canonical_sha256, baseline.canonical_sha256)
+
+    def test_undeclared_architecture_traceability_blocks_gate_b(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            refresh_control_hashes(project)
+            self.approve_project(project)
+            ready_report = doctor.inspect_project(project)
+            self.assertTrue(ready_report["ok"], ready_report["diagnostics"])
+            self.assertTrue(ready_report["write_authority"]["valid"])
+
+            prd_path = project / "docs/project/PRD.md"
+            text = prd_path.read_text(encoding="utf-8")
+            changed, count = re.subn(
+                r"(?m)^(\| FR-001 \| )ARCH-0001, API-001( \| PROP-001 \|)",
+                lambda match: f"{match.group(1)}ARCH-0001, API-999{match.group(2)}",
+                text,
+                count=1,
+            )
+            self.assertEqual(count, 1)
+            prd_path.write_text(changed, encoding="utf-8")
+            blocked_report = doctor.inspect_project(project)
+
+        self.assertFalse(blocked_report["ok"])
+        self.assertEqual(blocked_report["status"], "BLOCKED")
+        self.assertIn("DESIGN_CONTRACT_INVALID", codes(blocked_report))
+        self.assertEqual(blocked_report["design_contract"]["status"], "BLOCKED")
+        self.assertEqual(blocked_report["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
+        self.assertFalse(blocked_report["write_authority"]["valid"])
+        self.assertEqual(blocked_report["external_authority"]["kind"], "NONE")
+        self.assertEqual(blocked_report["next_prompt"], "STOP")
+        self.assertTrue(
+            any(
+                diagnostic["code"] == "DESIGN_CONTRACT_INVALID"
+                and "FR-001: architecture traceability references undeclared "
+                "design IDs: API-999"
+                in diagnostic["message"]
+                for diagnostic in blocked_report["diagnostics"]
+            ),
+            blocked_report["diagnostics"],
         )
 
     def test_all_part_one_requirement_families_have_stable_ids(self) -> None:
@@ -2825,7 +3875,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
             self.assertEqual(ready_report["requirements_contract"]["status"], "READY")
             self.assertEqual(contract["project_contract"]["status"], "READY")
-            self.assertEqual(contract["project_contract"]["first_wave"]["wave_contract_id"], "WAVE-001")
+            self.assertEqual(
+                contract["project_contract"]["first_wave"]["wave_contract_id"],
+                "WAVE-001",
+            )
             self.assertEqual(ready_report["coverage_plan"]["status"], "READY")
             self.assertEqual(contract["change_impact"]["status"], "READY")
             self.assertEqual(contract["status"], "READY")
@@ -2841,8 +3894,12 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
             self.assertEqual(ready_report["external_authority"]["kind"], "NONE")
             self.assertEqual(len(contract["technology_decisions"]), 9)
-            self.assertEqual(contract["technology_decisions"][6]["concern"], "PROPERTY_TESTING")
-            self.assertEqual(contract["property_execution"][0]["framework_tech_id"], "TECH-0007")
+            self.assertEqual(
+                contract["technology_decisions"][6]["concern"], "PROPERTY_TESTING"
+            )
+            self.assertEqual(
+                contract["property_execution"][0]["framework_tech_id"], "TECH-0007"
+            )
             self.assertRegex(contract["canonical_sha256"], r"^sha256:[0-9a-f]{64}$")
 
             prd_path = project / "docs/project/PRD.md"
@@ -2886,9 +3943,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "Approver: alice",
             ]
         )
-        receipt_digest = "sha256:" + hashlib.sha256(
-            receipt.encode("utf-8")
-        ).hexdigest()
+        receipt_digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
         verify_text = set_receipt(verify_text, "aws-deployment", receipt)
         lines = verify_text.splitlines(keepends=True)
         for index, line in enumerate(lines):
@@ -2896,9 +3951,13 @@ class BootstrapDoctorTests(unittest.TestCase):
                 suffix = "\n" if line.endswith("\n") else ""
                 lines[index] = (
                     "| Deployment | AWS-AUTH-0001 | AUTH-0001 | "
-                    "fastlane-deployment-role | sha256:" + "a" * 64
+                    "fastlane-deployment-role | sha256:"
+                    + "a"
+                    * 64
                     + " | TYPE: CLOUDFORMATION_CHANGE_SET; IDENTIFIER: "
-                    "canary-change-set; DIGEST: sha256:" + "b" * 64
+                    "canary-change-set; DIGEST: sha256:"
+                    + "b"
+                    * 64
                     + " | ACCOUNT: 111122223333; REGION: us-west-2; "
                     "ENVIRONMENT: development | RESOURCES: fastlane-stack; "
                     "OPERATIONS: cloudformation:CreateChangeSet, "
@@ -2985,9 +4044,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertIsNone(request_match["reviewed_script"])
 
         nonhuman_receipt = receipt.replace("Approver: alice", "Approver: Codex")
-        nonhuman_digest = "sha256:" + hashlib.sha256(
-            nonhuman_receipt.encode("utf-8")
-        ).hexdigest()
+        nonhuman_digest = (
+            "sha256:" + hashlib.sha256(nonhuman_receipt.encode("utf-8")).hexdigest()
+        )
         nonhuman = set_receipt("".join(lines), "aws-deployment", nonhuman_receipt)
         nonhuman = nonhuman.replace(
             " | alice | 2027-01-01T00:00:00Z | ",
@@ -3080,17 +4139,24 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "2099-01-01T00:00:00Z | EV-0601",
                 "2000-01-01T00:00:00Z | EV-0601",
             ),
-            "unbound": row.replace("| sha256:" + "d" * 64 + " | NONE |", "| NONE | NONE |"),
+            "unbound": row.replace(
+                "| sha256:" + "d" * 64 + " | NONE |", "| NONE | NONE |"
+            ),
         }
         for label, invalid_row in invalid_rows.items():
             with self.subTest(label=label):
                 invalid_ctx = doctor.Context(Path("."))
                 invalid_ctx.texts[doctor.VERIFY_FILE] = with_rows(invalid_row)
                 invalid_match = doctor.derive_request_match(invalid_ctx, authority)
-                self.assertEqual(invalid_match["allowed_execution_lanes"], ["STRUCTURED_API"])
+                self.assertEqual(
+                    invalid_match["allowed_execution_lanes"], ["STRUCTURED_API"]
+                )
                 self.assertIsNone(invalid_match["reviewed_script"])
                 self.assertTrue(
-                    any(item.code == "AWS_EXECUTION_CONTRACT_INVALID" for item in invalid_ctx.diagnostics)
+                    any(
+                        item.code == "AWS_EXECUTION_CONTRACT_INVALID"
+                        for item in invalid_ctx.diagnostics
+                    )
                 )
 
         duplicate_ctx = doctor.Context(Path("."))
@@ -3099,7 +4165,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(duplicate_match["allowed_execution_lanes"], ["STRUCTURED_API"])
         self.assertIsNone(duplicate_match["reviewed_script"])
 
-    def test_gate_b_binds_live_design_contract_hash_and_required_scope_ids(self) -> None:
+    def test_gate_b_binds_live_design_contract_hash_and_required_scope_ids(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             refresh_control_hashes(project)
@@ -3159,7 +4227,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
 
-    def test_gate_b_readiness_card_exactly_enumerates_current_technology_ids(self) -> None:
+    def test_gate_b_readiness_card_exactly_enumerates_current_technology_ids(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             refresh_control_hashes(project)
@@ -3317,7 +4387,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.approve_project(project)
             prd_path = project / "docs/project/PRD.md"
             text = prd_path.read_text(encoding="utf-8")
-            text = text.replace("Approver: alice\n```\n<!-- bootstrap:gate-b", "Approver: mallory\n```\n<!-- bootstrap:gate-b")
+            text = text.replace(
+                "Approver: alice\n```\n<!-- bootstrap:gate-b",
+                "Approver: mallory\n```\n<!-- bootstrap:gate-b",
+            )
             prd_path.write_text(text, encoding="utf-8")
 
             report = doctor.inspect_project(project)
@@ -3431,17 +4504,21 @@ class BootstrapDoctorTests(unittest.TestCase):
         ledger = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
         task = ready_task()
         cases = {
-            "duplicate singleton metadata": ledger + task.replace(
+            "duplicate singleton metadata": ledger
+            + task.replace(
                 "- Status: `READY`", "- Status: `READY`\n- Status: `READY`", 1
             ),
-            "stale execution basis": ledger + task.replace("REQ-0001; FR-001", "REQ-9999; FR-001", 1),
-            "missing objective section": ledger + task.replace("#### Validation", "#### Checks", 1),
-            "ambiguous external target": ledger + task.replace(
-                "- External state: `NONE`", "- External state: `aws:*`", 1
-            ),
+            "stale execution basis": ledger
+            + task.replace("REQ-0001; FR-001", "REQ-9999; FR-001", 1),
+            "missing objective section": ledger
+            + task.replace("#### Validation", "#### Checks", 1),
+            "ambiguous external target": ledger
+            + task.replace("- External state: `NONE`", "- External state: `aws:*`", 1),
             "fenced heading cannot satisfy section": ledger
             + task.replace("#### Outcome", "#### Summary", 1).replace(
-                "python -m unittest", "#### Outcome\nFake fenced heading\npython -m unittest", 1
+                "python -m unittest",
+                "#### Outcome\nFake fenced heading\npython -m unittest",
+                1,
             ),
         }
         for label, text in cases.items():
@@ -3484,7 +4561,9 @@ class BootstrapDoctorTests(unittest.TestCase):
                 approved_tech_ids={"TECH-0001", "TECH-0002"},
             )
 
-    def test_task_property_projection_is_exact_for_every_executable_status(self) -> None:
+    def test_task_property_projection_is_exact_for_every_executable_status(
+        self,
+    ) -> None:
         snapshot = {
             "Requirements revision": "REQ-0001",
             "Design revision": "DES-0001",
@@ -3544,12 +4623,16 @@ class BootstrapDoctorTests(unittest.TestCase):
                 1,
             )
         )
-        verify = """## Task completion evidence
+        verify = (
+            """## Task completion evidence
 
 | Evidence ID | Task | Command or observation | Result | Actor | Observed at | Commit / worktree / artifact | Durable source | Status |
 |---|---|---|---|---|---|---|---|---|
 | EV-0001 | TASK-001 | python -m unittest tests.test_properties | passed | alice | 2026-07-17T12:00:00-07:00 | commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | docs/project/VERIFY.md#ev-0001 | LOCAL_PASS |
-""" + "\n" + property_test_evidence_section()
+"""
+            + "\n"
+            + property_test_evidence_section()
+        )
         doctor.validate_task_records(
             ledger + done,
             snapshot,
@@ -3577,7 +4660,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
         }
         for expected, invalid in invalid_cases.items():
-            with self.subTest(expected=expected), self.assertRaisesRegex(ValueError, expected):
+            with (
+                self.subTest(expected=expected),
+                self.assertRaisesRegex(ValueError, expected),
+            ):
                 doctor.validate_task_records(
                     ledger + invalid,
                     snapshot,
@@ -3683,8 +4769,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             + property_test_evidence_section(source="observed by the coordinator"),
         }
         for expected, verify_text in invalid_cases.items():
-            with self.subTest(expected=expected), self.assertRaisesRegex(
-                ValueError, expected
+            with (
+                self.subTest(expected=expected),
+                self.assertRaisesRegex(ValueError, expected),
             ):
                 doctor.validate_task_records(
                     ledger + done,
@@ -3696,9 +4783,12 @@ class BootstrapDoctorTests(unittest.TestCase):
                 )
 
         for replay in ("seed unavailable", "seed: unavailable", "seed: abc"):
-            with self.subTest(replay=replay), self.assertRaisesRegex(
-                ValueError,
-                "replay evidence does not match the approved PRD",
+            with (
+                self.subTest(replay=replay),
+                self.assertRaisesRegex(
+                    ValueError,
+                    "replay evidence does not match the approved PRD",
+                ),
             ):
                 doctor.validate_task_records(
                     ledger + done,
@@ -3870,19 +4960,13 @@ class BootstrapDoctorTests(unittest.TestCase):
             "Run state": "NOT_STARTED",
             "Active run ID": "NONE",
         }
-        ledger = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(
-            encoding="utf-8"
-        )
+        ledger = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
         prd = complete_design_contract(
             (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         )
-        contract, issues = doctor.derive_design_contract(
-            prd, "DES-0001", required=True
-        )
+        contract, issues = doctor.derive_design_contract(prd, "DES-0001", required=True)
         self.assertEqual(issues, [])
-        executions = {
-            item.property_id: item for item in contract.property_execution
-        }
+        executions = {item.property_id: item for item in contract.property_execution}
         technologies = {
             item.decision_id: item for item in contract.technology_decisions
         }
@@ -3893,9 +4977,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             property_projection=property_execution_projection(),
         )
         valid_verify = (
-            task_completion_evidence_section()
-            + "\n"
-            + property_test_evidence_section()
+            task_completion_evidence_section() + "\n" + property_test_evidence_section()
         )
         doctor.validate_task_records(
             ledger + ready,
@@ -3938,8 +5020,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
         }
         for expected, verify_text in invalid_verify_cases.items():
-            with self.subTest(expected=expected), self.assertRaisesRegex(
-                ValueError, expected
+            with (
+                self.subTest(expected=expected),
+                self.assertRaisesRegex(ValueError, expected),
             ):
                 doctor.validate_task_records(
                     ledger + ready,
@@ -4073,9 +5156,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
             ["PROP-001"],
         )
-        backlog = property_task.replace(
-            "- Status: `READY`", "- Status: `BACKLOG`", 1
-        )
+        backlog = property_task.replace("- Status: `READY`", "- Status: `BACKLOG`", 1)
         doctor.validate_task_records(
             ledger + backlog,
             snapshot,
@@ -4111,7 +5192,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         blocked_property_task = property_task.replace(
             "- Status: `READY`", "- Status: `BLOCKED`", 1
-        ).replace("- Blocker: `NONE`", "- Blocker: `BLOCK-001 — dependency unavailable`", 1)
+        ).replace(
+            "- Blocker: `NONE`", "- Blocker: `BLOCK-001 — dependency unavailable`", 1
+        )
         doctor.validate_task_records(
             ledger + blocked_property_task,
             snapshot,
@@ -4151,7 +5234,339 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
 
-    def test_done_requires_observed_log_and_passing_structured_local_evidence(self) -> None:
+    def test_task_requirement_coverage_rejects_invalid_acceptance_traces(
+        self,
+    ) -> None:
+        rules = {
+            "FR-001": ("AC-FR-001", "UBIQUITOUS"),
+            "FR-002": ("AC-FR-002", "UNWANTED_BEHAVIOR"),
+        }
+        cases = {
+            "missing canonical acceptance": (
+                "REQ-0001; FR-001",
+                ("TASK-001: FR-001 requires AC-FR-001",),
+            ),
+            "mismatched canonical acceptance": (
+                "REQ-0001; FR-001; AC-FR-002",
+                (
+                    "TASK-001: FR-001 requires AC-FR-001",
+                    "TASK-001: AC-FR-002 requires owning requirement FR-002",
+                ),
+            ),
+            "unknown acceptance": (
+                "REQ-0001; FR-001; AC-FR-999",
+                ("TASK-001: unknown acceptance IDs: AC-FR-999",),
+            ),
+        }
+        for name, (requirements, expected_issues) in cases.items():
+            with self.subTest(case=name):
+                result = doctor.derive_task_requirement_coverage(
+                    doctor.inspect_task_blocks(ready_task(requirements=requirements)),
+                    "CURRENT",
+                    rules,
+                    {},
+                )
+                for expected_issue in expected_issues:
+                    self.assertIn(expected_issue, result.trace_issues)
+                self.assertIn("FR-001", result.missing_requirement_ids)
+
+    def test_skipped_tasks_do_not_satisfy_requirement_coverage(self) -> None:
+        skipped = ready_task(requirements="REQ-0001; FR-001; AC-FR-001").replace(
+            "- Status: `READY`", "- Status: `SKIPPED`", 1
+        )
+        skipped = skipped.replace(
+            "- Skip record: `NONE`",
+            "- Skip record: `OWNER-DECISION-001 - superseded; evidence EV-0001`",
+            1,
+        )
+        result = doctor.derive_task_requirement_coverage(
+            doctor.inspect_task_blocks(skipped),
+            "CURRENT",
+            {"FR-001": ("AC-FR-001", "UBIQUITOUS")},
+            {},
+        )
+
+        self.assertEqual(result.trace_issues, ())
+        self.assertEqual(result.records, ())
+        self.assertEqual(result.missing_requirement_ids, ("FR-001",))
+
+    def test_task_requirement_coverage_can_be_distributed_across_tasks(
+        self,
+    ) -> None:
+        first = ready_task(requirements="REQ-0001; FR-001; AC-FR-001")
+        second = ready_task(requirements="REQ-0001; FR-002; AC-FR-002").replace(
+            "TASK-001", "TASK-002"
+        )
+        result = doctor.derive_task_requirement_coverage(
+            doctor.inspect_task_blocks(first + second),
+            "CURRENT",
+            {
+                "FR-001": ("AC-FR-001", "UBIQUITOUS"),
+                "FR-002": ("AC-FR-002", "UNWANTED_BEHAVIOR"),
+            },
+            {},
+        )
+
+        self.assertEqual(result.trace_issues, ())
+        self.assertEqual(result.evidence_issues, ())
+        self.assertEqual(result.missing_requirement_ids, ())
+        by_requirement = {record.requirement_id: record for record in result.records}
+        self.assertEqual(by_requirement["FR-001"].disposition, "TASK_COVERED")
+        self.assertEqual(by_requirement["FR-001"].task_ids, ("TASK-001",))
+        self.assertEqual(by_requirement["FR-002"].disposition, "TASK_COVERED")
+        self.assertEqual(by_requirement["FR-002"].task_ids, ("TASK-002",))
+
+    def test_current_local_pass_and_verified_no_task_evidence_satisfies_coverage(
+        self,
+    ) -> None:
+        rules = {
+            "FR-001": ("AC-FR-001", "UBIQUITOUS"),
+            "FR-002": ("AC-FR-002", "UNWANTED_BEHAVIOR"),
+        }
+        verify = requirement_evidence_verify(
+            no_task_requirement_evidence_row(
+                "FR-001",
+                evidence_id="EV-9001",
+                status="LOCAL_PASS",
+            ),
+            no_task_requirement_evidence_row(
+                "FR-002",
+                evidence_id="EV-9002",
+                status="VERIFIED",
+            ),
+        )
+        evidence, evidence_issues = doctor.task_requirement_evidence_dispositions(
+            verify,
+            {
+                "Requirements revision": "REQ-0001",
+                "Design revision": "DES-0001",
+                "Construction authorization": "AUTH-0001",
+            },
+            rules,
+        )
+        result = doctor.derive_task_requirement_coverage(
+            [],
+            "CURRENT",
+            rules,
+            evidence,
+        )
+
+        self.assertEqual(evidence_issues, ())
+        self.assertEqual(
+            evidence,
+            {
+                "FR-001": ("ALREADY_SATISFIED", ("EV-9001",)),
+                "FR-002": ("ALREADY_SATISFIED", ("EV-9002",)),
+            },
+        )
+        self.assertEqual(result.missing_requirement_ids, ())
+        self.assertTrue(
+            all(record.disposition == "ALREADY_SATISFIED" for record in result.records)
+        )
+
+    def test_stale_no_task_evidence_scope_does_not_satisfy_coverage(self) -> None:
+        rules = {"FR-001": ("AC-FR-001", "UBIQUITOUS")}
+        verify = requirement_evidence_verify(
+            no_task_requirement_evidence_row(
+                "FR-001",
+                evidence_id="EV-9001",
+                status="LOCAL_PASS",
+            ),
+            requirements_revision="REQ-0000",
+        )
+        evidence, evidence_issues = doctor.task_requirement_evidence_dispositions(
+            verify,
+            {
+                "Requirements revision": "REQ-0001",
+                "Design revision": "DES-0001",
+                "Construction authorization": "AUTH-0001",
+            },
+            rules,
+        )
+        result = doctor.derive_task_requirement_coverage(
+            [],
+            "CURRENT",
+            rules,
+            evidence,
+        )
+
+        self.assertEqual(evidence, {})
+        self.assertEqual(evidence_issues, ())
+        self.assertEqual(result.missing_requirement_ids, ("FR-001",))
+
+    def test_not_applicable_evidence_is_limited_to_optional_features(self) -> None:
+        optional_rules = {"DATA-004": ("AC-DATA-004", "OPTIONAL_FEATURE")}
+        optional_verify = requirement_evidence_verify(
+            no_task_requirement_evidence_row(
+                "DATA-004",
+                evidence_id="EV-9001",
+                status="NOT_APPLICABLE",
+            )
+        )
+        optional, optional_issues = doctor.task_requirement_evidence_dispositions(
+            optional_verify,
+            {
+                "Requirements revision": "REQ-0001",
+                "Design revision": "DES-0001",
+                "Construction authorization": "AUTH-0001",
+            },
+            optional_rules,
+        )
+        self.assertEqual(optional_issues, ())
+        self.assertEqual(
+            optional,
+            {"DATA-004": ("NOT_APPLICABLE", ("EV-9001",))},
+        )
+
+        required_rules = {"FR-001": ("AC-FR-001", "UBIQUITOUS")}
+        required_verify = requirement_evidence_verify(
+            no_task_requirement_evidence_row(
+                "FR-001",
+                evidence_id="EV-9002",
+                status="NOT_APPLICABLE",
+            )
+        )
+        required, required_issues = doctor.task_requirement_evidence_dispositions(
+            required_verify,
+            {
+                "Requirements revision": "REQ-0001",
+                "Design revision": "DES-0001",
+                "Construction authorization": "AUTH-0001",
+            },
+            required_rules,
+        )
+        required_result = doctor.derive_task_requirement_coverage(
+            [],
+            "CURRENT",
+            required_rules,
+            required,
+        )
+        self.assertEqual(required, {})
+        self.assertIn(
+            "EV-9002: NOT_APPLICABLE is allowed only for OPTIONAL_FEATURE requirements",
+            required_issues,
+        )
+        self.assertEqual(required_result.missing_requirement_ids, ("FR-001",))
+
+    def test_task_coverage_conflicts_with_not_applicable_evidence(self) -> None:
+        result = doctor.derive_task_requirement_coverage(
+            doctor.inspect_task_blocks(
+                ready_task(requirements="REQ-0001; DATA-004; AC-DATA-004")
+            ),
+            "CURRENT",
+            {"DATA-004": ("AC-DATA-004", "OPTIONAL_FEATURE")},
+            {"DATA-004": ("NOT_APPLICABLE", ("EV-9001",))},
+        )
+
+        self.assertEqual(result.missing_requirement_ids, ())
+        self.assertEqual(
+            result.evidence_issues,
+            ("DATA-004: task coverage conflicts with NOT_APPLICABLE evidence",),
+        )
+        self.assertEqual(result.records[0].disposition, "TASK_COVERED")
+
+    def test_doctor_reports_requirement_coverage_and_routes_gaps_to_replan(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            refresh_control_hashes(project)
+            self.approve_project(project)
+            full_task = ready_task(
+                requirements="REQ-0001; FR-001; AC-FR-001; PROP-001",
+                design="DES-0001; TECH: TECH-0001, TECH-0007",
+                command="python -m unittest tests.test_properties",
+                property_projection=property_execution_projection(),
+            )
+            self.initialize_task_plan(project, full_task)
+            rules = modern_task_requirement_rules()
+            verify_path = project / "docs/project/VERIFY.md"
+            verify_path.write_text(
+                requirement_evidence_verify(
+                    *(
+                        no_task_requirement_evidence_row(
+                            requirement_id,
+                            evidence_id=f"EV-{9100 + index:04d}",
+                            status="LOCAL_PASS",
+                        )
+                        for index, requirement_id in enumerate(
+                            (item for item in rules if item != "FR-001"),
+                            start=1,
+                        )
+                    ),
+                    source=verify_path.read_text(encoding="utf-8"),
+                ),
+                encoding="utf-8",
+            )
+            refresh_control_hashes(project)
+            current_report = doctor.inspect_project(project)
+
+            tasks_path = project / "docs/project/TASKS.md"
+            text = tasks_path.read_text(encoding="utf-8").replace(
+                "REQ-0001; FR-001; AC-FR-001; PROP-001",
+                "REQ-0001; PROP-001",
+                1,
+            )
+            tasks_path.write_text(text, encoding="utf-8")
+            blocked_report = doctor.inspect_project(project)
+
+        self.assertTrue(current_report["ok"], current_report["diagnostics"])
+        self.assertNotIn("TASK_REQUIREMENT_COVERAGE", codes(current_report))
+        self.assertEqual(current_report["tasks"]["total"], 1)
+        self.assertEqual(current_report["tasks"]["ready"], 1)
+        self.assertEqual(current_report["tasks"]["ready_ids"], ["TASK-001"])
+        self.assertTrue(current_report["tasks"]["requirement_coverage_complete"])
+        self.assertEqual(current_report["tasks"]["missing_requirement_ids"], [])
+        self.assertEqual(
+            len(current_report["tasks"]["requirement_coverage"]),
+            len(MODERN_APPROVED_REQUIREMENT_IDS),
+        )
+
+        self.assertFalse(blocked_report["ok"])
+        self.assertIn("TASK_REQUIREMENT_COVERAGE", codes(blocked_report))
+        self.assertFalse(blocked_report["tasks"]["requirement_coverage_complete"])
+        self.assertIn("FR-001", blocked_report["tasks"]["missing_requirement_ids"])
+        self.assertNotIn("FR-002", blocked_report["tasks"]["missing_requirement_ids"])
+        remediation = next(
+            item
+            for item in blocked_report["remediation"]["items"]
+            if item["diagnostic_code"] == "TASK_REQUIREMENT_COVERAGE"
+        )
+        self.assertEqual(remediation["responsible_party"], "CODEX")
+        self.assertEqual(remediation["category"], "AGENT_REPLAN")
+        self.assertTrue(remediation["automatic_correction_allowed"])
+
+        replan_context = doctor.Context(PROJECT_ROOT)
+        replan_context.error(
+            "TASK_REQUIREMENT_COVERAGE",
+            "CURRENT task plan does not cover approved requirement IDs: FR-001",
+            doctor.TASKS_FILE,
+        )
+        replan = doctor.derive_remediation(
+            replan_context,
+            classification="ACTIVE_GREENFIELD",
+            gate_a="APPROVED_FOR_DESIGN",
+            gate_b="APPROVED_FOR_CONSTRUCTION",
+            envelope={
+                "Allowed repository write set": "PATHS: docs/project/TASKS.md",
+                "Excluded or owner-only write set": "NONE",
+                "Protected dirty paths": "NONE",
+            },
+            tasks=doctor.TaskSummary(plan_state="CURRENT"),
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            owner_stage_hint="DELIVER",
+        )
+        self.assertEqual(
+            replan["next_action"]["action_kind"],
+            "REPLAN_TASKS",
+        )
+        self.assertTrue(replan["next_action"]["preserve_done_evidence"])
+        self.assertTrue(replan["next_action"]["automatic_continuation_allowed"])
+
+    def test_done_requires_observed_log_and_passing_structured_local_evidence(
+        self,
+    ) -> None:
         snapshot = {
             "Requirements revision": "REQ-0001",
             "Design revision": "DES-0001",
@@ -4182,8 +5597,12 @@ class BootstrapDoctorTests(unittest.TestCase):
             "2026-07-17T12:00:00-07:00 coordinator observed validation pass.",
             1,
         )
-        stock_verify = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "wrong task|placeholder evidence|LOCAL_PASS"):
+        stock_verify = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(
+            encoding="utf-8"
+        )
+        with self.assertRaisesRegex(
+            ValueError, "wrong task|placeholder evidence|LOCAL_PASS"
+        ):
             doctor.validate_task_records(ledger + observed, snapshot, stock_verify)
 
         invalid_id = observed.replace("EV-0001", "EVIDENCE-0001", 1)
@@ -4211,7 +5630,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             doctor.validate_task_records(ledger + observed, snapshot, traversal_source)
 
         failed_observation = valid_verify.replace("LOCAL_PASS", "FAILED", 1)
-        with self.assertRaisesRegex(ValueError, "status must be LOCAL_PASS or VERIFIED"):
+        with self.assertRaisesRegex(
+            ValueError, "status must be LOCAL_PASS or VERIFIED"
+        ):
             doctor.validate_task_records(
                 ledger + observed,
                 snapshot,
@@ -4465,9 +5886,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             encoding="utf-8"
         )
         binding = "DES-0001"
-        passed = record_aws_core_evidence(
-            verify_text, "DESIGN-10", binding=binding
-        )
+        passed = record_aws_core_evidence(verify_text, "DESIGN-10", binding=binding)
         passed_rows = doctor.parse_aws_core_evidence(passed)
         self.assertEqual(
             doctor.aws_core_phase_evidence_issues(
@@ -4495,7 +5914,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             approved_tech_ids={"TECH-0001"},
         )
         self.assertTrue(
-            any("Advisory Design binding must reference DES-0001" in issue for issue in wrong_design_issues)
+            any(
+                "Advisory Design binding must reference DES-0001" in issue
+                for issue in wrong_design_issues
+            )
         )
 
         malformed_trace = record_aws_core_capability_evidence(
@@ -4511,7 +5933,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             expected_binding=binding,
         )
         self.assertTrue(
-            any("Advisory Design binding must use" in issue for issue in malformed_trace_issues)
+            any(
+                "Advisory Design binding must use" in issue
+                for issue in malformed_trace_issues
+            )
         )
 
         aws_binding = "sha256:" + "a" * 64
@@ -4565,7 +5990,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             approved_tech_ids={"TECH-0001"},
         )
         self.assertTrue(
-            any("unapproved TECH IDs: TECH-9999" in issue for issue in unknown_tech_issues)
+            any(
+                "unapproved TECH IDs: TECH-9999" in issue
+                for issue in unknown_tech_issues
+            )
         )
 
         unattributed = record_aws_core_capability_evidence(
@@ -4670,9 +6098,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             [chain["discovery_id"] for chain in observed["chains"]],
             ["AWS-DISC-0002", "AWS-DISC-0004"],
         )
-        self.assertEqual(
-            observed["chains"][0]["skill_identifier"], "aws-architecture"
-        )
+        self.assertEqual(observed["chains"][0]["skill_identifier"], "aws-architecture")
         self.assertEqual(
             observed["chains"][0]["official_references"],
             ["https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html"],
@@ -4718,11 +6144,16 @@ class BootstrapDoctorTests(unittest.TestCase):
             expected_design_revision="DES-0001",
         )
         self.assertTrue(
-            any("retrieve timestamp precedes search" in issue for issue in chronology_issues),
+            any(
+                "retrieve timestamp precedes search" in issue
+                for issue in chronology_issues
+            ),
             chronology_issues,
         )
 
-        duplicate = passed.replace(design_rows[0], design_rows[0] + "\n" + design_rows[0], 1)
+        duplicate = passed.replace(
+            design_rows[0], design_rows[0] + "\n" + design_rows[0], 1
+        )
         with self.assertRaisesRegex(ValueError, "duplicates DESIGN-10"):
             doctor.parse_aws_core_evidence(duplicate)
 
@@ -4758,7 +6189,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["diagnostics"],
         )
 
-    def test_aws_core_evidence_is_limited_to_requirements_design_and_preflight(self) -> None:
+    def test_aws_core_evidence_is_limited_to_requirements_design_and_preflight(
+        self,
+    ) -> None:
         verify_text = (REPOSITORY_ROOT / "docs/project/VERIFY.md").read_text(
             encoding="utf-8"
         )
@@ -4781,9 +6214,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
 
-        passed = record_aws_core_evidence(
-            verify_text, "AWS-10", binding=binding
-        )
+        passed = record_aws_core_evidence(verify_text, "AWS-10", binding=binding)
         passed_rows = doctor.parse_aws_core_evidence(passed)
         self.assertEqual(
             doctor.aws_core_phase_evidence_issues(
@@ -4823,7 +6254,11 @@ class BootstrapDoctorTests(unittest.TestCase):
             prd_path = project / "docs/project/PRD.md"
             text = prd_path.read_text(encoding="utf-8")
             text = set_table_value(
-                text, "## Document status", "## 1. Workload profile", "AWS lane", "`fast-dev`"
+                text,
+                "## Document status",
+                "## 1. Workload profile",
+                "AWS lane",
+                "`fast-dev`",
             )
             for field, value in {
                 "Project AWS lane": "`fast-dev`",
@@ -4846,7 +6281,9 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertIn("GATE_B_ENVELOPE", codes(mutation_report))
 
-    def test_fast_dev_mutation_requires_nonproduction_artifact_and_finite_validity(self) -> None:
+    def test_fast_dev_mutation_requires_nonproduction_artifact_and_finite_validity(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             self.approve_project(project)
@@ -4858,7 +6295,11 @@ class BootstrapDoctorTests(unittest.TestCase):
             prd_path = project / "docs/project/PRD.md"
             text = prd_path.read_text(encoding="utf-8")
             text = set_table_value(
-                text, "## Document status", "## 1. Workload profile", "AWS lane", "`fast-dev`"
+                text,
+                "## Document status",
+                "## 1. Workload profile",
+                "AWS lane",
+                "`fast-dev`",
             )
             values = {
                 "Project AWS lane": "`fast-dev`",
@@ -5085,9 +6526,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
     def test_cost_posture_and_mutation_ceiling_are_canonical_and_bounded(self) -> None:
         self.assertIsNone(
-            doctor.parse_cost_posture(
-                "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED"
-            )
+            doctor.parse_cost_posture("MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED")
         )
         currency, amount = doctor.parse_cost_posture(
             "MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00"
@@ -5123,9 +6562,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                         "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                     )
         with self.assertRaisesRegex(ValueError, "current ISO 4217"):
-            doctor.parse_cost_posture(
-                "MINIMIZE_TOTAL_COST; HARD_CAP: ZZZ 20.00"
-            )
+            doctor.parse_cost_posture("MINIMIZE_TOTAL_COST; HARD_CAP: ZZZ 20.00")
         self.assertEqual(
             bootstrap_runtime.ISO_4217_CURRENCY_CODES,
             doctor.ISO_4217_CURRENCY_CODES,
@@ -5304,7 +6741,9 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertIn("TASK_GRAPH_INVALID", codes(malformed_design_report))
 
-    def test_external_state_and_paths_use_case_insensitive_authorized_containment(self) -> None:
+    def test_external_state_and_paths_use_case_insensitive_authorized_containment(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             self.approve_project(project)
@@ -5321,7 +6760,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 project,
                 ready_task(
                     "APP/main.py",
-                    requirements="REQ-0001; FR-001; PROP-001",
+                    requirements=f"{MODERN_TASK_REQUIREMENT_TRACE}; PROP-001",
                     design="DES-0001; TECH: TECH-0001, TECH-0007",
                     external_state="aws:STACK/dev/resource",
                     command="python -m unittest tests.test_properties",
@@ -5346,15 +6785,25 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "`TARGETS: aws:stack/dev`",
             )
             prd_path.write_text(rebind_gate_b_envelope(text), encoding="utf-8")
-            self.initialize_task_plan(project, ready_task(external_state="aws:stack/prod"))
+            self.initialize_task_plan(
+                project, ready_task(external_state="aws:stack/prod")
+            )
 
             denied_report = doctor.inspect_project(project)
 
         self.assertIn("TASK_EXTERNAL_STATE_BOUNDARY", codes(denied_report))
 
-    def test_validation_commands_are_prefix_bound_and_reject_shell_control(self) -> None:
-        for command in ("python setup.py", "python -m unittest && curl https://example.test"):
-            with self.subTest(command=command), tempfile.TemporaryDirectory() as directory:
+    def test_validation_commands_are_prefix_bound_and_reject_shell_control(
+        self,
+    ) -> None:
+        for command in (
+            "python setup.py",
+            "python -m unittest && curl https://example.test",
+        ):
+            with (
+                self.subTest(command=command),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 project = self.copy_project(Path(directory))
                 self.approve_project(project)
                 self.initialize_task_plan(project, ready_task(command=command))
@@ -5464,14 +6913,20 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "Effective risk": "`low`",
                 "AWS lane": "`documentation-only`",
             }.items():
-                text = set_table_value(text, "## Document status", "## 1. Workload profile", field, value)
+                text = set_table_value(
+                    text, "## Document status", "## 1. Workload profile", field, value
+                )
             prd_path.write_text(text, encoding="utf-8")
 
             blocked_report = doctor.inspect_project(project)
 
             text = approve_gate_a(prd_path.read_text(encoding="utf-8"))
             text = set_table_value(
-                text, "## Document status", "## 1. Workload profile", "Project mode", "`brownfield`"
+                text,
+                "## Document status",
+                "## 1. Workload profile",
+                "Project mode",
+                "`brownfield`",
             )
             prd_path.write_text(text, encoding="utf-8")
             state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -5486,7 +6941,9 @@ class BootstrapDoctorTests(unittest.TestCase):
 
     def test_stale_gates_route_to_repair_prompts(self) -> None:
         self.assertEqual(
-            doctor.derive_route("STALE", "STALE", True, False, doctor.TaskSummary(), False, "NONE")[1],
+            doctor.derive_route(
+                "STALE", "STALE", True, False, doctor.TaskSummary(), False, "NONE"
+            )[1],
             "REQ-10",
         )
         self.assertEqual(
@@ -5529,12 +6986,20 @@ class BootstrapDoctorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            subprocess.run(["git", "-C", str(root), "config", "user.name", "Doctor Test"], check=True)
-            subprocess.run(["git", "-C", str(root), "config", "user.email", "doctor@example.test"], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "config", "user.name", "Doctor Test"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(root), "config", "user.email", "doctor@example.test"],
+                check=True,
+            )
             tracked = root / "tracked.txt"
             tracked.write_text("clean\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(root), "add", "tracked.txt"], check=True)
-            subprocess.run(["git", "-C", str(root), "commit", "-qm", "baseline"], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "commit", "-qm", "baseline"], check=True
+            )
             head = subprocess.run(
                 ["git", "-C", str(root), "rev-parse", "HEAD"],
                 check=True,
@@ -5553,9 +7018,14 @@ class BootstrapDoctorTests(unittest.TestCase):
             doctor.validate_resume_repository(dirty_context, snapshot)
 
         self.assertFalse(clean_context.diagnostics)
-        self.assertIn("CONSTRUCTION_WORKTREE_DRIFT", {item.code for item in dirty_context.diagnostics})
+        self.assertIn(
+            "CONSTRUCTION_WORKTREE_DRIFT",
+            {item.code for item in dirty_context.diagnostics},
+        )
 
-    def test_current_gate_b_and_checkpoint_states_require_real_git_history(self) -> None:
+    def test_current_gate_b_and_checkpoint_states_require_real_git_history(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             prd_path = project / "docs/project/PRD.md"
@@ -5607,7 +7077,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertIn("GATE_B_GIT_UNVERIFIED", codes(fabricated_report))
         self.assertIn("CONSTRUCTION_GIT_UNVERIFIED", codes(fabricated_report))
 
-    def test_real_paused_checkpoint_accepts_ledger_dirt_and_rejects_code_drift(self) -> None:
+    def test_real_paused_checkpoint_accepts_ledger_dirt_and_rejects_code_drift(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             self.approve_project(project)
@@ -5634,8 +7106,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             verify_path = project / "docs/project/VERIFY.md"
             verify_text = verify_path.read_text(encoding="utf-8")
             verify_path.write_text(
-                verify_text.replace("CP-0001", "CP-9999")
-                + "\n```text\nCP-0001\n```\n",
+                verify_text.replace("CP-0001", "CP-9999") + "\n```text\nCP-0001\n```\n",
                 encoding="utf-8",
             )
             missing_receipt_report = doctor.inspect_project(project)
@@ -5655,9 +7126,13 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertNotIn("CONSTRUCTION_GIT_UNVERIFIED", codes(paused_report))
         self.assertNotIn("CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(paused_report))
         self.assertNotIn("CONSTRUCTION_WORKTREE_DRIFT", codes(paused_report))
-        self.assertIn("CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(evidence_prefix_report))
+        self.assertIn(
+            "CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(evidence_prefix_report)
+        )
         self.assertIn("CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(wrong_attempt_report))
-        self.assertIn("CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(missing_receipt_report))
+        self.assertIn(
+            "CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(missing_receipt_report)
+        )
         self.assertIn("CONSTRUCTION_GIT_DRIFT", codes(drift_report))
 
     def test_route_function_handles_construction_modes(self) -> None:
@@ -5733,7 +7208,6 @@ class BootstrapDoctorTests(unittest.TestCase):
                     prompt,
                 )
 
-
     def test_greenfield_repository_does_not_infer_a_new_application(self) -> None:
         text = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
 
@@ -5756,7 +7230,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertIsNone(contract.pending_card.questions[0].recommended)
         self.assertFalse(contract.pending_card.accept_all_allowed)
 
-    def test_intake_selection_requires_current_owner_provenance_and_detail(self) -> None:
+    def test_intake_selection_requires_current_owner_provenance_and_detail(
+        self,
+    ) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         current_response = (
             "OWNER_RESPONSE: OWNER-MSG-0002; CARD: INTAKE-CARD-0001; REVISION: 1"
@@ -5817,6 +7293,17 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(len(contract.basis_ids), 7)
         self.assertEqual(contract.missing_fields, ())
         self.assertIsNone(contract.pending_card)
+        self.assertEqual(contract.schema_version, 2)
+        self.assertEqual(
+            contract.current_understanding,
+            (
+                "Starting point: a new application.",
+                "Users and problem: Development users — Users need to see the approved project outcome",
+                "First useful outcome: Display the current approved project outcome",
+                "First release: Local development slice only",
+                "Success and material boundaries: A rendered-output test confirms the approved outcome — Synthetic internal development data; us-west-2 only",
+            ),
+        )
         assert response_table is not None
         assert card_table is not None
         self.assertEqual(len(response_table.rows), 5)
@@ -5861,6 +7348,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(issues, [])
         assert initial.pending_card is not None
+        self.assertEqual(initial.current_understanding, ())
         digest = initial.pending_card.canonical_sha256
         provenance = intake_provenance(
             "OWNER-MSG-0001", "INTAKE-CARD-0001", 1, digest, "INTAKE-Q-0001", "A"
@@ -5877,16 +7365,29 @@ class BootstrapDoctorTests(unittest.TestCase):
             partial,
             doctor.INTAKE_RESPONSE_REGISTER_HEADING,
             doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
-            [(
-                "OWNER-MSG-0001", "INTAKE-CARD-0001", "1", digest, "1",
-                "INTAKE-Q-0001", "A", "NONE", "INTAKE-0001",
-            )],
+            [
+                (
+                    "OWNER-MSG-0001",
+                    "INTAKE-CARD-0001",
+                    "1",
+                    digest,
+                    "1",
+                    "INTAKE-Q-0001",
+                    "A",
+                    "NONE",
+                    "INTAKE-0001",
+                )
+            ],
         )
         contract, issues = doctor.derive_intake_foundation_contract(
             partial, "greenfield", grandfather_current_gate_a=False
         )
         self.assertEqual(issues, [])
         assert contract.pending_card is not None
+        self.assertEqual(
+            contract.current_understanding,
+            ("Starting point: a new application.",),
+        )
         self.assertEqual(
             [question.reply_key for question in contract.pending_card.questions],
             ["2", "3"],
@@ -5901,9 +7402,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             owner_response_id="OWNER-MSG-0002",
         )
         self.assertEqual(parsed.status, "PASS", parsed.to_dict())
-        self.assertEqual(
-            [answer.reply_key for answer in parsed.answers], ["2", "3"]
-        )
+        self.assertEqual([answer.reply_key for answer in parsed.answers], ["2", "3"])
 
     def test_response_register_rejects_repeated_questions_and_empty_facts(self) -> None:
         source = complete_intake_foundation(
@@ -5932,10 +7431,19 @@ class BootstrapDoctorTests(unittest.TestCase):
             "INTAKE_RESPONSE_REGISTER_INVALID",
             {code for code, _message in issues},
         )
-        empty_fact = list(table.rows) + [(
-            "OWNER-MSG-0003", "INTAKE-CARD-0999", "1", "sha256:" + "f" * 64,
-            "1", "INTAKE-Q-0999", "RESPONSE", "NONE", "INTAKE-0001",
-        )]
+        empty_fact = list(table.rows) + [
+            (
+                "OWNER-MSG-0003",
+                "INTAKE-CARD-0999",
+                "1",
+                "sha256:" + "f" * 64,
+                "1",
+                "INTAKE-Q-0999",
+                "RESPONSE",
+                "NONE",
+                "INTAKE-0001",
+            )
+        ]
         empty_text = replace_contract_table(
             source,
             doctor.INTAKE_RESPONSE_REGISTER_HEADING,
@@ -5967,7 +7475,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             "INTAKE_RESPONSE_REGISTER_INVALID", {code for code, _message in issues}
         )
 
-    def test_intake_parser_cli_is_normalizing_partial_stale_and_zero_write(self) -> None:
+    def test_intake_parser_cli_is_normalizing_partial_stale_and_zero_write(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             refresh_control_hashes(project)
@@ -6004,7 +7514,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             environment = dict(os.environ)
             environment["PYTHONDONTWRITEBYTECODE"] = "1"
 
-            def parse(reply: str, *, stale: bool = False) -> tuple[int, dict[str, object]]:
+            def parse(
+                reply: str, *, stale: bool = False
+            ) -> tuple[int, dict[str, object]]:
                 current = list(command)
                 if stale:
                     digest_index = current.index("--presented-card-sha256") + 1
@@ -6025,14 +7537,10 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "1a; 2: Development users need a clear outcome; "
                 "3: The first release displays that outcome"
             )
-            partial_exit, partial = parse(
-                "2: Development users need a clear outcome"
-            )
+            partial_exit, partial = parse("2: Development users need a clear outcome")
             stale_exit, stale = parse("1A", stale=True)
             rejected_exit, rejected = parse("1A; 1B")
-            secret_exit, secret = parse(
-                "2: aws_secret_access_key=synthetic-value"
-            )
+            secret_exit, secret = parse("2: aws_secret_access_key=synthetic-value")
 
             self.assertEqual(valid_exit, 0)
             self.assertEqual(valid["status"], "PASS")
@@ -6061,9 +7569,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "INTAKE_SECRET_MATERIAL",
                 {item["code"] for item in secret["errors"]},
             )
-            self.assertNotIn(
-                "synthetic-value", json.dumps(secret, sort_keys=True)
-            )
+            self.assertNotIn("synthetic-value", json.dumps(secret, sort_keys=True))
             self.assertEqual(snapshot(), baseline)
 
     def test_cli_rejects_a_delayed_reply_bound_to_the_previous_card(self) -> None:
@@ -6083,7 +7589,9 @@ class BootstrapDoctorTests(unittest.TestCase):
                 encoding="utf-8",
             )
             refresh_control_hashes(project)
-            current = doctor.inspect_project(project)["intake_foundation"]["pending_card"]
+            current = doctor.inspect_project(project)["intake_foundation"][
+                "pending_card"
+            ]
             assert isinstance(current, dict)
             self.assertNotEqual(old["reply_token"], current["reply_token"])
             completed = subprocess.run(
@@ -6111,7 +7619,181 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
             result = json.loads(completed.stdout)
             self.assertEqual(completed.returncode, 2)
-            self.assertIn("INTAKE_CARD_STALE", {item["code"] for item in result["errors"]})
+            self.assertIn(
+                "INTAKE_CARD_STALE", {item["code"] for item in result["errors"]}
+            )
+
+    def test_gate_receipt_cli_validates_same_gate_and_never_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+
+            def snapshot(target: Path = project) -> dict[str, str]:
+                return {
+                    path.relative_to(target).as_posix(): hashlib.sha256(
+                        path.read_bytes()
+                    ).hexdigest()
+                    for path in target.rglob("*")
+                    if path.is_file()
+                }
+
+            environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+
+            def validate(
+                candidate: str,
+                target: Path = project,
+            ) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
+                completed = subprocess.run(
+                    [
+                        sys.executable,
+                        "scripts/bootstrap_doctor.py",
+                        "--root",
+                        str(target),
+                        "--validate-gate-receipt",
+                        "--input-stdin",
+                        "--json",
+                    ],
+                    cwd=target,
+                    input=candidate,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    env=environment,
+                )
+                return completed, json.loads(completed.stdout)
+
+            gate_a = self.pending_gate_a(project)
+            gate_a_baseline = snapshot()
+            current_report = doctor.inspect_project(project)
+            contract = doctor.current_gate_receipt_contract(project, current_report)
+            prd_path = project / doctor.PRD_FILE
+            current_prd = prd_path.read_text(encoding="utf-8")
+            prd_path.write_text(current_prd + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "pending gate contract") as raised:
+                doctor.current_gate_receipt_contract(project, current_report)
+            self.assertIsNotNone(raised.exception.__cause__)
+            self.assertIn("snapshot changed", str(raised.exception.__cause__))
+            prd_path.write_text(current_prd, encoding="utf-8")
+            crlf_result = doctor.validate_gate_receipt_candidate(
+                gate_a.replace("\n", "\r\n"), contract
+            )
+            self.assertEqual(crlf_result["status"], "PASS")
+            self.assertEqual(crlf_result["normalized_receipt"], gate_a)
+
+            # Text-mode subprocess pipes perform platform newline translation;
+            # logical LF here becomes the platform representation on the wire.
+            completed, result = validate("  \n" + gate_a + "\n  ")
+            self.assertEqual(completed.returncode, 0, completed.stdout)
+            self.assertEqual(result["status"], "PASS")
+            self.assertTrue(result["candidate_accepted"])
+            self.assertEqual(result["gate"], "GATE_A")
+            self.assertEqual(result["lifecycle_state"], "WAITING_GATE_A")
+            self.assertEqual(result["next_prompt"], "INTAKE-20")
+            self.assertEqual(result["owner_action_kind"], "APPROVE_GATE_A")
+            self.assertFalse(result["project_state_changed"])
+            self.assertEqual(result["normalized_receipt"], gate_a)
+            self.assertEqual(snapshot(), gate_a_baseline)
+
+            gate_a_lines = gate_a.splitlines()
+            invalid_gate_a = [
+                "\n".join(gate_a_lines[:-1]),
+                "```text\n" + gate_a + "\n```",
+                "\n".join(
+                    [
+                        gate_a_lines[0],
+                        gate_a_lines[2],
+                        gate_a_lines[1],
+                        *gate_a_lines[3:],
+                    ]
+                ),
+                gate_a.replace("REQ-0001", "REQ-9999"),
+                gate_a.replace("Approver: alice", "Approver: <name/handle>"),
+                gate_a.replace("Approver: alice", "Approver: Codex"),
+                gate_a + "\nSecret: synthetic-private-value",
+            ]
+            for candidate in invalid_gate_a:
+                completed, result = validate(candidate)
+                self.assertEqual(completed.returncode, 2, completed.stdout)
+                self.assertEqual(result["status"], "FAIL")
+                self.assertFalse(result["candidate_accepted"])
+                self.assertEqual(result["lifecycle_state"], "WAITING_GATE_A")
+                self.assertEqual(result["next_prompt"], "INTAKE-20")
+                self.assertEqual(result["owner_action_kind"], "APPROVE_GATE_A")
+                self.assertFalse(result["project_state_changed"])
+                self.assertNotIn("normalized_receipt", result)
+                self.assertNotIn(candidate, completed.stdout)
+                self.assertNotIn("synthetic-private-value", completed.stdout)
+                self.assertEqual(snapshot(), gate_a_baseline)
+
+            gate_b_parent = Path(directory) / "gate-b"
+            gate_b_parent.mkdir()
+            gate_b_project = self.copy_project(gate_b_parent)
+            gate_b = self.pending_gate_b(gate_b_project)
+            gate_b_baseline = snapshot(gate_b_project)
+            completed, result = validate(gate_b, gate_b_project)
+            self.assertEqual(completed.returncode, 0, completed.stdout)
+            self.assertEqual(result["status"], "PASS")
+            self.assertTrue(result["candidate_accepted"])
+            self.assertEqual(result["gate"], "GATE_B")
+            self.assertEqual(result["lifecycle_state"], "WAITING_GATE_B")
+            self.assertEqual(result["next_prompt"], "DESIGN-20")
+            self.assertEqual(result["owner_action_kind"], "APPROVE_GATE_B")
+            self.assertFalse(result["project_state_changed"])
+            self.assertEqual(result["normalized_receipt"], gate_b)
+            self.assertEqual(snapshot(gate_b_project), gate_b_baseline)
+
+            gate_b_lines = gate_b.splitlines()
+            invalid_gate_b = [
+                "\n".join(gate_b_lines[:-1]),
+                gate_b.replace(
+                    gate_b_lines[4],
+                    "Construction envelope SHA-256: sha256:" + "0" * 64,
+                ),
+                gate_b + "\nUnexpected: line",
+            ]
+            for candidate in invalid_gate_b:
+                completed, result = validate(candidate, gate_b_project)
+                self.assertEqual(completed.returncode, 2, completed.stdout)
+                self.assertEqual(result["status"], "FAIL")
+                self.assertFalse(result["candidate_accepted"])
+                self.assertEqual(result["lifecycle_state"], "WAITING_GATE_B")
+                self.assertEqual(result["next_prompt"], "DESIGN-20")
+                self.assertEqual(result["owner_action_kind"], "APPROVE_GATE_B")
+                self.assertFalse(result["project_state_changed"])
+                self.assertNotIn("normalized_receipt", result)
+                self.assertNotIn(candidate, completed.stdout)
+                self.assertEqual(snapshot(gate_b_project), gate_b_baseline)
+
+    def test_gate_receipt_cli_requires_a_valid_pending_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project, gate_b=False)
+            refresh_control_hashes(project)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/bootstrap_doctor.py",
+                    "--root",
+                    str(project),
+                    "--validate-gate-receipt",
+                    "--input-stdin",
+                    "--json",
+                ],
+                cwd=project,
+                input="APPROVE REQUIREMENTS GATE A",
+                capture_output=True,
+                text=True,
+                check=False,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            )
+            result = json.loads(completed.stdout)
+            self.assertEqual(completed.returncode, 1, completed.stdout)
+            self.assertEqual(result["status"], "FAIL")
+            self.assertFalse(result["candidate_accepted"])
+            self.assertFalse(result["project_state_changed"])
+            self.assertIn(
+                "GATE_RECEIPT_NOT_PENDING",
+                {item["code"] for item in result["errors"]},
+            )
 
     def test_intake_contract_migrates_only_unapproved_legacy_projects(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -6157,7 +7839,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(approved.status, "READY_FOR_REQUIREMENTS")
         self.assertTrue(approved.grandfathered_approved_gate_a)
 
-    def test_missing_modern_intake_record_names_the_exact_migration_target(self) -> None:
+    def test_missing_modern_intake_record_names_the_exact_migration_target(
+        self,
+    ) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         register_start = source.index(doctor.INTAKE_RESPONSE_REGISTER_HEADING)
         card_start = source.index(doctor.INTAKE_CARD_HEADING)
@@ -6178,8 +7862,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             issues,
         )
 
-
-    def test_owner_input_creates_a_turn_boundary_but_automatic_work_does_not(self) -> None:
+    def test_owner_input_creates_a_turn_boundary_but_automatic_work_does_not(
+        self,
+    ) -> None:
         owner_input = doctor.derive_interaction(
             "INTAKE_REQUIRED",
             "INTAKE-10",
@@ -6202,7 +7887,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertFalse(automatic["turn_boundary_required"])
         self.assertTrue(automatic["automatic_continuation_allowed"])
 
-    def test_unproven_selection_is_agent_correctable_without_owner_confirmation(self) -> None:
+    def test_unproven_selection_is_agent_correctable_without_owner_confirmation(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             prd_path = project / "docs/project/PRD.md"
@@ -6230,7 +7917,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertFalse(report["interaction"]["turn_boundary_required"])
 
-    def test_real_cli_forwards_remediation_fingerprint_and_escalates_repeat(self) -> None:
+    def test_real_cli_forwards_remediation_fingerprint_and_escalates_repeat(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             prd_path = project / "docs/project/PRD.md"
@@ -6294,10 +7983,21 @@ class BootstrapDoctorTests(unittest.TestCase):
                 invalid_fingerprint.stderr,
             )
 
-
-
     def test_generated_intake_provenance_defects_are_agent_correctable(self) -> None:
-        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        values = dict(bootstrap_runtime.PLACEHOLDERS)
+        values.update(
+            {
+                "{{PROJECT_NAME}}": "Doctor Test Project",
+                "{{AWS_REGION}}": "us-west-2",
+                "{{COST_POSTURE}}": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
+            }
+        )
+        source = bootstrap_runtime.rendered_bytes(
+            PROJECT_ROOT / "docs/project/PRD.md",
+            values,
+            relative="docs/project/PRD.md",
+            render=True,
+        ).decode("utf-8")
         complete = complete_intake_foundation(source)
         foundation_table = doctor.contract_table_after_heading(
             complete,
@@ -6333,11 +8033,12 @@ class BootstrapDoctorTests(unittest.TestCase):
         }
 
         for expected_code, prd_text in cases.items():
-            with self.subTest(code=expected_code), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(code=expected_code),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 project = self.copy_project(Path(directory))
-                (project / "docs/project/PRD.md").write_text(
-                    prd_text, encoding="utf-8"
-                )
+                (project / "docs/project/PRD.md").write_text(prd_text, encoding="utf-8")
                 report = doctor.inspect_project(project)
 
             self.assertIn(expected_code, codes(report))
@@ -6359,7 +8060,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             "aws_lane": ("AWS lane", "`explicit-gate`", "explicit-gate"),
         }
         for missing_key in choices:
-            with self.subTest(missing=missing_key), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(missing=missing_key),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 project = self.copy_project(Path(directory))
                 prd_path = project / "docs/project/PRD.md"
                 text = prd_path.read_text(encoding="utf-8")
@@ -6462,6 +8166,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["remediation"]["next_action"]["action_kind"],
             "REVIEW_SAFETY_BLOCKER",
         )
+
     def test_schema_13_requirements_projection_is_grounded_and_migratable(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         text = approve_gate_a(source)
@@ -6567,6 +8272,382 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(grandfathered.status, "GRANDFATHERED")
         self.assertEqual(grandfathered.requirement_ids, ("FR-001",))
         self.assertTrue(grandfathered.grandfathered_approved_gate_a)
+
+    def test_schema_13_requires_inverse_actor_and_journey_coverage(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        text = approve_gate_a(source)
+        intake_contract, intake_issues = doctor.derive_intake_foundation_contract(
+            text,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+        actors = doctor.contract_table_after_heading(
+            text,
+            doctor.ACTOR_HEADING,
+            doctor.ACTOR_HEADERS,
+        )
+        journeys = doctor.contract_table_after_heading(
+            text,
+            doctor.JOURNEY_HEADING,
+            doctor.JOURNEY_HEADERS,
+        )
+        self.assertIsNotNone(actors)
+        self.assertIsNotNone(journeys)
+        assert actors is not None
+        assert journeys is not None
+
+        actor_candidate = replace_contract_table(
+            text,
+            doctor.ACTOR_HEADING,
+            doctor.ACTOR_HEADERS,
+            [
+                *actors.rows,
+                (
+                    "ACT-002",
+                    "Development observer",
+                    "SECONDARY_USER",
+                    "Observe the approved local outcome",
+                    "May read only synthetic development output",
+                    "INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0007",
+                ),
+            ],
+        )
+        actor_contract, actor_issues = doctor.derive_requirements_contract(
+            actor_candidate,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(actor_contract.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                code == "ACTOR_CONTRACT_INVALID" and "uncovered=ACT-002" in message
+                for code, message in actor_issues
+            ),
+            actor_issues,
+        )
+
+        requirement_list = ", ".join(sorted(doctor.authoritative_requirement_ids(text)))
+        journey_candidate = replace_contract_table(
+            text,
+            doctor.JOURNEY_HEADING,
+            doctor.JOURNEY_HEADERS,
+            [
+                *journeys.rows,
+                (
+                    "JOURNEY-002",
+                    "ACT-001",
+                    "Review the approved local outcome",
+                    "The development user requests a review",
+                    "The current approved outcome is reviewed",
+                    "Invalid input is rejected without changing approved state",
+                    requirement_list,
+                    "NONE",
+                ),
+            ],
+        )
+        journey_contract, journey_issues = doctor.derive_requirements_contract(
+            journey_candidate,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(journey_contract.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                code == "JOURNEY_CONTRACT_INVALID"
+                and "uncovered=JOURNEY-002" in message
+                for code, message in journey_issues
+            ),
+            journey_issues,
+        )
+
+    def test_schema_13_rich_use_cases_cover_each_risk_or_triggered_journey(
+        self,
+    ) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        base = approve_gate_a(source)
+        intake_contract, intake_issues = doctor.derive_intake_foundation_contract(
+            base,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+        coverage = doctor.contract_table_after_heading(
+            base,
+            doctor.REQUIREMENT_COVERAGE_HEADING,
+            doctor.REQUIREMENT_COVERAGE_HEADERS,
+        )
+        self.assertIsNotNone(coverage)
+        assert coverage is not None
+        requirement_list = ", ".join(sorted(doctor.authoritative_requirement_ids(base)))
+
+        def rich_fixture(second_trigger: str) -> str:
+            candidate = replace_contract_table(
+                base,
+                doctor.JOURNEY_HEADING,
+                doctor.JOURNEY_HEADERS,
+                [
+                    (
+                        "JOURNEY-001",
+                        "ACT-001",
+                        "See the approved project outcome",
+                        "The development user requests the local result",
+                        "The current approved outcome is displayed",
+                        "Invalid input is rejected without changing approved state",
+                        requirement_list,
+                        "CONFIDENTIAL_OR_REGULATED_MUTATION",
+                    ),
+                    (
+                        "JOURNEY-002",
+                        "ACT-001",
+                        "Review the approved project outcome",
+                        "The development user requests a review",
+                        "The current approved outcome is reviewed",
+                        "Invalid input is rejected without changing approved state",
+                        requirement_list,
+                        second_trigger,
+                    ),
+                ],
+            )
+            candidate = replace_contract_table(
+                candidate,
+                doctor.REQUIREMENT_COVERAGE_HEADING,
+                doctor.REQUIREMENT_COVERAGE_HEADERS,
+                [
+                    row[:3] + ("JOURNEY-001, JOURNEY-002",) + row[4:]
+                    for row in coverage.rows
+                ],
+            )
+            candidate = replace_contract_table(
+                candidate,
+                doctor.RICH_USE_CASE_APPLICABILITY_HEADING,
+                doctor.RICH_USE_CASE_APPLICABILITY_HEADERS,
+                [
+                    (
+                        "REQUIRED",
+                        "CONFIDENTIAL_OR_REGULATED_MUTATION",
+                        "USECASE-001",
+                    )
+                ],
+            )
+            candidate = replace_contract_table(
+                candidate,
+                doctor.RICH_USE_CASE_HEADING,
+                doctor.RICH_USE_CASE_HEADERS,
+                [
+                    (
+                        "USECASE-001",
+                        "JOURNEY-001",
+                        "ACT-001",
+                        "The development user needs private, correct output",
+                        "The user has an approved local request",
+                        "The approved outcome is displayed",
+                        "Failure preserves approved state and exposes no confidential content",
+                        "BR-001",
+                        "FR-001",
+                    )
+                ],
+            )
+            return replace_contract_table(
+                candidate,
+                doctor.BUSINESS_RULE_HEADING,
+                doctor.BUSINESS_RULE_HEADERS,
+                [
+                    (
+                        "BR-001",
+                        "Only the approved local outcome may be displayed",
+                        "FR-001",
+                        "JOURNEY-001, USECASE-001",
+                        "AC-FR-001",
+                    )
+                ],
+            )
+
+        triggered_only = rich_fixture("NONE")
+        low_contract, low_issues = doctor.derive_requirements_contract(
+            triggered_only,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(low_issues, [])
+        self.assertEqual(low_contract.status, "READY")
+        self.assertEqual(low_contract.use_case_ids, ("USECASE-001",))
+
+        high_contract, high_issues = doctor.derive_requirements_contract(
+            triggered_only,
+            "high",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(high_contract.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                code == "RICH_USE_CASE_REQUIRED" and "missing=JOURNEY-002" in message
+                for code, message in high_issues
+            ),
+            high_issues,
+        )
+
+        both_triggered = rich_fixture("PARTIAL_FAILURE")
+        triggered_contract, triggered_issues = doctor.derive_requirements_contract(
+            both_triggered,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(triggered_contract.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                code == "RICH_USE_CASE_REQUIRED" and "missing=JOURNEY-002" in message
+                for code, message in triggered_issues
+            ),
+            triggered_issues,
+        )
+
+    def test_schema_13_acceptance_test_bindings_are_exact_and_requirement_local(
+        self,
+    ) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        base = approve_gate_a(source)
+        intake_contract, intake_issues = doctor.derive_intake_foundation_contract(
+            base,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+        functionals = doctor.contract_table_after_heading(
+            base,
+            "### Functional requirements",
+            doctor.NORMATIVE_REQUIREMENT_HEADERS,
+        )
+        coverage = doctor.contract_table_after_heading(
+            base,
+            doctor.REQUIREMENT_COVERAGE_HEADING,
+            doctor.REQUIREMENT_COVERAGE_HEADERS,
+        )
+        self.assertIsNotNone(functionals)
+        self.assertIsNotNone(coverage)
+        assert functionals is not None
+        assert coverage is not None
+
+        functional_rows: list[tuple[str, ...]] = []
+        for row in functionals.rows:
+            cells = list(row)
+            if cells[0] == "FR-001":
+                cells[4] += " TEST-001 records this exact observation."
+            elif cells[0] == "FR-002":
+                cells[4] += " TEST-002 records this exact observation."
+            functional_rows.append(tuple(cells))
+        valid = replace_contract_table(
+            base,
+            "### Functional requirements",
+            doctor.NORMATIVE_REQUIREMENT_HEADERS,
+            functional_rows,
+        )
+        valid_coverage_rows = [
+            row[:4]
+            + (
+                (
+                    f"{row[4]}, TEST-001"
+                    if row[0] == "FR-001"
+                    else f"{row[4]}, TEST-002"
+                    if row[0] == "FR-002"
+                    else row[4]
+                ),
+            )
+            + row[5:]
+            for row in coverage.rows
+        ]
+        valid = replace_contract_table(
+            valid,
+            doctor.REQUIREMENT_COVERAGE_HEADING,
+            doctor.REQUIREMENT_COVERAGE_HEADERS,
+            valid_coverage_rows,
+        )
+        valid_contract, valid_issues = doctor.derive_requirements_contract(
+            valid,
+            "low",
+            intake_contract,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(valid_issues, [])
+        self.assertEqual(valid_contract.status, "READY")
+
+        def with_fr1_coverage(value: str) -> str:
+            return replace_contract_table(
+                valid,
+                doctor.REQUIREMENT_COVERAGE_HEADING,
+                doctor.REQUIREMENT_COVERAGE_HEADERS,
+                [
+                    row[:4] + (value,) + row[5:] if row[0] == "FR-001" else row
+                    for row in valid_coverage_rows
+                ],
+            )
+
+        for label, acceptance_test_ids in {
+            "missing explicit binding": "AC-FR-001",
+            "invented test binding": "AC-FR-001, TEST-999",
+            "cross-bound test binding": "AC-FR-001, TEST-002",
+        }.items():
+            with self.subTest(label=label):
+                contract, issues = doctor.derive_requirements_contract(
+                    with_fr1_coverage(acceptance_test_ids),
+                    "low",
+                    intake_contract,
+                    required=True,
+                    grandfather_current_gate_a=False,
+                )
+                self.assertEqual(contract.status, "BLOCKED")
+                self.assertTrue(
+                    any(
+                        code == "REQUIREMENT_COVERAGE_INVALID"
+                        and "FR-001: Acceptance/test IDs must exactly match" in message
+                        and "expected=AC-FR-001,TEST-001" in message
+                        for code, message in issues
+                    ),
+                    issues,
+                )
+
+        for label, acceptance_id in {
+            "cross-bound acceptance": "AC-FR-002",
+            "invented acceptance": "AC-FR-999",
+        }.items():
+            with self.subTest(label=label):
+                wrong_rows = [
+                    row[:3] + (acceptance_id,) + row[4:] if row[0] == "FR-001" else row
+                    for row in functional_rows
+                ]
+                candidate = replace_contract_table(
+                    valid,
+                    "### Functional requirements",
+                    doctor.NORMATIVE_REQUIREMENT_HEADERS,
+                    wrong_rows,
+                )
+                contract, issues = doctor.derive_requirements_contract(
+                    candidate,
+                    "low",
+                    intake_contract,
+                    required=True,
+                    grandfather_current_gate_a=False,
+                )
+                self.assertEqual(contract.status, "BLOCKED")
+                self.assertTrue(
+                    any(
+                        code == "REQUIREMENT_COVERAGE_INVALID"
+                        and "FR-001: Acceptance ID must be exactly AC-FR-001" in message
+                        for code, message in issues
+                    ),
+                    issues,
+                )
 
     def test_rich_use_case_trigger_cannot_be_silently_ignored(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -6679,7 +8760,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(blocked.status, "BLOCKED")
         self.assertTrue(
-            any("Authorization" in issue and "must be concrete" in issue for issue in blocked_issues),
+            any(
+                "Authorization" in issue and "must be concrete" in issue
+                for issue in blocked_issues
+            ),
             blocked_issues,
         )
 
@@ -6696,11 +8780,19 @@ class BootstrapDoctorTests(unittest.TestCase):
             stateful,
             doctor.STATE_REGISTER_HEADING,
             doctor.STATE_REGISTER_HEADERS,
-            [(
-                "STATE-001", "RESOURCE-001", "PENDING, READY", "PENDING",
-                "PENDING -> READY", "READY", "Reject invalid transitions",
-                "FR-001", "TEST-999",
-            )],
+            [
+                (
+                    "STATE-001",
+                    "RESOURCE-001",
+                    "PENDING, READY",
+                    "PENDING",
+                    "PENDING -> READY",
+                    "READY",
+                    "Reject invalid transitions",
+                    "FR-001",
+                    "TEST-999",
+                )
+            ],
         )
         cases = {
             "client-only authorization": (
@@ -6752,7 +8844,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(migration.project_contract.status, "MIGRATION_REQUIRED")
         self.assertFalse(migration.project_contract.grandfathered_v4)
         self.assertTrue(
-            any("Project design contract schema 5" in issue for issue in migration_issues),
+            any(
+                "Project design contract schema 5" in issue
+                for issue in migration_issues
+            ),
             migration_issues,
         )
 
@@ -6779,11 +8874,18 @@ class BootstrapDoctorTests(unittest.TestCase):
         coverage = doctor.CoverageContract(status="READY", work_kind="NEW_BUILD")
         harness = doctor.HarnessContract(
             status="READY",
-            rows=(doctor.HarnessRow(
-                "HARNESS-001", "End-to-end", "unittest", "Approved design",
-                "DES-0001, FR-001", "python -m unittest tests.test_legacy",
-                "docs/project/VERIFY.md#legacy", "REQUIRED",
-            ),),
+            rows=(
+                doctor.HarnessRow(
+                    "HARNESS-001",
+                    "End-to-end",
+                    "unittest",
+                    "Approved design",
+                    "DES-0001, FR-001",
+                    "python -m unittest tests.test_legacy",
+                    "docs/project/VERIFY.md#legacy",
+                    "REQUIRED",
+                ),
+            ),
             required_ids=("HARNESS-001",),
         )
         legacy_ids = {"ARCH-0001", "TECH-0001", "PROP-001", "HARNESS-001"}
@@ -6827,17 +8929,24 @@ class BootstrapDoctorTests(unittest.TestCase):
             doctor.JOURNEY_HEADERS,
             [
                 (
-                    "JOURNEY-001", "ACT-001", "See the approved project outcome",
+                    "JOURNEY-001",
+                    "ACT-001",
+                    "See the approved project outcome",
                     "The development user requests the local result",
                     "The current approved outcome is displayed",
                     "Invalid input is rejected without changing approved state",
-                    ", ".join(journey_one_ids), "NONE",
+                    ", ".join(journey_one_ids),
+                    "NONE",
                 ),
                 (
-                    "JOURNEY-002", "ACT-001", "Reject invalid input",
+                    "JOURNEY-002",
+                    "ACT-001",
+                    "Reject invalid input",
                     "The development user submits invalid input",
                     "The invalid input is rejected",
-                    "Approved state remains unchanged", "FR-002", "NONE",
+                    "Approved state remains unchanged",
+                    "FR-002",
+                    "NONE",
                 ),
             ],
         )
@@ -6852,8 +8961,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             doctor.REQUIREMENT_COVERAGE_HEADING,
             doctor.REQUIREMENT_COVERAGE_HEADERS,
             [
-                (*row[:3], "JOURNEY-002", *row[4:])
-                if row[0] == "FR-002" else row
+                (*row[:3], "JOURNEY-002", *row[4:]) if row[0] == "FR-002" else row
                 for row in coverage_table.rows
             ],
         )
@@ -6861,10 +8969,17 @@ class BootstrapDoctorTests(unittest.TestCase):
             split,
             doctor.FIRST_WAVE_HEADING,
             doctor.FIRST_WAVE_HEADERS,
-            [(
-                "WAVE-001", "NEW_BUILD", "JOURNEY-001", "FR-001, FR-002",
-                "AC-FR-001, AC-FR-002", "HARNESS-004", "NONE",
-            )],
+            [
+                (
+                    "WAVE-001",
+                    "NEW_BUILD",
+                    "JOURNEY-001",
+                    "FR-001, FR-002",
+                    "AC-FR-001, AC-FR-002",
+                    "HARNESS-004",
+                    "NONE",
+                )
+            ],
         )
         blocked, mismatch_issues = doctor.derive_design_contract(
             mismatched_wave, "DES-0001", required=True
@@ -6883,16 +8998,25 @@ class BootstrapDoctorTests(unittest.TestCase):
             complete,
             doctor.FIRST_WAVE_HEADING,
             doctor.FIRST_WAVE_HEADERS,
-            [(
-                "WAVE-001", "NEW_BUILD", "JOURNEY-001", "FR-001",
-                "AC-FR-001", "HARNESS-004", "SPIKE-001",
-            )],
+            [
+                (
+                    "WAVE-001",
+                    "NEW_BUILD",
+                    "JOURNEY-001",
+                    "FR-001",
+                    "AC-FR-001",
+                    "HARNESS-004",
+                    "SPIKE-001",
+                )
+            ],
         )
-        spike_table = "\n".join([
-            "| Spike ID | Blocking technical unknown | Time box | Disposable output boundary | Exit criterion | Required next action |",
-            "|---|---|---|---|---|---|",
-            "| SPIKE-001 | Verify the local adapter contract | MAX_ATTEMPTS: 2 | work/spike/** | python -m unittest tests.test_spike_exit | DISCARD_AND_BUILD_WALKING_SKELETON |",
-        ])
+        spike_table = "\n".join(
+            [
+                "| Spike ID | Blocking technical unknown | Time box | Disposable output boundary | Exit criterion | Required next action |",
+                "|---|---|---|---|---|---|",
+                "| SPIKE-001 | Verify the local adapter contract | MAX_ATTEMPTS: 2 | work/spike/** | python -m unittest tests.test_spike_exit | DISCARD_AND_BUILD_WALKING_SKELETON |",
+            ]
+        )
         spiked = spiked.replace(
             "NOT_APPLICABLE - no prerequisite discovery is needed before the walking skeleton",
             spike_table,
@@ -6919,8 +9043,10 @@ class BootstrapDoctorTests(unittest.TestCase):
                 )
                 self.assertEqual(unsafe.status, "BLOCKED")
                 self.assertTrue(
-                    any("Exit criterion must be one explicit local command" in issue
-                        for issue in unsafe_issues),
+                    any(
+                        "Exit criterion must be one explicit local command" in issue
+                        for issue in unsafe_issues
+                    ),
                     unsafe_issues,
                 )
 
@@ -6934,7 +9060,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             migrated.split("# Part III", 1)[0],
         )
         requirements, requirement_issues = doctor.derive_requirements_contract(
-            migrated, "low", None, required=True,
+            migrated,
+            "low",
+            None,
+            required=True,
             grandfather_current_gate_a=True,
         )
         self.assertEqual(requirement_issues, [])
@@ -6944,7 +9073,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             tuple(f"AC-{item}" for item in requirements.requirement_ids),
         )
         design, design_issues = doctor.derive_design_contract(
-            migrated, "DES-0001", required=True,
+            migrated,
+            "DES-0001",
+            required=True,
             grandfather_approved_v1=True,
             requirements_contract=requirements,
         )
@@ -6981,7 +9112,14 @@ class BootstrapDoctorTests(unittest.TestCase):
                     migrated,
                     doctor.STATE_APPLICABILITY_HEADING,
                     doctor.STATE_APPLICABILITY_HEADERS,
-                    [("RESOURCE-001", "NOT_APPLICABLE", "NOT_APPLICABLE - no state", "NONE")],
+                    [
+                        (
+                            "RESOURCE-001",
+                            "NOT_APPLICABLE",
+                            "NOT_APPLICABLE - no state",
+                            "NONE",
+                        )
+                    ],
                 ),
                 "grandfathered Gate A design requires an applicable state model",
             ),
@@ -6989,7 +9127,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         for label, (candidate, expected) in cases.items():
             with self.subTest(case=label):
                 design, issues = doctor.derive_design_contract(
-                    candidate, "DES-0001", required=True,
+                    candidate,
+                    "DES-0001",
+                    required=True,
                     grandfather_approved_v1=True,
                 )
                 self.assertEqual(design.status, "BLOCKED")
@@ -7001,7 +9141,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             1,
         )
         modern_design, modern_issues = doctor.derive_design_contract(
-            modern, "DES-0001", required=True,
+            modern,
+            "DES-0001",
+            required=True,
         )
         self.assertEqual(modern_design.status, "BLOCKED")
         self.assertTrue(
@@ -7013,30 +9155,46 @@ class BootstrapDoctorTests(unittest.TestCase):
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(source)
         requirements, requirement_issues = doctor.derive_requirements_contract(
-            complete, "low", None, required=True,
+            complete,
+            "low",
+            None,
+            required=True,
             grandfather_current_gate_a=False,
         )
         self.assertEqual(requirement_issues, [])
 
         def stateful(trigger_basis: str) -> str:
             text = replace_contract_table(
-                complete, doctor.STATE_APPLICABILITY_HEADING,
+                complete,
+                doctor.STATE_APPLICABILITY_HEADING,
                 doctor.STATE_APPLICABILITY_HEADERS,
                 [("RESOURCE-001", "APPLICABLE", trigger_basis, "STATE-001")],
             )
             return replace_contract_table(
-                text, doctor.STATE_REGISTER_HEADING, doctor.STATE_REGISTER_HEADERS,
-                [(
-                    "STATE-001", "RESOURCE-001", "PENDING, READY", "PENDING",
-                    "PENDING to READY", "READY", "Reject invalid transitions",
-                    "FR-001", "AC-FR-001",
-                )],
+                text,
+                doctor.STATE_REGISTER_HEADING,
+                doctor.STATE_REGISTER_HEADERS,
+                [
+                    (
+                        "STATE-001",
+                        "RESOURCE-001",
+                        "PENDING, READY",
+                        "PENDING",
+                        "PENDING to READY",
+                        "READY",
+                        "Reject invalid transitions",
+                        "FR-001",
+                        "AC-FR-001",
+                    )
+                ],
             )
 
         for category in doctor.STATE_MODEL_TRIGGERS:
             with self.subTest(category=category):
                 ready, issues = doctor.derive_design_contract(
-                    stateful(f"{category}: FR-001"), "DES-0001", required=True,
+                    stateful(f"{category}: FR-001"),
+                    "DES-0001",
+                    required=True,
                     requirements_contract=requirements,
                 )
                 self.assertEqual(issues, [])
@@ -7044,13 +9202,17 @@ class BootstrapDoctorTests(unittest.TestCase):
         for rich_trigger, state_trigger in doctor.RICH_TO_STATE_TRIGGER.items():
             triggered = replace(requirements, rich_use_case_triggers=(rich_trigger,))
             blocked, issues = doctor.derive_design_contract(
-                stateful("LIFECYCLE_RESOURCE: FR-001"), "DES-0001", required=True,
+                stateful("LIFECYCLE_RESOURCE: FR-001"),
+                "DES-0001",
+                required=True,
                 requirements_contract=triggered,
             )
             self.assertEqual(blocked.status, "BLOCKED")
             self.assertTrue(any(state_trigger in issue for issue in issues), issues)
             ready, issues = doctor.derive_design_contract(
-                stateful(f"{state_trigger}: FR-001"), "DES-0001", required=True,
+                stateful(f"{state_trigger}: FR-001"),
+                "DES-0001",
+                required=True,
                 requirements_contract=triggered,
             )
             self.assertEqual(issues, [])
@@ -7061,11 +9223,3130 @@ class BootstrapDoctorTests(unittest.TestCase):
             "APPROVAL_FLOW: FR-001; LIFECYCLE_RESOURCE: FR-001",
         ):
             blocked, issues = doctor.derive_design_contract(
-                stateful(invalid), "DES-0001", required=True,
+                stateful(invalid),
+                "DES-0001",
+                required=True,
                 requirements_contract=requirements,
             )
             self.assertEqual(blocked.status, "BLOCKED")
             self.assertTrue(any("State trigger" in issue for issue in issues), issues)
+
+
+class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
+    _DEPLOYMENT_ARTIFACT = "sha256:" + "a" * 64
+    _DEPLOYMENT_PLAN = (
+        "TYPE: CLOUDFORMATION_CHANGE_SET; IDENTIFIER: canary-change-set; "
+        "DIGEST: sha256:" + "b" * 64
+    )
+    _DEPLOYMENT_OPERATIONS = (
+        "cloudformation:CreateChangeSet",
+        "cloudformation:ExecuteChangeSet",
+    )
+    _VERIFICATION_MATRIX_HEADERS = (
+        "Evidence ID",
+        "PRD / property IDs",
+        "Task IDs",
+        "Requirement or invariant",
+        "Automated evidence",
+        "AWS/manual evidence",
+        "Artifact/environment",
+        "Status",
+    )
+
+    def deployment_envelope(self) -> dict[str, str]:
+        return aws_authority_envelope(
+            role="fastlane-deployment-role",
+            account="111122223333",
+            region="us-west-2",
+            environment="development",
+            resources=["fastlane-stack"],
+            operations=list(self._DEPLOYMENT_OPERATIONS),
+            artifact=self._DEPLOYMENT_ARTIFACT,
+            rollback="rollback fastlane-stack",
+        )
+
+    def deployment_read_authority(self) -> dict[str, object]:
+        return {
+            "kind": "AWS_READ_ONLY",
+            "validity": "CURRENT",
+            "authorization_id": "AWS-READ-AUTH-0001",
+            "receipt_digest": "sha256:" + "c" * 64,
+            "account": "111122223333",
+            "region": "us-west-2",
+            "environment": "development",
+            "role_or_profile": "fastlane-read-role",
+            "resources": ["fastlane-stack"],
+            "operations": ["cloudformation:DescribeStacks"],
+            "artifact_plan_binding": {
+                "artifact": self._DEPLOYMENT_ARTIFACT,
+                "plan": "NONE",
+            },
+            "cost_ceiling": "USD: 20.00",
+            "rollback_boundary": "NONE",
+            "expiration": "2099-01-01T00:00:00Z",
+            "authorized_at": "2026-12-31T23:59:59Z",
+            "authority_source": "owner-message MSG-AWS-READ-0001",
+        }
+
+    def bind_explicit_deployment_receipt(
+        self,
+        verify_text: str,
+        *,
+        authorization_id: str = "AWS-AUTH-0001",
+        valid_until: str = "2099-01-01T00:00:00Z",
+        authorized_at: str = "2027-01-01T00:00:00Z",
+    ) -> tuple[str, str]:
+        receipt = "\n".join(
+            [
+                "AUTHORIZE AWS DEPLOYMENT",
+                f"AWS authorization: {authorization_id}",
+                "Construction authorization: AUTH-0001",
+                "Profile or role: fastlane-deployment-role",
+                "Account: 111122223333",
+                "Region: us-west-2",
+                "Environment: development",
+                f"Artifact digest: {self._DEPLOYMENT_ARTIFACT}",
+                f"IaC plan/change-set binding: {self._DEPLOYMENT_PLAN}",
+                "Stack, application, and resources: fastlane-stack",
+                "Allowed operations: " + ", ".join(self._DEPLOYMENT_OPERATIONS),
+                "Cost ceiling: USD: 20.00",
+                "Rollback boundary: rollback fastlane-stack",
+                f"Valid until: {valid_until}",
+                "Approver: alice",
+            ]
+        )
+        digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
+        verify_text = set_receipt(verify_text, "aws-deployment", receipt)
+        lines = verify_text.splitlines(keepends=True)
+        for index, line in enumerate(lines):
+            if line.startswith("| Deployment | TODO |"):
+                suffix = "\n" if line.endswith("\n") else ""
+                lines[index] = (
+                    f"| Deployment | {authorization_id} | AUTH-0001 | "
+                    f"fastlane-deployment-role | {self._DEPLOYMENT_ARTIFACT} | "
+                    f"{self._DEPLOYMENT_PLAN} | ACCOUNT: 111122223333; "
+                    "REGION: us-west-2; ENVIRONMENT: development | "
+                    "RESOURCES: fastlane-stack; OPERATIONS: "
+                    + ", ".join(self._DEPLOYMENT_OPERATIONS)
+                    + f" | COST: USD: 20.00; VALID_UNTIL: {valid_until} | "
+                    "rollback fastlane-stack | owner-message MSG-AWS-0001 | "
+                    f"alice | {authorized_at} | "
+                    f"{digest} | AWS-PREFLIGHT-0001 | PASS | READY |{suffix}"
+                )
+                break
+        else:
+            self.fail("Deployment authorization provenance row not found")
+        return "".join(lines), digest
+
+    def bind_read_receipt(
+        self,
+        verify_text: str,
+        *,
+        construction_authorization: str = "AUTH-0001",
+        authorization_id: str = "AWS-READ-AUTH-0001",
+        role_or_profile: str = "fastlane-deployment-role",
+        account: str = "111122223333",
+        region: str = "us-west-2",
+        environment: str = "development",
+        resources: tuple[str, ...] = ("fastlane-stack",),
+        operations: tuple[str, ...] = ("cloudformation:DescribeStacks",),
+        valid_until: str = "2099-01-01T00:00:00Z",
+        authorized_at: str = "2027-01-01T00:00:00Z",
+        authority_source: str = "owner-message MSG-AWS-READ-0001",
+    ) -> tuple[str, dict[str, object]]:
+        resource_text = ", ".join(resources)
+        operation_text = ", ".join(operations)
+        receipt = "\n".join(
+            [
+                "AUTHORIZE AWS READ-ONLY PREFLIGHT",
+                f"Read authorization: {authorization_id}",
+                f"Construction authorization: {construction_authorization}",
+                f"Profile or role: {role_or_profile}",
+                f"Account: {account}",
+                f"Region: {region}",
+                f"Environment: {environment}",
+                f"Stack, application, and resources: {resource_text}",
+                f"Allowed read-only operations: {operation_text}",
+                f"Artifact digest: {self._DEPLOYMENT_ARTIFACT}",
+                "Prohibited operations: ALL_MUTATIONS",
+                f"Valid until: {valid_until}",
+                "Approver: alice",
+            ]
+        )
+        digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
+        verify_text = set_receipt(verify_text, "aws-read-preflight", receipt)
+        lines = verify_text.splitlines(keepends=True)
+        for index, line in enumerate(lines):
+            if line.startswith("| Read-only preflight | TODO |"):
+                suffix = "\n" if line.endswith("\n") else ""
+                lines[index] = (
+                    f"| Read-only preflight | {authorization_id} | "
+                    f"{construction_authorization} | {role_or_profile} | "
+                    f"{self._DEPLOYMENT_ARTIFACT} | "
+                    "NOT_APPLICABLE — read-only preflight creates no plan | "
+                    f"ACCOUNT: {account}; REGION: {region}; "
+                    f"ENVIRONMENT: {environment} | RESOURCES: {resource_text}; "
+                    f"OPERATIONS: {operation_text} | COST: expected low-volume "
+                    "request charges under USD 0.01; BOUNDED_BY: USD: 20.00; "
+                    f"VALID_UNTIL: {valid_until} | NOT_APPLICABLE — no mutation | "
+                    f"{authority_source} | alice | {authorized_at} | {digest} | "
+                    f"NONE | PASS | AUTHORIZED |{suffix}"
+                )
+                break
+        else:
+            self.fail("Read-only authorization provenance row not found")
+        return "".join(lines), {
+            "kind": "AWS_READ_ONLY",
+            "validity": "CURRENT",
+            "authorization_id": authorization_id,
+            "receipt_digest": digest,
+            "account": account,
+            "region": region,
+            "environment": environment,
+            "role_or_profile": role_or_profile,
+            "resources": list(resources),
+            "operations": list(operations),
+            "artifact_plan_binding": {
+                "artifact": self._DEPLOYMENT_ARTIFACT,
+                "plan": "NONE",
+            },
+            "cost_ceiling": "EXPECTED: low-volume under USD 0.01; BOUNDED_BY: USD: 20.00",
+            "rollback_boundary": "NONE",
+            "expiration": valid_until,
+            "authorized_at": authorized_at,
+            "authority_source": authority_source,
+        }
+
+    def assert_closure_context_is_resolved(self, report: dict[str, object]) -> None:
+        diagnostic_codes = {
+            str(item["code"])
+            for item in report["diagnostics"]
+            if isinstance(item, dict) and "code" in item
+        }
+        self.assertNotIn("CONTEXT_SOURCE_INVALID", diagnostic_codes, report)
+        plan = report["context_plan"]
+        self.assertIn(
+            plan["budget_status"],
+            {"WITHIN_LIMIT", "OVERSIZED_REQUIRED_RECORD"},
+            plan,
+        )
+        if plan["budget_status"] == "OVERSIZED_REQUIRED_RECORD":
+            self.assertEqual(len(plan["overflow_records"]), 1, plan)
+        else:
+            self.assertLessEqual(
+                plan["actual_initial_source_bytes"],
+                plan["maximum_initial_source_bytes"],
+                plan,
+            )
+
+    def assert_no_external_mutation_authority(self, report: dict[str, object]) -> None:
+        forbidden_kinds = {"AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}
+        external = report["external_authority"]
+        self.assertNotIn(external["kind"], forbidden_kinds, external)
+        self.assertNotIn(
+            external["request_match"]["authority_kind"],
+            forbidden_kinds,
+            external["request_match"],
+        )
+        self.assertEqual(
+            report["deployment_journal_closure_authority"]["aws_mutation_authority"],
+            "NONE",
+        )
+
+    def assert_exact_closure_authority(
+        self,
+        report: dict[str, object],
+        *,
+        sections: list[str],
+        operations: list[str],
+        release_states: list[str] | None = None,
+    ) -> None:
+        closure = report["deployment_journal_closure_authority"]
+        self.assertEqual(
+            {
+                "valid": closure["valid"],
+                "kind": closure["kind"],
+                "authorization_id": closure["authorization_id"],
+                "mode": closure["mode"],
+                "allowed_write_paths": closure["allowed_write_paths"],
+                "allowed_sections": closure["allowed_sections"],
+                "allowed_operations": closure["allowed_operations"],
+                "allowed_release_states": closure["allowed_release_states"],
+                "construction_authorization": closure["construction_authorization"],
+                "aws_mutation_authority": closure["aws_mutation_authority"],
+            },
+            {
+                "valid": True,
+                "kind": "AWS_DEPLOYMENT_JOURNAL_CLOSURE",
+                "authorization_id": "AWS_DEPLOYMENT_JOURNAL_CLOSURE",
+                "mode": "BOUNDED_EVIDENCE_CLOSURE",
+                "allowed_write_paths": [doctor.VERIFY_FILE],
+                "allowed_sections": sections,
+                "allowed_operations": operations,
+                "allowed_release_states": release_states or [],
+                "construction_authorization": "NONE",
+                "aws_mutation_authority": "NONE",
+            },
+            closure,
+        )
+
+    def assert_no_closure_authority(self, report: dict[str, object]) -> None:
+        closure = report["deployment_journal_closure_authority"]
+        self.assertFalse(closure["valid"], closure)
+        self.assertEqual(closure["kind"], "NONE", closure)
+        self.assertEqual(closure["allowed_write_paths"], [], closure)
+        self.assertEqual(closure["allowed_sections"], [], closure)
+        self.assertEqual(closure["allowed_operations"], [], closure)
+        self.assertEqual(closure["allowed_release_states"], [], closure)
+        self.assertEqual(closure["construction_authorization"], "NONE", closure)
+        self.assertEqual(closure["aws_mutation_authority"], "NONE", closure)
+
+    def deployment_row(
+        self,
+        *,
+        evidence_id: str,
+        attempt_id: str = "AWS-DEPLOY-0001",
+        phase: str,
+        status: str,
+        observed_at: str,
+        lane: str = "fast-dev",
+        basis: str = "REQ-0001 / DES-0001 / AUTH-0001",
+        read_authority: dict[str, object] | None = None,
+        receipt_digest: str = "NONE",
+        deployment_authorization: str | None = None,
+        deployment_valid_until: str | None = None,
+        deployment_authority_source: str | None = None,
+        artifact: str | None = None,
+        plan_binding: str | None = None,
+        account_scope: str | None = None,
+        deployment_role: str = "fastlane-deployment-role",
+        identity_and_boundary_match: str = "PASS",
+        operation_result: str | None = None,
+        acceptance_evidence_ids: str | None = None,
+    ) -> tuple[str, ...]:
+        is_read = phase == "AWS-30"
+        blocked = status in {"BLOCKED", "STALE"}
+        authorization = deployment_authorization or (
+            "AWS-AUTH-0001" if lane == "explicit-gate" else "AUTH-0001"
+        )
+        plan = (
+            self._DEPLOYMENT_PLAN
+            if lane == "explicit-gate"
+            else "STACK: fastlane-stack"
+        )
+        read = read_authority or self.deployment_read_authority()
+        values = {
+            "Evidence ID": evidence_id,
+            "Attempt ID": attempt_id,
+            "Phase": phase,
+            "REQ / DES / AUTH": basis,
+            "Deployment authorization": authorization,
+            "Deployment receipt digest": receipt_digest,
+            "Deployment valid until": deployment_valid_until
+            or (
+                "2099-01-01T00:00:00Z"
+                if lane == "explicit-gate"
+                else "2099-12-31T23:59:59Z"
+            ),
+            "Deployment authority source": deployment_authority_source
+            or (
+                "owner-message MSG-AWS-0001"
+                if lane == "explicit-gate"
+                else "owner-message MSG-GATE-B-0001"
+            ),
+            "Read authorization": (
+                str(read["authorization_id"]) if is_read else "NONE"
+            ),
+            "Deployment role or profile": deployment_role,
+            "Read role or profile": (
+                str(read["role_or_profile"]) if is_read else "NONE"
+            ),
+            "Read receipt digest": (str(read["receipt_digest"]) if is_read else "NONE"),
+            "Read valid until": (str(read["expiration"]) if is_read else "NONE"),
+            "Read authority source": (
+                doctor._format_deployment_read_provenance(
+                    str(read["authority_source"]),
+                    str(read["authorized_at"]),
+                    read["resources"],
+                    read["operations"],
+                )
+                if is_read
+                else "NONE"
+            ),
+            "Artifact digest": artifact or self._DEPLOYMENT_ARTIFACT,
+            "Plan/change-set binding": plan_binding or plan,
+            "Resources": "fastlane-stack",
+            "Mutation operations": ", ".join(self._DEPLOYMENT_OPERATIONS),
+            "Read operations observed": (
+                "cloudformation:DescribeStacks" if is_read else "NONE"
+            ),
+            "Account / Region / environment": account_scope
+            or ("ACCOUNT: 111122223333; REGION: us-west-2; ENVIRONMENT: development"),
+            "Operation identifiers and direct result": operation_result
+            or (
+                doctor.AWS_DEPLOYMENT_PRECALL_RESULT
+                if status == "STARTED"
+                else f"IDENTIFIERS: request-{evidence_id.lower()}; RESULT: terminal action evidence recorded"
+            ),
+            "Rollback result": "NONE",
+            "Acceptance evidence IDs": (
+                acceptance_evidence_ids
+                if acceptance_evidence_ids is not None
+                else "EV-9001"
+                if status == "COMPLETE"
+                else "NONE"
+            ),
+            "Observed at": observed_at,
+            "Durable source": f"logs/{evidence_id.lower()}.json",
+            "Identity and boundary match": identity_and_boundary_match,
+            "Blocker or stale reason": (
+                f"deployment reconciliation reported {status.lower()}"
+                if blocked
+                else "NONE"
+            ),
+            "Status": status,
+        }
+        return tuple(
+            values[header] for header in doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS
+        )
+
+    def deployment_verify_text(
+        self,
+        rows: list[tuple[str, ...]],
+        *,
+        lane: str,
+        verification_rows: list[tuple[str, ...]] | None = None,
+        explicit_authorization_id: str = "AWS-AUTH-0001",
+    ) -> tuple[str, str]:
+        verify_text = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(
+            encoding="utf-8"
+        )
+        if verification_rows is None:
+            verification_rows = [
+                (
+                    "EV-9001",
+                    "FR-001",
+                    "TASK-001",
+                    "FR-001 primary outcome passes after deployment",
+                    "EV-0001 local suite passed",
+                    "DescribeStacks returned UPDATE_COMPLETE",
+                    f"ARTIFACT: {self._DEPLOYMENT_ARTIFACT}; "
+                    "ACCOUNT: 111122223333; REGION: us-west-2; "
+                    "ENVIRONMENT: development",
+                    "VERIFIED",
+                )
+            ]
+        verify_text = replace_contract_table(
+            verify_text,
+            "## Verification matrix",
+            self._VERIFICATION_MATRIX_HEADERS,
+            verification_rows,
+        )
+        receipt_digest = "NONE"
+        if lane == "explicit-gate":
+            verify_text, receipt_digest = self.bind_explicit_deployment_receipt(
+                verify_text, authorization_id=explicit_authorization_id
+            )
+        if doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING in verify_text:
+            verify_text = replace_contract_table(
+                verify_text,
+                doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+                rows,
+            )
+        else:
+            verify_text += "\n" + "\n".join(
+                [
+                    doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                    "",
+                    "| " + " | ".join(doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS) + " |",
+                    "|"
+                    + "|".join("---" for _ in doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS)
+                    + "|",
+                    *("| " + " | ".join(row) + " |" for row in rows),
+                    "",
+                ]
+            )
+        return verify_text, receipt_digest
+
+    def derive_deployment(
+        self,
+        rows: list[tuple[str, ...]],
+        *,
+        lane: str = "fast-dev",
+        read_authority: dict[str, object] | None = None,
+        verification_rows: list[tuple[str, ...]] | None = None,
+        release_evidence_cutoff: str = "NONE",
+        release_state: str = "READY_TO_DEPLOY",
+        construction_authorization: str = "AUTH-0001",
+        gate_b_authorized_at: str = "2026-12-31T23:59:59Z",
+        explicit_authorization_id: str = "AWS-AUTH-0001",
+        envelope: dict[str, str] | None = None,
+    ) -> dict[str, object]:
+        verify_text, _digest = self.deployment_verify_text(
+            rows,
+            lane=lane,
+            verification_rows=verification_rows,
+            explicit_authorization_id=explicit_authorization_id,
+        )
+        return doctor.derive_deployment_sequence_state(
+            verify_text,
+            read_authority,
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            construction_authorization=construction_authorization,
+            envelope=envelope or self.deployment_envelope(),
+            lane=lane,
+            artifact_binding=self._DEPLOYMENT_ARTIFACT,
+            release_evidence_cutoff=release_evidence_cutoff,
+            release_state=release_state,
+            gate_b_authority_source="owner-message MSG-GATE-B-0001",
+            gate_b_authorized_at=gate_b_authorized_at,
+        )
+
+    def test_started_only_requires_automatic_terminal_record_before_aws30(self) -> None:
+        started = self.deployment_row(
+            evidence_id="EV-2000",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        result = self.derive_deployment([started])
+        self.assertEqual(result["status"], "ACTION_TERMINAL_REQUIRED", result)
+        self.assertEqual(result["action_status"], "STARTED")
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                result,
+                "fast-dev",
+            ),
+            ("AWS_DEPLOYMENT_ACTION_TERMINAL", "AWS-20"),
+        )
+        interaction = doctor.derive_interaction(
+            "AWS_DEPLOYMENT_ACTION_TERMINAL",
+            "AWS-20",
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=True,
+            aws_execution_planning_ready=True,
+            aws_lane="fast-dev",
+            aws_read_authority_required=False,
+        )
+        self.assertEqual(
+            interaction["owner_action_kind"], "NONE_CONTINUE_AUTOMATICALLY"
+        )
+        self.assertFalse(interaction["owner_action_required"])
+        self.assertTrue(interaction["automatic_continuation_allowed"])
+        self.assertFalse(interaction["formal_receipt_required"])
+
+    def test_complete_reconciliation_acceptance_ids_bind_verified_exact_target(
+        self,
+    ) -> None:
+        read = self.deployment_read_authority()
+        action_rows = [
+            self.deployment_row(
+                evidence_id="EV-2301",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2302",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2303",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+            ),
+        ]
+
+        def matrix_row(
+            evidence_id: str = "EV-9001",
+            *,
+            status: str = "VERIFIED",
+            artifact: str | None = None,
+        ) -> tuple[str, ...]:
+            return (
+                evidence_id,
+                "FR-001",
+                "TASK-001",
+                "FR-001 primary outcome passes after deployment",
+                "EV-0001 local suite passed",
+                "DescribeStacks returned UPDATE_COMPLETE",
+                f"ARTIFACT: {artifact or self._DEPLOYMENT_ARTIFACT}; "
+                "ACCOUNT: 111122223333; REGION: us-west-2; "
+                "ENVIRONMENT: development",
+                status,
+            )
+
+        cases = {
+            "nonexistent": ([matrix_row("EV-9002")], ("EV-9001", "exactly once")),
+            "failed": ([matrix_row(status="FAILED")], ("EV-9001", "VERIFIED")),
+            "stale": ([matrix_row(status="STALE")], ("EV-9001", "VERIFIED")),
+            "wrong artifact": (
+                [matrix_row(artifact="sha256:" + "f" * 64)],
+                ("EV-9001", "artifact/account/Region/environment"),
+            ),
+        }
+        for label, (verification_rows, expected_tokens) in cases.items():
+            with self.subTest(label=label):
+                result = self.derive_deployment(
+                    action_rows,
+                    read_authority=read,
+                    verification_rows=verification_rows,
+                )
+                self.assertEqual(result["status"], "BLOCKED", result)
+                joined = " ".join(str(issue) for issue in result["issues"])
+                for token in expected_tokens:
+                    self.assertIn(token.casefold(), joined.casefold(), result)
+
+    def test_malformed_historical_group_cannot_hide_behind_valid_current_attempt(
+        self,
+    ) -> None:
+        read = self.deployment_read_authority()
+        old_basis = "REQ-0000 / DES-0000 / AUTH-0000"
+        invalid_artifact = "artifact-without-sha256"
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2311",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+                basis=old_basis,
+                deployment_authorization="AUTH-0000",
+                artifact=invalid_artifact,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2312",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+                basis=old_basis,
+                deployment_authorization="AUTH-0000",
+                artifact=invalid_artifact,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2313",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                basis=old_basis,
+                deployment_authorization="AUTH-0000",
+                artifact=invalid_artifact,
+                read_authority=read,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2314",
+                attempt_id="AWS-DEPLOY-0002",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:03:00Z",
+            ),
+        ]
+        result = self.derive_deployment(
+            rows,
+            read_authority=read,
+            release_evidence_cutoff="EV-2313",
+        )
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(
+            any(
+                "historical" in issue.casefold() and "artifact" in issue.casefold()
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_non_started_rows_require_exact_identifiers_result_grammar(self) -> None:
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2321",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2322",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+                operation_result="request-123 succeeded",
+            ),
+        ]
+        result = self.derive_deployment(rows)
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(
+            any(
+                "IDENTIFIERS" in issue and "RESULT" in issue
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_deployment_journal_schema_is_exact_and_complete(self) -> None:
+        expected = (
+            "Evidence ID",
+            "Attempt ID",
+            "Phase",
+            "REQ / DES / AUTH",
+            "Deployment authorization",
+            "Deployment receipt digest",
+            "Deployment valid until",
+            "Deployment authority source",
+            "Read authorization",
+            "Deployment role or profile",
+            "Read role or profile",
+            "Read receipt digest",
+            "Read valid until",
+            "Read authority source",
+            "Artifact digest",
+            "Plan/change-set binding",
+            "Resources",
+            "Mutation operations",
+            "Read operations observed",
+            "Account / Region / environment",
+            "Operation identifiers and direct result",
+            "Rollback result",
+            "Acceptance evidence IDs",
+            "Observed at",
+            "Durable source",
+            "Identity and boundary match",
+            "Blocker or stale reason",
+            "Status",
+        )
+        self.assertEqual(doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS, expected)
+        self.assertEqual(len(expected), 28)
+        row = self.deployment_row(
+            evidence_id="EV-2330",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        self.assertEqual(len(row), 28)
+
+    def test_unacknowledged_terminal_requires_current_read_receipt(self) -> None:
+        current_read = self.deployment_read_authority()
+        forged_read = {
+            **current_read,
+            "authorization_id": "AWS-READ-AUTH-0002",
+            "receipt_digest": "sha256:" + "d" * 64,
+            "role_or_profile": "fastlane-read-role-2",
+            "authority_source": "owner-message MSG-AWS-READ-0002",
+        }
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2331",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2332",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2333",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=forged_read,
+            ),
+        ]
+        for label, authority in (
+            ("missing", None),
+            ("different canonical receipt", current_read),
+        ):
+            with self.subTest(label=label):
+                result = self.derive_deployment(rows, read_authority=authority)
+                self.assertEqual(result["status"], "BLOCKED", result)
+                self.assertTrue(
+                    any(
+                        "read" in issue.casefold()
+                        and (
+                            "current" in issue.casefold()
+                            or "marked" in issue.casefold()
+                        )
+                        for issue in result["issues"]
+                    ),
+                    result,
+                )
+
+        acknowledged = self.derive_deployment(
+            rows,
+            read_authority=current_read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-2333",
+        )
+        self.assertEqual(acknowledged["status"], "CONSUMED", acknowledged)
+        self.assertTrue(acknowledged["acknowledged"])
+        self.assertEqual(acknowledged["acknowledged_evidence_id"], "EV-2333")
+
+    def test_unacknowledged_terminal_requires_current_deployment_receipt(self) -> None:
+        read = self.deployment_read_authority()
+        forged_digest = "sha256:" + "e" * 64
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2341",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+                lane="explicit-gate",
+                deployment_authorization="AWS-AUTH-0002",
+                receipt_digest=forged_digest,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2342",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+                lane="explicit-gate",
+                deployment_authorization="AWS-AUTH-0002",
+                receipt_digest=forged_digest,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2343",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                lane="explicit-gate",
+                deployment_authorization="AWS-AUTH-0002",
+                receipt_digest=forged_digest,
+                read_authority=read,
+            ),
+        ]
+        result = self.derive_deployment(rows, lane="explicit-gate", read_authority=read)
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(
+            any(
+                "deployment" in issue.casefold()
+                and ("authority" in issue.casefold() or "receipt" in issue.casefold())
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+        acknowledged = self.derive_deployment(
+            rows,
+            lane="explicit-gate",
+            read_authority=read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-2343",
+        )
+        self.assertEqual(acknowledged["status"], "CONSUMED", acknowledged)
+
+    def test_release_cutoff_consumes_only_exact_terminal_aws30(self) -> None:
+        read = self.deployment_read_authority()
+        started = self.deployment_row(
+            evidence_id="EV-2351",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        terminal = self.deployment_row(
+            evidence_id="EV-2352",
+            phase="AWS-20",
+            status="SUCCEEDED",
+            observed_at="2027-01-01T00:01:00Z",
+        )
+        reconciled = self.deployment_row(
+            evidence_id="EV-2353",
+            phase="AWS-30",
+            status="COMPLETE",
+            observed_at="2027-01-01T00:02:00Z",
+            read_authority=read,
+        )
+        rows = [started, terminal, reconciled]
+
+        matrix_cutoff_before_ack = self.derive_deployment(
+            rows,
+            read_authority=read,
+            release_state="READY_TO_DEPLOY",
+            release_evidence_cutoff="EV-9001",
+        )
+        self.assertEqual(
+            matrix_cutoff_before_ack["status"],
+            "RECONCILED",
+            matrix_cutoff_before_ack,
+        )
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                matrix_cutoff_before_ack,
+                "fast-dev",
+                "EV-9001",
+            ),
+            ("RELEASE_REVIEW", "RELEASE-10"),
+        )
+
+        missing = self.derive_deployment(
+            rows,
+            read_authority=read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-9999",
+        )
+        self.assertEqual(missing["status"], "BLOCKED", missing)
+        self.assertIn(
+            "Active evidence cutoff must resolve exactly once",
+            " ".join(missing["issues"]),
+        )
+
+        nonterminal = self.derive_deployment(
+            rows,
+            read_authority=read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-2351",
+        )
+        self.assertEqual(nonterminal["status"], "BLOCKED", nonterminal)
+        self.assertIn("nonterminal deployment row", " ".join(nonterminal["issues"]))
+
+        deleted_terminal = self.derive_deployment(
+            [started, terminal],
+            read_authority=read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-2353",
+        )
+        self.assertEqual(deleted_terminal["status"], "BLOCKED", deleted_terminal)
+        self.assertIn(
+            "Active evidence cutoff must resolve exactly once",
+            " ".join(deleted_terminal["issues"]),
+        )
+
+        matrix_only_after_terminal = self.derive_deployment(
+            rows,
+            read_authority=read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-9001",
+        )
+        self.assertEqual(
+            matrix_only_after_terminal["status"],
+            "BLOCKED",
+            matrix_only_after_terminal,
+        )
+        self.assertIn(
+            "exact terminal AWS-30 evidence cutoff",
+            " ".join(matrix_only_after_terminal["issues"]),
+        )
+
+        acknowledged = self.derive_deployment(
+            rows,
+            read_authority=read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-2353",
+        )
+        self.assertEqual(acknowledged["status"], "CONSUMED", acknowledged)
+        self.assertEqual(acknowledged["release_evidence_cutoff"], "EV-2353")
+
+    def test_aws30_stale_cannot_precede_the_terminal_action(self) -> None:
+        old_read = self.deployment_read_authority()
+        new_read = {
+            **old_read,
+            "authorization_id": "AWS-READ-AUTH-0002",
+            "receipt_digest": "sha256:" + "d" * 64,
+            "authority_source": "owner-message MSG-AWS-READ-0002",
+        }
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2361",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2362",
+                phase="AWS-30",
+                status="STALE",
+                observed_at="2027-01-01T00:01:00Z",
+                read_authority=old_read,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2363",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:02:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2364",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:03:00Z",
+                read_authority=new_read,
+            ),
+        ]
+        result = self.derive_deployment(rows, read_authority=new_read)
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(
+            any(
+                "AWS-30" in issue and "terminal" in issue.casefold()
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_second_explicit_attempt_requires_prior_cutoff_and_fresh_authority(
+        self,
+    ) -> None:
+        read = self.deployment_read_authority()
+        _unused, current_digest = self.deployment_verify_text(
+            [],
+            lane="explicit-gate",
+            explicit_authorization_id="AWS-AUTH-0002",
+        )
+        historical_digest = "sha256:" + "e" * 64
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2371",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+                lane="explicit-gate",
+                deployment_authorization="AWS-AUTH-0001",
+                receipt_digest=historical_digest,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2372",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+                lane="explicit-gate",
+                deployment_authorization="AWS-AUTH-0001",
+                receipt_digest=historical_digest,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2373",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                lane="explicit-gate",
+                deployment_authorization="AWS-AUTH-0001",
+                receipt_digest=historical_digest,
+                read_authority=read,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2374",
+                attempt_id="AWS-DEPLOY-0002",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:03:00Z",
+                lane="explicit-gate",
+                deployment_authorization="AWS-AUTH-0002",
+                receipt_digest=current_digest,
+            ),
+        ]
+        for cutoff in ("NONE", "EV-9001"):
+            with self.subTest(cutoff=cutoff):
+                blocked = self.derive_deployment(
+                    rows,
+                    lane="explicit-gate",
+                    read_authority=read,
+                    release_evidence_cutoff=cutoff,
+                    explicit_authorization_id="AWS-AUTH-0002",
+                )
+                self.assertEqual(blocked["status"], "BLOCKED", blocked)
+                self.assertTrue(
+                    any(
+                        "prior" in issue.casefold() and "cutoff" in issue.casefold()
+                        for issue in blocked["issues"]
+                    ),
+                    blocked,
+                )
+
+        allowed = self.derive_deployment(
+            rows,
+            lane="explicit-gate",
+            read_authority=read,
+            release_evidence_cutoff="EV-2373",
+            explicit_authorization_id="AWS-AUTH-0002",
+        )
+        self.assertEqual(allowed["status"], "ACTION_TERMINAL_REQUIRED", allowed)
+        self.assertEqual(allowed["attempt_id"], "AWS-DEPLOY-0002")
+        self.assertEqual(allowed["deployment_authorization"], "AWS-AUTH-0002")
+
+    def test_deployment_and_read_observations_cannot_precede_authorization(
+        self,
+    ) -> None:
+        started = self.deployment_row(
+            evidence_id="EV-2381",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        too_early = self.derive_deployment(
+            [started], gate_b_authorized_at="2027-01-01T00:00:30Z"
+        )
+        self.assertEqual(too_early["status"], "BLOCKED", too_early)
+        self.assertTrue(
+            any(
+                "precedes" in issue.casefold() and "authorization" in issue.casefold()
+                for issue in too_early["issues"]
+            ),
+            too_early,
+        )
+
+        read = {
+            **self.deployment_read_authority(),
+            "authorized_at": "2027-01-01T00:03:00Z",
+        }
+        rows = [
+            started,
+            self.deployment_row(
+                evidence_id="EV-2382",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2383",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+            ),
+        ]
+        read_too_early = self.derive_deployment(rows, read_authority=read)
+        self.assertEqual(read_too_early["status"], "BLOCKED", read_too_early)
+        self.assertTrue(
+            any(
+                "read" in issue.casefold() and "precedes" in issue.casefold()
+                for issue in read_too_early["issues"]
+            ),
+            read_too_early,
+        )
+
+    def test_historical_fast_dev_rows_require_canonical_basis_validity_and_scope(
+        self,
+    ) -> None:
+        read = self.deployment_read_authority()
+
+        def history(**overrides: str) -> list[tuple[str, ...]]:
+            common = {
+                "lane": "fast-dev",
+                "basis": "REQ-0000 / DES-0000 / AUTH-0000",
+                "deployment_authorization": "AUTH-0000",
+                **overrides,
+            }
+            return [
+                self.deployment_row(
+                    evidence_id="EV-2391",
+                    attempt_id="AWS-DEPLOY-0001",
+                    phase="AWS-20",
+                    status="STARTED",
+                    observed_at="2027-01-01T00:00:00Z",
+                    **common,
+                ),
+                self.deployment_row(
+                    evidence_id="EV-2392",
+                    attempt_id="AWS-DEPLOY-0001",
+                    phase="AWS-20",
+                    status="SUCCEEDED",
+                    observed_at="2027-01-01T00:01:00Z",
+                    **common,
+                ),
+                self.deployment_row(
+                    evidence_id="EV-2393",
+                    attempt_id="AWS-DEPLOY-0001",
+                    phase="AWS-30",
+                    status="COMPLETE",
+                    observed_at="2027-01-01T00:02:00Z",
+                    read_authority=read,
+                    **common,
+                ),
+                self.deployment_row(
+                    evidence_id="EV-2394",
+                    attempt_id="AWS-DEPLOY-0002",
+                    phase="AWS-20",
+                    status="STARTED",
+                    observed_at="2027-01-01T00:03:00Z",
+                ),
+            ]
+
+        cases = {
+            "noncanonical basis": {"basis": "REQ-0000 / not-a-design / AUTH-0000"},
+            "one-operation validity": {"deployment_valid_until": "ONE_OPERATION"},
+            "unresolved account": {
+                "account_scope": (
+                    "ACCOUNT: TODO; REGION: us-west-2; ENVIRONMENT: development"
+                )
+            },
+            "unresolved region": {
+                "account_scope": (
+                    "ACCOUNT: 111122223333; REGION: TODO; ENVIRONMENT: development"
+                )
+            },
+            "unresolved environment": {
+                "account_scope": (
+                    "ACCOUNT: 111122223333; REGION: us-west-2; ENVIRONMENT: TODO"
+                )
+            },
+            "wildcard role": {"deployment_role": "fastlane-*"},
+        }
+        for label, overrides in cases.items():
+            with self.subTest(label=label):
+                result = self.derive_deployment(
+                    history(**overrides),
+                    read_authority=read,
+                    release_evidence_cutoff="EV-2393",
+                )
+                self.assertEqual(result["status"], "BLOCKED", result)
+                self.assertTrue(result["issues"], result)
+
+    def test_historical_explicit_plan_binding_must_be_canonical(self) -> None:
+        read = self.deployment_read_authority()
+        _unused, current_digest = self.deployment_verify_text([], lane="explicit-gate")
+        historical_digest = "sha256:" + "e" * 64
+        common = {
+            "lane": "explicit-gate",
+            "basis": "REQ-0000 / DES-0000 / AUTH-0000",
+            "deployment_authorization": "AWS-AUTH-0000",
+            "receipt_digest": historical_digest,
+            "plan_binding": "not-a-canonical-plan-binding",
+        }
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2401",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+                **common,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2402",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+                **common,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2403",
+                attempt_id="AWS-DEPLOY-0001",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+                **common,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2404",
+                attempt_id="AWS-DEPLOY-0002",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:03:00Z",
+                lane="explicit-gate",
+                receipt_digest=current_digest,
+            ),
+        ]
+        result = self.derive_deployment(
+            rows,
+            lane="explicit-gate",
+            read_authority=read,
+            release_evidence_cutoff="EV-2403",
+        )
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(
+            any(
+                "plan" in issue.casefold() and "canonical" in issue.casefold()
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_independently_authorized_read_receipt_may_use_same_role(self) -> None:
+        read = {
+            **self.deployment_read_authority(),
+            "role_or_profile": "fastlane-deployment-role",
+        }
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2411",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2412",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2413",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+            ),
+        ]
+        result = self.derive_deployment(rows, read_authority=read)
+        self.assertEqual(result["status"], "RECONCILED", result)
+        self.assertEqual(result["read_role_or_profile"], "fastlane-deployment-role")
+
+    def test_stale_reconciliation_requires_resolved_identity_boundary(self) -> None:
+        read = self.deployment_read_authority()
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2421",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2422",
+                phase="AWS-20",
+                status="UNKNOWN",
+                observed_at="2027-01-01T00:01:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2423",
+                phase="AWS-30",
+                status="STALE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+                identity_and_boundary_match="TODO",
+            ),
+        ]
+        result = self.derive_deployment(rows, read_authority=read)
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(
+            any(
+                "identity" in issue.casefold() and "boundary" in issue.casefold()
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_stale_basis_terminal_reconciliation_is_recoverable(self) -> None:
+        template = (PROJECT_ROOT / doctor.VERIFY_FILE).read_text(encoding="utf-8")
+        verify_text, read = self.bind_read_receipt(
+            template,
+            construction_authorization="AUTH-0000",
+            authorized_at="2027-01-01T00:01:30Z",
+        )
+        old = {
+            "basis": "REQ-0000 / DES-0000 / AUTH-0000",
+            "deployment_authorization": "AUTH-0000",
+        }
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2431",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+                **old,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2432",
+                phase="AWS-20",
+                status="UNKNOWN",
+                observed_at="2027-01-01T00:01:00Z",
+                **old,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2433",
+                phase="AWS-30",
+                status="BLOCKED",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+                **old,
+            ),
+        ]
+        verify_text = replace_contract_table(
+            verify_text,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+            rows,
+        )
+        result = doctor.derive_deployment_sequence_state(
+            verify_text,
+            None,
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            construction_authorization="AUTH-0001",
+            envelope=self.deployment_envelope(),
+            lane="fast-dev",
+            artifact_binding=self._DEPLOYMENT_ARTIFACT,
+            gate_b_authority_source="owner-message MSG-GATE-B-0001",
+            gate_b_authorized_at="2026-12-31T23:59:59Z",
+            restricted_closure=True,
+            cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+        )
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(result["basis_stale"])
+        self.assertEqual(result["reconciliation_status"], "BLOCKED")
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                result,
+                "fast-dev",
+            ),
+            ("RELEASE_REVIEW", "RELEASE-10"),
+        )
+
+    def test_terminal_acknowledgment_survives_later_authority_expiry(self) -> None:
+        read = {
+            **self.deployment_read_authority(),
+            "authorized_at": "2025-01-01T00:00:00Z",
+            "expiration": "2026-01-01T00:00:00Z",
+        }
+        envelope = self.deployment_envelope()
+        envelope["AWS authorization validity"] = (
+            "Expires at 2026-01-01T00:00:00Z; "
+            "earlier completion: authorized AWS action ends"
+        )
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2441",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2025-12-31T23:55:00Z",
+                deployment_valid_until="2026-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2442",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2025-12-31T23:56:00Z",
+                deployment_valid_until="2026-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2443",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2025-12-31T23:57:00Z",
+                deployment_valid_until="2026-01-01T00:00:00Z",
+                read_authority=read,
+            ),
+        ]
+        current = self.derive_deployment(
+            rows,
+            read_authority=read,
+            envelope=envelope,
+            gate_b_authorized_at="2025-01-01T00:00:00Z",
+        )
+        self.assertEqual(current["status"], "RECONCILED", current)
+        acknowledged = self.derive_deployment(
+            rows,
+            read_authority=None,
+            envelope=envelope,
+            gate_b_authorized_at="2025-01-01T00:00:00Z",
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-2443",
+        )
+        self.assertEqual(acknowledged["status"], "CONSUMED", acknowledged)
+
+    def test_deployment_sequence_routes_through_release_cutoff_and_residual_review(
+        self,
+    ) -> None:
+        read = self.deployment_read_authority()
+        started = self.deployment_row(
+            evidence_id="EV-2451",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        action_pending = self.derive_deployment([started])
+        self.assertEqual(action_pending["status"], "ACTION_TERMINAL_REQUIRED")
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                action_pending,
+                "fast-dev",
+            ),
+            ("AWS_DEPLOYMENT_ACTION_TERMINAL", "AWS-20"),
+        )
+
+        terminal = self.deployment_row(
+            evidence_id="EV-2452",
+            phase="AWS-20",
+            status="SUCCEEDED",
+            observed_at="2027-01-01T00:01:00Z",
+        )
+        reconciliation_pending = self.derive_deployment([started, terminal])
+        self.assertEqual(reconciliation_pending["status"], "RECONCILIATION_REQUIRED")
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                reconciliation_pending,
+                "fast-dev",
+            ),
+            ("AWS_DEPLOYMENT_RECONCILIATION", "AWS-30"),
+        )
+
+        reconciliation = self.deployment_row(
+            evidence_id="EV-2453",
+            phase="AWS-30",
+            status="COMPLETE",
+            observed_at="2027-01-01T00:02:00Z",
+            read_authority=read,
+        )
+        reconciled = self.derive_deployment(
+            [started, terminal, reconciliation], read_authority=read
+        )
+        self.assertEqual(reconciled["status"], "RECONCILED")
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                reconciled,
+                "fast-dev",
+            ),
+            ("RELEASE_REVIEW", "RELEASE-10"),
+        )
+
+        consumed = self.derive_deployment(
+            [started, terminal, reconciliation],
+            read_authority=read,
+            release_state="RELEASE_VERIFIED",
+            release_evidence_cutoff="EV-2453",
+        )
+        self.assertEqual(consumed["status"], "CONSUMED")
+        self.assertIsNone(
+            doctor.derive_aws_delivery_route(
+                "RELEASE_VERIFIED",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                consumed,
+                "fast-dev",
+                "EV-2453",
+            )
+        )
+        terminal_tasks = doctor.TaskSummary(
+            plan_revision="PLAN-0001",
+            plan_state="CURRENT",
+            statuses={"TASK-001": "DONE"},
+        )
+        self.assertEqual(
+            doctor.derive_route(
+                "APPROVED_FOR_DESIGN",
+                "APPROVED_FOR_CONSTRUCTION",
+                True,
+                True,
+                terminal_tasks,
+                True,
+                "NONE",
+                "RELEASE_VERIFIED",
+            ),
+            ("RELEASE_VERIFIED", "STOP"),
+        )
+        self.assertEqual(
+            doctor.derive_teardown_route("RESIDUAL_REVIEW", {"status": "NOT_ACTIVE"}),
+            ("AWS_RESIDUAL_REVIEW", "AWS-40"),
+        )
+
+    def test_started_and_every_terminal_action_require_aws30(self) -> None:
+        for lane in ("fast-dev", "explicit-gate"):
+            base_text, receipt_digest = self.deployment_verify_text([], lane=lane)
+            del base_text
+            for action_status in (
+                "STARTED",
+                "SUCCEEDED",
+                "FAILED",
+                "PARTIAL",
+                "UNKNOWN",
+            ):
+                with self.subTest(lane=lane, action_status=action_status):
+                    rows = [
+                        self.deployment_row(
+                            evidence_id="EV-2001",
+                            phase="AWS-20",
+                            status="STARTED",
+                            observed_at="2027-01-01T00:00:00Z",
+                            lane=lane,
+                            receipt_digest=receipt_digest,
+                        )
+                    ]
+                    if action_status != "STARTED":
+                        rows.append(
+                            self.deployment_row(
+                                evidence_id="EV-2002",
+                                phase="AWS-20",
+                                status=action_status,
+                                observed_at="2027-01-01T00:01:00Z",
+                                lane=lane,
+                                receipt_digest=receipt_digest,
+                            )
+                        )
+                    result = self.derive_deployment(rows, lane=lane)
+                    expected_status = (
+                        "ACTION_TERMINAL_REQUIRED"
+                        if action_status == "STARTED"
+                        else "RECONCILIATION_REQUIRED"
+                    )
+                    self.assertEqual(result["status"], expected_status)
+                    self.assertEqual(result["action_status"], action_status)
+                    self.assertEqual(result["reconciliation_status"], "NONE")
+                    self.assertEqual(result["phase"], "AWS-20")
+                    expected_route = (
+                        ("AWS_DEPLOYMENT_ACTION_TERMINAL", "AWS-20")
+                        if action_status == "STARTED"
+                        else ("AWS_DEPLOYMENT_RECONCILIATION", "AWS-30")
+                    )
+                    self.assertEqual(
+                        doctor.derive_aws_delivery_route(
+                            "READY_TO_DEPLOY",
+                            {"progress_state": "AWS_PREFLIGHT_READY"},
+                            result,
+                            lane,
+                        ),
+                        expected_route,
+                    )
+
+    def test_started_row_has_exact_pre_call_sentinel_and_no_result(self) -> None:
+        started = self.deployment_row(
+            evidence_id="EV-2051",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        result_index = doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS.index(
+            "Operation identifiers and direct result"
+        )
+        self.assertEqual(
+            doctor.AWS_DEPLOYMENT_PRECALL_RESULT,
+            "NOT_OBSERVED — pre-call journal only",
+        )
+        self.assertEqual(started[result_index], "NOT_OBSERVED — pre-call journal only")
+        valid = self.derive_deployment([started])
+        self.assertEqual(valid["status"], "ACTION_TERMINAL_REQUIRED", valid)
+
+        claimed = list(started)
+        claimed[result_index] = "request-123 already succeeded"
+        claimed_result = self.derive_deployment([tuple(claimed)])
+        self.assertEqual(claimed_result["status"], "BLOCKED", claimed_result)
+
+        terminal = list(
+            self.deployment_row(
+                evidence_id="EV-2052",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+            )
+        )
+        terminal[result_index] = "NOT_OBSERVED — pre-call journal only"
+        terminal_result = self.derive_deployment([started, tuple(terminal)])
+        self.assertEqual(terminal_result["status"], "BLOCKED", terminal_result)
+
+    def test_stale_reconciliation_can_refresh_to_either_terminal_outcome(self) -> None:
+        old_read = self.deployment_read_authority()
+        new_read = {
+            **old_read,
+            "authorization_id": "AWS-READ-AUTH-0002",
+            "receipt_digest": "sha256:" + "d" * 64,
+            "role_or_profile": "fastlane-read-role-2",
+        }
+        for terminal_status, expected_status in (
+            ("COMPLETE", "RECONCILED"),
+            ("BLOCKED", "BLOCKED"),
+        ):
+            with self.subTest(terminal_status=terminal_status):
+                rows = [
+                    self.deployment_row(
+                        evidence_id="EV-2151",
+                        phase="AWS-20",
+                        status="STARTED",
+                        observed_at="2027-01-01T00:00:00Z",
+                    ),
+                    self.deployment_row(
+                        evidence_id="EV-2152",
+                        phase="AWS-20",
+                        status="SUCCEEDED",
+                        observed_at="2027-01-01T00:01:00Z",
+                    ),
+                    self.deployment_row(
+                        evidence_id="EV-2153",
+                        phase="AWS-30",
+                        status="STALE",
+                        observed_at="2027-01-01T00:02:00Z",
+                        read_authority=old_read,
+                    ),
+                    self.deployment_row(
+                        evidence_id="EV-2154",
+                        phase="AWS-30",
+                        status=terminal_status,
+                        observed_at="2027-01-01T00:03:00Z",
+                        read_authority=new_read,
+                    ),
+                ]
+                result = self.derive_deployment(rows, read_authority=new_read)
+                self.assertEqual(result["status"], expected_status, result)
+                self.assertEqual(result["issues"], [], result)
+                self.assertEqual(result["reconciliation_status"], terminal_status)
+                self.assertEqual(result["read_authorization"], "AWS-READ-AUTH-0002")
+                self.assertEqual(result["read_role_or_profile"], "fastlane-read-role-2")
+
+    def test_reconciliation_refresh_replay_and_post_terminal_rows_fail_closed(
+        self,
+    ) -> None:
+        old_read = self.deployment_read_authority()
+        new_read = {
+            **old_read,
+            "authorization_id": "AWS-READ-AUTH-0002",
+            "receipt_digest": "sha256:" + "d" * 64,
+            "role_or_profile": "fastlane-read-role-2",
+        }
+        start = self.deployment_row(
+            evidence_id="EV-2161",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        terminal = self.deployment_row(
+            evidence_id="EV-2162",
+            phase="AWS-20",
+            status="SUCCEEDED",
+            observed_at="2027-01-01T00:01:00Z",
+        )
+        stale_old = self.deployment_row(
+            evidence_id="EV-2163",
+            phase="AWS-30",
+            status="STALE",
+            observed_at="2027-01-01T00:02:00Z",
+            read_authority=old_read,
+        )
+        stale_new = self.deployment_row(
+            evidence_id="EV-2164",
+            phase="AWS-30",
+            status="STALE",
+            observed_at="2027-01-01T00:03:00Z",
+            read_authority=new_read,
+        )
+        complete_old = self.deployment_row(
+            evidence_id="EV-2164",
+            phase="AWS-30",
+            status="COMPLETE",
+            observed_at="2027-01-01T00:03:00Z",
+            read_authority=old_read,
+        )
+        complete_new = self.deployment_row(
+            evidence_id="EV-2164",
+            phase="AWS-30",
+            status="COMPLETE",
+            observed_at="2027-01-01T00:03:00Z",
+            read_authority=new_read,
+        )
+        post_terminal = self.deployment_row(
+            evidence_id="EV-2165",
+            phase="AWS-30",
+            status="STALE",
+            observed_at="2027-01-01T00:04:00Z",
+            read_authority=old_read,
+        )
+        cases = {
+            "second stale": [start, terminal, stale_old, stale_new],
+            "same read authorization reused": [
+                start,
+                terminal,
+                stale_old,
+                complete_old,
+            ],
+            "row after terminal reconciliation": [
+                start,
+                terminal,
+                stale_old,
+                complete_new,
+                post_terminal,
+            ],
+        }
+        for label, rows in cases.items():
+            with self.subTest(label=label):
+                result = self.derive_deployment(rows, read_authority=new_read)
+                self.assertEqual(result["status"], "BLOCKED", result)
+                self.assertTrue(result["issues"], result)
+
+    def test_unreconciled_stale_basis_attempt_cannot_disappear(self) -> None:
+        old_attempt = self.deployment_row(
+            evidence_id="EV-2171",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+            basis="REQ-0000 / DES-0000 / AUTH-0000",
+        )
+        result = self.derive_deployment([old_attempt])
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(result["basis_stale"])
+        self.assertTrue(
+            any(
+                "original Gate B authorization provenance" in issue
+                for issue in result["issues"]
+            ),
+            result,
+        )
+        terminal = self.deployment_row(
+            evidence_id="EV-2172",
+            phase="AWS-20",
+            status="UNKNOWN",
+            observed_at="2027-01-01T00:01:00Z",
+            basis="REQ-0000 / DES-0000 / AUTH-0000",
+        )
+        result = self.derive_deployment([old_attempt, terminal])
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(result["basis_stale"])
+        self.assertTrue(
+            any(
+                "original Gate B authorization provenance" in issue
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_fast_dev_construction_authorization_cannot_be_replayed(self) -> None:
+        read = self.deployment_read_authority()
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-2181",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2182",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-01T00:01:00Z",
+            ),
+            self.deployment_row(
+                evidence_id="EV-2183",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+            ),
+            self.deployment_row(
+                evidence_id="EV-2184",
+                attempt_id="AWS-DEPLOY-0002",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:03:00Z",
+            ),
+        ]
+        result = self.derive_deployment(rows, read_authority=read)
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertTrue(
+            any(
+                "replays a deployment authorization" in issue.casefold()
+                for issue in result["issues"]
+            ),
+            result,
+        )
+
+    def test_aws30_complete_blocked_and_stale_have_distinct_states(self) -> None:
+        read = self.deployment_read_authority()
+        expected = {
+            "COMPLETE": "RECONCILED",
+            "BLOCKED": "BLOCKED",
+            "STALE": "RECONCILIATION_REQUIRED",
+        }
+        for lane in ("fast-dev", "explicit-gate"):
+            _base, receipt_digest = self.deployment_verify_text([], lane=lane)
+            for reconciliation_status, projection_status in expected.items():
+                with self.subTest(
+                    lane=lane, reconciliation_status=reconciliation_status
+                ):
+                    rows = [
+                        self.deployment_row(
+                            evidence_id="EV-2101",
+                            phase="AWS-20",
+                            status="STARTED",
+                            observed_at="2027-01-01T00:00:00Z",
+                            lane=lane,
+                            receipt_digest=receipt_digest,
+                        ),
+                        self.deployment_row(
+                            evidence_id="EV-2102",
+                            phase="AWS-20",
+                            status="SUCCEEDED",
+                            observed_at="2027-01-01T00:01:00Z",
+                            lane=lane,
+                            receipt_digest=receipt_digest,
+                        ),
+                        self.deployment_row(
+                            evidence_id="EV-2103",
+                            phase="AWS-30",
+                            status=reconciliation_status,
+                            observed_at="2027-01-01T00:02:00Z",
+                            lane=lane,
+                            read_authority=read,
+                            receipt_digest=receipt_digest,
+                        ),
+                    ]
+                    result = self.derive_deployment(
+                        rows, lane=lane, read_authority=read
+                    )
+                    self.assertEqual(result["status"], projection_status)
+                    self.assertEqual(
+                        result["reconciliation_status"], reconciliation_status
+                    )
+                    self.assertEqual(result["phase"], "AWS-30")
+                    self.assertEqual(
+                        result["deployment_role_or_profile"],
+                        "fastlane-deployment-role",
+                    )
+                    self.assertEqual(
+                        result["read_role_or_profile"], "fastlane-read-role"
+                    )
+
+                    expected_route = (
+                        ("AWS_DEPLOYMENT_RECONCILIATION", "AWS-30")
+                        if reconciliation_status == "STALE"
+                        else ("RELEASE_REVIEW", "RELEASE-10")
+                    )
+                    self.assertEqual(
+                        doctor.derive_aws_delivery_route(
+                            "READY_TO_DEPLOY",
+                            {"progress_state": "AWS_PREFLIGHT_READY"},
+                            result,
+                            lane,
+                        ),
+                        expected_route,
+                    )
+
+    def test_attempt_journal_mismatch_duplicate_order_and_replay_fail_closed(
+        self,
+    ) -> None:
+        read = self.deployment_read_authority()
+        started = self.deployment_row(
+            evidence_id="EV-2201",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+        )
+        terminal = self.deployment_row(
+            evidence_id="EV-2202",
+            phase="AWS-20",
+            status="SUCCEEDED",
+            observed_at="2027-01-01T00:01:00Z",
+        )
+        reconciliation = self.deployment_row(
+            evidence_id="EV-2203",
+            phase="AWS-30",
+            status="COMPLETE",
+            observed_at="2027-01-01T00:02:00Z",
+            read_authority=read,
+        )
+        cases = {
+            "duplicate evidence": [started, started],
+            "mismatched immutable binding": [
+                started,
+                self.deployment_row(
+                    evidence_id="EV-2202",
+                    phase="AWS-20",
+                    status="SUCCEEDED",
+                    observed_at="2027-01-01T00:01:00Z",
+                    artifact="sha256:" + "f" * 64,
+                ),
+            ],
+            "out of order": [reconciliation, started],
+            "duplicate reconciliation": [
+                started,
+                terminal,
+                reconciliation,
+                self.deployment_row(
+                    evidence_id="EV-2204",
+                    phase="AWS-30",
+                    status="BLOCKED",
+                    observed_at="2027-01-01T00:03:00Z",
+                    read_authority=read,
+                ),
+            ],
+            "noncontiguous replay": [
+                started,
+                terminal,
+                reconciliation,
+                self.deployment_row(
+                    evidence_id="EV-2204",
+                    attempt_id="AWS-DEPLOY-0002",
+                    phase="AWS-20",
+                    status="STARTED",
+                    observed_at="2027-01-01T00:03:00Z",
+                ),
+                self.deployment_row(
+                    evidence_id="EV-2205",
+                    attempt_id="AWS-DEPLOY-0001",
+                    phase="AWS-20",
+                    status="STARTED",
+                    observed_at="2027-01-01T00:04:00Z",
+                ),
+            ],
+            "mismatched revision": [
+                started,
+                self.deployment_row(
+                    evidence_id="EV-2202",
+                    phase="AWS-20",
+                    status="SUCCEEDED",
+                    observed_at="2027-01-01T00:01:00Z",
+                    basis="REQ-9999 / DES-0001 / AUTH-0001",
+                ),
+            ],
+        }
+        for label, rows in cases.items():
+            with self.subTest(label=label):
+                result = self.derive_deployment(rows, read_authority=read)
+                self.assertEqual(result["status"], "BLOCKED", result)
+                self.assertTrue(result["issues"], result)
+
+    def test_attempt_is_not_inferred_from_receipt_provenance_or_iac(self) -> None:
+        verify_text, _digest = self.deployment_verify_text([], lane="explicit-gate")
+        result = doctor.derive_deployment_sequence_state(
+            verify_text,
+            self.deployment_read_authority(),
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            construction_authorization="AUTH-0001",
+            envelope=self.deployment_envelope(),
+            lane="explicit-gate",
+            artifact_binding=self._DEPLOYMENT_ARTIFACT,
+        )
+        self.assertEqual(result["status"], "NOT_ACTIVE")
+        self.assertEqual(result["attempt_id"], "NONE")
+        self.assertEqual(result["action_status"], "NONE")
+
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "WAITING_AWS_MUTATION_AUTH"},
+                result,
+                "explicit-gate",
+            ),
+            ("WAITING_AWS_MUTATION_AUTH", "AWS-20"),
+        )
+        self.assertNotEqual(result["phase"], "AWS-20")
+
+    def test_aws30_projects_only_separate_reusable_read_authority(self) -> None:
+        context = doctor.Context(PROJECT_ROOT)
+        context.texts[doctor.VERIFY_FILE] = "verification"
+        read = self.deployment_read_authority()
+        calls: list[tuple[str, bool]] = []
+        original_read = doctor._read_preflight_receipt_authority
+        original_action = doctor._receipt_external_authority
+
+        def fake_read(
+            _text: str,
+            _authorization: str,
+            _cost: str,
+            _envelope: dict[str, str],
+            _artifact: str,
+            *,
+            allow_one_operation: bool = True,
+        ) -> dict[str, object]:
+            calls.append(("read", allow_one_operation))
+            return read
+
+        def forbidden_action(*_args: object, **_kwargs: object) -> None:
+            calls.append(("deployment", True))
+            return None
+
+        doctor._read_preflight_receipt_authority = fake_read
+        doctor._receipt_external_authority = forbidden_action
+        try:
+            authority = doctor.derive_external_authority(
+                context,
+                self.deployment_envelope(),
+                "explicit-gate",
+                "AUTH-0001",
+                cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+                active_artifact=self._DEPLOYMENT_ARTIFACT,
+                aws_action_phase="AWS-30",
+            )
+        finally:
+            doctor._read_preflight_receipt_authority = original_read
+            doctor._receipt_external_authority = original_action
+        self.assertEqual(calls, [("read", False)])
+        self.assertEqual(authority["kind"], "AWS_READ_ONLY")
+        self.assertEqual(authority["authorization_id"], "AWS-READ-AUTH-0001")
+        self.assertEqual(authority["role_or_profile"], "fastlane-read-role")
+        self.assertNotEqual(authority["role_or_profile"], "fastlane-deployment-role")
+
+    def test_expired_gate_b_closes_attempt_without_reviving_broad_authority(
+        self,
+    ) -> None:
+        fixture = BootstrapDoctorTests()
+        with tempfile.TemporaryDirectory() as directory:
+            project = fixture.copy_project(Path(directory))
+            manifest_path = project / "bootstrap.manifest.json"
+            state_path = project / "bootstrap.yaml"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            manifest["bootstrap_version"] = state["bootstrap_version"]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            refresh_control_hashes(project)
+            fixture.approve_project(project)
+
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["project"]["aws_lane"] = "explicit-gate"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            prd_path = project / "docs/project/PRD.md"
+            prd_text = prd_path.read_text(encoding="utf-8")
+            prd_text = set_table_value(
+                prd_text,
+                "## Document status",
+                "## 1. Workload profile",
+                "AWS lane",
+                "`explicit-gate`",
+            )
+            expired_at = "2026-07-18T18:00:00Z"
+            envelope_values = {
+                "Project AWS lane": "`explicit-gate`",
+                "AWS boundary": "`MUTATE_LISTED_RESOURCES`",
+                "AWS account": "`ACCOUNT: 111122223333`",
+                "AWS role or profile": "`ROLE: fastlane-deployment-role`",
+                "AWS Region": "`REGION: us-west-2`",
+                "AWS environment": (
+                    "`ENVIRONMENT: development; CLASS: NON_PRODUCTION`"
+                ),
+                "AWS stack or application": "`STACK: fastlane-stack`",
+                "AWS resource allowlist": "`RESOURCES: fastlane-stack`",
+                "AWS allowed operations": (
+                    "`OPERATIONS: cloudformation:DescribeStacks, "
+                    "cloudformation:CreateChangeSet, "
+                    "cloudformation:ExecuteChangeSet`"
+                ),
+                "AWS cost ceiling": "`USD: 20.00`",
+                "AWS prohibited operations": (
+                    "`PROHIBITED: wildcard resources, IAM broadening, "
+                    "destructive replacement`"
+                ),
+                "AWS artifact authorization and provenance": (
+                    f"`EXACT_DIGEST: {self._DEPLOYMENT_ARTIFACT}`"
+                ),
+                "AWS rollback boundary": "`ROLLBACK: rollback fastlane-stack`",
+                "AWS authorization validity": (
+                    f"`Expires at {expired_at}; earlier completion: "
+                    "authorized AWS action ends`"
+                ),
+                "Authorization expiry or completion condition": (
+                    f"`Expires at {expired_at}; earlier completion: release review`"
+                ),
+            }
+            for field, value in envelope_values.items():
+                prd_text = set_table_value(
+                    prd_text,
+                    "## 28. Construction envelope",
+                    "## 29. Gate B owner authorization record",
+                    field,
+                    value,
+                )
+            prd_path.write_text(rebind_gate_b_envelope(prd_text), encoding="utf-8")
+
+            verify_path = project / "docs/project/VERIFY.md"
+            verify_text = verify_path.read_text(encoding="utf-8")
+            verify_text = replace_contract_table(
+                verify_text,
+                "## Verification matrix",
+                self._VERIFICATION_MATRIX_HEADERS,
+                [
+                    (
+                        "EV-9001",
+                        "FR-001",
+                        "TASK-001",
+                        "FR-001 primary outcome passes after deployment",
+                        "EV-0001 local suite passed",
+                        "DescribeStacks returned UPDATE_COMPLETE",
+                        f"ARTIFACT: {self._DEPLOYMENT_ARTIFACT}; "
+                        "ACCOUNT: 111122223333; REGION: us-west-2; "
+                        "ENVIRONMENT: development",
+                        "VERIFIED",
+                    )
+                ],
+            )
+            verify_text, deployment_digest = self.bind_explicit_deployment_receipt(
+                verify_text,
+                valid_until=expired_at,
+                authorized_at="2026-07-17T18:00:00Z",
+            )
+            verify_text = set_table_value(
+                verify_text,
+                "## Active evidence scope",
+                "## Evidence status vocabulary",
+                "Commit, tag, or image digest",
+                f"`{self._DEPLOYMENT_ARTIFACT}`",
+            )
+            verify_text = verify_text.replace(
+                "- Release state: `NOT_READY`",
+                "- Release state: `READY_TO_DEPLOY`",
+                1,
+            ).replace(
+                "- Active evidence cutoff: TODO",
+                "- Active evidence cutoff: NONE",
+                1,
+            )
+
+            started = self.deployment_row(
+                evidence_id="EV-9501",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2026-07-17T18:30:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+                deployment_valid_until=expired_at,
+            )
+
+            def write_rows(*rows: tuple[str, ...]) -> None:
+                current = verify_path.read_text(encoding="utf-8")
+                verify_path.write_text(
+                    replace_contract_table(
+                        current,
+                        doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                        doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+                        list(rows),
+                    ),
+                    encoding="utf-8",
+                )
+
+            verify_path.write_text(verify_text, encoding="utf-8")
+            write_rows(started)
+            started_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(started_report)
+            self.assert_no_external_mutation_authority(started_report)
+
+            self.assertTrue(started_report["ok"], started_report["diagnostics"])
+            self.assertEqual(
+                (started_report["lifecycle_state"], started_report["next_prompt"]),
+                ("AWS_DEPLOYMENT_ACTION_TERMINAL", "AWS-20"),
+            )
+            self.assertEqual(
+                started_report["interaction"]["owner_action_kind"],
+                "NONE_CONTINUE_AUTOMATICALLY",
+            )
+            self.assertTrue(
+                started_report["interaction"]["automatic_continuation_allowed"]
+            )
+            self.assertEqual(started_report["authorizations"]["construction"], "NONE")
+            self.assertFalse(started_report["write_authority"]["valid"])
+            self.assertEqual(started_report["external_authority"]["kind"], "NONE")
+            closure = started_report["deployment_journal_closure_authority"]
+            self.assertTrue(closure["valid"], closure)
+            self.assertEqual(closure["mode"], "BOUNDED_EVIDENCE_CLOSURE")
+            self.assertEqual(closure["allowed_write_paths"], [doctor.VERIFY_FILE])
+            self.assertEqual(
+                closure["allowed_sections"],
+                [doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING],
+            )
+            self.assertEqual(
+                closure["allowed_operations"],
+                ["APPEND_ACTION_TERMINAL_ROW"],
+            )
+            self.assertEqual(closure["construction_authorization"], "NONE")
+            self.assertEqual(closure["aws_mutation_authority"], "NONE")
+
+            unknown = self.deployment_row(
+                evidence_id="EV-9502",
+                phase="AWS-20",
+                status="UNKNOWN",
+                observed_at="2026-07-29T00:01:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+                deployment_valid_until=expired_at,
+            )
+            write_rows(started, unknown)
+            missing_read_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(missing_read_report)
+            self.assert_no_external_mutation_authority(missing_read_report)
+            self.assertTrue(
+                missing_read_report["ok"], missing_read_report["diagnostics"]
+            )
+            self.assertEqual(
+                (
+                    missing_read_report["lifecycle_state"],
+                    missing_read_report["next_prompt"],
+                ),
+                ("AWS_DEPLOYMENT_RECONCILIATION", "AWS-30"),
+            )
+            self.assertEqual(
+                missing_read_report["external_authority"]["kind"],
+                "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED",
+            )
+            self.assertEqual(
+                missing_read_report["interaction"]["owner_action_kind"],
+                "AUTHORIZE_AWS_READ_PREFLIGHT",
+            )
+            self.assertFalse(missing_read_report["write_authority"]["valid"])
+            self.assertEqual(
+                missing_read_report["authorizations"]["construction"], "NONE"
+            )
+            closure = missing_read_report["deployment_journal_closure_authority"]
+            self.assertEqual(
+                closure["allowed_sections"],
+                [
+                    "bootstrap:aws-read-preflight-receipt",
+                    "## Action authorization provenance",
+                    doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                ],
+            )
+            self.assertEqual(
+                closure["allowed_operations"],
+                [
+                    "RECORD_RECONCILIATION_READ_AUTHORITY",
+                    "APPEND_RECONCILIATION_ROW",
+                ],
+            )
+
+            before_read = verify_path.read_text(encoding="utf-8")
+            wildcard_read, _wildcard = self.bind_read_receipt(
+                before_read,
+                operations=("cloudformation:*",),
+                authorized_at="2026-07-29T00:02:00Z",
+            )
+            verify_path.write_text(wildcard_read, encoding="utf-8")
+            wildcard_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(wildcard_report)
+            self.assert_no_external_mutation_authority(wildcard_report)
+            self.assertEqual(
+                wildcard_report["external_authority"]["kind"],
+                "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED",
+            )
+            self.assertEqual(wildcard_report["authorizations"]["aws"], "NONE")
+
+            read_bound, read_authority = self.bind_read_receipt(
+                before_read,
+                authorized_at="2026-07-29T00:02:00Z",
+            )
+            verify_path.write_text(read_bound, encoding="utf-8")
+            read_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(read_report)
+            self.assert_no_external_mutation_authority(read_report)
+            self.assertTrue(read_report["ok"], read_report["diagnostics"])
+            self.assertEqual(read_report["external_authority"]["kind"], "AWS_READ_ONLY")
+            self.assertEqual(
+                read_report["external_authority"]["operations"],
+                ["cloudformation:DescribeStacks"],
+            )
+            self.assertEqual(
+                read_report["interaction"]["owner_action_kind"],
+                "NONE_CONTINUE_AUTOMATICALLY",
+            )
+            self.assertFalse(read_report["write_authority"]["valid"])
+            self.assertEqual(read_report["authorizations"]["construction"], "NONE")
+            self.assertNotIn(
+                "cloudformation:ExecuteChangeSet",
+                read_report["external_authority"]["operations"],
+            )
+
+            terminal = self.deployment_row(
+                evidence_id="EV-9503",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2026-07-29T00:03:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+                deployment_valid_until=expired_at,
+                read_authority=read_authority,
+            )
+            write_rows(started, unknown, terminal)
+            terminal_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(terminal_report)
+            self.assert_no_external_mutation_authority(terminal_report)
+            self.assertTrue(terminal_report["ok"], terminal_report["diagnostics"])
+            self.assertEqual(
+                (terminal_report["lifecycle_state"], terminal_report["next_prompt"]),
+                ("RELEASE_REVIEW", "RELEASE-10"),
+            )
+            self.assertEqual(terminal_report["aws_deployment"]["status"], "RECONCILED")
+            self.assertFalse(terminal_report["write_authority"]["valid"])
+            self.assertEqual(terminal_report["external_authority"]["kind"], "NONE")
+            closure = terminal_report["deployment_journal_closure_authority"]
+            self.assertEqual(
+                closure["allowed_sections"], ["## Current release decision"]
+            )
+            self.assertEqual(
+                closure["allowed_operations"],
+                ["UPDATE_RELEASE_DECISION_AND_EVIDENCE_CUTOFF"],
+            )
+            self.assertEqual(
+                closure["allowed_release_states"],
+                ["NOT_READY", "RELEASE_VERIFIED"],
+            )
+
+            terminal_text = verify_path.read_text(encoding="utf-8")
+            terminal_text = terminal_text.replace(
+                "- Release state: `READY_TO_DEPLOY`",
+                "- Release state: `RELEASE_VERIFIED`",
+                1,
+            ).replace(
+                "- Active evidence cutoff: NONE",
+                "- Active evidence cutoff: EV-9503",
+                1,
+            )
+            verify_path.write_text(terminal_text, encoding="utf-8")
+            consumed_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(consumed_report)
+            self.assert_no_external_mutation_authority(consumed_report)
+            self.assertTrue(consumed_report["ok"], consumed_report["diagnostics"])
+            self.assertEqual(consumed_report["aws_deployment"]["status"], "CONSUMED")
+            self.assert_no_closure_authority(consumed_report)
+            self.assertFalse(consumed_report["write_authority"]["valid"])
+            self.assertEqual(consumed_report["authorizations"]["construction"], "NONE")
+            self.assertEqual(consumed_report["external_authority"]["kind"], "NONE")
+
+    def test_stale_gate_b_closes_historical_attempt_without_reapproval(self) -> None:
+        fixture = BootstrapDoctorTests()
+        with tempfile.TemporaryDirectory() as directory:
+            project = fixture.copy_project(Path(directory))
+            manifest_path = project / "bootstrap.manifest.json"
+            state_path = project / "bootstrap.yaml"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            manifest["bootstrap_version"] = state["bootstrap_version"]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            refresh_control_hashes(project)
+            fixture.approve_project(project)
+
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["project"]["aws_lane"] = "explicit-gate"
+            state["lifecycle"]["design_revision"] = "DES-0002"
+            state["lifecycle"]["gate_b"] = "STALE"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            prd_path = project / "docs/project/PRD.md"
+            prd_text = prd_path.read_text(encoding="utf-8")
+            for field, value in {
+                "Current design revision": "`DES-0002`",
+                "Gate B derived status": "`STALE`",
+                "AWS lane": "`explicit-gate`",
+            }.items():
+                prd_text = set_table_value(
+                    prd_text,
+                    "## Document status",
+                    "## 1. Workload profile",
+                    field,
+                    value,
+                )
+            prd_text = set_table_value(
+                prd_text,
+                "## 27. Gate B agent review record",
+                "## 28. Construction envelope",
+                "Agent recommendation",
+                "`BLOCKED`",
+            )
+            envelope_values = {
+                "Project AWS lane": "`explicit-gate`",
+                "AWS boundary": "`MUTATE_LISTED_RESOURCES`",
+                "AWS account": "`ACCOUNT: 111122223333`",
+                "AWS role or profile": "`ROLE: replacement-deployment-role`",
+                "AWS Region": "`REGION: us-east-1`",
+                "AWS environment": ("`ENVIRONMENT: redesign; CLASS: NON_PRODUCTION`"),
+                "AWS stack or application": "`STACK: replacement-stack`",
+                "AWS resource allowlist": "`RESOURCES: replacement-stack`",
+                "AWS allowed operations": (
+                    "`OPERATIONS: lambda:GetFunction, lambda:UpdateFunctionCode`"
+                ),
+                "AWS cost ceiling": "`USD: 20.00`",
+                "AWS prohibited operations": (
+                    "`PROHIBITED: wildcard resources, IAM broadening, "
+                    "destructive replacement`"
+                ),
+                "AWS artifact authorization and provenance": (
+                    "`EXACT_DIGEST: sha256:" + "f" * 64 + "`"
+                ),
+                "AWS rollback boundary": "`ROLLBACK: rollback replacement-stack`",
+                "AWS authorization validity": (
+                    "`Expires at 2099-01-01T00:00:00Z; earlier completion: "
+                    "authorized AWS action ends`"
+                ),
+                "Authorization expiry or completion condition": (
+                    "`Expires at 2099-01-01T00:00:00Z; earlier completion: "
+                    "release review`"
+                ),
+            }
+            for field, value in envelope_values.items():
+                prd_text = set_table_value(
+                    prd_text,
+                    "## 28. Construction envelope",
+                    "## 29. Gate B owner authorization record",
+                    field,
+                    value,
+                )
+            prd_path.write_text(prd_text, encoding="utf-8")
+
+            tasks_path = project / "docs/project/TASKS.md"
+            tasks_text = tasks_path.read_text(encoding="utf-8")
+            tasks_text = set_table_value(
+                tasks_text,
+                "## Active execution snapshot",
+                "## Coordinator contract",
+                "Design revision",
+                "`DES-0002`",
+            )
+            tasks_text = set_table_value(
+                tasks_text,
+                "## Active execution snapshot",
+                "## Coordinator contract",
+                "Gate B state",
+                "`STALE`",
+            )
+            tasks_path.write_text(tasks_text, encoding="utf-8")
+
+            verify_path = project / "docs/project/VERIFY.md"
+            verify_text = verify_path.read_text(encoding="utf-8")
+            verify_text = replace_contract_table(
+                verify_text,
+                "## Verification matrix",
+                self._VERIFICATION_MATRIX_HEADERS,
+                [
+                    (
+                        "EV-9001",
+                        "FR-001",
+                        "TASK-001",
+                        "FR-001 primary outcome passes after deployment",
+                        "EV-0001 local suite passed",
+                        "DescribeStacks returned UPDATE_COMPLETE",
+                        f"ARTIFACT: {self._DEPLOYMENT_ARTIFACT}; "
+                        "ACCOUNT: 111122223333; REGION: us-west-2; "
+                        "ENVIRONMENT: development",
+                        "VERIFIED",
+                    )
+                ],
+            )
+            verify_text, deployment_digest = self.bind_explicit_deployment_receipt(
+                verify_text,
+                authorized_at="2026-07-17T18:00:00Z",
+            )
+            verify_text = set_table_value(
+                verify_text,
+                "## Active evidence scope",
+                "## Evidence status vocabulary",
+                "Commit, tag, or image digest",
+                f"`{self._DEPLOYMENT_ARTIFACT}`",
+            )
+            verify_text = verify_text.replace(
+                "- Release state: `NOT_READY`",
+                "- Release state: `READY_TO_DEPLOY`",
+                1,
+            ).replace(
+                "- Active evidence cutoff: TODO",
+                "- Active evidence cutoff: NONE",
+                1,
+            )
+            verify_path.write_text(verify_text, encoding="utf-8")
+
+            started = self.deployment_row(
+                evidence_id="EV-9601",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2026-07-18T00:00:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+            )
+
+            def write_rows(*rows: tuple[str, ...]) -> None:
+                current = verify_path.read_text(encoding="utf-8")
+                verify_path.write_text(
+                    replace_contract_table(
+                        current,
+                        doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                        doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+                        list(rows),
+                    ),
+                    encoding="utf-8",
+                )
+
+            write_rows(started)
+            started_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(started_report)
+            self.assertTrue(started_report["ok"], started_report["diagnostics"])
+            self.assertEqual(started_report["gates"]["gate_b"], "STALE")
+            self.assertEqual(
+                (started_report["lifecycle_state"], started_report["next_prompt"]),
+                ("AWS_DEPLOYMENT_ACTION_TERMINAL", "AWS-20"),
+            )
+            self.assertTrue(started_report["aws_deployment"]["basis_stale"])
+            self.assertEqual(started_report["authorizations"]["construction"], "NONE")
+            self.assertFalse(started_report["write_authority"]["valid"])
+            self.assertEqual(started_report["external_authority"]["kind"], "NONE")
+            self.assert_no_external_mutation_authority(started_report)
+            self.assert_exact_closure_authority(
+                started_report,
+                sections=[doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING],
+                operations=["APPEND_ACTION_TERMINAL_ROW"],
+            )
+
+            unknown = self.deployment_row(
+                evidence_id="EV-9602",
+                phase="AWS-20",
+                status="UNKNOWN",
+                observed_at="2026-07-29T01:00:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+            )
+            write_rows(started, unknown)
+            no_read_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(no_read_report)
+            self.assertTrue(no_read_report["ok"], no_read_report["diagnostics"])
+            self.assertEqual(
+                (no_read_report["lifecycle_state"], no_read_report["next_prompt"]),
+                ("AWS_DEPLOYMENT_RECONCILIATION", "AWS-30"),
+            )
+            self.assertEqual(
+                no_read_report["external_authority"]["kind"],
+                "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED",
+            )
+            self.assertEqual(no_read_report["authorizations"]["construction"], "NONE")
+            self.assert_no_external_mutation_authority(no_read_report)
+            self.assert_exact_closure_authority(
+                no_read_report,
+                sections=[
+                    "bootstrap:aws-read-preflight-receipt",
+                    "## Action authorization provenance",
+                    doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                ],
+                operations=[
+                    "RECORD_RECONCILIATION_READ_AUTHORITY",
+                    "APPEND_RECONCILIATION_ROW",
+                ],
+            )
+
+            read_bound, read_authority = self.bind_read_receipt(
+                verify_path.read_text(encoding="utf-8"),
+                construction_authorization="AUTH-0001",
+                authorized_at="2026-07-29T01:01:00Z",
+            )
+            verify_path.write_text(read_bound, encoding="utf-8")
+            read_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(read_report)
+            self.assertTrue(read_report["ok"], read_report["diagnostics"])
+            self.assertEqual(read_report["external_authority"]["kind"], "AWS_READ_ONLY")
+            self.assertEqual(
+                read_report["external_authority"]["account"], "111122223333"
+            )
+            self.assertEqual(read_report["external_authority"]["region"], "us-west-2")
+            self.assertEqual(
+                read_report["external_authority"]["resources"], ["fastlane-stack"]
+            )
+            self.assertEqual(
+                read_report["external_authority"]["artifact_plan_binding"]["artifact"],
+                self._DEPLOYMENT_ARTIFACT,
+            )
+            self.assertEqual(read_report["authorizations"]["construction"], "NONE")
+            self.assertFalse(read_report["write_authority"]["valid"])
+            self.assert_no_external_mutation_authority(read_report)
+            self.assert_exact_closure_authority(
+                read_report,
+                sections=[
+                    "bootstrap:aws-read-preflight-receipt",
+                    "## Action authorization provenance",
+                    doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                ],
+                operations=[
+                    "RECORD_RECONCILIATION_READ_AUTHORITY",
+                    "APPEND_RECONCILIATION_ROW",
+                ],
+            )
+
+            terminal = self.deployment_row(
+                evidence_id="EV-9603",
+                phase="AWS-30",
+                status="BLOCKED",
+                observed_at="2026-07-29T01:02:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+                read_authority=read_authority,
+            )
+            write_rows(started, unknown, terminal)
+            terminal_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(terminal_report)
+            self.assertTrue(terminal_report["ok"], terminal_report["diagnostics"])
+            self.assertEqual(
+                (terminal_report["lifecycle_state"], terminal_report["next_prompt"]),
+                ("RELEASE_REVIEW", "RELEASE-10"),
+            )
+            self.assertTrue(terminal_report["aws_deployment"]["basis_stale"])
+            self.assertEqual(
+                terminal_report["aws_deployment"]["reconciliation_status"],
+                "BLOCKED",
+            )
+            self.assertEqual(terminal_report["authorizations"]["construction"], "NONE")
+            self.assertEqual(terminal_report["external_authority"]["kind"], "NONE")
+            self.assert_no_external_mutation_authority(terminal_report)
+            self.assert_exact_closure_authority(
+                terminal_report,
+                sections=["## Current release decision"],
+                operations=["UPDATE_RELEASE_DECISION_AND_EVIDENCE_CUTOFF"],
+                release_states=["NOT_READY"],
+            )
+
+            release_text = verify_path.read_text(encoding="utf-8")
+            release_text = release_text.replace(
+                "- Release state: `READY_TO_DEPLOY`",
+                "- Release state: `NOT_READY`",
+                1,
+            ).replace(
+                "- Active evidence cutoff: NONE",
+                "- Active evidence cutoff: EV-9603",
+                1,
+            )
+            verify_path.write_text(release_text, encoding="utf-8")
+            consumed_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(consumed_report)
+            self.assertTrue(consumed_report["ok"], consumed_report["diagnostics"])
+            self.assertEqual(consumed_report["aws_deployment"]["status"], "CONSUMED")
+            self.assertFalse(consumed_report["write_authority"]["valid"])
+            self.assertEqual(consumed_report["authorizations"]["construction"], "NONE")
+            self.assert_no_external_mutation_authority(consumed_report)
+            self.assert_no_closure_authority(consumed_report)
+
+    def test_stale_basis_aws30_requires_read_authority_not_mutation(self) -> None:
+        stale_started = self.deployment_row(
+            evidence_id="EV-2191",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2027-01-01T00:00:00Z",
+            basis="REQ-0000 / DES-0000 / AUTH-0000",
+            deployment_authorization="AUTH-0000",
+        )
+        stale_terminal = self.deployment_row(
+            evidence_id="EV-2192",
+            phase="AWS-20",
+            status="UNKNOWN",
+            observed_at="2027-01-01T00:01:00Z",
+            basis="REQ-0000 / DES-0000 / AUTH-0000",
+            deployment_authorization="AUTH-0000",
+        )
+        verify_text, _digest = self.deployment_verify_text(
+            [stale_started, stale_terminal], lane="fast-dev"
+        )
+        sequence = doctor.derive_deployment_sequence_state(
+            verify_text,
+            None,
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            construction_authorization="AUTH-0001",
+            envelope=self.deployment_envelope(),
+            lane="fast-dev",
+            artifact_binding=self._DEPLOYMENT_ARTIFACT,
+            gate_b_authority_source="owner-message MSG-GATE-B-0001",
+            gate_b_authorized_at="2026-12-31T23:59:59Z",
+        )
+        self.assertTrue(sequence["basis_stale"])
+        self.assertEqual(sequence["status"], "RECONCILIATION_REQUIRED")
+        self.assertEqual(
+            doctor.derive_aws_delivery_route(
+                "READY_TO_DEPLOY",
+                {"progress_state": "AWS_PREFLIGHT_READY"},
+                sequence,
+                "fast-dev",
+            ),
+            ("AWS_DEPLOYMENT_RECONCILIATION", "AWS-30"),
+        )
+
+        context = doctor.Context(PROJECT_ROOT)
+        context.texts[doctor.VERIFY_FILE] = verify_text
+        authority = doctor.derive_external_authority(
+            context,
+            self.deployment_envelope(),
+            "fast-dev",
+            "AUTH-0001",
+            cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+            active_artifact=self._DEPLOYMENT_ARTIFACT,
+            aws_action_phase="AWS-30",
+        )
+        self.assertEqual(authority["kind"], "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED")
+        self.assertEqual(authority["validity"], "REQUIRED")
+        self.assertNotEqual(authority["kind"], "FAST_DEV_GATE_B")
+        interaction = doctor.derive_interaction(
+            "AWS_DEPLOYMENT_RECONCILIATION",
+            "AWS-30",
+            has_errors=False,
+            diagnostic_codes=[],
+            design_aws_core_ready=True,
+            aws_execution_planning_ready=True,
+            aws_lane="fast-dev",
+            aws_read_authority_required=True,
+        )
+        self.assertEqual(
+            interaction["owner_action_kind"], "AUTHORIZE_AWS_READ_PREFLIGHT"
+        )
+        self.assertFalse(interaction["automatic_continuation_allowed"])
+        self.assertTrue(interaction["formal_receipt_required"])
+
+    def test_stale_started_before_original_authorization_fails_closed(self) -> None:
+        template = (PROJECT_ROOT / doctor.VERIFY_FILE).read_text(encoding="utf-8")
+        verify_text, deployment_digest = self.bind_explicit_deployment_receipt(
+            template,
+            authorized_at="2027-01-01T00:00:00Z",
+        )
+        started = self.deployment_row(
+            evidence_id="EV-9701",
+            phase="AWS-20",
+            status="STARTED",
+            observed_at="2026-12-31T23:59:00Z",
+            lane="explicit-gate",
+            basis="REQ-0000 / DES-0000 / AUTH-0001",
+            receipt_digest=deployment_digest,
+        )
+        verify_text = replace_contract_table(
+            verify_text,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+            [started],
+        )
+        result = doctor.derive_deployment_sequence_state(
+            verify_text,
+            None,
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            construction_authorization="AUTH-0001",
+            envelope=self.deployment_envelope(),
+            lane="explicit-gate",
+            artifact_binding=self._DEPLOYMENT_ARTIFACT,
+            gate_b_authority_source="owner-message MSG-GATE-B-0001",
+            gate_b_authorized_at="2026-12-31T23:58:00Z",
+            restricted_closure=True,
+        )
+        self.assertEqual(result["status"], "BLOCKED", result)
+        self.assertIn(
+            "precedes its original authorization provenance",
+            " ".join(result["issues"]),
+        )
+
+    def test_normal_gate_b_reuses_exact_aws10_receipt_end_to_end(self) -> None:
+        envelope = aws_authority_envelope(
+            role="fastlane-deployment-role",
+            account="111122223333",
+            region="us-west-2",
+            environment="development",
+            resources=["fastlane-stack"],
+            operations=[
+                "cloudformation:DescribeStacks",
+                *self._DEPLOYMENT_OPERATIONS,
+            ],
+            artifact=self._DEPLOYMENT_ARTIFACT,
+            rollback="rollback fastlane-stack",
+        )
+        template = (PROJECT_ROOT / doctor.VERIFY_FILE).read_text(encoding="utf-8")
+        verify_text, deployment_digest = self.bind_explicit_deployment_receipt(
+            template,
+            authorized_at="2026-12-31T23:58:00Z",
+        )
+        verify_text, read = self.bind_read_receipt(
+            verify_text,
+            authorized_at="2026-12-31T23:59:00Z",
+        )
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-9711",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+            ),
+            self.deployment_row(
+                evidence_id="EV-9712",
+                phase="AWS-20",
+                status="UNKNOWN",
+                observed_at="2027-01-01T00:01:00Z",
+                lane="explicit-gate",
+                receipt_digest=deployment_digest,
+            ),
+        ]
+        verify_text = replace_contract_table(
+            verify_text,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+            rows,
+        )
+        sequence = doctor.derive_deployment_sequence_state(
+            verify_text,
+            read,
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            construction_authorization="AUTH-0001",
+            envelope=envelope,
+            lane="explicit-gate",
+            artifact_binding=self._DEPLOYMENT_ARTIFACT,
+            gate_b_authority_source="owner-message MSG-GATE-B-0001",
+            gate_b_authorized_at="2026-12-31T23:57:00Z",
+            restricted_closure=False,
+            cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+        )
+        self.assertEqual(sequence["status"], "RECONCILIATION_REQUIRED", sequence)
+        projected = sequence["reconciliation_read_authority"]
+        self.assertEqual(projected["authorization_id"], read["authorization_id"])
+        self.assertFalse(projected["reconciliation_only"])
+        context = doctor.Context(PROJECT_ROOT)
+        context.texts[doctor.VERIFY_FILE] = verify_text
+        authority = doctor.derive_external_authority(
+            context,
+            envelope,
+            "explicit-gate",
+            "AUTH-0001",
+            cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+            active_artifact=self._DEPLOYMENT_ARTIFACT,
+            aws_action_phase="AWS-30",
+            deployment_sequence=sequence,
+        )
+        self.assertEqual(authority["kind"], "AWS_READ_ONLY", authority)
+        self.assertEqual(authority["authorization_id"], read["authorization_id"])
+
+    def test_stale_complete_can_only_acknowledge_not_ready(self) -> None:
+        template = (PROJECT_ROOT / doctor.VERIFY_FILE).read_text(encoding="utf-8")
+        verify_text, read = self.bind_read_receipt(
+            template,
+            construction_authorization="AUTH-0000",
+            authorized_at="2027-01-01T00:01:30Z",
+        )
+        verify_text = replace_contract_table(
+            verify_text,
+            "## Verification matrix",
+            self._VERIFICATION_MATRIX_HEADERS,
+            [
+                (
+                    "EV-9001",
+                    "FR-001",
+                    "TASK-001",
+                    "FR-001 primary outcome passes after deployment",
+                    "EV-0001 local suite passed",
+                    "DescribeStacks returned UPDATE_COMPLETE",
+                    f"ARTIFACT: {self._DEPLOYMENT_ARTIFACT}; "
+                    "ACCOUNT: 111122223333; REGION: us-west-2; "
+                    "ENVIRONMENT: development",
+                    "VERIFIED",
+                )
+            ],
+        )
+        old = {
+            "basis": "REQ-0000 / DES-0000 / AUTH-0000",
+            "deployment_authorization": "AUTH-0000",
+        }
+        rows = [
+            self.deployment_row(
+                evidence_id="EV-9721",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+                **old,
+            ),
+            self.deployment_row(
+                evidence_id="EV-9722",
+                phase="AWS-20",
+                status="UNKNOWN",
+                observed_at="2027-01-01T00:01:00Z",
+                **old,
+            ),
+            self.deployment_row(
+                evidence_id="EV-9723",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-01T00:02:00Z",
+                read_authority=read,
+                **old,
+            ),
+        ]
+        verify_text = replace_contract_table(
+            verify_text,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+            doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+            rows,
+        )
+        common = dict(
+            verify_text=verify_text,
+            read_authority=None,
+            requirements_revision="REQ-0001",
+            design_revision="DES-0001",
+            construction_authorization="AUTH-0001",
+            envelope=self.deployment_envelope(),
+            lane="fast-dev",
+            artifact_binding=self._DEPLOYMENT_ARTIFACT,
+            gate_b_authority_source="owner-message MSG-GATE-B-0001",
+            gate_b_authorized_at="2026-12-31T23:59:59Z",
+            restricted_closure=True,
+            cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+            release_evidence_cutoff="EV-9723",
+        )
+        rejected = doctor.derive_deployment_sequence_state(
+            release_state="RELEASE_VERIFIED", **common
+        )
+        self.assertEqual(rejected["status"], "BLOCKED", rejected)
+        accepted = doctor.derive_deployment_sequence_state(
+            release_state="NOT_READY", **common
+        )
+        self.assertEqual(accepted["status"], "CONSUMED", accepted)
+
+    def test_expired_blocked_acknowledgement_stops_without_release_loop(self) -> None:
+        fixture = BootstrapDoctorTests()
+        with tempfile.TemporaryDirectory() as directory:
+            project = fixture.copy_project(Path(directory))
+            manifest_path = project / "bootstrap.manifest.json"
+            state_path = project / "bootstrap.yaml"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            manifest["bootstrap_version"] = state["bootstrap_version"]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            refresh_control_hashes(project)
+            fixture.approve_project(project)
+
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["project"]["aws_lane"] = "explicit-gate"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            expired_at = "2026-07-18T18:00:00Z"
+            prd_path = project / doctor.PRD_FILE
+            prd_text = prd_path.read_text(encoding="utf-8")
+            prd_text = set_table_value(
+                prd_text,
+                "## Document status",
+                "## 1. Workload profile",
+                "AWS lane",
+                "`explicit-gate`",
+            )
+            envelope_values = {
+                "Project AWS lane": "`explicit-gate`",
+                "AWS boundary": "`MUTATE_LISTED_RESOURCES`",
+                "AWS account": "`ACCOUNT: 111122223333`",
+                "AWS role or profile": "`ROLE: fastlane-deployment-role`",
+                "AWS Region": "`REGION: us-west-2`",
+                "AWS environment": "`ENVIRONMENT: development; CLASS: NON_PRODUCTION`",
+                "AWS stack or application": "`STACK: fastlane-stack`",
+                "AWS resource allowlist": "`RESOURCES: fastlane-stack`",
+                "AWS allowed operations": (
+                    "`OPERATIONS: cloudformation:DescribeStacks, "
+                    "cloudformation:CreateChangeSet, cloudformation:ExecuteChangeSet`"
+                ),
+                "AWS cost ceiling": "`USD: 20.00`",
+                "AWS prohibited operations": (
+                    "`PROHIBITED: wildcard resources, IAM broadening, destructive replacement`"
+                ),
+                "AWS artifact authorization and provenance": (
+                    f"`EXACT_DIGEST: {self._DEPLOYMENT_ARTIFACT}`"
+                ),
+                "AWS rollback boundary": "`ROLLBACK: rollback fastlane-stack`",
+                "AWS authorization validity": (
+                    f"`Expires at {expired_at}; earlier completion: authorized AWS action ends`"
+                ),
+                "Authorization expiry or completion condition": (
+                    f"`Expires at {expired_at}; earlier completion: release review`"
+                ),
+            }
+            for field, value in envelope_values.items():
+                prd_text = set_table_value(
+                    prd_text,
+                    "## 28. Construction envelope",
+                    "## 29. Gate B owner authorization record",
+                    field,
+                    value,
+                )
+            prd_path.write_text(rebind_gate_b_envelope(prd_text), encoding="utf-8")
+
+            verify_path = project / doctor.VERIFY_FILE
+            verify_text = verify_path.read_text(encoding="utf-8")
+            verify_text, deployment_digest = self.bind_explicit_deployment_receipt(
+                verify_text,
+                valid_until=expired_at,
+                authorized_at="2026-07-17T18:00:00Z",
+            )
+            verify_text, read = self.bind_read_receipt(
+                verify_text,
+                authorized_at="2026-07-29T00:02:00Z",
+            )
+            verify_text = set_table_value(
+                verify_text,
+                "## Active evidence scope",
+                "## Evidence status vocabulary",
+                "Commit, tag, or image digest",
+                f"`{self._DEPLOYMENT_ARTIFACT}`",
+            )
+            verify_text = verify_text.replace(
+                "- Release state: `NOT_READY`",
+                "- Release state: `NOT_READY`",
+                1,
+            ).replace(
+                "- Active evidence cutoff: TODO",
+                "- Active evidence cutoff: EV-9733",
+                1,
+            )
+            rows = [
+                self.deployment_row(
+                    evidence_id="EV-9731",
+                    phase="AWS-20",
+                    status="STARTED",
+                    observed_at="2026-07-17T18:30:00Z",
+                    lane="explicit-gate",
+                    receipt_digest=deployment_digest,
+                    deployment_valid_until=expired_at,
+                ),
+                self.deployment_row(
+                    evidence_id="EV-9732",
+                    phase="AWS-20",
+                    status="UNKNOWN",
+                    observed_at="2026-07-29T00:01:00Z",
+                    lane="explicit-gate",
+                    receipt_digest=deployment_digest,
+                    deployment_valid_until=expired_at,
+                ),
+                self.deployment_row(
+                    evidence_id="EV-9733",
+                    phase="AWS-30",
+                    status="BLOCKED",
+                    observed_at="2026-07-29T00:03:00Z",
+                    lane="explicit-gate",
+                    receipt_digest=deployment_digest,
+                    deployment_valid_until=expired_at,
+                    read_authority=read,
+                ),
+            ]
+            verify_text = replace_contract_table(
+                verify_text,
+                doctor.AWS_DEPLOYMENT_EVIDENCE_HEADING,
+                doctor.AWS_DEPLOYMENT_EVIDENCE_HEADERS,
+                rows,
+            )
+            verify_path.write_text(verify_text, encoding="utf-8")
+            result = doctor.inspect_project(project)
+            self.assertTrue(result["ok"], result["diagnostics"])
+            self.assertEqual(result["aws_deployment"]["status"], "CONSUMED")
+            self.assertEqual(
+                (result["lifecycle_state"], result["next_prompt"]),
+                ("RELEASE_REVIEW_BLOCKED", "STOP"),
+            )
+            self.assertEqual(
+                result["interaction"]["owner_action_kind"],
+                "REVIEW_SAFETY_BLOCKER",
+            )
+            self.assertFalse(result["interaction"]["automatic_continuation_allowed"])
+            self.assert_no_closure_authority(result)
+            self.assert_no_external_mutation_authority(result)
+
+            verify_text = verify_text.replace(
+                "- AWS lifecycle intent: `NONE`\n"
+                "- AWS lifecycle intent source: `NONE`\n"
+                "- AWS lifecycle intent recorded at: `NONE`",
+                "- AWS lifecycle intent: `RESIDUAL_REVIEW`\n"
+                "- AWS lifecycle intent source: `owner-message MSG-AWS-LIFECYCLE-0001`\n"
+                "- AWS lifecycle intent recorded at: `2026-07-29T12:00:00Z`",
+                1,
+            )
+            verify_path.write_text(verify_text, encoding="utf-8")
+            residual = doctor.inspect_project(project)
+            self.assertTrue(residual["ok"], residual["diagnostics"])
+            self.assertEqual(
+                (residual["lifecycle_state"], residual["next_prompt"]),
+                ("AWS_RESIDUAL_REVIEW", "AWS-40"),
+                residual,
+            )
+            self.assertEqual(
+                residual["aws_lifecycle_intent"]["provenance_status"], "CURRENT"
+            )
+            self.assertFalse(residual["aws_lifecycle_intent"]["authorizes_aws_access"])
+            self.assertFalse(residual["aws_lifecycle_intent"]["authorizes_mutation"])
+            self.assertFalse(residual["aws_lifecycle_intent_write_authority"]["valid"])
+            self.assert_no_external_mutation_authority(residual)
+
 
 class AwsExecutionContractRegressionTests(unittest.TestCase):
     def test_req_materiality_modes_and_unresolved_required_fact(self) -> None:
@@ -7118,13 +12399,15 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                 "Unresolved material AWS fact IDs": "SEC-0002",
             },
             "REQ-0001",
-
             required=True,
             grandfather_current_gate_a=False,
         )
         self.assertEqual(blocked["status"], "BLOCKED")
         self.assertTrue(any("unresolved" in issue.lower() for issue in issues), issues)
-    def test_req_evidence_matches_exact_basis_without_selecting_architecture(self) -> None:
+
+    def test_req_evidence_matches_exact_basis_without_selecting_architecture(
+        self,
+    ) -> None:
         verify_text = (REPOSITORY_ROOT / "docs/project/VERIFY.md").read_text(
             encoding="utf-8"
         )
@@ -7171,7 +12454,6 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             expected_basis_ids={"REQ-0001", "SEC-0001"},
         )
         self.assertTrue(any("without selecting" in issue for issue in premature_issues))
-
 
     def test_all_four_lanes_have_deterministic_progression(self) -> None:
         materiality = {"materiality": "OPTIONAL", "status": "CURRENT"}
@@ -7338,9 +12620,7 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                     design_revision="DES-0001",
                     owner_stage_hint="DESIGN",
                 )
-                self.assertEqual(
-                    result["next_action"]["responsible_party"], expected
-                )
+                self.assertEqual(result["next_action"]["responsible_party"], expected)
                 if expected == "CODEX":
                     repeated_context = doctor.Context(
                         PROJECT_ROOT,
@@ -7413,12 +12693,24 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             "artifact_plan_binding": {"artifact": artifact_a, "plan": "NONE"},
         }
         values = (
-            "AWS-PREFLIGHT-0001", "AWS-READ-AUTH-0001",
-            "REQ-0001 / DES-0001 / AUTH-0001", artifact_b,
-            "audit-role", "123456789012", "us-west-2", "development",
-            "bucket-a", "s3:GetObject", "EV-0001", "READ_ONLY_OBSERVED",
-            "EV-0002", "EV-0003", "2026-01-01T00:00:00+00:00",
-            "2026-01-01T00:01:00+00:00", "PASS", "READY",
+            "AWS-PREFLIGHT-0001",
+            "AWS-READ-AUTH-0001",
+            "REQ-0001 / DES-0001 / AUTH-0001",
+            artifact_b,
+            "audit-role",
+            "123456789012",
+            "us-west-2",
+            "development",
+            "bucket-a",
+            "s3:GetObject",
+            "EV-0001",
+            "READ_ONLY_OBSERVED",
+            "EV-0002",
+            "EV-0003",
+            "2026-01-01T00:00:00+00:00",
+            "2026-01-01T00:01:00+00:00",
+            "PASS",
+            "READY",
         )
         table = "\n".join(
             (
@@ -7438,7 +12730,9 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "STALE")
         self.assertEqual(result["account_access"], "NOT_VERIFIED")
-        self.assertTrue(any("receipt artifact" in issue.lower() for issue in result["issues"]))
+        self.assertTrue(
+            any("receipt artifact" in issue.lower() for issue in result["issues"])
+        )
 
     def test_read_authority_requires_bounded_cost_provenance(self) -> None:
         receipt_lines = [
@@ -7459,35 +12753,59 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         receipt = "\n".join(receipt_lines)
         digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
         headers = (
-            "Action", "Authorization ID", "Construction AUTH", "Role or profile",
-            "Artifact digest", "IaC plan/change-set binding",
-            "Account / Region / environment", "Resources and operations",
-            "Cost ceiling and validity", "Rollback boundary",
-            "Stable owner-message source", "Approver", "Observed at",
-            "Verbatim receipt SHA-256", "Preflight evidence",
-            "Identity and boundary match", "Result",
+            "Action",
+            "Authorization ID",
+            "Construction AUTH",
+            "Role or profile",
+            "Artifact digest",
+            "IaC plan/change-set binding",
+            "Account / Region / environment",
+            "Resources and operations",
+            "Cost ceiling and validity",
+            "Rollback boundary",
+            "Stable owner-message source",
+            "Approver",
+            "Observed at",
+            "Verbatim receipt SHA-256",
+            "Preflight evidence",
+            "Identity and boundary match",
+            "Result",
         )
 
         def document(cost: str) -> str:
             row = (
-                "Read-only preflight", "AWS-READ-AUTH-0001", "AUTH-0001",
-                "audit-role", "sha256:" + ("a" * 64),
+                "Read-only preflight",
+                "AWS-READ-AUTH-0001",
+                "AUTH-0001",
+                "audit-role",
+                "sha256:" + ("a" * 64),
                 "NOT_APPLICABLE — read-only preflight creates no plan",
                 "ACCOUNT: 123456789012; REGION: us-west-2; ENVIRONMENT: development",
-                "RESOURCES: bucket-a; OPERATIONS: s3:GetObject", cost,
-                "NOT_APPLICABLE — no mutation", "owner-message-1", "owner-handle",
-                "2026-01-01T00:00:00+00:00", digest, "NONE", "PASS", "AUTHORIZED",
+                "RESOURCES: bucket-a; OPERATIONS: s3:GetObject",
+                cost,
+                "NOT_APPLICABLE — no mutation",
+                "owner-message-1",
+                "owner-handle",
+                "2026-01-01T00:00:00+00:00",
+                digest,
+                "NONE",
+                "PASS",
+                "AUTHORIZED",
             )
-            return "\n".join((
-                "<!-- bootstrap:aws-read-preflight-receipt:start -->",
-                "```text", receipt, "```",
-                "<!-- bootstrap:aws-read-preflight-receipt:end -->",
-                "## Action authorization provenance",
-                "| " + " | ".join(headers) + " |",
-                "|" + "|".join("---" for _ in headers) + "|",
-                "| " + " | ".join(row) + " |",
-                "| Deployment | " + " | ".join("TODO" for _ in headers[1:]) + " |",
-            ))
+            return "\n".join(
+                (
+                    "<!-- bootstrap:aws-read-preflight-receipt:start -->",
+                    "```text",
+                    receipt,
+                    "```",
+                    "<!-- bootstrap:aws-read-preflight-receipt:end -->",
+                    "## Action authorization provenance",
+                    "| " + " | ".join(headers) + " |",
+                    "|" + "|".join("---" for _ in headers) + "|",
+                    "| " + " | ".join(row) + " |",
+                    "| Deployment | " + " | ".join("TODO" for _ in headers[1:]) + " |",
+                )
+            )
 
         cost_posture = "MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00"
         active_artifact = "sha256:" + ("a" * 64)
@@ -7522,16 +12840,14 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                 invalid, "AUTH-0001", cost_posture, envelope, active_artifact
             )
         )
-        nonhuman_receipt = receipt.replace(
-            "Approver: owner-handle", "Approver: Codex"
+        nonhuman_receipt = receipt.replace("Approver: owner-handle", "Approver: Codex")
+        nonhuman_digest = (
+            "sha256:" + hashlib.sha256(nonhuman_receipt.encode("utf-8")).hexdigest()
         )
-        nonhuman_digest = "sha256:" + hashlib.sha256(
-            nonhuman_receipt.encode("utf-8")
-        ).hexdigest()
         nonhuman = set_receipt(valid, "aws-read-preflight", nonhuman_receipt)
-        nonhuman = nonhuman.replace(
-            " | owner-handle | ", " | Codex | ", 1
-        ).replace(digest, nonhuman_digest, 1)
+        nonhuman = nonhuman.replace(" | owner-handle | ", " | Codex | ", 1).replace(
+            digest, nonhuman_digest, 1
+        )
         self.assertIsNone(
             doctor._read_preflight_receipt_authority(
                 nonhuman, "AUTH-0001", cost_posture, envelope, active_artifact
@@ -7546,12 +12862,11 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         ):
             with self.subTest(operation=operation):
                 mutation_receipt = receipt.replace("s3:GetObject", operation)
-                mutation_digest = "sha256:" + hashlib.sha256(
-                    mutation_receipt.encode("utf-8")
-                ).hexdigest()
-                mutation = set_receipt(
-                    valid, "aws-read-preflight", mutation_receipt
+                mutation_digest = (
+                    "sha256:"
+                    + hashlib.sha256(mutation_receipt.encode("utf-8")).hexdigest()
                 )
+                mutation = set_receipt(valid, "aws-read-preflight", mutation_receipt)
                 mutation = mutation.replace(
                     "RESOURCES: bucket-a; OPERATIONS: s3:GetObject",
                     f"RESOURCES: bucket-a; OPERATIONS: {operation}",
@@ -7571,44 +12886,46 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         verify_text = (PROJECT_ROOT / "docs/project/VERIFY.md").read_text(
             encoding="utf-8"
         )
-        headers = (
-            "Action", "Authorization ID", "Construction AUTH", "Role or profile",
-            "Artifact digest", "IaC plan/change-set binding",
-            "Account / Region / environment", "Resources and operations",
-            "Cost ceiling and validity", "Rollback boundary",
-            "Stable owner-message source", "Approver", "Observed at",
-            "Verbatim receipt SHA-256", "Preflight evidence",
-            "Identity and boundary match", "Result",
-        )
 
         def document(approver: str) -> str:
-            receipt = "\n".join((
-                "AUTHORIZE AWS TEARDOWN",
-                "Teardown authorization: TEARDOWN-AUTH-0001",
-                "Construction authorization: AUTH-0001",
-                "Profile or role: cleanup-role",
-                "Account: 111122223333",
-                "Region: us-west-2",
-                "Environment: development",
-                "Stack, application, and resources to remove: fastlane-stack",
-                "Resources and data to retain: NONE",
-                "Allowed deletion operations: cloudformation:DeleteStack",
-                "Shared dependencies: NONE",
-                "Cost effect: removes stack billing",
-                "Post-teardown verification: cloudformation:DescribeStacks",
-                "Valid until: 2099-01-01T00:00:00Z",
-                f"Approver: {approver}",
-            ))
+            receipt = "\n".join(
+                (
+                    "AUTHORIZE AWS TEARDOWN",
+                    "Teardown authorization: TEARDOWN-AUTH-0001",
+                    "Construction authorization: AUTH-0001",
+                    "Profile or role: cleanup-role",
+                    "Account: 111122223333",
+                    "Region: us-west-2",
+                    "Environment: development",
+                    "Stack, application, and resources to remove: fastlane-stack",
+                    "Resources and data to retain: NONE",
+                    "Allowed deletion operations: cloudformation:DeleteStack",
+                    "Shared dependencies: NONE",
+                    "Cost effect: removes stack billing",
+                    "Post-teardown verification: cloudformation:DescribeStacks",
+                    "Valid until: 2099-01-01T00:00:00Z",
+                    f"Approver: {approver}",
+                )
+            )
             digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
             row = (
-                "Teardown", "TEARDOWN-AUTH-0001", "AUTH-0001", "cleanup-role",
+                "Teardown",
+                "TEARDOWN-AUTH-0001",
+                "AUTH-0001",
+                "cleanup-role",
                 "NOT_APPLICABLE — teardown binds the observed inventory",
                 "NOT_APPLICABLE — teardown uses its removal/retention manifest",
                 "ACCOUNT: 111122223333; REGION: us-west-2; ENVIRONMENT: development",
                 "RESOURCES: fastlane-stack; OPERATIONS: cloudformation:DeleteStack",
                 "COST: removes stack billing; VALID_UNTIL: 2099-01-01T00:00:00Z",
-                "cloudformation:DescribeStacks", "owner-message-2", approver,
-                "2027-01-01T00:00:00Z", digest, "EV-0040", "PASS", "READY",
+                "cloudformation:DescribeStacks",
+                "owner-message-2",
+                approver,
+                "2027-01-01T00:00:00Z",
+                digest,
+                "EV-0040",
+                "PASS",
+                "READY",
             )
             rendered = set_receipt(verify_text, "aws-teardown", receipt)
             lines = rendered.splitlines()
@@ -7633,6 +12950,11 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         teardown_review = {
             "status": "READY_FOR_TEARDOWN",
             "evidence_id": "EV-0040",
+            "read_authorization": "AWS-READ-AUTH-0001",
+            "read_role_or_profile": "inventory-role",
+            "read_receipt_digest": "sha256:" + "b" * 64,
+            "read_valid_until": "2099-01-01T00:00:00Z",
+            "read_authority_source": "owner-message-read-1",
             "resources_to_remove": ["fastlane-stack"],
             "allowed_operations": ["cloudformation:DeleteStack"],
             "resources_to_retain": [],
@@ -7665,6 +12987,15 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         self.assertNotEqual(
             authority["rollback_boundary"], "cloudformation:DescribeStacks"
         )
+        teardown_binding = doctor.derive_request_match(
+            doctor.Context(PROJECT_ROOT), authority
+        )["teardown_ready_binding"]
+        self.assertEqual(teardown_binding["read_role_or_profile"], "inventory-role")
+        self.assertEqual(teardown_binding["read_receipt_digest"], "sha256:" + "b" * 64)
+        self.assertEqual(teardown_binding["read_valid_until"], "2099-01-01T00:00:00Z")
+        self.assertEqual(
+            teardown_binding["read_authority_source"], "owner-message-read-1"
+        )
         self.assertIsNone(
             doctor._receipt_external_authority(
                 document("Codex"),
@@ -7677,68 +13008,106 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             )
         )
 
-
     def test_teardown_sequence_routes_by_current_phase_evidence(self) -> None:
         envelope = aws_authority_envelope(
-            role="cleanup-role", account="111122223333", region="us-west-2",
-            environment="development", resources=["fastlane-stack"],
+            role="cleanup-role",
+            account="111122223333",
+            region="us-west-2",
+            environment="development",
+            resources=["fastlane-stack"],
             operations=["cloudformation:DeleteStack"],
             artifact="sha256:" + "a" * 64,
             rollback="restore stack from approved IaC",
         )
+        read_receipt_digest = "sha256:" + "b" * 64
         read_authority = {
+            "kind": "AWS_READ_ONLY",
             "validity": "CURRENT",
             "authorization_id": "AWS-READ-AUTH-0001",
-            "role_or_profile": "cleanup-role",
+            "receipt_digest": read_receipt_digest,
+            "role_or_profile": "inventory-role",
             "account": "111122223333",
             "region": "us-west-2",
             "environment": "development",
+            "resources": ["fastlane-stack"],
+            "operations": ["cloudformation:DescribeStacks"],
+            "expiration": "2099-01-01T00:00:00Z",
+            "authority_source": "owner-message-read-1",
+            "authorized_at": "2026-12-31T00:00:00Z",
         }
 
-        receipt = "\n".join((
-            "AUTHORIZE AWS TEARDOWN",
-            "Teardown authorization: TEARDOWN-AUTH-0001",
-            "Construction authorization: AUTH-0001",
-            "Profile or role: cleanup-role",
-            "Account: 111122223333",
-            "Region: us-west-2",
-            "Environment: development",
-            "Stack, application, and resources to remove: fastlane-stack",
-            "Resources and data to retain: NONE",
-            "Allowed deletion operations: cloudformation:DeleteStack",
-            "Shared dependencies: NONE",
-            "Cost effect: removes stack billing",
-            "Post-teardown verification: cloudformation:DescribeStacks",
-            "Valid until: 2099-01-01T00:00:00Z",
-            "Approver: Alice Rivera",
-        ))
-        receipt_digest = "sha256:" + hashlib.sha256(
-            receipt.encode("utf-8")
-        ).hexdigest()
+        receipt = "\n".join(
+            (
+                "AUTHORIZE AWS TEARDOWN",
+                "Teardown authorization: TEARDOWN-AUTH-0001",
+                "Construction authorization: AUTH-0001",
+                "Profile or role: cleanup-role",
+                "Account: 111122223333",
+                "Region: us-west-2",
+                "Environment: development",
+                "Stack, application, and resources to remove: fastlane-stack",
+                "Resources and data to retain: NONE",
+                "Allowed deletion operations: cloudformation:DeleteStack",
+                "Shared dependencies: NONE",
+                "Cost effect: removes stack billing",
+                "Post-teardown verification: cloudformation:DescribeStacks",
+                "Valid until: 2099-01-01T00:00:00Z",
+                "Approver: Alice Rivera",
+            )
+        )
+        receipt_digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
         provenance_headers = (
-            "Action", "Authorization ID", "Construction AUTH", "Role or profile",
-            "Artifact digest", "IaC plan/change-set binding",
-            "Account / Region / environment", "Resources and operations",
-            "Cost ceiling and validity", "Rollback boundary",
-            "Stable owner-message source", "Approver", "Observed at",
-            "Verbatim receipt SHA-256", "Preflight evidence",
-            "Identity and boundary match", "Result",
+            "Action",
+            "Authorization ID",
+            "Construction AUTH",
+            "Role or profile",
+            "Artifact digest",
+            "IaC plan/change-set binding",
+            "Account / Region / environment",
+            "Resources and operations",
+            "Cost ceiling and validity",
+            "Rollback boundary",
+            "Stable owner-message source",
+            "Approver",
+            "Observed at",
+            "Verbatim receipt SHA-256",
+            "Preflight evidence",
+            "Identity and boundary match",
+            "Result",
         )
         provenance_row = (
-            "Teardown", "TEARDOWN-AUTH-0001", "AUTH-0001", "cleanup-role",
+            "Teardown",
+            "TEARDOWN-AUTH-0001",
+            "AUTH-0001",
+            "cleanup-role",
             "NOT_APPLICABLE \u2014 teardown binds the observed inventory",
             "NOT_APPLICABLE \u2014 teardown uses its removal/retention manifest",
             "ACCOUNT: 111122223333; REGION: us-west-2; ENVIRONMENT: development",
             "RESOURCES: fastlane-stack; OPERATIONS: cloudformation:DeleteStack",
             "COST: removes stack billing; VALID_UNTIL: 2099-01-01T00:00:00Z",
-            "cloudformation:DescribeStacks", "owner-message-2", "Alice Rivera",
-            "2027-01-01T00:00:00Z", receipt_digest, "EV-0040", "PASS", "READY",
+            "cloudformation:DescribeStacks",
+            "owner-message-2",
+            "Alice Rivera",
+            "2027-01-01T00:00:00Z",
+            receipt_digest,
+            "EV-0040",
+            "PASS",
+            "READY",
         )
 
         def evidence_row(
-            phase: str, status: str, *, evidence_id: str = "EV-0040",
+            phase: str,
+            status: str,
+            *,
+            evidence_id: str = "EV-0040",
             observed_at: str = "2027-01-01T00:00:00Z",
             read_authorization: str = "AWS-READ-AUTH-0001",
+            read_role_or_profile: str = "inventory-role",
+            read_digest: str = read_receipt_digest,
+            read_valid_until: str = "2099-01-01T00:00:00Z",
+            read_authority_source: str = (
+                "SOURCE: owner-message-read-1; AUTHORIZED_AT: 2026-12-31T00:00:00Z"
+            ),
             teardown_authorization: str | None = None,
             teardown_receipt_digest: str | None = None,
             terminal_status: str | None = None,
@@ -7771,9 +13140,7 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             if residual_resources is None:
                 residual_resources = (
                     "fastlane-stack"
-                    if status in {
-                        "FAILED", "PARTIAL", "UNKNOWN", "RESIDUALS_REMAIN"
-                    }
+                    if status in {"FAILED", "PARTIAL", "UNKNOWN", "RESIDUALS_REMAIN"}
                     else "NONE"
                 )
             if blocker_or_stale_reason is None:
@@ -7786,9 +13153,18 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                 )
             values = {
                 "Evidence ID": evidence_id,
+                "Attempt ID": (
+                    "AWS-TEARDOWN-0001"
+                    if action_phase or teardown_authorization != "NONE"
+                    else "NONE"
+                ),
                 "Phase": phase,
                 "REQ / DES / AUTH": "REQ-0001 / DES-0001 / AUTH-0001",
                 "Read authorization": read_authorization,
+                "Read role or profile": read_role_or_profile,
+                "Read receipt digest": read_digest,
+                "Read valid until": read_valid_until,
+                "Read authority source": read_authority_source,
                 "Teardown authorization": teardown_authorization,
                 "Teardown receipt digest": teardown_receipt_digest,
                 "Role or profile": "cleanup-role",
@@ -7805,8 +13181,7 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                 "Residual resources": residual_resources,
                 "Inventory or discovery limits": "CloudFormation stack scope",
                 "Account / Region / environment": (
-                    "ACCOUNT: 111122223333; REGION: us-west-2; "
-                    "ENVIRONMENT: development"
+                    "ACCOUNT: 111122223333; REGION: us-west-2; ENVIRONMENT: development"
                 ),
                 "Observed at": observed_at,
                 "Durable source": f"docs/project/VERIFY.md#{evidence_id.lower()}",
@@ -7814,9 +13189,13 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                 "Blocker or stale reason": blocker_or_stale_reason,
                 "Status": status,
             }
-            return "| " + " | ".join(
-                values[field] for field in doctor.AWS_TEARDOWN_EVIDENCE_HEADERS
-            ) + " |"
+            return (
+                "| "
+                + " | ".join(
+                    values[field] for field in doctor.AWS_TEARDOWN_EVIDENCE_HEADERS
+                )
+                + " |"
+            )
 
         def document(*rows: str, duplicate_provenance: bool = False) -> str:
             headers = doctor.AWS_TEARDOWN_EVIDENCE_HEADERS
@@ -7829,32 +13208,81 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             provenance_rows = [placeholder_provenance, rendered_provenance]
             if duplicate_provenance:
                 provenance_rows.append(rendered_provenance)
-            return "\n".join((
-                "<!-- bootstrap:aws-teardown-receipt:start -->",
-                "```text",
-                receipt,
-                "```",
-                "<!-- bootstrap:aws-teardown-receipt:end -->",
-                "",
-                "## Action authorization provenance",
-                "| " + " | ".join(provenance_headers) + " |",
-                "|" + "|".join("---" for _ in provenance_headers) + "|",
-                *provenance_rows,
-                "",
-                doctor.AWS_TEARDOWN_EVIDENCE_HEADING,
-                "",
-                "| " + " | ".join(headers) + " |",
-                "|" + "|".join("---" for _ in headers) + "|",
-                *rows,
-            ))
+            expanded_rows: list[str] = []
+            for rendered in rows:
+                for rendered_row in rendered.splitlines():
+                    cells = [cell.strip() for cell in rendered_row[1:-1].split("|")]
+                    row_values = dict(zip(headers, cells))
+                    if (
+                        row_values["Phase"] == "AWS-50"
+                        and row_values["Status"] != "STARTED"
+                    ):
+                        started = dict(row_values)
+                        evidence_digits = re.fullmatch(
+                            r"EV-(\d{4,})", row_values["Evidence ID"]
+                        )
+                        suffix = (
+                            evidence_digits.group(1)[-3:] if evidence_digits else "999"
+                        )
+                        started["Evidence ID"] = "EV-9" + suffix
+                        observed = datetime.fromisoformat(
+                            row_values["Observed at"].replace("Z", "+00:00")
+                        ) - timedelta(seconds=1)
+                        started["Observed at"] = observed.isoformat().replace(
+                            "+00:00", "Z"
+                        )
+                        started["Stack events and terminal status"] = (
+                            doctor.AWS_TEARDOWN_PRECALL_RESULT
+                        )
+                        started["Resources removed"] = "NONE"
+                        started["Snapshots and backups"] = "NONE"
+                        started["Residual resources"] = "NONE"
+                        started["Inventory or discovery limits"] = (
+                            doctor.AWS_TEARDOWN_PRECALL_RESULT
+                        )
+                        started["Durable source"] = "pre-call teardown journal"
+                        started["Blocker or stale reason"] = "NONE"
+                        started["Status"] = "STARTED"
+                        expanded_rows.append(
+                            "| "
+                            + " | ".join(started[field] for field in headers)
+                            + " |"
+                        )
+                    expanded_rows.append(rendered_row)
+            return "\n".join(
+                (
+                    "<!-- bootstrap:aws-teardown-receipt:start -->",
+                    "```text",
+                    receipt,
+                    "```",
+                    "<!-- bootstrap:aws-teardown-receipt:end -->",
+                    "",
+                    "## Action authorization provenance",
+                    "| " + " | ".join(provenance_headers) + " |",
+                    "|" + "|".join("---" for _ in provenance_headers) + "|",
+                    *provenance_rows,
+                    "",
+                    doctor.AWS_TEARDOWN_EVIDENCE_HEADING,
+                    "",
+                    "| " + " | ".join(headers) + " |",
+                    "|" + "|".join("---" for _ in headers) + "|",
+                    *expanded_rows,
+                )
+            )
 
-        def derive(text: str) -> dict[str, object]:
+        def derive(
+            text: str,
+            authority: Mapping[str, object] | None = read_authority,
+        ) -> dict[str, object]:
             return doctor.derive_teardown_sequence_state(
-                text, read_authority,
+                text,
+                authority,
                 requirements_revision="REQ-0001",
                 design_revision="DES-0001",
                 construction_authorization="AUTH-0001",
                 envelope=envelope,
+                cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+                active_artifact="sha256:" + "a" * 64,
             )
 
         self.assertEqual(derive(document())["status"], "NOT_ACTIVE")
@@ -7870,8 +13298,58 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             blocked["blocker_or_stale_reason"],
             "caller identity could not be verified",
         )
-        self.assertIn("caller identity could not be verified", blocked["issues"][0])
+        self.assertEqual(blocked["issues"], [])
 
+        latest_epoch = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-40",
+                    "BLOCKED",
+                    evidence_id="EV-0041",
+                    observed_at="2027-01-01T00:00:01Z",
+                ),
+            )
+        )
+        self.assertEqual(latest_epoch["status"], "BLOCKED")
+        self.assertEqual(latest_epoch["evidence_id"], "EV-0041")
+
+        nonadjacent_ready = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-40",
+                    "RUNNING",
+                    evidence_id="EV-0042",
+                    observed_at="2027-01-01T00:00:01Z",
+                ),
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0043",
+                    observed_at="2027-01-01T00:00:03Z",
+                ),
+            )
+        )
+        self.assertEqual(nonadjacent_ready["status"], "BLOCKED")
+        self.assertTrue(
+            any("immediately follow" in issue for issue in nonadjacent_ready["issues"])
+        )
+
+        tampered_read_tuple = derive(
+            document(
+                evidence_row(
+                    "AWS-40",
+                    "READY_FOR_TEARDOWN",
+                    evidence_id="EV-0044",
+                    read_role_or_profile="cleanup-role",
+                )
+            )
+        )
+        self.assertEqual(tampered_read_tuple["status"], "BLOCKED")
+        self.assertTrue(
+            any("read role" in issue for issue in tampered_read_tuple["issues"])
+        )
 
         action_results: dict[str, dict[str, object]] = {}
         action_cases = (
@@ -7882,13 +13360,17 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         )
         for action_status, evidence_id, observed_at in action_cases:
             with self.subTest(action_status=action_status):
-                post_action = derive(document(
-                    ready_row,
-                    evidence_row(
-                        "AWS-50", action_status, evidence_id=evidence_id,
-                        observed_at=observed_at,
-                    ),
-                ))
+                post_action = derive(
+                    document(
+                        ready_row,
+                        evidence_row(
+                            "AWS-50",
+                            action_status,
+                            evidence_id=evidence_id,
+                            observed_at=observed_at,
+                        ),
+                    )
+                )
                 action_results[action_status] = post_action
                 self.assertEqual(
                     post_action["status"], "POST_ACTION_REVIEW", post_action["issues"]
@@ -7898,43 +13380,199 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                     post_action["teardown_authorization"],
                     "TEARDOWN-AUTH-0001",
                 )
+                self.assertEqual(post_action["teardown_receipt_digest"], receipt_digest)
                 self.assertEqual(
-                    post_action["teardown_receipt_digest"], receipt_digest
+                    post_action["read_receipt_digest"], read_receipt_digest
                 )
 
-        verified = derive(document(
+        post_action_authority = doctor.derive_external_authority(
+            doctor.Context(PROJECT_ROOT),
+            envelope,
+            "explicit-gate",
+            "NONE",
+            cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+            active_artifact="sha256:" + "a" * 64,
+            aws_action_phase="AWS-40",
+            teardown_review=action_results["SUCCEEDED"],
+        )
+        self.assertEqual(post_action_authority["kind"], "AWS_READ_ONLY")
+        self.assertEqual(post_action_authority["attempt_id"], "AWS-TEARDOWN-0001")
+
+        verified_document = document(
             ready_row,
             evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0060",
+                "AWS-50",
+                "SUCCEEDED",
+                evidence_id="EV-0060",
                 observed_at="2027-01-03T00:00:00Z",
             ),
             evidence_row(
-                "AWS-40", "VERIFIED_CLEAN", evidence_id="EV-0061",
+                "AWS-40",
+                "VERIFIED_CLEAN",
+                evidence_id="EV-0061",
                 observed_at="2027-01-03T00:00:01Z",
                 teardown_authorization="TEARDOWN-AUTH-0001",
                 teardown_receipt_digest=receipt_digest,
             ),
-        ))
+        )
+        verified = derive(verified_document)
         self.assertEqual(verified["status"], "VERIFIED_CLEAN", verified["issues"])
-        residuals = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "PARTIAL", evidence_id="EV-0062",
-                observed_at="2027-01-03T00:00:02Z",
-            ),
-            evidence_row(
-                "AWS-40", "RESIDUALS_REMAIN", evidence_id="EV-0063",
-                observed_at="2027-01-03T00:00:03Z",
-                teardown_authorization="TEARDOWN-AUTH-0001",
-                teardown_receipt_digest=receipt_digest,
-            ),
-        ))
+        residuals = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "PARTIAL",
+                    evidence_id="EV-0062",
+                    observed_at="2027-01-03T00:00:02Z",
+                ),
+                evidence_row(
+                    "AWS-40",
+                    "RESIDUALS_REMAIN",
+                    evidence_id="EV-0063",
+                    observed_at="2027-01-03T00:00:03Z",
+                    teardown_authorization="TEARDOWN-AUTH-0001",
+                    teardown_receipt_digest=receipt_digest,
+                ),
+            )
+        )
         self.assertEqual(residuals["status"], "RESIDUALS_REMAIN", residuals["issues"])
+
+        missing_terminal_read_proof = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-6060",
+                    observed_at="2027-01-03T00:01:00Z",
+                ),
+                evidence_row(
+                    "AWS-40",
+                    "VERIFIED_CLEAN",
+                    evidence_id="EV-6061",
+                    observed_at="2027-01-03T00:01:01Z",
+                    read_authority_source="owner-message-read-1",
+                    teardown_authorization="TEARDOWN-AUTH-0001",
+                    teardown_receipt_digest=receipt_digest,
+                ),
+            )
+        )
+        self.assertEqual(missing_terminal_read_proof["status"], "BLOCKED")
+        self.assertTrue(
+            any(
+                "source and ISO authorization timestamp" in issue
+                for issue in missing_terminal_read_proof["issues"]
+            )
+        )
+
+        mismatched_terminal_read_proof = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-6062",
+                    observed_at="2027-01-03T00:02:00Z",
+                ),
+                evidence_row(
+                    "AWS-40",
+                    "VERIFIED_CLEAN",
+                    evidence_id="EV-6063",
+                    observed_at="2027-01-03T00:02:01Z",
+                    read_authority_source=(
+                        "SOURCE: owner-message-read-1; "
+                        "AUTHORIZED_AT: 2026-12-30T00:00:00Z"
+                    ),
+                    teardown_authorization="TEARDOWN-AUTH-0001",
+                    teardown_receipt_digest=receipt_digest,
+                ),
+            )
+        )
+        self.assertEqual(mismatched_terminal_read_proof["status"], "BLOCKED")
+        self.assertTrue(
+            any(
+                "read authorization timestamp is tampered" in issue
+                for issue in mismatched_terminal_read_proof["issues"]
+            )
+        )
+
+        mismatched_terminal_scope = derive(
+            verified_document,
+            {
+                **read_authority,
+                "resources": ["fastlane-stack", "unrelated-stack"],
+            },
+        )
+        self.assertEqual(mismatched_terminal_scope["status"], "BLOCKED")
+        self.assertTrue(
+            any(
+                "recorded resources do not match exact read scope" in issue
+                for issue in mismatched_terminal_scope["issues"]
+            )
+        )
+
+        expired_terminal_proof = derive(
+            verified_document,
+            {**read_authority, "validity": "EXPIRED"},
+        )
+        self.assertEqual(
+            expired_terminal_proof["status"],
+            "VERIFIED_CLEAN",
+            expired_terminal_proof["issues"],
+        )
+        replacement_authority = {
+            **read_authority,
+            "authorization_id": "AWS-READ-AUTH-0002",
+            "receipt_digest": "sha256:" + "c" * 64,
+            "authority_source": "owner-message-read-2",
+            "authorized_at": "2027-01-03T00:00:30Z",
+        }
+        replaced_terminal_proof = derive(verified_document, replacement_authority)
+        self.assertEqual(
+            replaced_terminal_proof["status"],
+            "VERIFIED_CLEAN",
+            replaced_terminal_proof["issues"],
+        )
+
+        fresh_review_after_closed_attempt = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0064",
+                    observed_at="2027-01-03T00:00:04Z",
+                ),
+                evidence_row(
+                    "AWS-40",
+                    "VERIFIED_CLEAN",
+                    evidence_id="EV-0065",
+                    observed_at="2027-01-03T00:00:05Z",
+                    teardown_authorization="TEARDOWN-AUTH-0001",
+                    teardown_receipt_digest=receipt_digest,
+                ),
+                evidence_row(
+                    "AWS-40",
+                    "RUNNING",
+                    evidence_id="EV-0066",
+                    observed_at="2027-01-03T00:00:06Z",
+                ),
+            )
+        )
+        self.assertEqual(
+            fresh_review_after_closed_attempt["status"],
+            "RUNNING",
+            fresh_review_after_closed_attempt["issues"],
+        )
+        self.assertEqual(fresh_review_after_closed_attempt["evidence_id"], "EV-0066")
 
         invalid_cases = (
             (
                 evidence_row(
-                    "AWS-50", "SUCCEEDED", evidence_id="EV-0070",
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0070",
                     observed_at="2027-01-04T00:00:00Z",
                     teardown_authorization="TEARDOWN-AUTH-9999",
                 ),
@@ -7942,7 +13580,9 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             ),
             (
                 evidence_row(
-                    "AWS-50", "SUCCEEDED", evidence_id="EV-0071",
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0071",
                     observed_at="2027-01-04T00:00:01Z",
                     teardown_receipt_digest="sha256:" + "f" * 64,
                 ),
@@ -7950,7 +13590,9 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             ),
             (
                 evidence_row(
-                    "AWS-50", "SUCCEEDED", evidence_id="EV-0072",
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0072",
                     observed_at="2027-01-04T00:00:02Z",
                     terminal_status="NONE",
                 ),
@@ -7958,15 +13600,19 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             ),
             (
                 evidence_row(
-                    "AWS-50", "SUCCEEDED", evidence_id="EV-0073",
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0073",
                     observed_at="2027-01-04T00:00:03Z",
                     residual_resources="fastlane-stack",
                 ),
-                "cannot retain unexpected residuals",
+                "cannot retain residuals",
             ),
             (
                 evidence_row(
-                    "AWS-50", "SUCCEEDED", evidence_id="EV-0074",
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0074",
                     observed_at="2027-01-04T00:00:04Z",
                     resources_removed="NONE",
                 ),
@@ -7982,99 +13628,153 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
                     invalid["issues"],
                 )
 
-        malformed_id = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-BAD",
-                observed_at="2027-01-04T00:00:05Z",
-            ),
-        ))
+        malformed_id = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-BAD",
+                    observed_at="2027-01-04T00:00:05Z",
+                ),
+            )
+        )
         self.assertEqual(malformed_id["status"], "BLOCKED")
-        self.assertTrue(any(
-            "noncanonical" in issue for issue in malformed_id["issues"]
-        ))
-        partial_placeholder = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="TODO",
-                observed_at="2027-01-04T00:00:06Z",
-            ),
-        ))
+        self.assertTrue(
+            any("noncanonical" in issue for issue in malformed_id["issues"])
+        )
+        partial_placeholder = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="TODO",
+                    observed_at="2027-01-04T00:00:06Z",
+                ),
+            )
+        )
         self.assertEqual(partial_placeholder["status"], "BLOCKED")
-        wrong_read_authority = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0075",
-                observed_at="2027-01-04T00:00:07Z",
-                read_authorization="AWS-READ-AUTH-9999",
-            ),
-        ))
+        wrong_read_authority = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0075",
+                    observed_at="2027-01-04T00:00:07Z",
+                    read_authorization="AWS-READ-AUTH-9999",
+                ),
+            )
+        )
         self.assertEqual(wrong_read_authority["status"], "BLOCKED")
-        self.assertTrue(any(
-            "matching READY_FOR_TEARDOWN" in issue
-            for issue in wrong_read_authority["issues"]
-        ))
-        missing_blocker = derive(document(evidence_row(
-            "AWS-40", "BLOCKED", evidence_id="EV-0076",
-            observed_at="2027-01-04T00:00:08Z",
-            blocker_or_stale_reason="NONE",
-        )))
+        self.assertTrue(
+            any(
+                "READY_FOR_TEARDOWN" in issue
+                for issue in wrong_read_authority["issues"]
+            )
+        )
+        missing_blocker = derive(
+            document(
+                evidence_row(
+                    "AWS-40",
+                    "BLOCKED",
+                    evidence_id="EV-0076",
+                    observed_at="2027-01-04T00:00:08Z",
+                    blocker_or_stale_reason="NONE",
+                )
+            )
+        )
         self.assertEqual(missing_blocker["status"], "BLOCKED")
-        self.assertTrue(any(
-            "exact blocker" in issue for issue in missing_blocker["issues"]
-        ))
-        replayed_action = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "PARTIAL", evidence_id="EV-0077",
-                observed_at="2027-01-04T00:00:09Z",
-            ),
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0078",
-                observed_at="2027-01-04T00:00:10Z",
-            ),
-        ))
+        self.assertTrue(
+            any("exact blocker" in issue for issue in missing_blocker["issues"])
+        )
+        replayed_action = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "PARTIAL",
+                    evidence_id="EV-0077",
+                    observed_at="2027-01-04T00:00:09Z",
+                ),
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0078",
+                    observed_at="2027-01-04T00:00:10Z",
+                ),
+            )
+        )
         self.assertEqual(replayed_action["status"], "BLOCKED")
-        self.assertTrue(any(
-            "replays a teardown authorization" in issue
-            for issue in replayed_action["issues"]
-        ))
-        different_authority_retry = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "FAILED", evidence_id="EV-0079",
-                observed_at="2027-01-04T00:00:10Z",
-                teardown_authorization="TEARDOWN-AUTH-9999",
-                teardown_receipt_digest="sha256:" + "f" * 64,
-            ),
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0088",
-                observed_at="2027-01-04T00:00:11Z",
-            ),
-        ))
+        self.assertTrue(
+            any(
+                "requires exactly one first AWS-50 STARTED row" in issue
+                for issue in replayed_action["issues"]
+            )
+        )
+        different_authority_retry = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "FAILED",
+                    evidence_id="EV-0079",
+                    observed_at="2027-01-04T00:00:10Z",
+                    teardown_authorization="TEARDOWN-AUTH-9999",
+                    teardown_receipt_digest="sha256:" + "f" * 64,
+                ),
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0088",
+                    observed_at="2027-01-04T00:00:11Z",
+                ),
+            )
+        )
         self.assertEqual(different_authority_retry["status"], "BLOCKED")
-        self.assertTrue(any(
-            "does not follow matching READY_FOR_TEARDOWN" in issue
-            for issue in different_authority_retry["issues"]
-        ))
+        self.assertTrue(
+            any(
+                "requires exactly one first AWS-50 STARTED row" in issue
+                for issue in different_authority_retry["issues"]
+            )
+        )
 
-        premature_binding = derive(document(evidence_row(
-            "AWS-40", "READY_FOR_TEARDOWN", evidence_id="EV-0080",
-            teardown_authorization="TEARDOWN-AUTH-0001",
-            teardown_receipt_digest=receipt_digest,
-        )))
+        premature_binding = derive(
+            document(
+                evidence_row(
+                    "AWS-40",
+                    "READY_FOR_TEARDOWN",
+                    evidence_id="EV-0080",
+                    teardown_authorization="TEARDOWN-AUTH-0001",
+                    teardown_receipt_digest=receipt_digest,
+                )
+            )
+        )
         self.assertEqual(premature_binding["status"], "BLOCKED")
-        orphan_terminal = derive(document(evidence_row(
-            "AWS-40", "VERIFIED_CLEAN", evidence_id="EV-0081",
-            teardown_authorization="TEARDOWN-AUTH-0001",
-            teardown_receipt_digest=receipt_digest,
-        )))
+        orphan_terminal = derive(
+            document(
+                evidence_row(
+                    "AWS-40",
+                    "VERIFIED_CLEAN",
+                    evidence_id="EV-0081",
+                    teardown_authorization="TEARDOWN-AUTH-0001",
+                    teardown_receipt_digest=receipt_digest,
+                )
+            )
+        )
         self.assertEqual(orphan_terminal["status"], "BLOCKED")
 
-        residual_only_clean = derive(document(evidence_row(
-            "AWS-40", "VERIFIED_CLEAN", evidence_id="EV-0085",
-            observed_at="2027-01-05T00:00:01Z",
-        )))
+        residual_only_clean = derive(
+            document(
+                evidence_row(
+                    "AWS-40",
+                    "VERIFIED_CLEAN",
+                    evidence_id="EV-0085",
+                    observed_at="2027-01-05T00:00:01Z",
+                )
+            )
+        )
         self.assertEqual(residual_only_clean["status"], "VERIFIED_CLEAN")
         self.assertFalse(residual_only_clean["post_action_bound"])
         self.assertEqual(
@@ -8082,21 +13782,27 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             ("AWS_RESIDUAL_REVIEW_COMPLETE", "STOP"),
         )
 
-        erased_binding = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0086",
-                observed_at="2027-01-05T00:00:02Z",
-            ),
-            evidence_row(
-                "AWS-40", "VERIFIED_CLEAN", evidence_id="EV-0087",
-                observed_at="2027-01-05T00:00:03Z",
-            ),
-        ))
+        erased_binding = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0086",
+                    observed_at="2027-01-05T00:00:02Z",
+                ),
+                evidence_row(
+                    "AWS-40",
+                    "VERIFIED_CLEAN",
+                    evidence_id="EV-0087",
+                    observed_at="2027-01-05T00:00:03Z",
+                ),
+            )
+        )
         self.assertEqual(erased_binding["status"], "BLOCKED")
-        self.assertTrue(any(
-            "cannot erase" in issue for issue in erased_binding["issues"]
-        ))
+        self.assertTrue(
+            any("cannot erase" in issue for issue in erased_binding["issues"])
+        )
 
         partial_pairs = (
             ("TEARDOWN-AUTH-0001", "NONE"),
@@ -8108,123 +13814,237 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             with self.subTest(
                 authorization_id=authorization_id, digest_value=digest_value
             ):
-                malformed = derive(document(evidence_row(
-                    "AWS-40", "VERIFIED_CLEAN",
-                    evidence_id=f"EV-{8090 + index}",
-                    observed_at=f"2027-01-05T00:01:0{index}Z",
-                    teardown_authorization=authorization_id,
-                    teardown_receipt_digest=digest_value,
-                )))
+                malformed = derive(
+                    document(
+                        evidence_row(
+                            "AWS-40",
+                            "VERIFIED_CLEAN",
+                            evidence_id=f"EV-{8090 + index}",
+                            observed_at=f"2027-01-05T00:01:0{index}Z",
+                            teardown_authorization=authorization_id,
+                            teardown_receipt_digest=digest_value,
+                        )
+                    )
+                )
                 self.assertEqual(malformed["status"], "BLOCKED")
 
-        replayed_attempt = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0094",
-                observed_at="2027-01-05T00:02:00Z",
-            ),
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0095",
-                observed_at="2027-01-05T00:02:01Z",
-            ),
-            evidence_row(
-                "AWS-40", "VERIFIED_CLEAN", evidence_id="EV-0096",
-                observed_at="2027-01-05T00:02:02Z",
-                teardown_authorization="TEARDOWN-AUTH-0001",
-                teardown_receipt_digest=receipt_digest,
-            ),
-        ))
+        replayed_attempt = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0094",
+                    observed_at="2027-01-05T00:02:00Z",
+                ),
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0095",
+                    observed_at="2027-01-05T00:02:01Z",
+                ),
+                evidence_row(
+                    "AWS-40",
+                    "VERIFIED_CLEAN",
+                    evidence_id="EV-0096",
+                    observed_at="2027-01-05T00:02:02Z",
+                    teardown_authorization="TEARDOWN-AUTH-0001",
+                    teardown_receipt_digest=receipt_digest,
+                ),
+            )
+        )
         self.assertEqual(replayed_attempt["status"], "BLOCKED")
-        self.assertTrue(any(
-            "exactly one earlier matching" in issue
-            for issue in replayed_attempt["issues"]
-        ))
+        self.assertTrue(
+            any(
+                "requires exactly one first AWS-50 STARTED row" in issue
+                or "more than one AWS-50 terminal row" in issue
+                for issue in replayed_attempt["issues"]
+            )
+        )
 
-        duplicate_id = derive(document(
-            evidence_row("AWS-40", "RUNNING"),
-            evidence_row(
-                "AWS-40", "READY_FOR_TEARDOWN",
-                observed_at="2027-01-02T00:00:00Z",
-            ),
-        ))
+        duplicate_id = derive(
+            document(
+                evidence_row("AWS-40", "RUNNING"),
+                evidence_row(
+                    "AWS-40",
+                    "READY_FOR_TEARDOWN",
+                    observed_at="2027-01-02T00:00:00Z",
+                ),
+            )
+        )
         self.assertEqual(duplicate_id["status"], "BLOCKED")
-        self.assertTrue(any(
-            "duplicate IDs" in issue for issue in duplicate_id["issues"]
-        ))
-        duplicate_timestamp = derive(document(
-            evidence_row("AWS-40", "RUNNING", evidence_id="EV-0082"),
-            evidence_row(
-                "AWS-40", "READY_FOR_TEARDOWN", evidence_id="EV-0083",
-            ),
-        ))
+        self.assertTrue(
+            any("duplicate IDs" in issue for issue in duplicate_id["issues"])
+        )
+        duplicate_timestamp = derive(
+            document(
+                evidence_row("AWS-40", "RUNNING", evidence_id="EV-0082"),
+                evidence_row(
+                    "AWS-40",
+                    "READY_FOR_TEARDOWN",
+                    evidence_id="EV-0083",
+                ),
+            )
+        )
         self.assertEqual(duplicate_timestamp["status"], "BLOCKED")
-        self.assertTrue(any(
-            "timestamps must be unique" in issue
-            for issue in duplicate_timestamp["issues"]
-        ))
-        duplicate_provenance = derive(document(
-            ready_row,
-            evidence_row(
-                "AWS-50", "SUCCEEDED", evidence_id="EV-0084",
-                observed_at="2027-01-05T00:00:00Z",
-            ),
-            duplicate_provenance=True,
-        ))
+        self.assertTrue(
+            any(
+                "timestamps must be unique" in issue
+                for issue in duplicate_timestamp["issues"]
+            )
+        )
+        duplicate_provenance = derive(
+            document(
+                ready_row,
+                evidence_row(
+                    "AWS-50",
+                    "SUCCEEDED",
+                    evidence_id="EV-0084",
+                    observed_at="2027-01-05T00:00:00Z",
+                ),
+                duplicate_provenance=True,
+            )
+        )
         self.assertEqual(duplicate_provenance["status"], "BLOCKED")
-        self.assertTrue(any(
-            "one exact owner-authored teardown receipt" in issue
-            for issue in duplicate_provenance["issues"]
-        ))
+        self.assertTrue(
+            any(
+                "one exact owner-authored teardown receipt" in issue
+                for issue in duplicate_provenance["issues"]
+            )
+        )
 
+        pending = {"status": "PENDING", "value": "NONE"}
+        retain = {"status": "CURRENT", "value": "RETAIN"}
+        investigate = {"status": "CURRENT", "value": "INVESTIGATE"}
+        remove = {"status": "CURRENT", "value": "REMOVE"}
         route_cases = (
             (
-                "RESIDUAL_REVIEW", ready,
+                "RESIDUAL_REVIEW",
+                ready,
+                pending,
                 ("AWS_RESIDUALS_REMAIN", "STOP"),
             ),
             (
-                "RESIDUAL_REVIEW", verified,
+                "RESIDUAL_REVIEW",
+                verified,
+                None,
                 ("AWS_RESIDUAL_REVIEW_COMPLETE", "STOP"),
             ),
             (
-                "RESIDUAL_REVIEW", residuals,
+                "RESIDUAL_REVIEW",
+                residuals,
+                pending,
                 ("AWS_RESIDUALS_REMAIN", "STOP"),
             ),
             (
-                "RESIDUAL_REVIEW", blocked,
+                "RESIDUAL_REVIEW",
+                blocked,
+                None,
                 ("AWS_RESIDUAL_REVIEW_BLOCKED", "STOP"),
             ),
             (
-                "TEARDOWN", ready,
+                "TEARDOWN",
+                ready,
+                remove,
                 ("WAITING_AWS_TEARDOWN_AUTH", "AWS-50"),
             ),
             (
-                "TEARDOWN", verified,
+                "TEARDOWN",
+                verified,
+                None,
                 ("AWS_TEARDOWN_COMPLETE", "STOP"),
             ),
             (
-                "TEARDOWN", residuals,
+                "TEARDOWN",
+                residuals,
+                pending,
                 ("AWS_RESIDUALS_REMAIN", "STOP"),
             ),
             (
-                "TEARDOWN", blocked,
+                "TEARDOWN",
+                blocked,
+                None,
                 ("AWS_RESIDUAL_REVIEW_BLOCKED", "STOP"),
             ),
             (
-                "TEARDOWN", action_results["SUCCEEDED"],
+                "TEARDOWN",
+                action_results["SUCCEEDED"],
+                None,
                 ("AWS_RESIDUAL_REVIEW", "AWS-40"),
             ),
             (
-                "TEARDOWN", running,
+                "TEARDOWN",
+                running,
+                None,
+                ("AWS_RESIDUAL_REVIEW", "AWS-40"),
+            ),
+            (
+                "RETAIN",
+                residuals,
+                retain,
+                ("AWS_RESIDUALS_RETAINED", "STOP"),
+            ),
+            (
+                "RESIDUAL_REVIEW",
+                residuals,
+                investigate,
+                ("AWS_RESIDUAL_REVIEW", "AWS-40"),
+            ),
+            (
+                "TEARDOWN",
+                residuals,
+                remove,
                 ("AWS_RESIDUAL_REVIEW", "AWS-40"),
             ),
         )
-        for intent, sequence, expected_route in route_cases:
+        for intent, sequence, disposition, expected_route in route_cases:
             with self.subTest(intent=intent, status=sequence["status"]):
                 self.assertEqual(
-                    doctor.derive_teardown_route(intent, sequence),
+                    doctor.derive_teardown_route(intent, sequence, disposition),
                     expected_route,
                 )
-        self.assertIsNone(doctor.derive_teardown_route("NONE", ready))
+        self.assertEqual(
+            doctor.derive_teardown_route("NONE", ready),
+            ("AWS_RESIDUALS_REMAIN", "STOP"),
+        )
+        self.assertIsNone(
+            doctor.derive_teardown_route("NONE", {"status": "NOT_ACTIVE"})
+        )
+
+        fresh_record = {
+            "value": "RETAIN",
+            "recorded_at": "2098-01-01T00:00:00Z",
+            "provenance_status": "CURRENT",
+        }
+        retained = doctor.derive_aws_residual_disposition(fresh_record, residuals)
+        self.assertEqual(retained["status"], "CURRENT")
+        self.assertEqual(retained["value"], "RETAIN")
+        self.assertFalse(retained["authorizes_aws_access"])
+        self.assertFalse(retained["authorizes_mutation"])
+        stale = doctor.derive_aws_residual_disposition(
+            {
+                "value": "TEARDOWN",
+                "recorded_at": "2020-01-01T00:00:00Z",
+                "provenance_status": "CURRENT",
+            },
+            residuals,
+        )
+        self.assertEqual(stale["status"], "PENDING")
+        prior_remove = doctor.derive_aws_residual_disposition(
+            {
+                "value": "TEARDOWN",
+                "recorded_at": "2020-01-01T00:00:00Z",
+                "provenance_status": "CURRENT",
+            },
+            ready,
+        )
+        self.assertEqual(prior_remove["status"], "CURRENT")
+        self.assertEqual(prior_remove["value"], "REMOVE")
+        invalid_retain = doctor.derive_aws_residual_disposition(
+            fresh_record,
+            {"status": "NOT_ACTIVE"},
+        )
+        self.assertEqual(invalid_retain["status"], "INVALID")
         specialized = doctor.derive_interaction(
             "AWS_RESIDUAL_REVIEW_BLOCKED",
             "STOP",
@@ -8247,15 +14067,40 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         )
         teardown_context = doctor.Context(PROJECT_ROOT)
         teardown_context.error(
-            "AWS_TEARDOWN_EVIDENCE_INVALID", "residual review blocked", doctor.VERIFY_FILE
+            "AWS_TEARDOWN_EVIDENCE_INVALID",
+            "residual review blocked",
+            doctor.VERIFY_FILE,
         )
-        self.assertTrue(doctor._preserve_specialized_teardown_block(
-            teardown_context, "AWS_RESIDUAL_REVIEW_BLOCKED"
-        ))
+        self.assertTrue(
+            doctor._preserve_specialized_teardown_block(
+                teardown_context, "AWS_RESIDUAL_REVIEW_BLOCKED"
+            )
+        )
         teardown_context.error("UNRELATED_VALIDATION", "separate error")
-        self.assertFalse(doctor._preserve_specialized_teardown_block(
-            teardown_context, "AWS_RESIDUAL_REVIEW_BLOCKED"
-        ))
+        self.assertFalse(
+            doctor._preserve_specialized_teardown_block(
+                teardown_context, "AWS_RESIDUAL_REVIEW_BLOCKED"
+            )
+        )
+
+        self.assertTrue(
+            doctor.aws_deployment_teardown_sequence_conflict(
+                {"status": "ACTION_TERMINAL_REQUIRED"},
+                {"status": "READY_FOR_TEARDOWN"},
+            )
+        )
+        self.assertFalse(
+            doctor.aws_deployment_teardown_sequence_conflict(
+                {"status": "CONSUMED"},
+                {"status": "READY_FOR_TEARDOWN"},
+            )
+        )
+        self.assertFalse(
+            doctor.aws_deployment_teardown_sequence_conflict(
+                {"status": "RECONCILED"},
+                {"status": "VERIFIED_CLEAN"},
+            )
+        )
 
     def test_action_receipts_are_phase_isolated(self) -> None:
         context = doctor.Context(PROJECT_ROOT)
@@ -8272,15 +14117,21 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         doctor._receipt_external_authority = fake_receipt
         try:
             teardown = doctor.derive_external_authority(
-                context, {"AWS boundary": "MUTATE_LISTED_RESOURCES"},
-                "explicit-gate", "AUTH-0001", aws_action_phase="AWS-50",
+                context,
+                {"AWS boundary": "MUTATE_LISTED_RESOURCES"},
+                "explicit-gate",
+                "AUTH-0001",
+                aws_action_phase="AWS-50",
                 teardown_review={"status": "READY_FOR_TEARDOWN"},
             )
             self.assertEqual(calls, ["Teardown"])
             calls.clear()
             deployment = doctor.derive_external_authority(
-                context, {"AWS boundary": "MUTATE_LISTED_RESOURCES"},
-                "explicit-gate", "AUTH-0001", aws_action_phase="AWS-20",
+                context,
+                {"AWS boundary": "MUTATE_LISTED_RESOURCES"},
+                "explicit-gate",
+                "AUTH-0001",
+                aws_action_phase="AWS-20",
                 aws_progress_state="WAITING_AWS_MUTATION_AUTH",
                 preflight={
                     "status": "READY",
@@ -8297,9 +14148,13 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
     def test_fast_dev_mutation_requires_observed_preflight_and_aws20(self) -> None:
         artifact = "sha256:" + "a" * 64
         envelope = aws_authority_envelope(
-            role="deploy-role", account="111122223333", region="us-west-2",
-            environment="development", resources=["fastlane-stack"],
-            operations=["cloudformation:ExecuteChangeSet"], artifact=artifact,
+            role="deploy-role",
+            account="111122223333",
+            region="us-west-2",
+            environment="development",
+            resources=["fastlane-stack"],
+            operations=["cloudformation:ExecuteChangeSet"],
+            artifact=artifact,
             rollback="rollback fastlane-stack",
         )
         context = doctor.Context(PROJECT_ROOT)
@@ -8309,23 +14164,38 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             "aws_progress_state": "AWS_PREFLIGHT_READY",
             "active_artifact": artifact,
         }
-        self.assertEqual(doctor.derive_external_authority(
-            context, envelope, "fast-dev", "AUTH-0001", **common
-        )["kind"], "NONE")
-        self.assertEqual(doctor.derive_external_authority(
-            context, envelope, "fast-dev", "AUTH-0001",
-            aws_action_phase="AWS-20", **common
-        )["kind"], "NONE")
+        self.assertEqual(
+            doctor.derive_external_authority(
+                context, envelope, "fast-dev", "AUTH-0001", **common
+            )["kind"],
+            "NONE",
+        )
+        self.assertEqual(
+            doctor.derive_external_authority(
+                context,
+                envelope,
+                "fast-dev",
+                "AUTH-0001",
+                aws_action_phase="AWS-20",
+                **common,
+            )["kind"],
+            "NONE",
+        )
         authority = doctor.derive_external_authority(
-            context, envelope, "fast-dev", "AUTH-0001",
+            context,
+            envelope,
+            "fast-dev",
+            "AUTH-0001",
             aws_action_phase="AWS-20",
             preflight=ready_preflight(
-                account="111122223333", region="us-west-2",
+                account="111122223333",
+                region="us-west-2",
                 environment="development",
             ),
             **common,
         )
         self.assertEqual(authority["kind"], "FAST_DEV_GATE_B")
+
 
 if __name__ == "__main__":
     unittest.main()

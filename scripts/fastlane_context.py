@@ -79,6 +79,7 @@ def _public(item: Mapping[str, object]) -> dict[str, object]:
 
 def _sort_key(item: Mapping[str, object]) -> tuple[object, ...]:
     return (
+        not bool(item["_required"]),
         int(item["_priority"]),
         str(item["path"]),
         int(item["start_line"]),
@@ -128,9 +129,7 @@ def resolve_context_packet(
         seen: set[tuple[str, int, int]] = set()
         for request in requests:
             if request.selector_kind not in SELECTOR_KINDS:
-                issues.append(
-                    {"path": request.path, "reason": "unknown selector kind"}
-                )
+                issues.append({"path": request.path, "reason": "unknown selector kind"})
                 continue
             text = source_texts.get(request.path)
             if text is None:
@@ -152,11 +151,11 @@ def resolve_context_packet(
     initial_candidates = resolve_many(initial_requests)
     on_demand = resolve_many(on_demand_requests)
     initial_ranges = {
-        (item["path"], item["_start"], item["_end"])
-        for item in initial_candidates
+        (item["path"], item["_start"], item["_end"]) for item in initial_candidates
     }
     on_demand = [
-        item for item in on_demand
+        item
+        for item in on_demand
         if (item["path"], item["_start"], item["_end"]) not in initial_ranges
     ]
     for reason in _overlap_issues([*initial_candidates, *on_demand]):

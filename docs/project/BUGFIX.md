@@ -1,4 +1,4 @@
-# My AWS Project — Bugfix Specification
+# {{PROJECT_NAME}} — Bugfix Specification
 
 Canonical path: `docs/project/BUGFIX.md`.
 

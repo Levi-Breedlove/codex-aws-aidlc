@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.0.2
+**Pack version:** 1.0.3
 
 This pack turns a rough idea or an existing repository into a reviewed,
 executable AWS delivery plan, then lets Codex run the approved work for long
@@ -182,7 +182,8 @@ record those receipts but may never create or self-accept them.
 When recording a valid receipt, also record its observed ISO 8601 time and the
 exact source locator available in the current interaction (for example, a
 message, issue, or meeting-record link). Those provenance fields are metadata,
-not extra receipt lines. Do not invent a source link or approver identity; if
+not extra receipt lines. Store only a stable source locator with no URL credentials,
+sensitive query parameters, or fragments. Do not invent a source link or approver identity; if
 the source cannot be durably identified, stop and ask the owner how it should
 be cited.
 
@@ -284,7 +285,10 @@ Gate B approves only the versioned envelope recorded in docs/project/PRD.md. It 
 - repository, base branch, branch strategy, and allowed local write boundary;
 - task scope, non-goals, and maximum autonomous run boundary;
 - allowed GitHub write operations, or NONE;
-- AWS mode: NONE, DOCS_ONLY, READ_ONLY, or MUTATION;
+- Gate B AWS maximum: NONE, DOCS_ONLY, READ_ONLY, or
+  MUTATE_LISTED_RESOURCES. This is a planned ceiling for later AWS phases, not
+  task metadata or action authority. Local task metadata uses only NONE or
+  DOCS_ONLY;
 - stop conditions, validation commands, and evidence requirements;
 - cost, security, data, environment, and destructive-action limits;
 - whether merge and branch cleanup are allowed;
@@ -302,15 +306,33 @@ exact action receipt remains mandatory.
 
 ### Canonical AWS mode mapping
 
-The project lane, one prompt's access mode, and Gate B's AWS boundary are
-different fields. Use this mapping and no synonyms:
+The project lane, local task mode, current prompt mode, Gate B AWS boundary,
+and current external authority are different fields. Gate B is a maximum
+planned ceiling only. It never authorizes account access and never promotes a
+local task to authenticated AWS work. Use this mapping and no synonyms:
 
-| Project AWS lane | Prompt AWS mode | Gate B AWS boundary |
-|---|---|---|
-| `documentation-only` | `DOCS_ONLY` | `DOCS_ONLY` |
-| `read-only` | `READ_ONLY` | `READ_ONLY` |
-| `fast-dev` | `MUTATION` only after AWS-10 preflight | `MUTATE_LISTED_RESOURCES` |
-| `explicit-gate` | `DOCS_ONLY` or `READ_ONLY` until AWS-20 | `DOCS_ONLY`, `READ_ONLY`, or `MUTATE_LISTED_RESOURCES` for a planned mutation; AWS-20 still requires a separate action-specific receipt |
+| Project AWS lane | Local task modes | Gate B AWS maximum | Authenticated AWS route |
+|---|---|---|---|
+| `documentation-only` | `NONE`, or `DOCS_ONLY` when the maximum is not `NONE` | `DOCS_ONLY` | `NONE` -- no account access |
+| `read-only` | `NONE` or `DOCS_ONLY` | `READ_ONLY` | AWS-10, AWS-30, or AWS-40 under a separate exact current read authority |
+| `fast-dev` | `NONE` or `DOCS_ONLY` | `MUTATE_LISTED_RESOURCES` | AWS-10 read preflight, then AWS-20 only under current derived mutation authority |
+| `explicit-gate` | `NONE` or `DOCS_ONLY` | `DOCS_ONLY`, `READ_ONLY`, or `MUTATE_LISTED_RESOURCES` | AWS-10/AWS-30/AWS-40 reads and AWS-20/AWS-50 mutations each require their exact current authority |
+
+A Gate B maximum of `NONE` allows local task mode `NONE` only. Every other
+valid Gate B maximum allows local task mode `NONE` or `DOCS_ONLY` only.
+Authenticated `READ_ONLY` and `MUTATION` are phase modes, never task metadata.
+If a current plan contains either legacy task value, fail closed and replan
+remaining local work. Preserve DONE completion records and append-only VERIFY
+evidence; never reinterpret historical completion as reusable AWS authority.
+
+The Engine reports these distinctions in `aws_mode_boundary`: project lane,
+local task modes, current prompt mode, Gate B maximum, external-authority kind
+and validity, and separate account-access and mutation-authorized booleans.
+Requirements and design work use `DOCS_ONLY` with no account access. BUG-10
+uses no authenticated access. AWS-10, AWS-30, and AWS-40 are the only
+authenticated read phases. AWS-20 and AWS-50 are the only mutation phases.
+Every authenticated phase still requires the exact current external authority;
+the prompt mode alone grants nothing.
 
 `NONE` means no AWS access in the current prompt. An IaC synth or local plan
 does not itself require authenticated AWS mutation.
@@ -337,9 +359,12 @@ record. Its advisory evidence may use the PRD's exact `Design` syntax to bind a
 current DES and influenced TECH IDs, but it never selects technology or grants
 approval. Its observed version is metadata, not a pin. Fresh templates require
 current official `aws-core@agent-toolkit-for-aws` before initialization.
-Initialized projects skip the prerequisite gate during normal resume. Missing
-or stale AWS Core evidence later pauses only the affected material AWS step and
-produces one concise official setup action.
+Initialized projects skip the prerequisite gate during normal resume. A truly
+unavailable official AWS Core capability produces one concise owner setup
+action. Missing, stale, or safely repairable generated evidence while the
+capability is available is Codex work; unexplained structural drift or unsafe
+evidence conflict requires human review. Each case pauses only the affected
+material AWS step.
 AWS operations remain blocked without the required evidence and authorization.
 
 Before any AWS mutation, the active authorization must state all of:
@@ -364,8 +389,9 @@ Missing, stale, or conflicting values make the mutation BLOCKED. Read-only
 discovery must precede mutation. Prefer a read-only profile by default and the
 least-privileged write profile only for an authorized operation.
 
-AWS Core selects a currently supported account-operation tool; never make a
-tool name a product dependency or infer a lane from prose. `STRUCTURED_API` is
+Codex follows current AWS Core guidance to select a supported account-operation
+tool; never make a tool name a product dependency or infer a lane from prose.
+`STRUCTURED_API` is
 one attributable operation whose observable service, operation, context,
 parameters, and resources fit current Engine-derived authority.
 `REVIEWED_SCRIPT` is a legitimate multi-step workflow bound by one current
@@ -492,6 +518,18 @@ project change.
 INTAKE-20 and DESIGN-20 return the exact Gate A or Gate B owner receipt defined
 above, bound to the current PRD revision. They may precede it with a concise
 readiness summary, but must not append a routine status or AWS receipt.
+Before writing either owner record, pass the complete candidate on stdin to:
+
+~~~text
+python scripts/bootstrap_doctor.py --root . --validate-gate-receipt --input-stdin --json
+~~~
+
+Only `PASS` with `candidate_accepted: true` may be recorded. On `FAIL`, write
+nothing, say that no approval was recorded, preserve the unchanged pending
+gate, and re-present the unchanged exact current receipt without echoing the
+rejected candidate. A receipt-format failure alone does not stale a revision or
+route backward; return to requirements or design only when the Engine reports
+an underlying material change or stale basis.
 
 #### AWS authority/evidence receipt
 
@@ -530,17 +568,25 @@ direct evidence.
 | INTAKE-20 | Present Gate A | DESIGN-10 |
 | DESIGN-10 | Complete the PRD and construction envelope | DESIGN-20 |
 | DESIGN-20 | Present Gate B | TASK-10 |
-| BUG-10 | Define an evidence-based defect contract | TASK-10 |
+| BUG-10 | Current-request adjunct: define an evidence-based defect contract | Return to the Engine-derived route |
 | TASK-10 | Produce executable tasks and safe waves | BUILD-10 or BUILD-20 |
-| BUILD-10 | Execute one approved task | BUILD-10, RELEASE-10, or STOP |
-| BUILD-20 | Run approved tasks autonomously | RELEASE-10 or STOP |
-| SYNC-10 | Reconcile authorized GitHub tracking | BUILD-20, RELEASE-10, or STOP |
+| BUILD-10 | Execute one approved task | BUILD-10, BUILD-20, RELEASE-10, or STOP |
+| BUILD-20 | Run approved tasks autonomously | BUILD-20, RELEASE-10, or STOP |
+| SYNC-10 | Current-request adjunct: reconcile authorized GitHub tracking | Return to the Engine-derived route |
 | RELEASE-10 | Review and, if authorized, finalize the release | AWS-10, AWS-40, or STOP |
 | AWS-10 | Read-only deployment preflight | AWS-20 or STOP |
-| AWS-20 | Execute an authorized deployment | AWS-30 |
-| AWS-30 | Reconcile deployed evidence | RELEASE-10 |
+| AWS-20 | Journal and execute one authorized deployment attempt | AWS-30 |
+| AWS-30 | Reconcile one deployment attempt read-only | RELEASE-10, or AWS-30 while stale |
 | AWS-40 | Read-only residual and teardown review | AWS-50 or STOP |
 | AWS-50 | Execute an authorized teardown mutation | AWS-40 |
+
+BUG-10 and SYNC-10 are current-request-scoped adjunct prompts, not Engine
+routes or additional lifecycle phases. Invoke one only when the current owner
+message explicitly requests its bounded work and the exact required authority
+is current. Preserve the Engine-derived route and pending owner action, perform
+only the adjunct's permitted writes, rerun the Engine, and return to its route.
+An adjunct cannot cross a gate, authorize work, or become the persisted next
+prompt.
 
 ---
 
@@ -652,7 +698,10 @@ previous local blocker.
    `MINIMIZE_TOTAL_COST; HARD_CAP: <ISO_CURRENCY> <OWNER_AMOUNT>`; otherwise
    use `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED`. Recommend `us-west-2`
    only when the owner is unsure. A budget is a ceiling, not a spending target
-   or AWS authorization.
+   or AWS authorization. Normalize the project name and Region once through the
+   bootstrap identity contract. Pass owner values as literal argv elements;
+   never concatenate or evaluate them as shell source. Region syntax validation
+   does not replace later current-availability verification through AWS Core.
 
 4. Run:
 
@@ -725,8 +774,10 @@ previous local blocker.
    setup value.
 
 If current AWS evidence later becomes missing or stale, stop only the affected
-material step and give one official AWS Core action. Do not regenerate the
-project or rerun the fresh prerequisite gate.
+material step and follow the Engine's ownership: owner setup only for an
+unavailable capability, Codex correction for safely repairable generated
+evidence, and human review for unexplained unsafe structure. Do not regenerate
+the project or rerun the fresh prerequisite gate.
 
 Native hook review is the owner's attestation to the official plugin identity
 and hook inventory displayed by Codex. Fastlane never claims to observe a
@@ -754,8 +805,8 @@ Active execution snapshot. Reconcile IN_PROGRESS work before making a plan STALE
 **GitHub mode:** NONE by default; READ_ONLY only when needed to understand an
 identified brownfield repository.
 
-**AWS mode:** DOCS_ONLY only when a current AWS fact is needed; no authenticated
-AWS access.
+**AWS mode:** NONE. Intake records product facts and defers current public AWS
+evidence to REQ-10; it never inspects credentials or accesses an AWS account.
 
 **Required authorization:** Intake and its declared local write only.
 
@@ -833,8 +884,10 @@ Before requirements analysis:
   question's basis IDs. All foundation facts derived from one question cite the
   same parsed owner-response record. For the initial work-context question, map
   `A` to `NEW_APPLICATION`, `B` to `EXISTING_APPLICATION_CHANGE`, and `C` to
-  `REPAIR_OR_MIGRATION`. This provenance proves deterministic interpretation
-  and current-card binding; it does not authenticate the owner's identity.
+  `REPAIR_OR_MIGRATION`. This parsed card binding
+  does not authenticate the owner's identity.
+- `NEW_APPLICATION` deterministically requires `NEW_BUILD`; never infer owner
+  context from work kind or repository state.
 - If the owner asks for advice or says `recommend one`, explain the options
   and practical tradeoff, state that project state did not change, and restore
   the unchanged card.
@@ -893,7 +946,8 @@ commit/archive the stopped ledger, then mark its Task-plan state STALE.
 
 **GitHub mode:** READ_ONLY only if authorized and needed for brownfield facts.
 
-**AWS mode:** DOCS_ONLY; authenticated AWS access is not required.
+**AWS mode:** DOCS_ONLY. Never inspect credentials or access an AWS account.
+Authenticated reads route through AWS-10 after Gate B.
 
 **Required authorization:** Requirements analysis and declared docs/project/PRD.md writes only.
 
@@ -910,18 +964,15 @@ or a material AWS feasibility fact needed for Gate A remains unverified.
 Analyze the entire intake as one requirement set before technical design.
 
 First run `python scripts/bootstrap_dependencies.py --root . --json`. The
-coordinator challenges the complete requirement set. Quick MVP uses no
-subagent by default. Invoke the read-only
-`fastlane-requirements-challenger` only for ambiguity, contradictions,
-sensitive data, identity, payments, migrations, shared interfaces, high risk,
-or an explicit owner request, and only after the complete draft exists with no
-open owner decision. Make one attempt per requirements revision and wait no
-more than 60 seconds. If it fails, stalls, or is unavailable, stop it, record
-`Independent requirements challenge: UNAVAILABLE — coordinator checklist completed`
-in the current Gate A Recommendation rationale, perform the checklist as the
-coordinator, rerun the Engine and deterministic presenter, and continue. Never
-expose reviewer timing or orchestration or turn its availability into an owner
-action. Classify REQ-10 AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
+coordinator challenges the complete requirement set and remains the only
+writer. Quick MVP uses no
+subagent by default. Use the read-only `fastlane-requirements-challenger` only
+at the Define-reference triggers, after a complete draft has no open owner
+decision. Allow one attempt per requirements revision and 60 seconds. If it is
+unavailable, record `Independent requirements challenge: UNAVAILABLE — coordinator checklist completed`,
+apply that checklist, rerun the Engine and presenter, and continue. Never
+expose reviewer timing or orchestration or make availability an owner action.
+Classify REQ-10 AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
 `NOT_MATERIAL`. Use `REQUIRED` when Gate A depends on current AWS facts for
 service/Region feasibility, identity/authorization, sensitive data/uploads,
 public exposure, encryption, deletion/recovery, quotas, availability, or
@@ -944,34 +995,35 @@ challenger cannot satisfy AWS evidence or approve Gate A.
 Translate only normative requirement rows into the Fastlane EARS Contract in
 the current PRD table and select exactly one `GHERKIN` or `MEASURABLE`
 acceptance form. Keep product statements, stories, goals, non-goals, facts,
-findings, assumptions, open decisions, architecture, tasks, tests, receipts,
-evidence, and authorization metadata outside that contract. For material performance,
-availability, reliability, recovery, scalability, security-response, or
-operational-response concerns, complete a `QAS-*` row; otherwise record
-`NOT_APPLICABLE — <concrete reason>`. Apply STRIDE, LINDDUN, ATAM, or ADR only
-when the phase reference's material trigger is met. Record results in existing
-authorities and add no methodology-specific stage, gate, or document. Keep all
-methodology names out of routine owner responses unless the owner explicitly
-asks for an explanation.
+findings, assumptions, decisions, architecture, tasks, tests, receipts,
+evidence, and authority outside that contract. Add `QAS-*` only for material
+quality concerns; otherwise record `NOT_APPLICABLE — <concrete reason>`. Apply
+STRIDE, LINDDUN, ATAM, or ADR only at the phase reference's material trigger,
+using existing authorities and no extra stage, gate, or document. Hide method
+names unless the owner asks.
 
-Complete the PRD schema 1.3 actor, journey, conditional rich-use-case, business-rule, acceptance-ID, and requirement-coverage records. Ask only for missing product facts; never expose the internal method profile or invent them.
+Complete schema 1.3 actors, journeys, conditional rich use cases, business
+rules, acceptance IDs, coverage, and existing state-machine records when their
+validated trigger applies. Mermaid flow diagrams are optional presentation aids
+for validated `JOURNEY-*` or `STATE-*` records, never readiness artifacts. Ask
+only for missing product facts; never expose the internal profile or invent them.
 
-Create or increment a requirements revision such as REQ-0001. Give every
-requirement, non-goal, assumption, and material open question a stable ID.
-Derive the internal Adaptive Coverage Plan from the work kind, delivery profile,
-risk, requirements, and repository facts. Do not ask a new routine question.
+Require bidirectional first-release traceability: every requirement appears
+exactly once in coverage, and every declared actor and journey participates in
+at least one coverage row. Each row's Acceptance/test IDs is exactly that
+requirement's canonical `AC-*` followed only by `TEST-*`, `PROP-*`, or `EV-*`
+IDs explicitly named in its own acceptance criterion. At low/moderate risk,
+bind a rich use case to every journey declaring a material trigger; at
+high/critical risk, bind one to every journey. Applicability prose cannot move a
+typed journey trigger.
+
+Create or increment REQ and give every requirement, non-goal, assumption, and
+material open question a stable ID. Complete the Define-reference PRD contract:
+outcome/scope, measurable acceptance, security/privacy/data/failure/recovery,
+observability/performance/cost/accessibility/Region, brownfield compatibility,
+assumptions, contradictions, feasibility, and material AWS impacts. Derive the
+Adaptive Coverage Plan from current facts without a routine owner question.
 Every omission needs a current basis; uncertain impact uses full coverage.
-Record in docs/project/PRD.md:
-- problem, actors, outcome, scope, and non-goals;
-- measurable functional and non-functional requirements;
-- security, privacy, data, failure, concurrency, recovery, observability,
-  performance, cost posture and any real hard cap, accessibility, and regional
-  constraints where applicable;
-- brownfield compatibility and migration constraints;
-- acceptance criteria and objective verification method for each requirement;
-- assumptions explicitly proposed for acceptance;
-- contradictions, ambiguities, undefined terms, missing cases, and feasibility;
-- relevant AWS Well-Architected impacts.
 
 Fill the Gate A readiness card with these exact fields: Outcome; Owner and
 users; Scope and non-goals; Measurable requirement/acceptance IDs; Data
@@ -1027,8 +1079,8 @@ snapshot if needed to repair a mirror mismatch, never task blocks.
 
 **GitHub mode:** NONE.
 
-**AWS mode:** DOCS_ONLY when current AWS evidence is needed; no AWS account
-access.
+**AWS mode:** NONE. Gate A presents already validated requirements evidence;
+it neither refreshes AWS Core evidence nor accesses an AWS account.
 
 **Required authorization:** Presentation only until the human sends the exact receipt.
 
@@ -1039,7 +1091,9 @@ unverified.
 
 **Receipt:** Exact Gate A receipt after a concise readiness summary. Do not append a routine status or AWS receipt.
 
-**Next:** DESIGN-10 only after exact acceptance; otherwise REQ-10 or INTAKE-10.
+**Next:** DESIGN-10 only after exact acceptance; otherwise remain at INTAKE-20.
+Return to REQ-10 or INTAKE-10 only for an underlying material requirements
+change or stale requirements basis, not for invalid receipt formatting alone.
 
 ~~~text
 [INTAKE-20]
@@ -1073,6 +1127,14 @@ Approver: <name/handle>
 The revision, cost posture, and assumptions must exactly match the proposed
 card. Reject extra or duplicate fields, comments, reordered lines, partial
 blocks, and code fences.
+Before any Gate A write, run the complete candidate through
+`python scripts/bootstrap_doctor.py --root . --validate-gate-receipt
+--input-stdin --json`. Only its `PASS` result may be recorded. On `FAIL`, write
+nothing, state that no Gate A approval was recorded, remain at INTAKE-20, and
+put the unchanged exact current Gate A receipt last. Never echo the rejected
+candidate. Invalid formatting alone does not return to REQ-10 or INTAKE-10;
+return there only when the Engine independently reports a material requirements
+change or stale basis.
 Silence, continued conversation, task state, or tool access never counts. After
 a valid receipt, preserve the complete normalized receipt inside the uniquely
 marked Gate A receipt block, copy its exact cost posture into the detailed
@@ -1094,12 +1156,14 @@ receipt last after a concise readiness summary.
 **Authoritative inputs:** AGENTS.md, PRD, VERIFY, relevant brownfield evidence,
 current AWS Core/docs, and read-only findings.
 
-**Permitted writes:** PRD Parts III/IV, envelope/status, one needed ADR, VERIFY,
+**Permitted writes:** PRD Parts III/IV, envelope/status, needed ADR, VERIFY,
 TASKS snapshot, and bootstrap.yaml as one checkpoint. No task generation.
 
 **GitHub mode:** READ_ONLY only when authorized.
 
-**AWS mode:** DOCS_ONLY; authenticated READ_ONLY requires exact authorization.
+**AWS mode:** DOCS_ONLY only. Do not inspect credentials or access an AWS
+account. DESIGN-10 records the planned Gate B ceiling; authenticated reads route
+later through AWS-10 and never occur during design.
 
 **Required authorization:** Design writes only; no implementation or external writes.
 
@@ -1121,16 +1185,17 @@ basis IDs, call `search_documentation`, review returned descriptions, select
 the smallest relevant set, and call `retrieve_skill` with exact returned
 identifiers. Follow the retrieved procedure and current official references.
 
-Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md. Search precedes
-retrieve and every required field and returned/selected ID must match. Bind
-each `AWS-EV-*` to its chain and use
+Record linked `AWS-DISC-*` chains in docs/project/VERIFY.md; search precedes
+retrieve and returned/selected IDs match. Bind each `AWS-EV-*` to its chain as
 `DES-0001; TECH: TECH-0001, TECH-0002` or
 `DES-0001; TECH: NONE — no technology/toolchain impact`;
-observed AWS Core version is metadata, never a pin. Persist no raw skill content/transcripts;
-installation, cache, connectors, and memory are insufficient. Codex is the only writer and selects the design.
+observed AWS Core version is metadata, never a pin. Persist no raw skill
+content/transcripts; installation, cache, connectors, and memory are
+insufficient. Codex is the only writer and selects the design.
+Unavailable AWS Core is owner setup; missing/stale or safely repairable generated evidence is Codex work;
+unexplained drift or unsafe evidence conflicts require human review.
 
-After completing the proposed design, use `fastlane-architecture-challenger`
-only when conditionally triggered; it cannot select, write, approve,
+After completing the proposed design, use `fastlane-architecture-challenger` only when conditionally triggered; it cannot select, write, approve,
 authorize, or replace evidence.
 
 Load the Design reference, follow the Adaptive Coverage Plan, and complete
@@ -1144,24 +1209,39 @@ designs require schema 5, new digests, and fresh Gate B. Codex may migrate a
 current legacy schema 1.2 Gate A without changing Part I. Report `Need from
 you: Nothing` unless an owner fact is missing; never invent facts or widen authority.
 
-- For SELECT, evaluate a secure managed-serverless baseline. Complete `DRV-*`,
-  `CAND-*`, selected `ARCH-*`, traceability, and `AWS-EV-*`; apply
+- For `SELECT`, compare at least two complete, credible, non-straw whole-system
+  candidates. Include the secure managed-serverless baseline unless Gate A forbids
+  it. Complete `DRV-*`/`CAND-*`/`ARCH-*`/`AWS-EV-*` and traceability; apply
   hard constraints before preferences; select only an eligible candidate.
-- Record rejected alternatives, risks/mitigations, Security impact,
-  Reliability impact, Operational burden, cost/breakpoints, Migration path,
-  revisit triggers, and validation across required whole-system domains.
+  `NO_VIABLE_ALTERNATIVE` requires at least two total candidates and exactly one eligible.
+- Trace every requirement only to declared IDs. For current schema 5, design
+  IDs are the selected `ARCH-*` plus interface `API/EVENT/CLI/FILE-*`,
+  `BOUNDARY-*`, and `STATE-*` rows; undeclared `COMP/DATA/CTRL-*` fail closed.
+  Property/test IDs are current applicable `PROP-*` rows or exact declared
+  `EX-*` rows; undeclared `TEST-*` fail closed. Preserve the exact approved
+  schema 4 grandfathering path.
+- Record alternatives, risks/mitigations, security/reliability/operations,
+  cost/breakpoints, migration, revisit triggers, and validation.
 - Complete in-scope `TECH-*`. Only `EXACT` accepts opaque versions; Active `PROPERTY_TESTING` uses
   `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
 - classify every measurable Gate A requirement exactly once. Each applicable
   `PROP-*` has one bounded local command without shell-control
   chaining; its replay format must explicitly declare a seed or deterministic
   reproduction and VERIFY target.
-- Complete the Gate B Harness Profile and Change impact record. Uncertain
-  impact uses `FULL_REVALIDATION`; resolve brownfield compatibility,
-  migration, and protected behavior.
+- Complete the Gate B Harness Profile and Change impact record. Choosing
+  applicability is procedural coordinator review. Deterministic validation begins
+  with the recorded row's status and checks its fields only. At Gate B resolve
+  every Harness row to `REQUIRED` or `NOT_APPLICABLE — <concrete reason>`. Routes:
+  `HARNESS-011` accessibility -> `End-to-end`; `HARNESS-012` visual regression
+  -> `End-to-end`; `HARNESS-013` mutation testing -> `Unit`; `HARNESS-014` SAST
+  -> `Static`; `HARNESS-015` DAST -> `Security and privacy`; and `HARNESS-016`
+  formal/model checking -> `Property`. Duplicate layers are intentional. Use `FULL_REVALIDATION` for uncertain impact.
 
 - Complete material interfaces/layers, applicable state models, and the
-  NEW_BUILD first-wave/spike record; bind them into the design digest.
+  NEW_BUILD first-wave/spike record. Give every referenced `EX-*` exactly one
+  concrete Example-based scenarios row. Bind that table into the modern design
+  digest after Technology and before Property applicability, definitions, and
+  execution.
 
 Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as the
 shared basis, and not append by default. Route material
@@ -1174,9 +1254,9 @@ Fill the Gate B readiness card with these exact fields: Design basis IDs;
 Architecture/components; Technology/toolchains/version policy; Interfaces/data
 flow; Identity/secrets; Failure/retry/concurrency; Deployment/operations;
 Validation/evidence; Rollback/recovery/teardown; Brownfield
-compatibility/migration; Outstanding gaps. Use explicit stable IDs.
-`NOT_APPLICABLE — <reason>` is allowed only when genuine. Outstanding gaps is
-`NONE` or stable gap IDs; any gap keeps Gate B `BLOCKED`.
+compatibility/migration; Outstanding gaps. Use stable IDs; only genuine
+`NOT_APPLICABLE — <reason>`; gaps are `NONE` or stable IDs and keep Gate B
+`BLOCKED`.
 
 Propose every construction-envelope row with the PRD's exact grammar. GitHub
 merge/branch deletion remain unauthorized unless listed; AWS defaults
@@ -1186,34 +1266,28 @@ and AWS-50 phases.
 Execution is limited to its intersection with current phase mode, evidence,
 and phase-specific authority.
 
-A planned `fast-dev` or `explicit-gate` mutation requires a
-`MUTATE_LISTED_RESOURCES` maximum with exact resources/operations, finite
-positive cost within the owner's cap/currency, feasible rollback/teardown,
-authorized SHA-256 provenance, future expiry, and exact
-`ENVIRONMENT: <exact>; CLASS: NON_PRODUCTION`,
-`EXACT_DIGEST: sha256:<64 lowercase hex>` or
-`DERIVED_FROM_AUTHORIZED_SOURCE: SHA-256 from baseline <full authorized commit>; <deterministic rule>`,
-and `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>` grammars.
-Fast-dev requires non-production. An explicit-gate maximum grants no
-mutation by itself; AWS-20 and AWS-50 still require separate exact receipts.
+For `explicit-gate` or `fast-dev`, a planned mutation ceiling is
+`MUTATE_LISTED_RESOURCES` and must satisfy the Design-reference scope, cost,
+provenance, expiry, rollback, and teardown grammars. An explicit-gate maximum grants no
+mutation by itself and still needs a separate AWS-20 action receipt;
+fast-dev is non-production. AWS-50 still needs its separate exact receipt.
 
-Require local Git and a baseline. Hash Architecture driver, Candidate,
-Selection, Traceability, Material AWS evidence, Harness, Change impact,
-Technology, Property applicability, definition, and execution tables into the
+Require local Git baseline. Hash Architecture driver, Candidate,
+Selection, Traceability, Material AWS evidence, Harness, Change impact, Project
+design contract, Technology, Example-based scenarios, Property applicability,
+definition, and execution records into the
 Design contract SHA-256. Copy it to the envelope; include the selected `ARCH-*`,
 current `TECH-*`, and applicable `PROP-*` in `SCOPE_IDS`. Hash the complete
 envelope and copy it to the Gate B review and proposed receipt.
 
-Incomplete design/envelope keeps Gate B `BLOCKED`. Only after the recommendation
-is `READY_FOR_CONSTRUCTION_APPROVAL`, atomically set the
-Document status DES/AUTH/design/Gate B fields and owner Gate B state to
-`PENDING_OWNER_APPROVAL`; copy current REQ/DES/AUTH, Gate B state, and authorized maximum
-workers, baseline, and protected dirty paths into docs/project/TASKS.md's Active
-execution snapshot and
-bootstrap.yaml. Keep old tasks stale until TASK-10 replaces them. Reset the
-owner decision to `PENDING`, clear old approval provenance/receipts, and never
-reuse a receipt for a new design/AUTH. Render the proposal; do not implement,
-generate tasks, approve, or write GitHub/AWS. Return routine status.
+Incomplete design/envelope keeps Gate B `BLOCKED`. At
+`READY_FOR_CONSTRUCTION_APPROVAL`, atomically set Document status DES/AUTH/design/Gate B fields
+and owner Gate B state to
+`PENDING_OWNER_APPROVAL`; mirror REQ/DES/AUTH, Gate B, maximum
+workers, baseline, and protected dirty paths into TASKS and bootstrap.yaml.
+Keep old tasks stale, reset
+owner decision/provenance/receipt, and never reuse a receipt. Render the
+proposal; do not implement, generate tasks, approve, or write GitHub/AWS.
 ~~~
 ## DESIGN-20 — PRD and Construction Gate B
 
@@ -1232,8 +1306,8 @@ task blocks.
 
 **GitHub mode:** NONE.
 
-**AWS mode:** DOCS_ONLY through the current AWS Core session; no AWS account
-access.
+**AWS mode:** NONE. Gate B presents the current validated design and envelope;
+it neither refreshes AWS Core evidence nor accesses an AWS account.
 
 **Required authorization:** Presentation only until the exact receipt is received.
 
@@ -1245,7 +1319,9 @@ or material AWS design evidence is stale or unverified.
 
 **Receipt:** Exact Gate B receipt after a concise readiness summary. Do not append a routine status or AWS receipt.
 
-**Next:** TASK-10 only after exact acceptance; otherwise DESIGN-10 or REQ-10.
+**Next:** TASK-10 only after exact acceptance; otherwise remain at DESIGN-20.
+Return to DESIGN-10 or REQ-10 only for an underlying material design or
+requirements change or stale basis, not for invalid receipt formatting alone.
 
 ~~~text
 [DESIGN-20]
@@ -1287,8 +1363,17 @@ Approver: <name/handle>
 
 All IDs and the canonical complete-envelope SHA-256 must exactly match the
 proposed card and structured owner record. Reject extra or duplicate fields,
-comments, reordered lines, partial blocks, and code fences. Silence, continued
-conversation, task state, or tool access never counts. After a valid receipt,
+comments, reordered lines, partial blocks, and code fences.
+Before any Gate B write, run the complete candidate through
+`python scripts/bootstrap_doctor.py --root . --validate-gate-receipt
+--input-stdin --json`. Only its `PASS` result may be recorded. On `FAIL`, write
+nothing, state that no Gate B approval was recorded, remain at DESIGN-20, and
+put the unchanged exact current Gate B receipt last. Never echo the rejected
+candidate. Invalid formatting alone does not return to DESIGN-10 or REQ-10;
+return there only when the Engine independently reports a material design or
+requirements change or stale basis.
+
+Silence, continued conversation, task state, or tool access never counts. After a valid receipt,
 preserve the complete normalized receipt inside the uniquely marked Gate B
 receipt block, then atomically update the detailed owner record, Document
 status, docs/project/TASKS.md Active execution snapshot, and lifecycle mirror to
@@ -1308,8 +1393,10 @@ requesting another owner message merely to cross the internal route.
 
 ## BUG-10 — Active Defect Contract
 
-**Preconditions:** Reproducible symptom or bounded investigation request; an
-active construction authorization is required before implementation.
+**Preconditions:** The current owner message explicitly requests a reproducible
+symptom or bounded investigation and the Engine-derived route and pending owner
+action have been preserved. An active construction authorization is required
+before implementation, but this adjunct itself performs analysis only.
 
 **Authoritative inputs:** AGENTS.md; docs/project/BUGFIX.md; relevant docs/project/PRD.md requirements; code, tests,
 logs supplied by the user, configuration, IaC, and relevant history.
@@ -1318,10 +1405,14 @@ logs supplied by the user, configuration, IaC, and relevant history.
 
 **GitHub mode:** READ_ONLY only when authorized and necessary for evidence.
 
-**AWS mode:** NONE by default; READ_ONLY only with explicit environment scope.
+**AWS mode:** NONE, or DOCS_ONLY for public AWS guidance. BUG-10 never inspects
+credentials or accesses an AWS account. If diagnosis requires authenticated
+environment evidence, stop the adjunct and return to the Engine so the
+applicable AWS-10, AWS-30, or AWS-40 authority can be derived separately.
 
-**Required authorization:** Analysis only. This prompt never authorizes a fix or external
-write.
+**Required authorization:** The current owner request authorizes only the
+bounded defect analysis and its BUGFIX.md write. This prompt never authorizes a
+fix, changes the Engine route, crosses a gate, or authorizes an external write.
 
 **Stop conditions:** Evidence requires secrets; production mutation would be
 needed to reproduce; symptom suggests active incident/data loss; scope becomes
@@ -1329,7 +1420,8 @@ a feature or material requirements change.
 
 **Receipt:** Routine status.
 
-**Next:** TASK-10 if covered by active Gate B; otherwise REQ-10.
+**Next:** Rerun the Engine and return to its derived route. TASK-10 or REQ-10
+may be that route, but BUG-10 never selects it.
 
 ~~~text
 [BUG-10]
@@ -1346,8 +1438,8 @@ Record in docs/project/BUGFIX.md:
 
 Inspect before hypothesizing. Do not manufacture logs or claim reproduction you
 did not observe. If the correction changes accepted behavior or exceeds the
-active envelope, return to REQ-10. Otherwise state readiness for TASK-10 and
-return the routine status.
+active envelope, record that fact without selecting a route. Return the routine
+status, rerun the Engine, and restore its derived route and pending owner action.
 ~~~
 
 ## TASK-10 — Executable Task Plan
@@ -1358,12 +1450,17 @@ authorization; or a defect fully covered by that authorization.
 **Authoritative inputs:** AGENTS.md; docs/project/PRD.md; docs/project/BUGFIX.md when applicable; current code/tests/IaC;
 docs/project/TASKS.md; docs/project/VERIFY.md; docs/project/RUNBOOK.md; bootstrap.yaml; passing Fastlane Engine output.
 
-**Permitted writes:** docs/project/TASKS.md and its matching `bootstrap.yaml` task-plan mirror
-as one checkpoint; no implementation.
+**Permitted writes:** docs/project/TASKS.md and its matching `bootstrap.yaml`
+task-plan mirror as one checkpoint; plus docs/project/VERIFY.md only to append
+or structurally reconcile current observed no-task requirement evidence. Do not
+invent evidence and do not implement application or infrastructure work.
 
 **GitHub mode:** NONE. Planning GitHub objects is allowed, creating them is not.
 
-**AWS mode:** NONE, except DOCS_ONLY for validation-command accuracy.
+**AWS mode:** Local task metadata may be `NONE`, or `DOCS_ONLY` for current
+public guidance when Gate B's maximum is not `NONE`. TASK-10 never emits
+`READ_ONLY` or `MUTATION`; authenticated work is checkpointed and routed to the
+applicable AWS phase.
 
 **Required authorization:** Task planning within active AUTH scope.
 
@@ -1404,20 +1501,26 @@ task, checkpoint and commit the non-runnable graph, add its plan/REQ/DES/AUTH an
 archive commit to the registry, then replace the current graph without reusing
 task IDs.
 
-For every task include:
-- stable ID and outcome;
-- status: BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE, or SKIPPED;
-- requirement/bug, applicable acceptance/journey/PROP and wave/spike traceability, plus the existing `Design`
-  value as `DES-0001; TECH: TECH-0001, TECH-0002` or
-  `DES-0001; TECH: NONE — no technology/toolchain impact`;
-- current AUTH ID, dependencies, and explicit skipped-dependency waivers or NONE;
-- exact write set and external-state set;
-- acceptance criteria;
-- validation commands and required evidence;
-- risk class, AWS mode, attempt budget/used count, owner, run ID, blocker,
-  skip record, and checkpoint fields;
-- GitHub link or PENDING_SYNC;
-- concise execution log.
+Before a modern plan becomes `CURRENT`, follow the Deliver reference and give
+every approved first-release requirement one Engine-derived disposition:
+`TASK_COVERED` by a non-`SKIPPED` task carrying its exact requirement and
+canonical acceptance ID; `ALREADY_SATISFIED` by current concrete
+`LOCAL_PASS`/ `VERIFIED` no-task evidence; or `NOT_APPLICABLE` only for an
+`OPTIONAL_FEATURE` with current concrete evidence. Never invent or relabel
+proof, and add no disposition field or second coverage table.
+
+Rerun the Engine and require `tasks.requirement_coverage_complete: true`, no
+`tasks.missing_requirement_ids`, and one coverage object per modern approved
+requirement. Missing, duplicate, unknown, mismatched, stale, or conflicting
+coverage is Codex-owned replanning. Use an existing gate only when correction
+changes requirements, design, envelope, or authority.
+
+Use the ledger's exact task schema: stable outcome/status; requirement,
+acceptance/journey/PROP/wave/spike and existing `Design` trace; AUTH,
+dependencies/waivers, write/external boundaries, acceptance, validation,
+evidence, risk/AWS/attempt/run/checkpoint/GitHub fields, and execution log.
+Use `DES-0001; TECH: TECH-0001, TECH-0002` or
+`DES-0001; TECH: NONE — no technology/toolchain impact`.
 
 TASK-10 is copy-only for design decisions. Copy relevant TECH IDs and every
 applicable property execution value exactly from the approved PRD. Never choose
@@ -1431,28 +1534,19 @@ metadata fields or a separate task merely to repeat the profile. A missing,
 changed, or incompatible harness value routes to DESIGN-10.
 
 
-For every applicable `PROP-*`, include its ID in `Requirements`, keep it in the
-same implementation task when practical, and copy its exact command, run
-target/time bound, seed or reproduction format, framework TECH ID, and VERIFY
-destination into an exact Property execution projection table under
-`#### Validation`; also put the exact command once in that section's fenced
-command list. The table uses the PRD Property execution headers and one copied
-row per referenced property:
+For every applicable `PROP-*`, include its ID in `Requirements`, keep it with
+implementation when practical, copy its PRD values into an exact Property execution projection table
+under `#### Validation`, and list its command once:
 `Property ID | Framework TECH ID | Exact command | Run target/time bound | Seed or reproduction format | Evidence destination`.
-A
-property may be omitted only when DESIGN-10 records `NOT_APPLICABLE` with a
-concrete reason. Do not add a separate property-test task merely to inflate the
-graph.
+A property may be omitted only for DESIGN-10's concrete `NOT_APPLICABLE`;
+never add a property-only task merely to inflate the graph.
 
-Emit each record in the validator's exact human-first shape: one
-`### <TASK-ID> — <title>` heading; visible Status, Owner, Blocker, and GitHub
-issue fields; `#### Outcome`, `#### Acceptance criteria`, `#### Validation`, and
-`#### Execution log`; then a collapsed `#### Agent execution details` section
-containing every remaining singleton metadata line from docs/project/TASKS.md's Required
-task record schema, spelled exactly once. A READY task cannot contain TODO in its outcome,
-acceptance criteria, validation, boundary, or traceability. Acceptance criteria
-must be checkboxes, and a DONE task must have every acceptance checkbox checked,
-non-NONE Evidence, and an observed execution-log entry.
+Emit the ledger's exact human-first shape: task heading; visible status/owner/
+blocker/GitHub; `#### Outcome`, `#### Acceptance criteria`, `#### Validation`,
+`#### Execution log`; then collapsed `#### Agent execution details` with
+every remaining singleton metadata line exactly once. READY has no TODO in
+outcome, acceptance, validation, boundaries, or traceability. DONE has checked
+acceptance, non-NONE evidence, and an observed log entry.
 
 In a CURRENT plan, fully resolve the outcome, acceptance criteria, validation,
 boundaries, REQ/DES/AUTH trace, applicable TECH decisions, and property
@@ -1460,12 +1554,11 @@ projection for every BACKLOG task as well. BACKLOG means dependency-gated, not
 undefined: it contributes to approved plan coverage, never appears in
 `--ready`, and cannot be claimed until it explicitly becomes READY. The stock
 UNINITIALIZED placeholder is exempt, and SKIPPED tasks do not satisfy property
-coverage.
+or requirement coverage.
 
 Keep tasks thin enough to validate independently. Mark READY only when all
-dependencies, inputs, and authorization are satisfied. A SKIPPED dependency is
-not satisfied without a current waiver naming the dependency, downstream task,
-authority, rationale, and replacement evidence. Compute structural waves, then
+dependencies, inputs, and authorization are satisfied. Require explicit skipped-dependency waivers
+naming the dependency, downstream task, authority, rationale, and replacement evidence. Compute structural waves, then
 preserve their dependency order, and execute them serially through one
 coordinator. Set `Maximum workers` to `1`. The coordinator is the only writer
 for implementation files, docs/project/TASKS.md, docs/project/VERIFY.md,
@@ -1499,8 +1592,11 @@ operations change.
 **GitHub mode:** Only operations explicitly allowed by current AUTH or current
 user instruction.
 
-**AWS mode:** As stated by current AUTH. AWS mutation still requires a complete
-active mutation boundary.
+**AWS mode:** `NONE` or `DOCS_ONLY` only, subject to the Gate B maximum. BUILD-10
+never uses authenticated task metadata. At an authenticated boundary,
+checkpoint local state and route reads through AWS-10/AWS-30/AWS-40,
+deployment through AWS-20, or teardown through AWS-50 under separate current
+authority.
 
 **Required authorization:** One named task inside AUTH scope.
 
@@ -1512,7 +1608,7 @@ hypothesis.
 
 **Receipt:** Routine status with validation evidence.
 
-**Next:** BUILD-10, RELEASE-10, or STOP.
+**Next:** BUILD-10, BUILD-20, RELEASE-10, or STOP.
 
 ~~~text
 [BUILD-10]
@@ -1628,7 +1724,11 @@ generated output, and other shared paths.
 **GitHub mode:** Only operations explicitly listed in AUTH; no merge or branch
 deletion unless named.
 
-**AWS mode:** AUTH boundary only. AWS mutations are always serialized.
+**AWS mode:** Every generated/local task remains `NONE` or `DOCS_ONLY`; Gate B
+is only the maximum planned ceiling. BUILD-20 checkpoints before authenticated
+AWS work, routes reads through AWS-10/AWS-30/AWS-40, deployment through AWS-20,
+and teardown through AWS-50, and never relabels a task `READ_ONLY` or
+`MUTATION`.
 
 **Required authorization:** Autonomous work only until the envelope completion/expiry,
 task boundary, or stop condition.
@@ -1641,7 +1741,9 @@ budget exhausted without a materially new hypothesis.
 
 **Receipt:** One routine status per completed wave and a final receipt.
 
-**Next:** Continue BUILD-20, SYNC-10, RELEASE-10, or STOP.
+**Next:** Continue BUILD-20, RELEASE-10, or STOP. A current explicit GitHub
+reconciliation request may invoke the SYNC-10 adjunct, which then returns to
+the rerun Engine.
 
 ~~~text
 [BUILD-20]
@@ -1700,9 +1802,13 @@ Use this loop:
 No subagent may edit implementation files, shared controls, protected or dirty
 paths, manifests, lockfiles, schemas, generated output, or GitHub state.
 Deterministic task and evidence checks—not reviewer prose—decide readiness and
-completion. Journal every external operation before execution. Reconcile
-UNKNOWN or partial results read-only before retrying. Keep GitHub operations
-within AUTH. Route AWS mutation through AWS-10/AWS-20.
+completion. Journal every external operation before execution. Reconcile UNKNOWN or
+partial results read-only before retrying. Keep GitHub operations within AUTH.
+When the current owner message explicitly requests named GitHub reconciliation,
+invoke SYNC-10 only after the current wave is checkpointed, then rerun the
+Engine and resume its route. Route deployment through AWS-10 to AWS-20 to
+AWS-30; only AWS-20 may mutate. Route teardown through AWS-40 to AWS-50 to
+AWS-40; only AWS-50 may mutate.
 
 After every reconciled task or wave, rerun the Engine, derive progress only
 from its task totals and task-ID fields through `fastlane_presenter.py`, and
@@ -1715,8 +1821,10 @@ final routine status.
 
 ## SYNC-10 — GitHub Reconciliation
 
-**Preconditions:** Repository identity is verified; task IDs are stable; current
-user instruction or AUTH explicitly permits named GitHub writes.
+**Preconditions:** The current owner message explicitly requests named GitHub
+reconciliation; repository identity is verified; task IDs are stable; the
+Engine-derived route and pending owner action are preserved; and the current
+instruction or AUTH permits every named GitHub write.
 
 **Authoritative inputs:** docs/project/TASKS.md; docs/project/VERIFY.md; existing GitHub issues, project items, branches,
 checks, and pull requests in the named repository.
@@ -1728,14 +1836,17 @@ WRITE operations.
 
 **AWS mode:** NONE.
 
-**Required authorization:** Repository plus allowed operations must be explicit.
+**Required authorization:** Repository plus every allowed operation must be
+explicit in the current owner request or AUTH. This adjunct creates no
+authority and cannot expand Gate B.
 
 **Stop conditions:** Repository mismatch; issue/task conflict; protected branch
 or required check failure; requested merge/close/delete not authorized.
 
 **Receipt:** Routine status listing exact observed GitHub actions.
 
-**Next:** BUILD-20, RELEASE-10, or STOP.
+**Next:** Rerun the Engine and return to its derived BUILD-20, RELEASE-10, or
+STOP route; SYNC-10 never selects or persists that route.
 
 ~~~text
 [SYNC-10]
@@ -1750,7 +1861,8 @@ do not silently overwrite.
 Creating branches, issues, project items, commits, pushes, PRs, labels,
 comments, merges, releases, or deletions are distinct write operations. Perform
 only those explicitly named. Tool availability is never authorization. Return
-the routine status.
+the routine status, rerun the Engine, and restore its derived route and pending
+owner action.
 ~~~
 
 ## RELEASE-10 — Release Readiness and Finalization
@@ -1759,7 +1871,9 @@ the routine status.
 aggregate local validation is available; release target is identified.
 
 **Authoritative inputs:** docs/project/PRD.md; docs/project/BUGFIX.md; docs/project/TASKS.md; docs/project/VERIFY.md; docs/project/RUNBOOK.md; diff; tests; IaC;
-dependency/security results; authorized GitHub checks.
+dependency/security results; authorized GitHub checks. Post-AWS-30 review loads
+both VERIFY's `AWS deployment action and reconciliation evidence` and `Current
+release decision` sections.
 
 **Permitted writes:** docs/project/VERIFY.md release assessment; docs/project/RUNBOOK.md only for corrected
 procedures; authorized GitHub PR/release actions.
@@ -1778,13 +1892,34 @@ rollback; evidence gap; scope/revision drift; unauthorized merge/release.
 **Receipt:** Routine status with READY or BLOCKED and the exact release
 state `NOT_READY`, `READY_TO_DEPLOY`, or `RELEASE_VERIFIED` in Validation.
 
-When release state is `RELEASE_VERIFIED`, record optional `AWS lifecycle
-intent` as exactly `NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`. It selects a
-follow-up route but grants no AWS access or mutation.
+At a settled `NOT_READY` boundary after a consumed deployment attempt, or at
+`RELEASE_VERIFIED`, only a direct plain-language owner request may change the
+optional AWS lifecycle-intent record. Use only the Engine-projected
+`aws_lifecycle_intent_write_authority`, update the value, source, and recorded-at
+lines atomically, and leave them unchanged when no such owner request exists.
+The normal capability contains exactly `NONE`, `RESIDUAL_REVIEW`, and
+`TEARDOWN`. At a current residual-choice boundary it instead contains exactly
+`RETAIN`, `RESIDUAL_REVIEW`, and `TEARDOWN`, shown to the owner as RETAIN,
+INVESTIGATE, and REMOVE. Non-`NONE` requires the canonical `owner-message
+MSG-AWS-LIFECYCLE-nnnn` reference to the actual owner message plus its
+timezone-aware recorded time. Never fabricate, infer, or relabel an owner
+message. Record one choice for the complete current residual set, not different
+choices per resource. The record selects a route only and grants no AWS access,
+mutation, cleanup, or spending authority.
 
-**Next:** AWS-10 only from `READY_TO_DEPLOY`. From `RELEASE_VERIFIED`, `NONE`
-stops; `RESIDUAL_REVIEW` and `TEARDOWN` route to AWS-40. No other value or
-state may enter the residual/teardown path.
+**Next:** AWS-10 only from `READY_TO_DEPLOY`. From a settled `NOT_READY` or
+`RELEASE_VERIFIED` boundary, `NONE` stops; `RESIDUAL_REVIEW` and `TEARDOWN`
+route to AWS-40. A STARTED attempt, required post-action review, or recorded
+AWS-40 blocker outranks elective intent and cannot be hidden by `NONE`. From
+current residual evidence, RETAIN stops with an explicit retained-resources
+result, INVESTIGATE routes under separate read authority, and REMOVE reaches
+AWS-50 only through the exact teardown receipt after any required AWS-40 refresh.
+Follow `aws_residual_disposition`, not the raw lifecycle value. Every choice
+after `RESIDUALS_REMAIN` must be strictly newer than that row. After READY,
+RETAIN and INVESTIGATE must be strictly newer, while an earlier
+owner-provenanced TEARDOWN may carry forward as REMOVE. New residual evidence
+reopens the choice; RETAIN without current READY or residual evidence is
+invalid.
 
 ~~~text
 [RELEASE-10]
@@ -1811,7 +1946,15 @@ Set exactly one release state in docs/project/VERIFY.md: NOT_READY when any requ
 is incomplete/failed/stale; READY_TO_DEPLOY when all pre-deployment evidence is
 current for the immutable artifact and AWS deployment is the only remaining
 required step; RELEASE_VERIFIED only when every required local and deployed
-acceptance item is VERIFIED or explicitly not applicable. Record observed
+acceptance item is VERIFIED or explicitly not applicable. Before any terminal
+AWS-30 row, Active evidence cutoff may be TODO or NONE. When AWS-30 returns
+COMPLETE or BLOCKED, record that exact terminal AWS-30 Evidence ID as Active
+evidence cutoff in the same checkpoint that decides NOT_READY,
+RELEASE_VERIFIED, or records a separately authorized correction path. Once the
+cutoff matches, that attempt cannot route back to RELEASE-10. Retry requires
+distinct current mutation authority: a new exact deployment receipt for
+explicit-gate or freshly approved construction authorization for fast-dev, plus
+a new Attempt ID. Never replay prior deployment authority. Record observed
 evidence and return READY or BLOCKED with specific reasons.
 If authorization explicitly permits finalization, perform only the named
 GitHub operations after required checks pass. Never infer permission to merge,
@@ -1934,13 +2077,17 @@ teardown.
 ## AWS-20 — Authorized Deployment
 
 **Preconditions:** AWS-10 READY; active fast-dev envelope or action-specific
-authorization contains every AWS mutation-boundary field and matches preflight.
+authorization contains every AWS mutation-boundary field and matches preflight;
+and no prior deployment Attempt ID remains STARTED or lacks AWS-30
+reconciliation.
 
 **Authoritative inputs:** Current REQ/DES/AUTH; docs/project/VERIFY.md; docs/project/RUNBOOK.md; artifact; preflight;
 aws-core docs/tools; live read-only target state.
 
-**Permitted writes:** Authorized AWS target; docs/project/VERIFY.md IaC/action evidence; docs/project/TASKS.md status;
-docs/project/RUNBOOK.md only for observed procedural correction.
+**Permitted writes:** One authorized AWS target attempt; append-only
+docs/project/VERIFY.md IaC/action and deployment-attempt evidence;
+docs/project/TASKS.md status; docs/project/RUNBOOK.md only for observed
+procedural correction.
 
 **GitHub mode:** Only separately authorized deployment-status/check operations.
 
@@ -1954,7 +2101,15 @@ insufficient.
 
 **Stop conditions:** Any field mismatch; authorization expired; unexpected
 change set/cost/resource; alarm or smoke-test failure; rollback condition;
-operation expands scope; destructive replacement not explicitly allowed.
+operation expands scope; destructive replacement not explicitly allowed;
+a previous STARTED, FAILED, PARTIAL, or UNKNOWN attempt has not completed its
+required AWS-30 reconciliation and RELEASE-10 decision.
+
+An expiry or legitimate Gate B staleness discovered after a valid STARTED row
+is not permission to call AWS and is not permission to abandon the attempt.
+Use only the Engine's `deployment_journal_closure_authority` for the exact
+VERIFY append it names. Ordinary construction/write authority and AWS mutation
+authority remain NONE.
 
 **Receipt:** AWS authority/evidence receipt listing exact mutations and identifiers,
 without secrets.
@@ -1977,6 +2132,22 @@ fully and exactly contained in the current Gate B mutation envelope; otherwise
 mark Gate B stale and route to DESIGN-10. An action-specific receipt cannot
 repair a fast-dev envelope mismatch.
 
+Allocate the next unused `AWS-DEPLOY-nnnn` Attempt ID. Before the external
+call, append one AWS-20 `STARTED` row to docs/project/VERIFY.md's canonical
+`AWS deployment action and reconciliation evidence` table. Bind the exact
+REQ/DES/AUTH and immutable deployment provenance: authorization, receipt digest,
+valid-until value, stable authority source, and deployment role/profile. For
+explicit-gate, derive it from the current marked deployment receipt and source.
+For fast-dev, record the exact current construction `AUTH-*`, digest `NONE`,
+the expiry timestamp parsed from Gate B `AWS authorization validity`, and Gate B
+owner-authorization source.
+Also bind artifact, plan/change-set, target, resources, mutation operations,
+timestamp, and durable
+source. Use exact `NONE` for every read-provenance field, read operations,
+rollback, and acceptance evidence. The combined operation field is exactly
+`NOT_OBSERVED — pre-call journal only`. STARTED proves only that Fastlane
+journaled intent; it is not evidence that AWS received or executed a call.
+
 Reconfirm caller identity, account, Region, environment, artifact digest, exact
 plan/change-set binding, finite positive cost ceiling, owner-cap compatibility, and rollback
 path immediately before mutation. The ceiling covers the authorization-validity
@@ -1996,39 +2167,93 @@ checks. Record the observed row in `IaC validation evidence` using
 
 Stream concise milestones. Stop on every declared threshold. If a rollback
 condition occurs, perform rollback only when the authorization includes it;
-otherwise stop and report the safest state. Capture command/result identifiers,
-resource identifiers, timestamps, alarms, and smoke-test outcomes without
-secrets. Do not mark deployed verification complete in this prompt. Return the
-AWS authority/evidence receipt and proceed to AWS-30.
+otherwise stop and report the safest state. After the call resolves or its
+outcome becomes ambiguous, append exactly one terminal AWS-20 row for the same
+Attempt ID with `SUCCEEDED`, `FAILED`,
+`PARTIAL`, or `UNKNOWN`. Copy the immutable deployment provenance and write the
+combined operation field exactly as `IDENTIFIERS: <unique exact list or NONE — concrete reason>; RESULT: <concrete direct result>`.
+Also record rollback result, timestamp, and durable source. The grammar
+structures observed evidence but never proves execution by itself. Never
+replace the STARTED row. Capture no secrets and do
+not mark deployed verification complete here. The projected deployment
+authority is consumed by this Attempt ID; it cannot carry over to AWS-30 or be
+replayed for another attempt. Return the AWS authority/evidence receipt and
+proceed to AWS-30 for every terminal result. If resuming with STARTED but no
+terminal row, do not call AWS or ask the owner: append UNKNOWN, rerun the Engine,
+and only then request AWS-30 read authority. If Gate B has since expired or
+become legitimately stale, perform this append only when the Engine projects
+`deployment_journal_closure_authority` for UNKNOWN terminalization. It is a
+narrow journal closure, not renewed Gate B or deployment authority.
 ~~~
 
 ## AWS-30 — Deployed Evidence Reconciliation
 
-**Preconditions:** AWS-20 attempted a deployment or rollback; read-only target
-access remains authorized.
+**Preconditions:** AWS-20 has one STARTED and one terminal row for the same
+Attempt ID; independently current exact read-only target authority covers the
+required reconciliation operations; the Attempt ID has no COMPLETE or BLOCKED
+reconciliation and no more than one prior STALE. Mutation authority is neither
+read authority nor reusable authority.
 
-**Authoritative inputs:** Deployment receipt; docs/project/PRD.md acceptance criteria; docs/project/VERIFY.md; docs/project/RUNBOOK.md;
-live read-only AWS state, telemetry, logs, and smoke-test endpoints.
+**Authoritative inputs:** The canonical `AWS deployment action and reconciliation
+evidence` table and exact
+Attempt ID; deployment receipt as provenance only; docs/project/PRD.md
+acceptance criteria; docs/project/VERIFY.md; docs/project/RUNBOOK.md; live
+read-only AWS state, telemetry, logs, and smoke-test endpoints.
 
 **Permitted writes:** docs/project/VERIFY.md; docs/project/TASKS.md evidence/status; docs/project/RUNBOOK.md only for repeatable
 procedural correction.
 
+When Gate B expired or became legitimately stale after the valid attempt began,
+the broader permitted-write sentence above no longer applies. Write only
+`docs/project/VERIFY.md` and perform only the exact closure operations projected
+by `deployment_journal_closure_authority`: record the canonical marked read
+receipt/provenance and append its AWS-30 journal row, or update RELEASE-10's release decision and cutoff together. Only the journal row is append-only.
+
 **GitHub mode:** Only authorized status/check/comment updates.
 
-**AWS mode:** READ_ONLY. Any corrective mutation requires a new or still-valid
-explicit mutation authorization.
+**AWS mode:** READ_ONLY. Any corrective mutation requires a newly derived
+current mutation authorization and a new Attempt ID after RELEASE-10. AWS-30
+never carries or replays prior mutation authority.
 
-**Required authorization:** Exact read-only target scope.
+**Required authorization:** A current exact `AWS-READ-AUTH-*` projection
+whose identity, target, resources, allowed read operations, artifact, and
+validity independently cover AWS-30. Record its exact receipt SHA-256, exact
+valid-until value, and `Read authority source` exactly as `SOURCE: <stable
+owner-message source>; AUTHORIZED_AT: <ISO 8601 with timezone>; RESOURCES:
+<exact canonical list>; OPERATIONS: <exact canonical list>`. `AUTHORIZED_AT` is
+the `Observed at` timestamp of the matching Read-only preflight row in Action
+authorization provenance, not the owner-message creation time or the AWS-30
+evidence-row observation time. The reconciliation observation stays inside that
+authorization window, journal Resources exactly match the encoded resources,
+and observed reads are a subset of encoded operations. It may remain current from
+AWS-10 only when its exact receipt already covers reconciliation; never infer
+it from, carry over, or replay the deployment authorization.
+
+A fresh post-action read receipt may close a structurally valid historical
+attempt after its mutation Gate B expired or became legitimately stale. It
+must bind that attempt's immutable account, Region, environment, artifact,
+resources, and read operations. Durable original deployment receipt/provenance
+must prove STARTED did not precede its authorization. This receipt does not
+renew Gate B and cannot authorize mutation.
 
 **Stop conditions:** Identity mismatch; telemetry unavailable; security/data
-anomaly; failed acceptance test; correction would mutate AWS.
+anomaly; failed acceptance test; correction would mutate AWS; a repeated STALE;
+an existing COMPLETE or BLOCKED reconciliation.
 
-**Receipt:** AWS authority/evidence receipt with `COMPLETE` or `BLOCKED`; put
-`VERIFIED`, `PENDING_AWS`, or failed evidence states in Validation and Open
-risks, not in the receipt's Observed results field.
+**Receipt:** AWS authority/evidence receipt with `COMPLETE`, `BLOCKED`, or
+`STALE`; put
+`VERIFIED`, `PENDING_AWS`, or failed evidence states in
+Validation and Open risks, not in the receipt's Observed results field.
 
-**Next:** RELEASE-10 after recording evidence. RELEASE-10 decides whether the
-release is RELEASE_VERIFIED, still NOT_READY, or needs an authorized correction.
+**Next:** `COMPLETE` or `BLOCKED` returns to RELEASE-10, which decides
+whether the release is RELEASE_VERIFIED, still NOT_READY, or needs a newly
+authorized correction. RELEASE-10 must update the release decision and terminal
+AWS-30 Active evidence cutoff together. BLOCKED permits only NOT_READY;
+stale-basis COMPLETE permits only NOT_READY; same-basis COMPLETE permits
+NOT_READY or RELEASE_VERIFIED. A consumed NOT_READY attempt routes to
+`RELEASE_REVIEW_BLOCKED / STOP` for owner safety review instead of looping.
+One first `STALE` remains AWS-30 until current read authority and evidence are
+restored. A repeated STALE stops as a safety-review blocker.
 
 ~~~text
 [AWS-30]
@@ -2044,18 +2269,61 @@ Observe:
   billing and AWS Budgets delay rather than treating an alert as a hard stop;
 - rollback status after a failed deployment.
 
-Record what was actually observed, when, where, and by which read-only identity.
-Mark VERIFIED only with objective evidence. Keep unavailable or time-dependent
-checks PENDING_AWS. Do not mutate to repair a failed check. Do not set the
-release state here. Return the AWS authority/evidence receipt whose Next is RELEASE-10.
+Append one AWS-30 row for the exact Attempt ID when no terminal non-STALE
+reconciliation exists. Copy its immutable deployment provenance. Populate the
+separate read authorization and read role/profile, exact read receipt SHA-256,
+exact valid-until value, and the four-field Read authority source envelope above.
+Populate exact read operations observed, rollback observation, acceptance
+evidence IDs, timestamp, durable source, identity/boundary match, and blocker or
+stale reason. For acknowledged history after receipt replacement, derive
+authorized resources and operations only from the stored envelope and never
+from observed operations. Write live operation history and direct result using
+the exact non-STARTED operation-field
+grammar; the field alone does not prove execution. Use `COMPLETE` when the
+authorized observation boundary is complete,
+`BLOCKED` when a current observation proves a safety or acceptance blocker,
+and `STALE` when authority, identity, basis, or evidence cutoff is no longer
+current. A current terminal AWS-30 row must match the current marked read
+receipt. COMPLETE Acceptance evidence IDs must each resolve exactly once in
+the `Verification matrix` to a `VERIFIED` row with concrete Requirement or
+invariant, concrete AWS/manual evidence, and Artifact/environment exactly
+`ARTIFACT: sha256:<64 lowercase>; ACCOUNT: <exact>; REGION: <exact>; ENVIRONMENT: <exact>`.
+Once RELEASE-10 acknowledges it, stored deployment and read provenance keep
+that historical row auditable after either marked receipt is replaced. Never
+copy the deployment role into the read-role field unless it was independently
+authorized for these reads.
+
+One first STALE may be followed by exactly one later COMPLETE or BLOCKED under
+a different current read authorization. Do not append a second STALE or any row
+after COMPLETE or BLOCKED. Repeated staleness is a safety-review blocker.
+
+If the attempt's Gate B is now expired or legitimately stale, append this row
+only under the Engine's exact `deployment_journal_closure_authority`. Standard
+write authority, construction authorization, and AWS mutation authority must
+remain NONE. A STARTED row created after its authority expired, malformed
+journal or receipt provenance, or invalid evidence remains blocked rather than
+eligible for closure.
+
+Record only what was actually observed. Mark VERIFIED only with objective
+evidence and keep unavailable or time-dependent checks PENDING_AWS. Do not
+mutate to repair a failed check, set release state here, or retry a FAILED,
+PARTIAL, or UNKNOWN attempt before reconciliation. COMPLETE or BLOCKED returns
+the AWS authority/evidence receipt with RELEASE-10 next; the first STALE returns
+the receipt with AWS-30 next and remains there.
 ~~~
 
 ## AWS-40 — Residual Resource and Teardown Review
 
-**Preconditions:** Deployment, test, rollback, or environment lifecycle creates
-a need to assess residual resources; `AWS lifecycle intent` is
-`RESIDUAL_REVIEW` or `TEARDOWN`; and exact read-only target access is
-authorized for this AWS-40 observation.
+**Preconditions:** Either a structurally valid prior AWS-50 attempt requires
+post-action review, a recorded AWS-40 safety blocker requires owner review, or
+a settled release has owner-provenanced lifecycle intent `RESIDUAL_REVIEW` or
+`TEARDOWN`. A current INVESTIGATE disposition routes here; current REMOVE routes
+here only from `RESIDUALS_REMAIN`, while REMOVE plus READY goes to the AWS-50
+authorization boundary. RETAIN stops without another AWS-40 call. Elective
+intent is not required for forced action closure or a
+safety blocker. Any authenticated observation still requires exact current
+read-only target authority; lifecycle intent itself never authorizes account
+access.
 
 **Authoritative inputs:** docs/project/PRD.md retention requirements; docs/project/VERIFY.md; docs/project/RUNBOOK.md; IaC state;
 live read-only inventory, dependencies, backups, retention, and billing signals.
@@ -2067,7 +2335,14 @@ repeatable plan.
 
 **AWS mode:** READ_ONLY. No deletion or mutation.
 
-**Required authorization:** Exact read-only account/Region/environment/resource boundary.
+**Required authorization:** Exact read-only account/Region/environment/resource
+boundary. Store `Read authority source` exactly as `SOURCE: <stable owner-message
+source>; AUTHORIZED_AT: <ISO 8601 with timezone>`. `AUTHORIZED_AT` is the
+`Observed at` timestamp of the matching Read-only preflight row in Action
+authorization provenance. Current rows use the current read ID, role, receipt
+digest, and validity, keep `Observed at` inside the authorization window, and do
+not exceed authorized resources or operations. Exact scope equality applies only
+when the Engine requires exact-scope reconciliation; STALE claims no fresh reads.
 
 **Stop conditions:** Shared ownership unclear; retained/regulated data; unknown
 dependency; identity mismatch; teardown would cross the named boundary.
@@ -2075,11 +2350,20 @@ dependency; identity mismatch; teardown would cross the named boundary.
 **Receipt:** AWS authority/evidence receipt with residual inventory and authorization
 requirements.
 
-**Next:** From current `READY_FOR_TEARDOWN` evidence and lifecycle intent
-`TEARDOWN`, present the exact teardown receipt and enter AWS-50 only after its
-acceptance. A residual-only review, `VERIFIED_CLEAN`, `RESIDUALS_REMAIN`, or
-`BLOCKED` stops with that explicit outcome. Any AWS-50 attempt returns here for
+**Next:** Follow `aws_residual_disposition`. Request one set-level owner choice
+only while that projection is PENDING. Current RETAIN stores `RETAIN` and stops;
+current INVESTIGATE stores `RESIDUAL_REVIEW` and requires separate read
+authority; current REMOVE plus `RESIDUALS_REMAIN` stores `TEARDOWN` and refreshes
+the proposal through AWS-40. Current REMOVE plus `READY_FOR_TEARDOWN` presents
+the exact teardown receipt and enters AWS-50 only after acceptance. A current
+`VERIFIED_CLEAN` or `BLOCKED` result stops with its explicit outcome. Every
+AWS-50 attempt returns here for
 post-action read-only reconciliation.
+Every choice after `RESIDUALS_REMAIN` must be strictly newer than that row.
+After READY, RETAIN and INVESTIGATE must be strictly newer. An earlier
+owner-provenanced TEARDOWN may carry forward as REMOVE. New residual evidence
+reopens the set-level choice. These rules are derived by the Engine; never infer
+them from raw intent text.
 
 ~~~text
 [AWS-40]
@@ -2099,6 +2383,13 @@ Identify:
 Record inventory/discovery scope and blind spots, including unsupported resource
 types, permission limits, account/Region boundaries, and eventual consistency.
 An empty query does not prove absence outside that observed boundary.
+
+Write the exact two-field Read authority source grammar above. Require the row's
+read ID, role, digest, and validity to match the current receipt when appended.
+Observed resources and operations must never exceed its scope; exact equality is
+required only when the Engine applies exact-scope reconciliation. STALE claims
+no fresh reads. Later expiry or replacement does not invalidate a terminal row
+whose complete durable tuple was proven at append time.
 
 Before mutation, record `Teardown authorization` and `Teardown receipt digest`
 as `NONE`. After AWS-50, bind the terminal AWS-40 row to the exact teardown

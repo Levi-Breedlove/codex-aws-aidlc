@@ -8,6 +8,7 @@ import json
 import re
 import sys
 from pathlib import Path
+
 try:
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # pragma: no cover - package-style test import
@@ -94,20 +95,34 @@ def inspect_repository(root: Path) -> dict[str, Any]:
             try:
                 skill_text = required[0].read_text(encoding="utf-8")
                 yaml_text = required[1].read_text(encoding="utf-8")
-                if not skill_text.startswith("---\n") or "\n---\n" not in skill_text[4:]:
-                    raise ValueError("SKILL.md must begin with complete YAML frontmatter")
+                if (
+                    not skill_text.startswith("---\n")
+                    or "\n---\n" not in skill_text[4:]
+                ):
+                    raise ValueError(
+                        "SKILL.md must begin with complete YAML frontmatter"
+                    )
                 frontmatter = skill_text.split("---", 2)[1]
-                name_match = re.search(r"^name:\s*([^\r\n]+)$", frontmatter, re.MULTILINE)
+                name_match = re.search(
+                    r"^name:\s*([^\r\n]+)$", frontmatter, re.MULTILINE
+                )
                 description_match = re.search(
                     r"^description:\s*([^\r\n]+)$", frontmatter, re.MULTILINE
                 )
                 if name_match is None or name_match.group(1).strip() != name:
-                    raise ValueError("SKILL.md frontmatter name must match its directory")
+                    raise ValueError(
+                        "SKILL.md frontmatter name must match its directory"
+                    )
                 if description_match is None or not description_match.group(1).strip():
-                    raise ValueError("SKILL.md requires a non-empty trigger description")
+                    raise ValueError(
+                        "SKILL.md requires a non-empty trigger description"
+                    )
                 skill_descriptions[name] = description_match.group(1).strip()
                 for field in ("display_name", "short_description", "default_prompt"):
-                    if re.search(rf"^\s*{field}:\s*.+$", yaml_text, re.MULTILINE) is None:
+                    if (
+                        re.search(rf"^\s*{field}:\s*.+$", yaml_text, re.MULTILINE)
+                        is None
+                    ):
                         raise ValueError(f"openai.yaml is missing {field}")
                 policy = SKILL_IMPLICIT_POLICY[name]
                 if (
@@ -122,7 +137,9 @@ def inspect_repository(root: Path) -> dict[str, Any]:
                         f"openai.yaml allow_implicit_invocation must be {policy}"
                     )
                 if name == "fastlane" and "init template" not in yaml_text:
-                    raise ValueError("fastlane default prompt must expose init template")
+                    raise ValueError(
+                        "fastlane default prompt must expose init template"
+                    )
             except (OSError, ValueError) as exc:
                 state = "BLOCKED"
                 diagnostics.append(
@@ -188,7 +205,9 @@ def inspect_repository(root: Path) -> dict[str, Any]:
             },
         },
         "fastlane_skills": {
-            "status": "READY" if all(state == "READY" for state in skill_states.values()) else "BLOCKED",
+            "status": "READY"
+            if all(state == "READY" for state in skill_states.values())
+            else "BLOCKED",
             "items": skill_states,
         },
         "diagnostics": diagnostics,

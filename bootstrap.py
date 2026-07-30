@@ -16,11 +16,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Sequence
+from scripts.fastlane_process import resolve_trusted_git
+from scripts.fastlane_project_identity import (
+    PROJECT_NAME_TOKEN,
+    markdown_inline,
+    normalize_aws_region,
+    normalize_project_name,
+)
 from scripts.fastlane_stdio import configure_utf8_standard_streams
 
 
 PLACEHOLDERS = {
-    "My AWS Project": "AWS Codex Project",
+    "{{PROJECT_NAME}}": "AWS Codex Project",
     "{{AWS_REGION}}": "us-west-2",
     "{{COST_POSTURE}}": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
     "{{SETUP_METHOD}}": "EXTERNAL_COPY",
@@ -46,6 +53,8 @@ NO_RENDER_PATHS = {
     "bootstrap.manifest.json",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_process.py",
+    "scripts/fastlane_project_identity.py",
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
@@ -63,6 +72,8 @@ CORE_CONTROL_PATHS = {
     "bootstrap.yaml",
     "prompts/CODEX-PROMPTS.md",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_process.py",
+    "scripts/fastlane_project_identity.py",
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
@@ -72,6 +83,8 @@ RUNTIME_CONTROL_PATHS = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_process.py",
+    "scripts/fastlane_project_identity.py",
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
@@ -170,7 +183,9 @@ def canonical_adoption_plan_sha256(
     )
 
 
-def adoption_decision_payload(decisions: dict[str, AdoptionDecision]) -> list[dict[str, str]]:
+def adoption_decision_payload(
+    decisions: dict[str, AdoptionDecision],
+) -> list[dict[str, str]]:
     """Return the canonical ordered JSON representation of parsed decisions."""
 
     return [
@@ -225,9 +240,7 @@ def validate_adoption_authority(plan: AdoptionPlan) -> None:
         if not isinstance(decision, AdoptionDecision):
             raise ValueError(f"{relative}: invalid programmatic adoption decision")
         if decision.path != relative:
-            raise ValueError(
-                f"{relative}: decision path does not match its lookup key"
-            )
+            raise ValueError(f"{relative}: decision path does not match its lookup key")
         if decision.action not in ADOPTION_ACTIONS:
             raise ValueError(f"{relative}: invalid adoption action {decision.action!r}")
         validate_digest(
@@ -266,10 +279,66 @@ def is_text_file(path: Path) -> bool:
         return False
 
 
-def render_text(text: str, values: dict[str, str]) -> str:
-    for key, value in values.items():
-        text = text.replace(key, value)
-    return text
+def normalize_render_values(values: dict[str, str]) -> dict[str, str]:
+    """Normalize owner identity tokens before any render plan or write."""
+
+    normalized = dict(values)
+    if PROJECT_NAME_TOKEN in normalized:
+        normalized[PROJECT_NAME_TOKEN] = normalize_project_name(
+            normalized[PROJECT_NAME_TOKEN]
+        )
+    if "{{AWS_REGION}}" in normalized:
+        normalized["{{AWS_REGION}}"] = normalize_aws_region(
+            normalized["{{AWS_REGION}}"]
+        )
+    return normalized
+
+
+def contextual_render_values(
+    relative: str,
+    values: dict[str, str],
+) -> dict[str, str]:
+    """Encode replacement values for the exact destination syntax."""
+
+    rendered = dict(values)
+    if relative == "bootstrap.yaml":
+        rendered = {
+            key: json.dumps(value, ensure_ascii=False)[1:-1]
+            for key, value in rendered.items()
+        }
+    elif PurePosixPath(relative).suffix.casefold() == ".md":
+        rendered[PROJECT_NAME_TOKEN] = markdown_inline(
+            rendered.get(PROJECT_NAME_TOKEN, "")
+        )
+    return rendered
+
+
+def render_text(text: str, values: dict[str, str], relative: str) -> str:
+    """Render known tokens once so owner text cannot become another token."""
+
+    replacements = contextual_render_values(relative, values)
+    if not replacements:
+        return text
+    pattern = re.compile(
+        "|".join(re.escape(key) for key in sorted(replacements, key=len, reverse=True))
+    )
+    return pattern.sub(lambda match: replacements[match.group(0)], text)
+
+
+def validate_rendered_bootstrap_state(content: bytes) -> None:
+    """Require the rendered structured identity to remain canonical JSON."""
+
+    try:
+        state = json.loads(content.decode("utf-8"))
+        project = state["project"]
+        name = project["name"]
+        region = project["region"]
+    except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ValueError(
+            "Rendered bootstrap.yaml is not valid canonical project state"
+        ) from exc
+    if normalize_project_name(name) != name or normalize_aws_region(region) != region:
+        raise ValueError("Rendered bootstrap.yaml project identity is not canonical")
 
 
 def paths_overlap(first: Path, second: Path) -> bool:
@@ -287,7 +356,9 @@ def validate_non_overlapping_paths(source: Path, target: Path) -> None:
         raise ValueError(f"Template source is not a directory: {source}")
     filesystem_root = Path(target.anchor).resolve()
     if target in {filesystem_root, Path.home().resolve()}:
-        raise ValueError(f"Target must not be a filesystem root or home directory: {target}")
+        raise ValueError(
+            f"Target must not be a filesystem root or home directory: {target}"
+        )
     if any(part.casefold() == ".git" for part in target.parts):
         raise ValueError(f"Target must not be inside Git metadata: {target}")
     if paths_overlap(source, target):
@@ -312,8 +383,7 @@ def validate_relative_path(raw: str) -> str:
         raise ValueError(f"Invalid adoption path: {raw!r}")
     path = PurePosixPath(raw)
     if path.is_absolute() or any(
-        part in {"", ".", ".."} or part.casefold() == ".git"
-        for part in path.parts
+        part in {"", ".", ".."} or part.casefold() == ".git" for part in path.parts
     ):
         raise ValueError(f"Invalid adoption path: {raw!r}")
     canonical = path.as_posix()
@@ -370,17 +440,20 @@ def validate_repository_dependencies(source: Path) -> None:
             text=True,
         )
     except OSError as exc:
-        raise ValueError(f"Bootstrap dependency validation could not run: {exc}") from exc
+        raise ValueError(
+            f"Bootstrap dependency validation could not run: {exc}"
+        ) from exc
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise ValueError(
-            "Bootstrap dependency validation failed"
-            + (f": {detail}" if detail else "")
+            "Bootstrap dependency validation failed" + (f": {detail}" if detail else "")
         )
     try:
         report = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise ValueError("Bootstrap dependency validator returned invalid JSON") from exc
+        raise ValueError(
+            "Bootstrap dependency validator returned invalid JSON"
+        ) from exc
     if not isinstance(report, dict) or report.get("status") != "READY":
         raise ValueError("Bootstrap dependency validator did not report READY")
 
@@ -484,7 +557,7 @@ def git_text(root: Path, *arguments: str, allow_failure: bool = False) -> str:
 
     try:
         result = subprocess.run(
-            ["git", "-C", str(root), *arguments],
+            [resolve_trusted_git(root), "-C", str(root), *arguments],
             check=False,
             capture_output=True,
             text=True,
@@ -581,19 +654,21 @@ def initialize_template_in_place(
     if not remaining:
         ok, output = run_generated_doctor(source)
         if not ok:
-            raise ValueError(f"Configured template Fastlane Engine validation failed: {output}")
+            raise ValueError(
+                f"Configured template Fastlane Engine validation failed: {output}"
+            )
         return CopyReport(unchanged=len(required))
 
     validate_in_place_repository(source)
     validate_template_tree_inventory(source, required)
     validate_template_source_hashes(source, required)
-    values = dict(values)
+    values = normalize_render_values(values)
     values["{{SETUP_METHOD}}"] = "IN_PLACE"
     operations: list[tuple[str, Path, bytes, bytes]] = []
     for relative in renderable:
         path = source.joinpath(*PurePosixPath(relative).parts)
         original = path.read_bytes()
-        rendered = rendered_bytes(path, values, render=True)
+        rendered = rendered_bytes(path, values, relative=relative, render=True)
         if original != rendered:
             operations.append((relative, path, original, rendered))
 
@@ -612,7 +687,9 @@ def initialize_template_in_place(
             print(f"CONFIGURED {relative} sha256={sha256_bytes(rendered)}")
         ok, output = run_generated_doctor(source)
         if not ok:
-            raise ValueError(f"Configured template Fastlane Engine validation failed: {output}")
+            raise ValueError(
+                f"Configured template Fastlane Engine validation failed: {output}"
+            )
     except Exception:
         for path, original in reversed(written):
             atomic_write_bytes(path, original, path)
@@ -645,7 +722,9 @@ def load_adoption_plan(path: Path, source: Path, target: Path) -> AdoptionPlan:
     source_root = Path(str(payload["source_root"])).expanduser().resolve()
     target_root = Path(str(payload["target_root"])).expanduser().resolve()
     if source_root != source.resolve() or target_root != target.resolve():
-        raise ValueError("Adoption map source_root or target_root does not match this run")
+        raise ValueError(
+            "Adoption map source_root or target_root does not match this run"
+        )
 
     raw_decisions = payload["decisions"]
     if not isinstance(raw_decisions, list):
@@ -710,9 +789,7 @@ def load_adoption_plan(path: Path, source: Path, target: Path) -> AdoptionPlan:
     )
     validate_rfc3339(authorized_at, "Adoption authorization")
     if authorization_source != "OWNER_CONFIRMATION":
-        raise ValueError(
-            "Adoption authorization_source must be OWNER_CONFIRMATION"
-        )
+        raise ValueError("Adoption authorization_source must be OWNER_CONFIRMATION")
     result = AdoptionPlan(
         source_root,
         target_root,
@@ -730,13 +807,17 @@ def rendered_bytes(
     path: Path,
     values: dict[str, str],
     *,
+    relative: str,
     render: bool = True,
 ) -> bytes:
     if is_text_file(path):
         content = path.read_text(encoding="utf-8")
         if render:
-            content = render_text(content, values)
-        return content.encode("utf-8")
+            content = render_text(content, values, relative)
+        rendered = content.encode("utf-8")
+        if relative == "bootstrap.yaml":
+            validate_rendered_bootstrap_state(rendered)
+        return rendered
     return path.read_bytes()
 
 
@@ -820,6 +901,7 @@ def copy_template(
     source = source.resolve()
     target = target.resolve()
     validate_non_overlapping_paths(source, target)
+    values = normalize_render_values(values)
     if force:
         raise ValueError(
             "Blanket --force is disabled; use a hash-bound per-path adoption map"
@@ -843,7 +925,9 @@ def copy_template(
             raise ValueError(
                 f"Staging target must not be inside Git metadata: {staging_target}"
             )
-        if paths_overlap(source, staging_target) or paths_overlap(target, staging_target):
+        if paths_overlap(source, staging_target) or paths_overlap(
+            target, staging_target
+        ):
             raise ValueError("Staging target must be separate from source and target")
         if staging_target.exists() and not staging_target.is_dir():
             raise ValueError(f"Staging target is not a directory: {staging_target}")
@@ -858,23 +942,26 @@ def copy_template(
             canonical = validate_relative_path(relative)
             item = source.joinpath(*PurePosixPath(canonical).parts)
             if has_unsafe_parent(source, item) or item.is_symlink():
-                raise ValueError(f"Manifest file uses an unsafe source path: {canonical}")
+                raise ValueError(
+                    f"Manifest file uses an unsafe source path: {canonical}"
+                )
             if not item.is_file():
                 raise ValueError(f"Manifest file is missing: {canonical}")
             discovered_items.append(item)
     symlinks = [item for item in discovered_items if item.is_symlink()]
     if symlinks:
         raise ValueError(
-            "Template source contains unsupported symbolic link: " f"{symlinks[0]}"
+            f"Template source contains unsupported symbolic link: {symlinks[0]}"
         )
 
     items: list[Path] = []
     casefolded_paths: dict[str, str] = {}
     for item in discovered_items:
         relative_path = item.relative_to(source)
-        if any(
-            part.casefold() in SKIP_NAMES_CASEFOLD for part in relative_path.parts
-        ) or item.suffix.casefold() in SKIP_SUFFIXES:
+        if (
+            any(part.casefold() in SKIP_NAMES_CASEFOLD for part in relative_path.parts)
+            or item.suffix.casefold() in SKIP_SUFFIXES
+        ):
             continue
         relative = relative_path.as_posix()
         casefolded = "/".join(part.casefold() for part in relative_path.parts)
@@ -906,8 +993,7 @@ def copy_template(
             except ValueError:
                 continue
             if any(
-                part.casefold() in SKIP_NAMES_CASEFOLD
-                for part in relative_target.parts
+                part.casefold() in SKIP_NAMES_CASEFOLD for part in relative_target.parts
             ):
                 continue
             relative = relative_target.as_posix()
@@ -947,6 +1033,7 @@ def copy_template(
         content = rendered_bytes(
             item,
             values,
+            relative=relative,
             render=should_render_path(relative),
         )
         template_digest = sha256_bytes(content)
@@ -960,14 +1047,18 @@ def copy_template(
             continue
 
         if not destination.exists():
-            operations.append(CopyOperation(relative, item, destination, content, "WRITE"))
+            operations.append(
+                CopyOperation(relative, item, destination, content, "WRITE")
+            )
             report.planned += 1
             continue
 
         try:
             target_content = destination.read_bytes()
         except OSError as exc:
-            raise ValueError(f"Unable to read collision target {destination}: {exc}") from exc
+            raise ValueError(
+                f"Unable to read collision target {destination}: {exc}"
+            ) from exc
         target_digest = sha256_bytes(target_content)
         if target_content == content:
             report.unchanged += 1
@@ -989,7 +1080,9 @@ def copy_template(
         if decision.expected_target_sha256 != target_digest:
             raise ValueError(f"{relative}: target changed after adoption review")
         if decision.expected_template_sha256 != template_digest:
-            raise ValueError(f"{relative}: rendered template changed after adoption review")
+            raise ValueError(
+                f"{relative}: rendered template changed after adoption review"
+            )
 
         if decision.action == "PRESERVE":
             report.preserved += 1
@@ -1030,8 +1123,13 @@ def copy_template(
                 staged_destination.exists() and not staged_destination.is_file()
             ):
                 raise ValueError(f"{relative}: unsafe staging collision")
-            if staged_destination.exists() and staged_destination.read_bytes() != content:
-                raise ValueError(f"{relative}: staging target already has different content")
+            if (
+                staged_destination.exists()
+                and staged_destination.read_bytes() != content
+            ):
+                raise ValueError(
+                    f"{relative}: staging target already has different content"
+                )
             if not staged_destination.exists():
                 operations.append(
                     CopyOperation(
@@ -1116,8 +1214,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Create or safely adopt an AWS Codex Fastlane project."
     )
     parser.add_argument("--target", required=True, help="Target project directory")
-    parser.add_argument("--project-name", required=True, help="Human-readable project name")
-    parser.add_argument("--region", default="us-west-2", help="Primary AWS Region")
+    parser.add_argument(
+        "--project-name", required=True, help="One-line human-readable project name"
+    )
+    parser.add_argument("--region", default="us-west-2", help="Canonical AWS Region ID")
     parser.add_argument(
         "--cost-posture",
         "--budget",
@@ -1164,11 +1264,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     source = Path(__file__).resolve().parent
     target = Path(args.target).expanduser().resolve()
     values = dict(PLACEHOLDERS)
-    values["My AWS Project"] = args.project_name
-    values["{{AWS_REGION}}"] = args.region
-    values["{{COST_POSTURE}}"] = args.cost_posture
 
     try:
+        project_name = normalize_project_name(args.project_name)
+        region = normalize_aws_region(args.region)
+        values[PROJECT_NAME_TOKEN] = project_name
+        values["{{AWS_REGION}}"] = region
+        values["{{COST_POSTURE}}"] = args.cost_posture
         if args.cost_posture != DEFAULT_COST_POSTURE:
             cost_match = COST_POSTURE_WITH_CAP.fullmatch(args.cost_posture)
             if cost_match is None:
@@ -1179,8 +1281,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             if cost_match.group("currency") not in ISO_4217_CURRENCY_CODES:
                 raise ValueError(
-                    "--cost-posture currency must be a current ISO 4217 "
-                    "List One code"
+                    "--cost-posture currency must be a current ISO 4217 List One code"
                 )
         validate_repository_dependencies(source)
         if args.in_place_template_instance:
@@ -1225,7 +1326,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif report.unresolved:
         print("Bootstrap stopped with unresolved, preserved target collisions.")
     elif report.partial_adoption:
-        print("Bootstrap partially adopted; merge staged/preserved control files and run the Fastlane Engine.")
+        print(
+            "Bootstrap partially adopted; merge staged/preserved control files and run the Fastlane Engine."
+        )
     else:
         print("Bootstrap complete.")
     print(f"Project root: {target}")
@@ -1250,8 +1353,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     print()
     print("Next steps:")
     print("1. Run the Fastlane Engine: python scripts/bootstrap_doctor.py --root .")
-    print("2. If setup was run manually, open this repository in Codex and send: init template")
-    print("3. Answer the project name, Region, and budget questions; Codex begins intake.")
+    print(
+        "2. If setup was run manually, open this repository in Codex and send: init template"
+    )
+    print(
+        "3. Answer the project name, Region, and budget questions; Codex begins intake."
+    )
     print(
         "Fastlane verifies official AWS Core before fresh initialization; "
         "this generator did not inspect plugin state or access AWS."
