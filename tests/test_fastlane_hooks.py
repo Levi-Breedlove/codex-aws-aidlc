@@ -3062,7 +3062,11 @@ class FastlaneHookTests(unittest.TestCase):
         security = (self.root / "SECURITY.md").read_text(encoding="utf-8")
         hooks = (self.root / "docs" / "HOOKS.md").read_text(encoding="utf-8")
         self.assertIn("Hooks are defense in depth", hooks)
+        self.assertIn("internal schema 2", hooks)
+        self.assertIn("expires after 15 minutes", hooks)
+        self.assertIn("without assuming a `tool_use_id`", hooks)
         self.assertIn("never auto-allows", security)
+        self.assertIn("private schema-2 transition record", security)
 
 
 class AwsActionTransitionHookTests(unittest.TestCase):
@@ -3111,6 +3115,277 @@ class AwsActionTransitionHookTests(unittest.TestCase):
             "apply_patch", tool_input, current_report, root
         )
         return (*result, root, temporary)
+
+    def _active_structured_transition(
+        self, root: Path
+    ) -> tuple[
+        dict[str, object],
+        dict[str, object],
+        dict[str, object],
+        dict[str, str],
+    ]:
+        external = authority("FAST_DEV_GATE_B", ["cloudformation:CreateStack"])
+        current = self._report_for(external)
+        match = current["external_authority"]["request_match"]
+        attempt_id = "AWS-DEPLOY-9300"
+        authority_digest = fastlane_hook._canonical_digest(match)
+        start_event = payload(
+            "PreToolUse",
+            root,
+            tool_name="apply_patch",
+            tool_input={"command": "approved STARTED patch"},
+            session_id="session-9300",
+            turn_id="turn-9300",
+            tool_use_id="start-tool-9300",
+        )
+        identity = fastlane_hook._tool_identity(start_event)
+        self.assertIsNotNone(identity)
+        state = fastlane_hook._empty_transition_state(
+            stage="START_BOUND",
+            action_kind="FAST_DEV_GATE_B",
+            identity=identity,
+            tool_name="apply_patch",
+            attempt_sha256=fastlane_hook._value_digest(attempt_id),
+            authority_sha256=authority_digest,
+            start_patch_sha256="sha256:" + "e" * 64,
+        )
+        fastlane_hook._store_transition(root, state)
+        current["aws_action_transition"] = {
+            "schema_version": 1,
+            "status": "BOUND",
+            "attempt_id": attempt_id,
+            "authority_kind": "FAST_DEV_GATE_B",
+            "request_match_sha256": authority_digest,
+            "request_match": match,
+        }
+        tool_input = aws_request("CreateStack")
+        pre_event = payload(
+            "PreToolUse",
+            root,
+            tool_name="aws___call_aws",
+            tool_input=tool_input,
+            session_id="session-9300",
+            turn_id="turn-9300",
+            tool_use_id="aws-tool-9300",
+        )
+        permission_event = payload(
+            "PermissionRequest",
+            root,
+            tool_name="aws___call_aws",
+            tool_input=tool_input,
+            session_id="session-9300",
+            turn_id="turn-9300",
+        )
+        return (
+            current,
+            pre_event,
+            permission_event,
+            {
+                "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                "GitHub boundary": "NONE",
+            },
+        )
+
+    def test_permission_request_uses_documented_fields_and_exact_binding(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            current, pre_event, permission_event, envelope = (
+                self._active_structured_transition(root)
+            )
+            self.assertNotIn("tool_use_id", permission_event)
+            self.assertIsNone(
+                fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    pre_event,
+                    root=root,
+                    doctor_report=current,
+                    envelope=envelope,
+                )
+            )
+            self.assertIsNone(
+                fastlane_hook.handle_event(
+                    "permission-request",
+                    permission_event,
+                    root=root,
+                    doctor_report=current,
+                    envelope=envelope,
+                )
+            )
+
+        cases = ("session", "turn", "tool-name", "request", "authority")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                current, pre_event, permission_event, envelope = (
+                    self._active_structured_transition(root)
+                )
+                self.assertIsNone(
+                    fastlane_hook.handle_event(
+                        "pre-tool-use",
+                        pre_event,
+                        root=root,
+                        doctor_report=current,
+                        envelope=envelope,
+                    )
+                )
+                changed = dict(permission_event)
+                if case == "session":
+                    changed["session_id"] = "other-session"
+                elif case == "turn":
+                    changed["turn_id"] = "other-turn"
+                elif case == "tool-name":
+                    changed["tool_name"] = "mcp__aws-core__call_aws"
+                elif case == "request":
+                    changed["tool_input"] = aws_request("UpdateStack")
+                else:
+                    current = json.loads(json.dumps(current))
+                    current["aws_action_transition"]["attempt_id"] = (
+                        "AWS-DEPLOY-9999"
+                    )
+                denied = fastlane_hook.handle_event(
+                    "permission-request",
+                    changed,
+                    root=root,
+                    doctor_report=current,
+                    envelope=envelope,
+                )
+                self.assertEqual(
+                    denied["hookSpecificOutput"]["decision"]["behavior"], "deny"
+                )
+                self.assertIsNone(fastlane_hook._load_transition(root))
+
+    def test_post_tool_use_requires_exact_tool_use_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            current, pre_event, permission_event, envelope = (
+                self._active_structured_transition(root)
+            )
+            self.assertIsNone(
+                fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    pre_event,
+                    root=root,
+                    doctor_report=current,
+                    envelope=envelope,
+                )
+            )
+            self.assertIsNone(
+                fastlane_hook.handle_event(
+                    "permission-request",
+                    permission_event,
+                    root=root,
+                    doctor_report=current,
+                    envelope=envelope,
+                )
+            )
+            missing_identity = {
+                **permission_event,
+                "hook_event_name": "PostToolUse",
+                "tool_response": {"ok": True},
+            }
+            result = fastlane_hook.handle_event(
+                "post-tool-use",
+                missing_identity,
+                root=root,
+                doctor_report=current,
+                envelope=envelope,
+            )
+            self.assertIn("identity changed", result["systemMessage"])
+            self.assertIsNone(fastlane_hook._load_transition(root))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            current, pre_event, permission_event, envelope = (
+                self._active_structured_transition(root)
+            )
+            fastlane_hook.handle_event(
+                "pre-tool-use",
+                pre_event,
+                root=root,
+                doctor_report=current,
+                envelope=envelope,
+            )
+            fastlane_hook.handle_event(
+                "permission-request",
+                permission_event,
+                root=root,
+                doctor_report=current,
+                envelope=envelope,
+            )
+            post_event = {
+                **permission_event,
+                "hook_event_name": "PostToolUse",
+                "tool_use_id": "aws-tool-9300",
+                "tool_response": {"ok": True},
+            }
+            result = fastlane_hook.handle_event(
+                "post-tool-use",
+                post_event,
+                root=root,
+                doctor_report=current,
+                envelope=envelope,
+            )
+            self.assertIn("observed the AWS result", result["systemMessage"])
+            state = fastlane_hook._load_transition(root)
+            self.assertEqual(state["stage"], "AWS_RESULT_BOUND")
+            fastlane_hook._clear_transition(root)
+
+    def test_private_transition_state_clears_legacy_expired_and_replay(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            self._active_structured_transition(root)
+            state = fastlane_hook._load_transition(root)
+            self.assertEqual(state["schema_version"], "2")
+
+            legacy = dict(state)
+            legacy["schema_version"] = "1"
+            fastlane_hook._store_transition(root, legacy)
+            self.assertIsNone(fastlane_hook._load_transition(root))
+            self.assertFalse(fastlane_hook._transition_path(root).exists())
+
+            path = fastlane_hook._transition_path(root)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{}", encoding="utf-8")
+            self.assertIsNone(fastlane_hook._load_transition(root))
+            self.assertFalse(path.exists())
+
+            current, pre_event, _permission_event, envelope = (
+                self._active_structured_transition(root)
+            )
+            path = fastlane_hook._transition_path(root)
+            expired = path.stat().st_mtime - fastlane_hook.TRANSITION_MAX_AGE_SECONDS - 1
+            os.utime(path, (expired, expired))
+            self.assertIsNone(fastlane_hook._load_transition(root))
+
+            current, pre_event, _permission_event, envelope = (
+                self._active_structured_transition(root)
+            )
+            self.assertIsNone(
+                fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    pre_event,
+                    root=root,
+                    doctor_report=current,
+                    envelope=envelope,
+                )
+            )
+            replay = {**pre_event, "tool_use_id": "replayed-tool"}
+            denied = fastlane_hook.handle_event(
+                "pre-tool-use",
+                replay,
+                root=root,
+                doctor_report=current,
+                envelope=envelope,
+            )
+            self.assertIn(
+                "replay",
+                denied["hookSpecificOutput"]["permissionDecisionReason"],
+            )
+            self.assertIsNone(fastlane_hook._load_transition(root))
 
     def test_deployment_started_uses_observed_at_and_durable_source_columns(
         self,

@@ -47,13 +47,20 @@ observable exact fields. A multi-step account script requires exact reviewed
 bytes or a contained immutable artifact with the current approved digest;
 opaque or unbound scripts are denied rather than inferred from prose.
 
-The handler never auto-allows an approval request. Its denials and continuation
-checks are defense in depth. Engine-projected write and external authority are
-derived views of existing records; they grant nothing. Lack of a hook denial is
-not Gate A, Gate B, GitHub, AWS, or teardown authority and does not replace
-native owner approval, the Codex sandbox, IAM, or observed AWS evidence. Review
-all active hook sources in `/hooks` because Codex can run matching hooks from
-more than one configuration layer.
+The handler never auto-allows an approval request. It binds `PermissionRequest`
+to the preceding event with hashed session/turn values, normalized tool name,
+canonical request digest, and current authority; only `PreToolUse` and
+`PostToolUse` require `tool_use_id`. One private schema-2 transition record may
+exist under the OS temporary directory for at most 15 minutes. It stores hashes,
+not raw identifiers, and clears on session start, terminal completion, malformed
+or legacy state, mismatch, or replay. It is never packaged or authoritative.
+
+Hook denials and continuation checks are defense in depth. Engine-projected
+write and external authority are derived views of existing records; they grant
+nothing. Lack of a hook denial is not Gate A, Gate B, GitHub, AWS, or teardown
+authority and does not replace native owner approval, the Codex sandbox, IAM,
+or observed AWS evidence. Review all active hook sources in `/hooks` because
+Codex can run matching hooks from more than one configuration layer.
 
 ## Setup controls
 

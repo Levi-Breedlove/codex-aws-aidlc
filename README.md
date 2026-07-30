@@ -1,5 +1,5 @@
 # AWS Codex Fastlane 1.0
-Current customer build: **1.0.4**.
+Current customer build: **1.0.5**.
 
 Fastlane 1.0 gives Codex a disciplined way to design and build your AWS application. You explain the outcome in plain language. Codex turns it into clear requirements, consults current AWS guidance, recommends a complete design, and builds it after you approve the plan.
 

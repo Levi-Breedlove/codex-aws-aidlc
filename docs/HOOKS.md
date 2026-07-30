@@ -50,9 +50,9 @@ root, and a missing or ambiguous root fails closed.
 
 | Event | Behavior |
 |---|---|
-| `SessionStart` | Runs the Fastlane Engine read-only; an untouched template gets prerequisite context, while an initialized project gets short current-state context. |
+| `SessionStart` | Clears private transition state, then runs the Fastlane Engine read-only. Untouched-template handling is defensive if the pack was enabled too early; normal activation remains post-Gate-B. |
 | `PreToolUse` | Uses the Engine's current write and external-authority projections to deny only clearly out-of-bound requests. |
-| `PermissionRequest` | Never auto-allows escalation; otherwise preserves the normal owner approval flow. |
+| `PermissionRequest` | Binds the request to its preceding event without assuming a `tool_use_id`; never auto-allows escalation and otherwise preserves normal owner approval. |
 | `PostToolUse` | Runs the smallest relevant validation and returns bounded corrective context without creating evidence. |
 | `Stop` | Continues only when the Engine permits automatic continuation, no owner action is required, and no formal receipt is pending. |
 
@@ -102,9 +102,19 @@ without weakening target binding.
 
 For `Bash` and `apply_patch`, Codex supplies the command or patch in
 `tool_input.command`. MCP and local-function hooks receive that tool's argument
-object. Matching hooks from multiple sources can run concurrently, so review
-every source displayed by native `/hooks`; the owner keeps trust outside the
+object. `PreToolUse` and `PostToolUse` bind the documented session, turn, and
+`tool_use_id`; `PermissionRequest` binds the documented session and turn plus
+the normalized tool name, canonical request digest, and current Fastlane
+authority. `PostToolUse` still requires the exact observed `tool_use_id`.
+Matching hooks from multiple sources can run concurrently, so review every
+source displayed by native `/hooks`; the owner keeps trust outside the
 repository.
+
+During one AWS mutation transition, internal schema 2 stores only hashes under
+the OS temporary directory. It contains no raw session, turn, or tool
+identifiers, expires after 15 minutes, and is cleared on session start, terminal
+completion, malformed or legacy state, mismatch, or replay. The record is never
+packaged, authoritative, or a substitute for native approval.
 
 A request that passes these advisory comparisons receives no hook denial, not
 an automatic allow. Native Codex approval and sandbox controls remain active,

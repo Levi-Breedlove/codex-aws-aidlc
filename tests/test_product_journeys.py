@@ -487,8 +487,8 @@ class ProductJourneyTests(unittest.TestCase):
                     aws=authorization_id, external_authority=external
                 )
                 tool_input = hook_fixtures.aws_request(operation)
-                event = hook_fixtures.payload(
-                    "PermissionRequest",
+                pre_event = hook_fixtures.payload(
+                    "PreToolUse",
                     REPOSITORY_ROOT,
                     tool_name="aws___call_aws",
                     tool_input=tool_input,
@@ -496,7 +496,14 @@ class ProductJourneyTests(unittest.TestCase):
                     turn_id=f"turn-{kind}",
                     tool_use_id=f"tool-{kind}",
                 )
-                pre_event = {**event, "hook_event_name": "PreToolUse"}
+                event = hook_fixtures.payload(
+                    "PermissionRequest",
+                    REPOSITORY_ROOT,
+                    tool_name="aws___call_aws",
+                    tool_input=tool_input,
+                    session_id=f"session-{kind}",
+                    turn_id=f"turn-{kind}",
+                )
                 missing_started = hook_fixtures.fastlane_hook.handle_event(
                     "pre-tool-use",
                     pre_event,
@@ -512,7 +519,7 @@ class ProductJourneyTests(unittest.TestCase):
                     missing_started["hookSpecificOutput"]["permissionDecisionReason"],
                 )
 
-                identity = hook_fixtures.fastlane_hook._event_identity(event)
+                identity = hook_fixtures.fastlane_hook._tool_identity(pre_event)
                 self.assertIsNotNone(identity)
                 match = current["external_authority"]["request_match"]
                 attempt_id = (
@@ -523,6 +530,7 @@ class ProductJourneyTests(unittest.TestCase):
                     stage="START_BOUND",
                     action_kind=kind,
                     identity=identity,
+                    tool_name="apply_patch",
                     attempt_sha256=hook_fixtures.fastlane_hook._value_digest(
                         attempt_id
                     ),
@@ -561,6 +569,12 @@ class ProductJourneyTests(unittest.TestCase):
                 self.assertIn(
                     "binding is absent or changed",
                     changed["hookSpecificOutput"]["permissionDecisionReason"],
+                )
+                self.assertIsNone(
+                    hook_fixtures.fastlane_hook._load_transition(REPOSITORY_ROOT)
+                )
+                hook_fixtures.fastlane_hook._store_transition(
+                    REPOSITORY_ROOT, state
                 )
                 pre_allowed = hook_fixtures.fastlane_hook.handle_event(
                     "pre-tool-use",
