@@ -16,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Mapping, Sequence
 
 
@@ -1206,16 +1206,28 @@ def _candidate_paths(tool_input: Mapping[str, Any]) -> list[str]:
 
 
 def _relative_candidate(raw: str, root: Path, cwd: Path) -> str | None:
-    candidate = Path(raw.strip().strip("'\""))
+    try:
+        resolved_root = root.resolve(strict=False)
+        resolved_cwd = cwd.resolve(strict=False)
+    except OSError:
+        return None
+    cleaned = raw.strip().strip("'\"")
+    windows_candidate = PureWindowsPath(cleaned)
+    if os.name != "nt" and (windows_candidate.drive or "\\" in cleaned):
+        # A Windows drive, UNC target, or backslash is ambiguous on POSIX.
+        # Fail closed instead of reinterpreting a literal POSIX filename as a
+        # nested path that could appear to fall within broader write authority.
+        return None
+    candidate = Path(cleaned)
     if not candidate.is_absolute():
-        candidate = cwd / candidate
+        candidate = resolved_cwd / candidate
     try:
         resolved = candidate.resolve(strict=False)
     except OSError:
         return None
-    if not _is_within(resolved, root):
+    if not _is_within(resolved, resolved_root):
         return None
-    return resolved.relative_to(root).as_posix()
+    return resolved.relative_to(resolved_root).as_posix()
 
 
 def _path_contains(boundary: str, requested: str) -> bool:
@@ -1289,6 +1301,9 @@ def _write_denial(
         return "Fastlane blocked an ambiguous file mutation because its exact target path is not observable."
     relative_paths: list[str] = []
     for raw in raw_paths:
+        cleaned = raw.strip().strip("'\"")
+        if os.name != "nt" and "\\" in cleaned:
+            return "Fastlane blocked a file mutation with an ambiguous non-native path separator."
         relative = _relative_candidate(raw, root, cwd)
         if relative is None:
             return "Fastlane blocked a write outside the current repository boundary."

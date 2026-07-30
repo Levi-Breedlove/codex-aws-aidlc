@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -1460,7 +1461,11 @@ class FastlaneHookTests(unittest.TestCase):
             (
                 "Bash",
                 "Write-Output safe\nRemove-Item -LiteralPath ..\\outside.txt",
-                "outside the current repository",
+                (
+                    "outside the current repository"
+                    if os.name == "nt"
+                    else "ambiguous non-native path separator"
+                ),
             ),
             (
                 "Bash",
@@ -1540,6 +1545,33 @@ class FastlaneHookTests(unittest.TestCase):
                 self.assertIn(
                     reason, denied["hookSpecificOutput"]["permissionDecisionReason"]
                 )
+
+    @unittest.skipIf(os.name == "nt", "Backslash is a native separator on Windows")
+    def test_posix_literal_backslash_cannot_bypass_write_roots(self) -> None:
+        authority = {
+            "valid": True,
+            "approved_write_roots": ["app/**"],
+            "exclusions": [],
+            "protected_paths": [],
+            "active_task": "TASK-0001",
+            "active_task_write_set": ["app/service/**"],
+        }
+        denied = fastlane_hook.handle_event(
+            "pre-tool-use",
+            payload(
+                "PreToolUse",
+                self.root,
+                tool_name="write_file",
+                tool_input={"path": r"app\service\handler.py"},
+            ),
+            root=self.root,
+            doctor_report=report(construction="AUTH-0001", write_authority=authority),
+            envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+        )
+        self.assertIn(
+            "ambiguous non-native path separator",
+            denied["hookSpecificOutput"]["permissionDecisionReason"],
+        )
 
     def test_lifecycle_intent_allows_only_exact_atomic_local_record(self) -> None:
         allowed = fastlane_hook.handle_event(

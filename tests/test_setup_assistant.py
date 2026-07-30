@@ -204,7 +204,7 @@ class SetupAssistantTests(unittest.TestCase):
             )
 
             target = setup.configure_local_hooks(root, interpreter=Path(sys.executable))
-            self.assertEqual(target, codex / "hooks.json")
+            self.assertEqual(target, (codex / "hooks.json").resolve())
             configured = json.loads(target.read_text(encoding="utf-8"))
             commands = [
                 hook[field]
