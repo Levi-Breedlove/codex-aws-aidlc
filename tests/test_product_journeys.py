@@ -58,9 +58,7 @@ class ProductJourneyTests(unittest.TestCase):
                 "--prerequisite-report-stdin",
             ],
             cwd=project,
-            input=json.dumps(
-                setup.reduce_prerequisites(setup_fixtures.local_ready())
-            ),
+            input=json.dumps(setup.reduce_prerequisites(setup_fixtures.local_ready())),
             check=False,
             capture_output=True,
             text=True,

@@ -153,11 +153,7 @@ class PackageReleaseTests(unittest.TestCase):
             )
             matches = [immutable_pin.fullmatch(value) for value in uses]
             self.assertTrue(all(match is not None for match in matches))
-            return [
-                match.group("identity")
-                for match in matches
-                if match is not None
-            ]
+            return [match.group("identity") for match in matches if match is not None]
 
         expected_identities = [
             "actions/checkout",

@@ -1251,9 +1251,10 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
         or not isinstance(card.get("accept_all_allowed"), bool)
     ):
         raise PresentationError("invalid deterministic intake card")
-    if reply_token != intake_reply_token(
-        card_id, revision, digest
-    ) or exact_reply != reply_token + "; " + owner_reply:
+    if (
+        reply_token != intake_reply_token(card_id, revision, digest)
+        or exact_reply != reply_token + "; " + owner_reply
+    ):
         raise PresentationError(
             "intake copyable reply is not bound to its current card"
         )

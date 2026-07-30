@@ -4122,7 +4122,9 @@ def main() -> int:
     parser.add_argument(
         "--claim", metavar="TASK_ID", help="Atomically claim one READY task"
     )
-    parser.add_argument("--owner", help="Coordinator identity for a claim (legacy option name)")
+    parser.add_argument(
+        "--owner", help="Coordinator identity for a claim (legacy option name)"
+    )
     parser.add_argument(
         "--start-run", metavar="RUN_ID", help="Start a new coordinator run"
     )

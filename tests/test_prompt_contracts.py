@@ -1207,6 +1207,7 @@ Approver: <name/handle>"""
             dependency.index("search_documentation"),
             dependency.index("retrieve_skill"),
         )
+
     def test_boot_setup_first_and_resume_are_single_action_contracts(self) -> None:
         boot = self.prompt_section("BOOT-00")
         for phrase in (
