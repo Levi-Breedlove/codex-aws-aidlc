@@ -77,12 +77,12 @@ change budget.
 
 ## Live customer publication
 
-For the live `fast-lane-maint` customer branch, `PUBLISH` defaults to a
+For the live `fast-lane` customer branch, `PUBLISH` defaults to a
 PR-gated flow:
 
 1. create a short-lived maintenance branch from the exact current customer tip;
 2. push only that short-lived branch and open a pull request targeting only
-   `fast-lane-maint`;
+   `fast-lane`;
 3. require the pull request branch to be current with the customer tip; and
 4. merge only after all of these exact checks pass:
    - `safety-tests (3.11)`;
@@ -91,11 +91,13 @@ PR-gated flow:
    - `windows-smoke`; and
    - `macos-setup-smoke`.
 
-A direct push to `fast-lane-maint` requires explicit emergency publication
+A direct push to `fast-lane` requires explicit emergency publication
 authorization naming that branch and push. Never force-push or delete the
 live customer branch. Configuring or changing its GitHub branch rule is a
 separate repository-setting action and is not implied by source publication.
-The protected `Legacy` branch remains outside this customer flow unless separately authorized.
+The protected `fast-lane-maint` branch preserves the 1.0.5 predecessor.
+The protected `Legacy` branch remains outside this customer flow unless
+separately authorized.
 
 Every `PUBLISH` operation must revalidate the exact source and target branch
 tips and commits immediately before mutation. Never switch, reset, merge,

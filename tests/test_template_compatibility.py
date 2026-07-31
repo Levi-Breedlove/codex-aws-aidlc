@@ -51,10 +51,10 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertNotIn("Delegate to `$fastlane`", skill)
         self.assertIn("pull requests targeting only that customer branch", workflow)
         self.assertIn(
-            "direct push to `fast-lane-maint` requires explicit emergency", workflow
+            "direct push to `fast-lane` requires explicit emergency", workflow
         )
         self.assertIn("Force pushes and deletion", workflow)
-        self.assertIn("live `fast-lane-maint` customer branch", workflow)
+        self.assertIn("live `fast-lane` customer branch", workflow)
         self.assertIn("legacy `Legacy` is not a customer publication target", workflow)
         self.assertIn("The protected `Legacy` branch", skill)
         self.assertIn("separate repository-setting action", workflow)

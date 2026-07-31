@@ -94,7 +94,7 @@ class MaintenancePreflightTests(unittest.TestCase):
             invalid = self.contract(commit, "IMPLEMENT")
             invalid["publication"] = {
                 "operations": ["PUSH"],
-                "targets": ["fast-lane-maint"],
+                "targets": ["fast-lane"],
                 "authorization_reference": "owner-request-001",
             }
             result, passed = preflight.validate_contract(invalid, root)
@@ -106,7 +106,7 @@ class MaintenancePreflightTests(unittest.TestCase):
             publish = self.contract(commit, "PUBLISH")
             publish["publication"] = {
                 "operations": ["PUSH"],
-                "targets": ["fast-lane-maint"],
+                "targets": ["fast-lane"],
                 "authorization_reference": "owner-request-001",
             }
             result, passed = preflight.validate_contract(publish, root)

@@ -1385,7 +1385,7 @@ Approver: <name/handle>"""
         for route in ("BOOT", "INTAKE", "DESIGN", "BUILD"):
             self.assertIn(route, maintain)
         self.assertIn("short-lived maintenance branch", maintain)
-        self.assertIn("targeting only\n   `fast-lane-maint`", maintain)
+        self.assertIn("targeting only\n   `fast-lane`", maintain)
         for check in (
             "safety-tests (3.11)",
             "safety-tests (3.12)",
@@ -1817,9 +1817,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.0.5")
+        self.assertEqual(manifest["bootstrap_version"], "1.1.0")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.0.5", self.prompts)
+        self.assertIn("**Pack version:** 1.1.0", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]

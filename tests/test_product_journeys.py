@@ -127,7 +127,7 @@ class ProductJourneyTests(unittest.TestCase):
             "GitHub boundary": "`ISSUES`",
             "GitHub repository, branch, and merge constraints": (
                 "`REPO: Levi-Breedlove/aws-bootstrap; "
-                "BRANCH: fast-lane-maint; MERGE: PROHIBITED`"
+                "BRANCH: fast-lane; MERGE: PROHIBITED`"
             ),
         }.items():
             text = doctor_fixtures.set_table_value(

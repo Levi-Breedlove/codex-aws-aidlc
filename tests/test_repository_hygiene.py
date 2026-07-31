@@ -265,7 +265,7 @@ class RepositoryHygieneTests(unittest.TestCase):
             "updates:\n"
             '  - package-ecosystem: "github-actions"\n'
             '    directory: "/"\n'
-            '    target-branch: "fast-lane-maint"\n'
+            '    target-branch: "fast-lane"\n'
             "    schedule:\n"
             '      interval: "weekly"\n',
         )

@@ -191,7 +191,7 @@ class PackageReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            "push:\n    branches:\n      - fast-lane-maint\n      - Legacy\n",
+            "push:\n    branches:\n      - fast-lane\n      - Legacy\n",
             workflow,
         )
         self.assertNotIn("      - main\n", workflow)
@@ -212,8 +212,8 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertNotIn("github.event.repository.is_template", workflow)
         self.assertIn(
             "(github.event_name == 'pull_request' && github.base_ref == "
-            "'fast-lane-maint') || (github.event_name == 'push' && "
-            "github.ref_name == 'fast-lane-maint')",
+            "'fast-lane') || (github.event_name == 'push' && "
+            "github.ref_name == 'fast-lane')",
             workflow,
         )
         self.assertIn(
@@ -269,7 +269,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.0.5")
+        self.assertEqual(manifest["bootstrap_version"], "1.1.0")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())

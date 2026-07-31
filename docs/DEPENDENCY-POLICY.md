@@ -59,12 +59,12 @@ account, or change Fastlane's product, architecture, gate, or authority model.
 ## GitHub Actions monitoring
 
 Dependabot checks only GitHub Actions dependencies each week and targets
-`fast-lane-maint`. Its proposals require human review; Fastlane configures no
+`fast-lane`. Its proposals require human review; Fastlane configures no
 automatic merge, custom registry, credential, or write token.
 
 GitHub security updates target the repository default branch when
 `target-branch` is configured. If the default branch ever differs from
-`fast-lane-maint`, maintainers must explicitly reconcile urgent security pin
+`fast-lane`, maintainers must explicitly reconcile urgent security pin
 updates into the customer branch. Dependabot proposals never replace the
 required cross-platform validation, immutable action pin, or publication
 authority.
