@@ -488,16 +488,19 @@ def _load_transition(root: Path) -> dict[str, str] | None:
         "attempt_sha256",
         "authority_sha256",
         "start_patch_sha256",
+        "start_tool_name_sha256",
         "start_tool_sha256",
         "request_sha256",
+        "aws_tool_name_sha256",
         "aws_tool_sha256",
         "response_sha256",
         "terminal_patch_sha256",
+        "terminal_tool_name_sha256",
         "terminal_tool_sha256",
     }
     if (
         set(value) != required
-        or value["schema_version"] != "1"
+        or value["schema_version"] != "2"
         or value["stage"] not in TRANSITION_STAGES
         or value["action_kind"] not in TRANSITION_ACTIONS
         or any(
@@ -510,18 +513,30 @@ def _load_transition(root: Path) -> dict[str, str] | None:
     return value
 
 
-def _event_identity(payload: Mapping[str, Any]) -> dict[str, str] | None:
+def _turn_identity(payload: Mapping[str, Any]) -> dict[str, str] | None:
     result: dict[str, str] = {}
     for destination, key in (
         ("session_sha256", "session_id"),
         ("turn_sha256", "turn_id"),
-        ("tool_sha256", "tool_use_id"),
     ):
         value = payload.get(key)
         if not isinstance(value, str) or not value.strip():
             return None
         result[destination] = _value_digest(value.strip())
     return result
+
+
+def _tool_identity(payload: Mapping[str, Any]) -> dict[str, str] | None:
+    result = _turn_identity(payload)
+    tool_use_id = payload.get("tool_use_id")
+    if result is None or not isinstance(tool_use_id, str) or not tool_use_id.strip():
+        return None
+    result["tool_sha256"] = _value_digest(tool_use_id.strip())
+    return result
+
+
+def _tool_name_digest(tool_name: str) -> str:
+    return _value_digest(tool_name.strip().casefold())
 
 
 def _event_matches_transition(
@@ -538,12 +553,13 @@ def _empty_transition_state(
     stage: str,
     action_kind: str,
     identity: Mapping[str, str],
+    tool_name: str,
     attempt_sha256: str,
     authority_sha256: str,
     start_patch_sha256: str,
 ) -> dict[str, str]:
     return {
-        "schema_version": "1",
+        "schema_version": "2",
         "stage": stage,
         "action_kind": action_kind,
         "session_sha256": identity["session_sha256"],
@@ -551,11 +567,14 @@ def _empty_transition_state(
         "attempt_sha256": attempt_sha256,
         "authority_sha256": authority_sha256,
         "start_patch_sha256": start_patch_sha256,
+        "start_tool_name_sha256": _tool_name_digest(tool_name),
         "start_tool_sha256": identity["tool_sha256"],
         "request_sha256": "NONE",
+        "aws_tool_name_sha256": "NONE",
         "aws_tool_sha256": "NONE",
         "response_sha256": "NONE",
         "terminal_patch_sha256": "NONE",
+        "terminal_tool_name_sha256": "NONE",
         "terminal_tool_sha256": "NONE",
     }
 
@@ -777,18 +796,33 @@ def _transition_projection(
 def _start_transition_decision(
     event_key: str,
     payload: Mapping[str, Any],
+    tool_name: str,
     candidate: Mapping[str, str],
     root: Path,
 ) -> str | None:
-    identity = _event_identity(payload)
+    identity = (
+        _tool_identity(payload)
+        if event_key == "pre-tool-use"
+        else _turn_identity(payload)
+    )
     if identity is None:
-        return "Fastlane blocked AWS STARTED because hook session, turn, and tool identity are required."
+        required = (
+            "session, turn, and tool"
+            if event_key == "pre-tool-use"
+            else "session and turn"
+        )
+        _clear_transition(root)
+        return (
+            "Fastlane blocked AWS STARTED because hook "
+            f"{required} identity is required."
+        )
     state = _load_transition(root)
     if event_key == "pre-tool-use":
         expected = _empty_transition_state(
             stage="START_PATCH_PENDING",
             action_kind=candidate["action_kind"],
             identity=identity,
+            tool_name=tool_name,
             attempt_sha256=candidate["attempt_sha256"],
             authority_sha256=candidate["authority_sha256"],
             start_patch_sha256=candidate["patch_sha256"],
@@ -797,17 +831,19 @@ def _start_transition_decision(
             _store_transition(root, expected)
             return None
         if state != expected:
+            _clear_transition(root)
             return "Fastlane blocked AWS STARTED because another transition is already active."
         return None
     if (
         state is None
         or state.get("stage") != "START_PATCH_PENDING"
         or not _event_matches_transition(state, identity)
-        or state.get("start_tool_sha256") != identity["tool_sha256"]
+        or state.get("start_tool_name_sha256") != _tool_name_digest(tool_name)
         or state.get("start_patch_sha256") != candidate["patch_sha256"]
         or state.get("attempt_sha256") != candidate["attempt_sha256"]
         or state.get("authority_sha256") != candidate["authority_sha256"]
     ):
+        _clear_transition(root)
         return "Fastlane blocked AWS STARTED permission because its PreToolUse binding is absent or changed."
     return None
 
@@ -830,31 +866,50 @@ def _mutable_aws_transition_decision(
         ):
             return "Fastlane blocked AWS STARTED because only one exact structured AWS request is supported."
         return "Fastlane blocked AWS mutation until one exact STARTED journal row is appended first."
-    identity = _event_identity(payload)
+    identity = (
+        _tool_identity(payload)
+        if event_key == "pre-tool-use"
+        else _turn_identity(payload)
+    )
     if identity is None:
-        return "Fastlane blocked AWS mutation because hook session, turn, and tool identity are required."
+        _clear_transition(root)
+        required = (
+            "session, turn, and tool"
+            if event_key == "pre-tool-use"
+            else "session and turn"
+        )
+        return (
+            "Fastlane blocked AWS mutation because hook "
+            f"{required} identity is required."
+        )
     if request.get("lane") != "STRUCTURED_API" or not _is_aws_account_tool(tool_name):
+        _clear_transition(root)
         return "Fastlane blocked the post-STARTED action because only one exact structured AWS request is permitted."
     if not _event_matches_transition(state, identity):
         _clear_transition(root)
         return "Fastlane blocked AWS mutation because the STARTED binding belongs to another turn or session."
     match = _transition_projection(report, state)
     if match is None:
+        _clear_transition(root)
         return "Fastlane blocked AWS mutation because the consumed STARTED authority binding is absent or changed."
     expected_kind = "TEARDOWN" if state["action_kind"] == "AWS_TEARDOWN" else "MUTATE"
     if request.get("kind") != expected_kind:
+        _clear_transition(root)
         return "Fastlane blocked AWS mutation because its action class does not match STARTED."
     synthetic = {"external_authority": {"request_match": dict(match)}}
     authority_reason = _aws_authority_denial(request, synthetic, root)
     if authority_reason is not None:
+        _clear_transition(root)
         return authority_reason
     request_sha256 = _canonical_digest(request)
+    tool_name_sha256 = _tool_name_digest(tool_name)
     if event_key == "pre-tool-use":
         if state["stage"] == "START_BOUND":
             state.update(
                 {
                     "stage": "AWS_CALL_PENDING",
                     "request_sha256": request_sha256,
+                    "aws_tool_name_sha256": tool_name_sha256,
                     "aws_tool_sha256": identity["tool_sha256"],
                 }
             )
@@ -863,15 +918,18 @@ def _mutable_aws_transition_decision(
         if (
             state["stage"] == "AWS_CALL_PENDING"
             and state["request_sha256"] == request_sha256
+            and state["aws_tool_name_sha256"] == tool_name_sha256
             and state["aws_tool_sha256"] == identity["tool_sha256"]
         ):
             return None
+        _clear_transition(root)
         return "Fastlane blocked a replay or changed AWS request for the active STARTED attempt."
     if (
         state["stage"] != "AWS_CALL_PENDING"
         or state["request_sha256"] != request_sha256
-        or state["aws_tool_sha256"] != identity["tool_sha256"]
+        or state["aws_tool_name_sha256"] != tool_name_sha256
     ):
+        _clear_transition(root)
         return "Fastlane blocked AWS permission because its matching PreToolUse binding is absent or changed."
     return None
 
@@ -978,19 +1036,27 @@ def _terminal_patch_candidate(
 def _terminal_transition_decision(
     event_key: str,
     payload: Mapping[str, Any],
+    tool_name: str,
     candidate: Mapping[str, str],
     root: Path,
     state: dict[str, str],
 ) -> str | None:
-    identity = _event_identity(payload)
+    identity = (
+        _tool_identity(payload)
+        if event_key == "pre-tool-use"
+        else _turn_identity(payload)
+    )
     if identity is None or not _event_matches_transition(state, identity):
+        _clear_transition(root)
         return "Fastlane blocked AWS terminal evidence because its session and turn binding is absent."
+    tool_name_sha256 = _tool_name_digest(tool_name)
     if event_key == "pre-tool-use":
         if state["stage"] == "AWS_RESULT_BOUND":
             state.update(
                 {
                     "stage": "TERMINAL_PATCH_PENDING",
                     "terminal_patch_sha256": candidate["patch_sha256"],
+                    "terminal_tool_name_sha256": tool_name_sha256,
                     "terminal_tool_sha256": identity["tool_sha256"],
                 }
             )
@@ -999,15 +1065,18 @@ def _terminal_transition_decision(
         if (
             state["stage"] == "TERMINAL_PATCH_PENDING"
             and state["terminal_patch_sha256"] == candidate["patch_sha256"]
+            and state["terminal_tool_name_sha256"] == tool_name_sha256
             and state["terminal_tool_sha256"] == identity["tool_sha256"]
         ):
             return None
+        _clear_transition(root)
         return "Fastlane blocked duplicate or changed terminal evidence for this AWS attempt."
     if (
         state["stage"] != "TERMINAL_PATCH_PENDING"
         or state["terminal_patch_sha256"] != candidate["patch_sha256"]
-        or state["terminal_tool_sha256"] != identity["tool_sha256"]
+        or state["terminal_tool_name_sha256"] != tool_name_sha256
     ):
+        _clear_transition(root)
         return "Fastlane blocked terminal-evidence permission because its PreToolUse binding is absent or changed."
     return None
 
@@ -1032,7 +1101,7 @@ def _transition_pre_decision(
             if reason is not None or candidate is None:
                 return "TERMINAL", reason
             return "TERMINAL", _terminal_transition_decision(
-                event_key, payload, candidate, root, state
+                event_key, payload, tool_name, candidate, root, state
             )
     request = _aws_request_details(tool_name, tool_input)
     if request is not None and request.get("kind") in {"MUTATE", "TEARDOWN"}:
@@ -1045,7 +1114,9 @@ def _transition_pre_decision(
     if recognized:
         if reason is not None or candidate is None:
             return "START", reason
-        return "START", _start_transition_decision(event_key, payload, candidate, root)
+        return "START", _start_transition_decision(
+            event_key, payload, tool_name, candidate, root
+        )
     return "NONE", None
 
 
@@ -1068,13 +1139,14 @@ def _transition_post_message(
     state = _load_transition(root)
     if state is None:
         return None
-    identity = _event_identity(payload)
+    identity = _tool_identity(payload)
     if identity is None or not _event_matches_transition(state, identity):
         _clear_transition(root)
         return "Fastlane cleared an AWS transition whose session or turn identity changed; append UNKNOWN only."
     if state["stage"] == "START_PATCH_PENDING":
         if (
             state["start_tool_sha256"] != identity["tool_sha256"]
+            or state["start_tool_name_sha256"] != _tool_name_digest(tool_name)
             or state["start_patch_sha256"] != _value_digest(_tool_command(tool_input))
             or not _tool_response_succeeded(payload)
         ):
@@ -1090,6 +1162,7 @@ def _transition_post_message(
     if state["stage"] == "AWS_CALL_PENDING" and request is not None:
         if (
             state["aws_tool_sha256"] != identity["tool_sha256"]
+            or state["aws_tool_name_sha256"] != _tool_name_digest(tool_name)
             or state["request_sha256"] != _canonical_digest(request)
             or "tool_response" not in payload
         ):
@@ -1106,9 +1179,12 @@ def _transition_post_message(
             + state["response_sha256"]
         )
     if state["stage"] == "TERMINAL_PATCH_PENDING":
-        valid_tool = state["terminal_tool_sha256"] == identity["tool_sha256"] and state[
-            "terminal_patch_sha256"
-        ] == _value_digest(_tool_command(tool_input))
+        valid_tool = (
+            state["terminal_tool_sha256"] == identity["tool_sha256"]
+            and state["terminal_tool_name_sha256"] == _tool_name_digest(tool_name)
+            and state["terminal_patch_sha256"]
+            == _value_digest(_tool_command(tool_input))
+        )
         succeeded = valid_tool and _tool_response_succeeded(payload)
         _clear_transition(root)
         if not succeeded:

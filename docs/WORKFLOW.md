@@ -56,15 +56,17 @@ one owner-safe correction without echoing the input. A valid partial reply
 records only the supplied answers and leaves the other questions pending under
 their original stable reply keys.
 
-The `Accept all recommendations.` payload is safe only after the current reply
-token and when every question is a decision with a complete recommendation
-that needs no supporting detail. It is unavailable for factual questions or a
-partially recommended card. For the initial work-context question, normalized A/B/C choices map to
-`NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, and `REPAIR_OR_MIGRATION`.
-The normalized response register, card row, and all foundation facts derived
-from that question share one current-card provenance record. That record proves
-how Fastlane interpreted the message; it does not authenticate the owner's
-identity.
+The `Accept all recommendations.` payload is safe only when the exact current
+card ID, revision, and canonical digest match and every question is a decision
+with a complete recommendation that needs no supporting detail. It requires no
+visible reply token. A matching legacy token-prefixed reply remains hidden 1.0.x
+compatibility input for that exact card only. Accept-all is unavailable for
+factual questions or a partially recommended card. For the initial work-context
+question, normalized A/B/C choices map to `NEW_APPLICATION`,
+`EXISTING_APPLICATION_CHANGE`, and `REPAIR_OR_MIGRATION`. The normalized response
+register, card row, and all foundation facts derived from that question share
+one current-card provenance record. That record proves how Fastlane interpreted
+the message; it does not authenticate the owner's identity.
 
 For unapproved legacy intake, prior values remain unconfirmed context: Codex
 reopens the affected facts and asks the smallest current card rather than
@@ -98,6 +100,10 @@ create another owner gate.
 
 Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
 
+After Gate B, Codex builds locally. For AWS preflight, deployment verification,
+or teardown preparation, ask Codex to use `$operate-fastlane-aws`. Every AWS
+mutation still requires its exact separate authorization.
+
 BUG-10 and SYNC-10 are current-request-scoped adjunct prompts, not Engine
 routes or extra lifecycle gates. Codex may use BUG-10 only for an explicitly
 requested bounded defect contract and SYNC-10 only for explicitly requested,
@@ -107,62 +113,38 @@ Engine, and resumes the derived route. BUILD-10 may advance to BUILD-20 when
 the Engine permits autonomous continuation; BUILD-20 may continue itself until
 RELEASE-10 or a declared stop condition.
 
-## Internal precision and delivery methods
+## Internal delivery rules
 
-Owners continue answering short, plain-language questions. Internally, Codex
-translates normative requirements through the Fastlane EARS Contract with Gherkin or
-measurable acceptance and adds quality-attribute scenarios only when material.
-TASK-10 applies Fastlane's INVEST profile, prefers thin vertical slices when
-appropriate, and uses the existing DONE transition as the Definition of Done.
-TDD, Mikado, STRIDE, LINDDUN, ATAM, and ADR are conditional techniques, not
-lifecycle stages or approval gates. Their outputs stay in the existing PRD,
-task, decision, test, and evidence authorities.
+Owner responses remain short and plain. The terms below are internal selection
+rules, not another lifecycle, approval system, dependency, or public vocabulary.
+They are conditional techniques, not lifecycle stages or approval gates.
 
-At Gate A, Fastlane derives one internal coverage record from the work kind,
-approved requirements, risk, and repository facts. New builds receive a full
-architecture comparison. A bounded change may reconsider only affected design
-decisions or retain the current architecture after proving that its technology,
-trust, data, recovery, Region, and validation boundaries did not change. Every
-omitted domain needs a current basis; uncertain impact uses full revalidation.
-This changes work depth, not safety, owner questions, or the two-gate lifecycle.
+- Normative requirements use the Fastlane EARS Contract with Gherkin or
+  measurable acceptance; quality scenarios appear only for material concerns.
+- New builds receive complete architecture comparison. Bounded changes may
+  amend affected decisions or preserve architecture only with current proof;
+  uncertain impact receives full revalidation.
+- Delivery uses existing INVEST, thin-slice, walking-skeleton, property-test,
+  DONE, TDD, refactoring, and Mikado contracts only when their triggers apply.
+- Baseline security, testing, observability, and error handling always apply.
+  STRIDE, LINDDUN, OWASP Top 10, ATAM, ADR, and formal inspection deepen work
+  only for material exposure, privacy, one-way decisions, or high/critical risk.
+- Rich use cases and state models are required for high/critical risk or
+  materially branching, asynchronous, retry/resume, approval, migration,
+  permissioned, or meaningful-transition flows. Flow diagrams are optional
+  presentation aids and never readiness artifacts.
+- Gate B also records a risk-derived Harness Profile. Applicable checks become `REQUIRED`
+  with exact commands; conditional checks name an exact trigger; non-applicable
+  checks state a technology- or risk-based reason. No universal scanner is
+  imposed.
+- Repository Markdown/Mermaid remains canonical. External issue tracking needs
+  current authority and never becomes issue-per-task ceremony.
 
-Gate B also records a risk-derived Harness Profile. It selects the smallest
-exact checks justified by the approved technology, risk, data, identity,
-exposure, recovery, and AWS lane; it never imposes a universal scanner.
-
-### Fastlane Semantic Contract profile
-
-Reviewed 2026-07-28 against [Semantic Anchors](https://llm-coding.github.io/Semantic-Anchors/),
-[Semantic Contracts](https://llm-coding.github.io/Semantic-Anchors/contracts/),
-[spec-driven development](https://llm-coding.github.io/Semantic-Anchors/spec-driven-development/),
-and the [Harness Inventory](https://llm-coding.github.io/Semantic-Anchors/harness-inventory/).
-These are design vocabulary, not a package, runtime dependency, user workflow,
-or additional authority. `ADOPT` means the named official contract is used as
-written; `ADAPT` means Fastlane defines a narrower local contract;
-`CONDITIONAL` activates only on its stated trigger; `NOT_APPLICABLE` means
-Fastlane does not mandate the technique, although an approved project may.
-
-| Profile ID | Local contract | Official basis | Disposition | Fastlane meaning | Authority | Activation trigger / exclusion | Deterministic validation or evidence | Owner-facing effect |
-|---|---|---|---|---|---|---|---|---|
-| FSC-001 | Single source of truth and meaningful human control | SSOT; Meaningful Human Control; Semantic Contracts | ADOPT | One authority per fact; owners approve consequential boundaries | `AGENTS.md`; canonical project records | Always | Engine state, receipt, and authority checks | Two understandable approvals |
-| FSC-002 | Concise, plain-language progressive disclosure | Concise Response; BLUF; Plain English; Progressive Disclosure; Explaining and Teaching | ADAPT | Lead with status, needed action, and what follows; teaching is opt-in | Presenter, prompt pack, explain skill | Always; teaching only on request | Presenter and prompt-contract tests | Concise responses without ledger dumps |
-| FSC-003 | Focused Socratic discovery and completeness | Requirements Discovery; Socratic Method; MECE | ADAPT | Ask at most three related questions and cover non-overlapping product concerns | REQ procedure and intake contract | Define | Procedural: coordinator reviews semantic overlap and completeness; Deterministic: card-size, provenance, seven-field foundation, journey, and requirement-projection checks | Short questions in ordinary language |
-| FSC-004 | Outcome, actor, and first-release traceability | Specification; Actor-Goal List; Impact Mapping; User Story Mapping | ADAPT | Fastlane adopts outcome-to-actor-to-journey traceability but keeps fully dressed use cases and diagrams conditional under FSC-009; every first-release requirement maps to its owner-grounded outcome and canonical acceptance/test bindings | PRD requirements contract | Gate A readiness | Requirements-contract projection and inverse actor/journey coverage | Clear product agreement |
-| FSC-005 | Observable normative requirements and acceptance | Specification; EARS; Gherkin; Quality Attribute Scenario | ADAPT | Normative requirements are observable and testable | PRD normative tables | Gate A; QAS only when material | Requirement and QAS validators | Requirements state what success means |
-| FSC-006 | Whole-system choices, traceability, and layer boundaries | Strategic Architecture Analysis; Layer Boundaries; ADR | ADAPT | Compare viable systems, preserve explicit inward boundaries, and trace only to declared design and validation IDs | PRD design contract | New or materially changed architecture | Candidate, declared-ID traceability, example-scenario binding, boundary, and digest checks | One reasoned recommendation |
-| FSC-007 | Bounded work and the first end-to-end outcome | INVEST; Vertical Slicing; Walking Skeleton; Thin Vertical Slice; Spike Solution | ADAPT | A new build starts with one tested usable path; a blocking spike is disposable | TASKS ledger and first-wave contract | TASK-10 for `NEW_BUILD` | Task graph, wave, and spike checks | Useful progress appears early |
-| FSC-008 | Closed-loop construction and maintenance | Implement Next; Red/Green TDD; Property-Based Testing; Definition of Done; Refactoring; Mikado Method | ADAPT | Construction and maintenance iterate against exact checks and observed evidence | Harness, tasks, VERIFY, maintenance skill | When selected by risk, technology, or bounded repair | Procedural: coordinator selects and applies TDD, refactoring, or Mikado; Deterministic: Harness, property, task/DONE, and observed-evidence checks | Codex corrects safe in-scope failures |
-| FSC-009 | Rich use cases and state machines; optional flow diagrams | Cockburn Use Cases; Activity Diagrams; State Machines | CONDITIONAL | Add rich guarantees to each triggering journey, and to every journey at high/critical risk; use Mermaid flow diagrams only as presentation aids | PRD journey and state contracts; optional diagrams are non-authoritative | High/critical risk; materially branching, async, retry/resume, approval, migration, permissioned, or meaningful-transition trigger | Per-journey rich-use-case and existing state applicability validators | Extra detail only when the flow demands it |
-| FSC-010 | Threat, application-security, and privacy analysis | Quality Review; STRIDE; LINDDUN; OWASP Top 10 | CONDITIONAL | Threat/privacy analysis deepens material security work; applicable web, API, or application surfaces receive an OWASP Top 10 review | PRD security/privacy requirements, design trust boundaries, Harness, and VERIFY | Material security/privacy trigger or applicable web/API/application attack surface | Procedural: trigger review and STRIDE/LINDDUN/OWASP Top 10 application; Deterministic: resulting requirement, control, test, Harness, and evidence-ID traceability | Security depth matches exposure |
-| FSC-011 | Consequential decision and review depth | Quality Review; ATAM; ADR; Fagan Inspection | CONDITIONAL | Hard-to-reverse choices receive deeper review | Current PRD decision; cited ADR rationale/history only | One-way door, high/critical risk, or material tradeoff | Procedural: trigger and ATAM/ADR/Fagan review; Deterministic: candidate, selection, traceability, and digest checks | Tradeoffs are visible when consequential |
-| FSC-012 | Extended Harness checks | Harness Inventory | CONDITIONAL | Accessibility, visual, mutation, SAST/DAST, and formal checks activate from technology/risk | Gate B Harness Profile | Technology/risk applicability review | Procedural: applicability review; Deterministic: every recorded row's status, basis, exact command/API, evidence destination, and scope | No universal scanner burden |
-| FSC-013 | External issue tracking | Backlog Management | CONDITIONAL | Mirror tasks only when authorized and operationally useful | TASKS and GitHub boundary | Current external-write authority | Issue reconciliation checks | No issue ceremony by default |
-| FSC-014 | Repository-native Docs-as-Code and optional external documentation stack | Docs-as-Code; Architecture Documentation; arc42; AsciiDoc/docToolchain; PlantUML | ADAPT | Markdown documents and Mermaid diagrams are versioned, linked, validated authorities; arc42, AsciiDoc/docToolchain, and PlantUML are not mandatory | Fastlane package and documentation contracts | Always for repository-native docs; external stack only when a project constraint selects it | Manifest, relative-link, Markdown, Mermaid, and package integrity tests | Familiar repository documents without mandatory external tooling |
-| FSC-015 | Extra lifecycle and approval machinery | Pugh Matrix; Backlog Management | NOT_APPLICABLE | No second lifecycle, extra gate, universal scoring, or issue-per-task execution | Workflow and receipt contracts | Excluded from Fastlane | Route and exact-receipt tests | No added approval bureaucracy |
-| FSC-016 | Semantic Anchors package or runtime | Semantic Anchors; Semantic Contracts | NOT_APPLICABLE | The profile is locally defined and dependency-free | This table and local validators | Excluded from runtime/package | Manifest and package inventory checks | No additional installation |
-| FSC-017 | Baseline threat/security boundary and crosscutting quality | Crosscutting Concepts | ADAPT | A lightweight threat surface plus security, testing, observability, and error handling are always addressed; formal STRIDE/LINDDUN/OWASP Top 10 depth remains conditional under FSC-010 | PRD security/privacy requirements and architecture trust boundaries; Harness; RUNBOOK; VERIFY | Always for the baseline; FSC-010 trigger for formal threat/privacy/application-security analysis | Requirement, design, Harness, runbook, and evidence validators | Safe operational defaults without extra lifecycle or approval ceremony |
-| FSC-018 | Complete requirement-to-delivery disposition | Specification; Implement Next; Definition of Done | ADAPT | Every modern approved first-release requirement resolves to task coverage, current no-task proof, or evidence-backed optional non-applicability | PRD requirements contract, TASKS traces, and VERIFY evidence | TASK-10 and every `CURRENT` task-plan check | Engine derives exact requirement/acceptance dispositions and reports missing IDs | No approved requirement disappears and no extra owner gate is added |
-
+Semantic Anchors and related catalogs are optional design vocabulary, not a
+Fastlane package, runtime dependency, owner workflow, authority, or new source
+of truth. The Engine validates the resulting PRD, task, Harness, evidence, and
+digest contracts; procedural technique selection never claims deterministic
+proof by itself.
 ## Framework maintenance
 
 Fastlane framework work uses `maintain-fastlane`, never the adopter lifecycle.

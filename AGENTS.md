@@ -83,23 +83,11 @@ Initialize credential-free with `search_documentation`, then matching
 Missing evidence pauses its step; cache/delegation cannot replace it. Owners
 manage plugin/trust; planning never changes them, inspects credentials, or accesses AWS.
 
-SYNC-10 permits only current-Gate-B or explicit-owner GitHub work, then reruns
-Engine. AWS-20 records STARTED and one terminal; lone STARTED gets Codex-owned
-UNKNOWN before owner action/AWS-30 reads. Provenance is immutable. AWS-30 needs
-current read authority: one STALE may retry under different authority; a second
-needs safety review; none follows COMPLETE/BLOCKED. RELEASE-10 stores the
-terminal Evidence ID cutoff. Retry needs a new Attempt ID and explicit-gate
-receipt or fresh fast-dev approval; prior authority grants no read/replay.
-AWS-40/50 has a distinct teardown receipt.
-
-Gate B expiry/staleness after valid STARTED never revives authority or erases
-the attempt. Engine projects only `deployment_journal_closure_authority` for
-bounded VERIFY closure: append lone STARTED UNKNOWN, AWS-30 read provenance, or
-RELEASE-10 cutoff. Rows are append-only; ordinary authority is NONE and
-app/task/runbook writes are prohibited. Closure needs a valid journal and
-STARTED under then-current mutation authority; expiry relaxes only
-`GATE_B_AUTHORITY_EXPIRED`. Any receipt, hash, state, scope, timing, or evidence
-defect fails closed.
+GitHub and AWS stages follow the Engine; AWS stages require explicit
+`operate-fastlane-aws`. That skill owns execution, journal, retry,
+reconciliation, and teardown procedure; the prompt registry owns exact
+receipts. The Engine alone projects current or closure authority. Ordinary
+authority remains NONE unless current, and every defect fails closed.
 ## Brownfield and completion
 
 Before brownfield writes record baseline behavior, tests, interfaces, data,
@@ -109,5 +97,8 @@ checks pass, VERIFY/RUNBOOK hold observed evidence, and external tracking is
 reconciled or explicitly pending.
 ## Agent reference
 
-App/AWS/Engine/tests: nested `AGENTS.md`; phases:
-`.agents/skills/fastlane/references/`; receipts: `prompts/CODEX-PROMPTS.md`.
+This file owns invariants/routing. Nested `AGENTS.md` files narrow app,
+AWS, Engine, or test rules; phase references own procedures;
+`operate-fastlane-aws` owns AWS operations; `prompts/CODEX-PROMPTS.md` owns
+exact syntax/receipts; the Engine validates and projects authority; and
+`docs/WORKFLOW.md` explains the product.

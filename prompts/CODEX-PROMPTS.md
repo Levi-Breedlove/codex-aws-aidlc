@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.0.4
+**Pack version:** 1.0.5
 
 This pack turns a rough idea or an existing repository into a reviewed,
 executable AWS delivery plan, then lets Codex run the approved work for long
@@ -64,7 +64,9 @@ It progressively loads the phase procedure selected by the Engine.
 `launch-fastlane`, `plan-fastlane`, and `build-fastlane` are explicit
 compatibility aliases that delegate to `fastlane`; they never run separate
 lifecycles. `explain-fastlane` and `operate-fastlane-aws` are explicit-only.
-`LEARN-10` remains only as a backward-compatible alias for
+When the Engine reaches AWS preflight, verification, or teardown preparation,
+Fastlane preserves state and tells the owner to explicitly invoke `$operate-fastlane-aws`;
+the handoff grants no authority. `LEARN-10` remains only as a backward-compatible alias for
 `explain-fastlane`, never an automatic route. `maintain-fastlane` applies only
 to the reusable framework and must not start project intake.
 
@@ -1179,12 +1181,10 @@ design; unavailable AWS Core; unverified, missing, failed, stale, or wrong DESIG
 Complete the build-ready PRD for accepted requirements.
 
 Create/increment DES/proposed AUTH IDs. Confirm `aws-core@agent-toolkit-for-aws`.
-For each material AWS fact, bind basis IDs; call `search_documentation`;
-review descriptions; select the smallest relevant set; call `retrieve_skill`
-with exact returned IDs; follow its procedure/official references.
-
-Record `AWS-DISC-*` chains in docs/project/VERIFY.md; search precedes
-retrieve and selected/returned IDs match. Bind each `AWS-EV-*` as
+For each material AWS fact, bind basis IDs; call `search_documentation`, select
+the smallest returned set, then `retrieve_skill` exact IDs and follow its
+official procedure/references. Record `AWS-DISC-*` in docs/project/VERIFY.md;
+search precedes retrieve and IDs match. Bind each `AWS-EV-*` as
 `DES-0001; TECH: TECH-0001, TECH-0002` or
 `DES-0001; TECH: NONE — no technology/toolchain impact`. observed AWS Core version is metadata, never a pin.
 Persist no raw skill content/transcripts; install/cache/connectors/memory do not count. Codex, the only writer, selects the design.
@@ -1193,23 +1193,20 @@ Unavailable AWS Core is owner setup; Codex repairs evidence; unsafe/unexplained 
 After completing the proposed design, conditionally run `fastlane-architecture-challenger`;
 it cannot select, write, approve, authorize, or replace evidence.
 
-Load the Design reference and apply the Adaptive Coverage Plan. `SELECT` compares
-complete candidates; `AMEND` revalidates affected drivers/alternatives;
-`PRESERVE` proves architecture, technology, trust, data, recovery, Region, and
-Harness boundaries unchanged. An unchanged approved schema 4 Gate B remains
-current; new, unapproved, or changed designs require schema 5, new digests,
-and fresh Gate B. Codex may migrate a current
-legacy schema 1.2 Gate A without changing Part I. Use `Need from you: Nothing`
-unless an owner fact is missing; never invent facts or widen authority.
+Load the Design reference and Adaptive Coverage Plan. `SELECT` compares complete
+candidates; `AMEND` revalidates affected drivers/alternatives; `PRESERVE` proves
+architecture, technology, trust, data, recovery, Region, and Harness unchanged.
+The reference owns schema 4 grandfathering and the legacy 1.2 bridge; changed
+designs need schema 5, new digests, and fresh Gate B. Use `Need from you:
+Nothing` unless an owner fact is missing; never invent facts or widen authority.
 
 - For `SELECT`, compare at least two complete, credible, non-straw whole-system
   candidates, including the secure managed-serverless baseline unless Gate A
   forbids it. Complete `DRV-*`/`CAND-*`/`ARCH-*`/`AWS-EV-*` and traceability;
   apply hard constraints before preferences and select only an eligible candidate.
   `NO_VIABLE_ALTERNATIVE` requires at least two total candidates and exactly one is eligible.
-- Trace requirements only to declared IDs. Schema 5 design IDs are selected
-  `ARCH-*` plus `API/EVENT/CLI/FILE-*`, `BOUNDARY-*`, and `STATE-*`; property/test
-  IDs are applicable `PROP-*` or declared `EX-*`. Preserve schema 4 grandfathering.
+- Trace only declared `ARCH-*`, `API/EVENT/CLI/FILE-*`, `BOUNDARY-*`, `STATE-*`,
+  applicable `PROP-*`, or declared `EX-*` IDs; preserve schema 4 grandfathering.
 - Record alternatives, risks/mitigations, security/reliability/operations,
   cost/breakpoints, migration, revisit triggers, and validation.
 - Complete in-scope `TECH-*`. Only `EXACT` accepts opaque versions; Active `PROPERTY_TESTING` uses `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
@@ -1217,21 +1214,17 @@ unless an owner fact is missing; never invent facts or widen authority.
   `PROP-*` has one bounded local command without shell-control
   chaining; its replay format must explicitly declare a seed or deterministic reproduction
   and VERIFY target.
-- Complete the Gate B Harness Profile and Change impact record. Choosing
-  applicability is procedural coordinator design review. Deterministic validation begins with the
-  recorded row's status. At Gate B resolve every Harness row to `REQUIRED` or
-  `NOT_APPLICABLE — <concrete reason>`. Routes: `HARNESS-011` accessibility ->
-  `End-to-end`; `HARNESS-012` visual regression -> `End-to-end`; `HARNESS-013`
-  mutation testing -> `Unit`; `HARNESS-014` SAST -> `Static`; `HARNESS-015` DAST
-  -> `Security and privacy`; `HARNESS-016` formal/model checking -> `Property`.
-  Duplicate layers are intentional. Use `FULL_REVALIDATION` for uncertain impact.
+- Complete the Gate B Harness Profile and Change impact record. Procedural coordinator design review
+  chooses applicability; Deterministic validation begins with the recorded row's status.
+  At Gate B resolve every Harness row to `REQUIRED` or `NOT_APPLICABLE —
+  <concrete reason>`; the Design reference owns layer routing. Use
+  `FULL_REVALIDATION` for uncertain impact. Duplicate layers are intentional.
 - Complete material interfaces/layers, applicable state models, and the
   NEW_BUILD first-wave/spike record. Give each referenced `EX-*` one concrete
   Example-based scenarios row and bind it into the modern design digest.
 
 Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as the
-shared basis, and do not append by default. Route material Part I flow changes through REQ-10. Preserve least privilege, encryption, secrets, validation, safe
-failures, telemetry, billing, scaling breakpoints, and measurable expansion or migration
+shared basis, and do not append by default. Route material Part I flow changes through REQ-10. Preserve required controls and measurable expansion or migration
 triggers. Never weaken one of those required controls to lower cost.
 
 Fill the Gate B readiness card with these exact fields: Design basis IDs;
@@ -1241,30 +1234,25 @@ Validation/evidence; Rollback/recovery/teardown; Brownfield compatibility/migrat
 Outstanding gaps. Use stable IDs; only genuine `NOT_APPLICABLE — <reason>`;
 gaps are `NONE` or stable IDs and keep Gate B `BLOCKED`.
 
-Propose construction-envelope rows with exact PRD grammar. GitHub merge/branch
-deletion stay unauthorized unless listed; AWS defaults DOCS_ONLY. `AWS allowed
-operations` is the deduplicated maximum union across applicable AWS-10..50 and
-execution is its intersection with current phase, evidence, and authority.
-For `explicit-gate` or `fast-dev`, `MUTATE_LISTED_RESOURCES` must satisfy scope,
-cost, provenance, expiry, rollback, and teardown grammar. Explicit-gate still
-needs a separate AWS-20 action receipt; fast-dev is non-production; AWS-50 needs
-a separate receipt.
+Use exact envelope grammar; merge/deletion stay unauthorized unless listed and
+AWS defaults DOCS_ONLY. `AWS allowed operations` is the deduplicated AWS-10..50
+maximum; execution intersects it with current phase, evidence, and authority.
+For `explicit-gate`, `MUTATE_LISTED_RESOURCES` must satisfy scope, cost,
+provenance, expiry, rollback, and teardown and needs a separate AWS-20 action
+receipt; AWS-50 needs its own receipt. Fast-dev remains non-production.
 
 Require a local Git baseline. Hash Architecture driver, Candidate, Selection,
 Traceability, Material AWS evidence, Technology decision, Property applicability,
-Property definition, Property execution, Harness, Change impact, Project design
-contract, and Example scenarios tables into the Design contract SHA-256. Copy
-it to the envelope; include the selected `ARCH-*`, current `TECH-*`, and applicable
-`PROP-*` in `SCOPE_IDS`. Hash the envelope into Gate B review/proposed receipt.
+Property definition, and Property execution plus all other PRD-listed design
+tables into the Design contract SHA-256; include the selected `ARCH-*`, current
+`TECH-*`, and applicable `PROP-*` in `SCOPE_IDS`, copy it to the envelope, then
+hash the envelope into Gate B review/proposed receipt.
 
-Incomplete design/envelope keeps Gate B `BLOCKED`. At
-`READY_FOR_CONSTRUCTION_APPROVAL`, atomically set Document status DES/AUTH/design/Gate B fields
-and Gate B state to
+Incomplete design/envelope keeps Gate B `BLOCKED`. At `READY_FOR_CONSTRUCTION_APPROVAL`, atomically set Document status DES/AUTH/design/Gate B fields and Gate B state to
 `PENDING_OWNER_APPROVAL`; mirror REQ/DES/AUTH, Gate B, maximum
-workers, baseline, and protected dirty paths into TASKS and bootstrap.yaml.
-Keep old tasks stale, clear owner decision/provenance/receipt, and never reuse a
-receipt. Render the proposal; do not implement, generate tasks, approve, or
-write GitHub/AWS.
+workers, baseline, and protected dirty paths into TASKS/bootstrap.yaml. Keep old
+tasks stale, clear owner decision/provenance/receipt, never reuse a receipt, and
+render the proposal without tasks, implementation, approval, or GitHub/AWS writes.
 ~~~
 ## DESIGN-20 — PRD and Construction Gate B
 

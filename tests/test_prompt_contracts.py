@@ -52,7 +52,7 @@ MAX_SKILL_DESCRIPTION_CHARACTERS = 320
 MAX_REPOSITORY_SKILL_INDEX_CHARACTERS = 1_200
 MAX_BOOT_PROMPT_BYTES = 32 * 1024
 MAX_PHASE_PROMPT_BYTES = 8 * 1024
-MAX_DESIGN_PROMPT_BYTES = 7_000
+MAX_DESIGN_PROMPT_BYTES = 6_300
 
 
 class PromptPackContractTests(unittest.TestCase):
@@ -136,7 +136,15 @@ class PromptPackContractTests(unittest.TestCase):
     ) -> None:
         agent_files = sorted(PROJECT_ROOT.rglob("AGENTS.md"))
         self.assertGreater(len(agent_files), 0)
-        self.assertLessEqual(len((PROJECT_ROOT / "AGENTS.md").read_bytes()), 6_500)
+        self.assertLessEqual(len((PROJECT_ROOT / "AGENTS.md").read_bytes()), 5_900)
+        self.assertLessEqual(
+            len((PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_bytes()),
+            8_500,
+        )
+        self.assertLessEqual(
+            len((PROJECT_ROOT / "docs/WORKFLOW.md").read_bytes()), 32_000
+        )
+        self.assertLessEqual(len(self.root_readme.splitlines()), 80)
 
         for agent_file in agent_files:
             chain: list[Path] = []
@@ -738,10 +746,6 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("Only the passing status may be cited", build)
         self.assertIn("Never weaken an invariant", self.agents)
         self.assertIn("Never narrow a generator", test_agents)
-        self.assertIn(
-            "Requires the Codex CLI, Git, and Python 3.11 or newer", self.root_readme
-        )
-        self.assertIn("reproducible seeds and counterexamples", self.root_readme)
 
     def test_receipts_require_complete_normalized_block_equality(self) -> None:
         self.assertIn("equal to this complete", self.prompts)
@@ -1016,7 +1020,7 @@ Approver: <name/handle>"""
 
         self.assertIn("Lightweight Well-Architected decision review", self.prd)
         self.assertRegex(self.prd, r"not a separate audit or\s+gate")
-        self.assertLessEqual(len(self.root_readme.splitlines()), 85)
+        self.assertLessEqual(len(self.root_readme.splitlines()), 80)
 
     def test_aws_execution_lanes_are_derived_and_do_not_create_authority(self) -> None:
         for document in (self.verify, self.runbook, self.prompts):
@@ -1103,7 +1107,7 @@ Approver: <name/handle>"""
         }
         for name, document in documents.items():
             self.assertRegex(document, r"(?m)^## Agent reference", name)
-        self.assertLessEqual(len(self.root_readme.splitlines()), 85)
+        self.assertLessEqual(len(self.root_readme.splitlines()), 80)
         self.assertIn("## Start", self.root_readme)
         self.assertIn("## What to expect", self.root_readme)
 
@@ -1114,6 +1118,34 @@ Approver: <name/handle>"""
         )
         self.assertEqual(self.root_readme.count(gate_line), 1)
         self.assertNotIn("| Gate | You approve |", self.root_readme)
+
+    def test_customer_readme_links_and_explicit_aws_handoff(self) -> None:
+        links = {
+            "Get started": "docs/SETUP.md",
+            "Understand the workflow": "docs/WORKFLOW.md",
+            "Troubleshoot": "docs/TROUBLESHOOTING.md",
+            "Security": "SECURITY.md",
+            "Optional hooks": "docs/HOOKS.md",
+            "Maintainer evaluation": "docs/EVALUATION.md",
+        }
+        for label, target in links.items():
+            with self.subTest(label=label):
+                self.assertIn(f"[{label}]({target})", self.root_readme)
+                self.assertTrue((REPOSITORY_ROOT / target).is_file())
+        handoff = (
+            "After Gate B, Codex builds locally. For AWS preflight, deployment "
+            "verification, or teardown preparation, ask Codex to use "
+            "`$operate-fastlane-aws`."
+        )
+        self.assertIn(handoff, " ".join(self.root_readme.split()))
+        self.assertIn(handoff, " ".join(self.workflow.split()))
+        self.assertIn("explicitly invoke `$operate-fastlane-aws`", self.prompts)
+        workflow_words = " ".join(self.workflow.split())
+        self.assertIn(
+            "exact current card ID, revision, and canonical digest", workflow_words
+        )
+        self.assertIn("requires no visible reply token", workflow_words)
+        self.assertNotIn("safe only after the current reply token", workflow_words)
 
     def test_aws_lifecycle_map_and_lane_authority_are_plain_and_ordered(self) -> None:
         phase_positions = [
@@ -1126,9 +1158,12 @@ Approver: <name/handle>"""
             "Choose a residual disposition when required",
             self.workflow,
         )
-        self.assertIn("`fast-dev` may use only a current Gate B", self.root_readme)
         self.assertIn(
-            "`explicit-gate` requires a separate exact authorization receipt",
+            "Fast Dev stays inside a current non-production Gate B envelope",
+            self.root_readme,
+        )
+        self.assertIn(
+            "explicit-gate deployment and teardown require their own exact receipts",
             self.root_readme,
         )
 
@@ -1150,17 +1185,15 @@ Approver: <name/handle>"""
         ):
             self.assertIn(phrase, self.root_readme)
         for path in (
-            "AGENTS.md",
             "docs/project/PRD.md",
             "docs/project/TASKS.md",
-            ".agents/skills/",
-            ".codex/agents/",
-            "prompts/CODEX-PROMPTS.md",
+            "docs/project/VERIFY.md",
+            "docs/project/RUNBOOK.md",
         ):
             self.assertIn(path, self.root_readme)
         self.assertNotIn("codex plugin marketplace add", self.root_readme)
         self.assertNotIn("continue setup", self.root_readme)
-        self.assertLessEqual(len(self.root_readme.splitlines()), 85)
+        self.assertLessEqual(len(self.root_readme.splitlines()), 80)
         self.assertFalse((REPOSITORY_ROOT / "my-project" / "README.md").exists())
 
     def test_boot_prompt_has_stable_template_first_contract(self) -> None:
@@ -1316,6 +1349,14 @@ Approver: <name/handle>"""
         ).read_text(encoding="utf-8")
         self.assertIn("Use only when the user explicitly invokes this skill", aws_skill)
         self.assertIn("They never authorize an AWS change", aws_skill)
+        fastlane_config = (
+            REPOSITORY_ROOT / ".agents/skills/fastlane/agents/openai.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("explicitly invoke $operate-fastlane-aws", fastlane_config)
+        operator_config = (
+            REPOSITORY_ROOT / ".agents/skills/operate-fastlane-aws/agents/openai.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("allow_implicit_invocation: false", operator_config)
         explain_skill = (
             REPOSITORY_ROOT / ".agents/skills/explain-fastlane/SKILL.md"
         ).read_text(encoding="utf-8")
@@ -1776,9 +1817,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.0.4")
+        self.assertEqual(manifest["bootstrap_version"], "1.0.5")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.0.4", self.prompts)
+        self.assertIn("**Pack version:** 1.0.5", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -1957,8 +1998,8 @@ Approver: <name/handle>"""
         self.assertIn("Use ATAM only", design_reference)
         self.assertIn("Nygard-style ADR only", design_reference)
         self.assertIn(
-            "conditional techniques, not\nlifecycle stages or approval gates",
-            workflow,
+            "conditional techniques, not lifecycle stages or approval gates",
+            " ".join(workflow.split()),
         )
 
     def test_gate_b_harness_profile_is_risk_derived_and_closed_loop(self) -> None:
@@ -2231,82 +2272,26 @@ Approver: <name/handle>"""
             boot_compact.index("Architecture-specific discovery begins"),
         )
 
-    def test_semantic_contract_profile_is_selective_local_and_update_atomic(
+    def test_internal_delivery_rules_are_compact_and_non_authoritative(
         self,
     ) -> None:
-        workflow = (PROJECT_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
-        rows = [
-            [cell.strip() for cell in line.strip("|").split("|")]
-            for line in workflow.splitlines()
-            if line.startswith("| FSC-")
-        ]
-        self.assertTrue(rows and all(len(row) == 9 for row in rows))
-        self.assertEqual(
-            [row[0] for row in rows],
-            [f"FSC-{index:03d}" for index in range(1, 19)],
-        )
-        dispositions = {row[0]: row[3] for row in rows}
-        for identifier in ("FSC-001",):
-            self.assertEqual(dispositions[identifier], "ADOPT")
-        for identifier in (
-            "FSC-002",
-            "FSC-003",
-            "FSC-004",
-            "FSC-005",
-            "FSC-006",
-            "FSC-007",
-            "FSC-008",
-            "FSC-014",
-            "FSC-017",
-            "FSC-018",
+        workflow = self.workflow
+        normalized = " ".join(workflow.split())
+        self.assertNotIn("| FSC-", workflow)
+        for phrase in (
+            "Fastlane EARS Contract",
+            "complete architecture comparison",
+            "walking-skeleton",
+            "STRIDE, LINDDUN, OWASP Top 10, ATAM, ADR",
+            "Flow diagrams are optional presentation aids",
+            "risk-derived Harness Profile",
+            "No universal scanner",
+            "optional design vocabulary",
+            "not a Fastlane package, runtime dependency, owner workflow, authority",
+            "procedural technique selection never claims deterministic proof",
         ):
-            self.assertEqual(dispositions[identifier], "ADAPT")
-        for identifier in ("FSC-009", "FSC-010", "FSC-011", "FSC-012", "FSC-013"):
-            self.assertEqual(dispositions[identifier], "CONDITIONAL")
-        for identifier in ("FSC-015", "FSC-016"):
-            self.assertEqual(dispositions[identifier], "NOT_APPLICABLE")
-        for definition in (
-            "`ADOPT` means",
-            "`ADAPT` means",
-            "`CONDITIONAL` activates",
-            "`NOT_APPLICABLE` means",
-        ):
-            self.assertIn(definition, workflow)
-        for source in (
-            "https://llm-coding.github.io/Semantic-Anchors/",
-            "https://llm-coding.github.io/Semantic-Anchors/contracts/",
-            "https://llm-coding.github.io/Semantic-Anchors/spec-driven-development/",
-            "https://llm-coding.github.io/Semantic-Anchors/harness-inventory/",
-        ):
-            self.assertIn(source, workflow)
-        bases = " ".join(row[2] for row in rows)
-        for basis in (
-            "Meaningful Human Control",
-            "Concise Response",
-            "Requirements Discovery",
-            "Layer Boundaries",
-            "Walking Skeleton",
-            "Spike Solution",
-            "Property-Based Testing",
-            "Cockburn Use Cases",
-            "STRIDE",
-            "ATAM",
-            "Harness Inventory",
-            "Docs-as-Code",
-        ):
-            self.assertIn(basis, bases)
-        self.assertIn("not a package", workflow)
-        self.assertIn(
-            "not a package, runtime dependency, user workflow, or additional authority",
-            " ".join(workflow.split()),
-        )
-        self.assertIn(
-            "A change to an FSC contract updates its workflow rule, applicable phase\n"
-            "reference, PRD schema, deterministic validator/router, owner-visible\n"
-            "presentation when affected, tests, and manifest in the same bounded\n"
-            "maintenance change.",
-            workflow,
-        )
+            self.assertIn(phrase, normalized)
+
         tasks = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
         prompts = (PROJECT_ROOT / "prompts/CODEX-PROMPTS.md").read_text(
             encoding="utf-8"
@@ -2326,9 +2311,6 @@ Approver: <name/handle>"""
         self.assertLess(
             self.prd.index(component_table), self.prd.index("### Layer boundaries")
         )
-        design_reference = (
-            PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
-        ).read_text(encoding="utf-8")
         for kind in ("PRIMARY_USER", "SECONDARY_USER", "OPERATOR", "EXTERNAL_SYSTEM"):
             self.assertIn(kind, self.prd)
         for trigger in (
@@ -2340,18 +2322,8 @@ Approver: <name/handle>"""
             "OTHER_MEANINGFUL_TRANSITION",
         ):
             self.assertIn(trigger, self.prd)
-        for phrase in (
-            "MAX_ATTEMPTS: <positive integer>",
-            "one executable",
-            "INWARD",
-            "server-side",
-            "numeric measurable bound",
-            "first-wave journey `NONE`",
-            "wave plus every selected approved requirement",
-        ):
-            self.assertIn(phrase, self.prd + workflow + design_reference)
-        self.assertIn("FSC-009", workflow)
-        self.assertIn("retry/resume", workflow)
+        self.assertIn("MAX_ATTEMPTS: <positive integer>", self.prd)
+        self.assertIn("retry/resume", normalized)
 
     def test_request_scoped_adjuncts_never_become_engine_routes(self) -> None:
         coordinator = (PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_text(
@@ -2398,91 +2370,23 @@ Approver: <name/handle>"""
             autonomous,
         )
 
-    def test_crosscutting_concepts_map_explicitly_to_fastlane_profile(self) -> None:
-        workflow = self.workflow
-        self.assertIn("Crosscutting Concepts", workflow)
-        rows = {
-            cells[0]: cells
-            for cells in (
-                [cell.strip() for cell in line.strip("|").split("|")]
-                for line in workflow.splitlines()
-                if line.startswith("| FSC-")
-            )
-        }
-        expected_basis = {
-            "FSC-001": "SSOT",
-            "FSC-002": "Plain English",
-            "FSC-003": "Socratic Method",
-            "FSC-004": "Actor-Goal List",
-            "FSC-005": "EARS",
-            "FSC-006": "Layer Boundaries",
-            "FSC-007": "Walking Skeleton",
-            "FSC-008": "Definition of Done",
-            "FSC-009": "State Machines",
-            "FSC-010": "STRIDE",
-            "FSC-011": "ADR",
-            "FSC-012": "Harness Inventory",
-            "FSC-013": "Backlog Management",
-            "FSC-014": "Docs-as-Code",
-            "FSC-015": "Pugh Matrix",
-            "FSC-016": "Semantic Contracts",
-            "FSC-017": "Crosscutting Concepts",
-            "FSC-018": "Definition of Done",
-        }
-        self.assertEqual(set(rows), set(expected_basis))
-        for identifier, anchor in expected_basis.items():
-            with self.subTest(identifier=identifier):
-                self.assertEqual(len(rows[identifier]), 9)
-                self.assertIn(anchor, rows[identifier][2])
-                self.assertIn(
-                    rows[identifier][3],
-                    {"ADOPT", "ADAPT", "CONDITIONAL", "NOT_APPLICABLE"},
-                )
-        self.assertIn("OWASP Top 10", rows["FSC-010"][2])
-        self.assertEqual(rows["FSC-010"][3], "CONDITIONAL")
-        self.assertEqual(rows["FSC-014"][3], "ADAPT")
-        self.assertEqual(rows["FSC-017"][3], "ADAPT")
-        self.assertEqual(rows["FSC-018"][3], "ADAPT")
-        crosscutting = " ".join(rows["FSC-017"]).casefold()
-        for baseline_concern in (
-            "security",
-            "testing",
-            "observability",
-            "error handling",
+    def test_crosscutting_concerns_remain_explicit_and_conditional(self) -> None:
+        workflow = " ".join(self.workflow.split())
+        for concern in ("security", "testing", "observability", "error handling"):
+            self.assertIn(concern, workflow)
+        for method in (
+            "STRIDE",
+            "LINDDUN",
+            "OWASP Top 10",
+            "ATAM",
+            "ADR",
+            "formal inspection",
         ):
-            with self.subTest(baseline_concern=baseline_concern):
-                self.assertIn(baseline_concern, crosscutting)
+            self.assertIn(method, workflow)
+        self.assertIn("only for material exposure", workflow)
+        self.assertIn("not another lifecycle", workflow)
 
-    def test_semantic_contract_evidence_is_honest_and_reference_bound(self) -> None:
-        rows = {
-            cells[0]: cells
-            for cells in (
-                [cell.strip() for cell in line.strip("|").split("|")]
-                for line in self.workflow.splitlines()
-                if line.startswith("| FSC-")
-            )
-        }
-        for identifier in (
-            "FSC-003",
-            "FSC-008",
-            "FSC-010",
-            "FSC-011",
-            "FSC-012",
-        ):
-            with self.subTest(identifier=identifier):
-                validation = rows[identifier][7]
-                self.assertIn("Procedural:", validation)
-                self.assertIn("Deterministic:", validation)
-        self.assertEqual(
-            rows["FSC-011"][5],
-            "Current PRD decision; cited ADR rationale/history only",
-        )
-        self.assertIn("semantic overlap and completeness", rows["FSC-003"][7])
-        self.assertIn("TDD, refactoring, or Mikado", rows["FSC-008"][7])
-        self.assertIn("STRIDE/LINDDUN/OWASP Top 10 application", rows["FSC-010"][7])
-        self.assertIn("ATAM/ADR/Fagan review", rows["FSC-011"][7])
-        self.assertIn("every recorded row's status", rows["FSC-012"][7])
-
+    def test_method_selection_keeps_procedure_and_validation_distinct(self) -> None:
         define_reference = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/define.md"
         ).read_text(encoding="utf-8")
@@ -2491,41 +2395,18 @@ Approver: <name/handle>"""
         ).read_text(encoding="utf-8")
         define_words = " ".join(define_reference.split())
         design_words = " ".join(design_reference.split())
+        workflow_words = " ".join(self.workflow.split())
 
-        self.assertIn(
-            "one-way mapping: when confirmed owner work context is "
-            "`NEW_APPLICATION`, Work kind must be `NEW_BUILD`",
-            define_words,
-        )
-        self.assertIn(
-            "Selecting and applying STRIDE, LINDDUN, or OWASP Top 10 is procedural coordinator review",
-            define_words,
-        )
-        self.assertIn(
-            "`SELECT` compares at least two complete, credible, non-straw "
-            "whole-system candidates",
-            design_words,
-        )
-        self.assertIn(
-            "Selecting and applying ATAM, ADR, or Fagan review is procedural "
-            "coordinator review",
-            design_words,
-        )
-        expected_routes = (
-            "`HARNESS-011` accessibility -> `End-to-end`",
-            "`HARNESS-012` visual regression -> `End-to-end`",
-            "`HARNESS-013` mutation testing -> `Unit`",
-            "`HARNESS-014` SAST -> `Static`",
-            "`HARNESS-015` DAST -> `Security and privacy`",
-            "`HARNESS-016` formal/model checking -> `Property`",
-        )
-        for route in expected_routes:
-            with self.subTest(route=route):
-                self.assertIn(route, design_words)
+        self.assertIn("Selecting and applying STRIDE, LINDDUN", define_words)
+        self.assertIn("Selecting and applying ATAM, ADR", design_words)
         self.assertIn("Choosing applicability is procedural review", design_words)
         self.assertIn(
             "deterministic validation begins with the recorded row's status",
             design_words,
+        )
+        self.assertIn(
+            "procedural technique selection never claims deterministic proof",
+            workflow_words,
         )
 
     def test_prd_and_prompt_bind_semantic_design_contracts(self) -> None:
@@ -2687,26 +2568,11 @@ Approver: <name/handle>"""
     def test_flow_diagrams_are_optional_and_never_readiness_artifacts(self) -> None:
         for document in (self.prd, self.prompts):
             self.assertNotIn("### Primary flow", document)
-        rows = [
-            [cell.strip() for cell in line.strip("|").split("|")]
-            for line in self.workflow.splitlines()
-            if line.startswith("| FSC-")
-        ]
-        fsc_009 = next(row for row in rows if row[0] == "FSC-009")
-        self.assertEqual(
-            fsc_009,
-            [
-                "FSC-009",
-                "Rich use cases and state machines; optional flow diagrams",
-                "Cockburn Use Cases; Activity Diagrams; State Machines",
-                "CONDITIONAL",
-                "Add rich guarantees to each triggering journey, and to every journey at high/critical risk; use Mermaid flow diagrams only as presentation aids",
-                "PRD journey and state contracts; optional diagrams are non-authoritative",
-                "High/critical risk; materially branching, async, retry/resume, approval, migration, permissioned, or meaningful-transition trigger",
-                "Per-journey rich-use-case and existing state applicability validators",
-                "Extra detail only when the flow demands it",
-            ],
+        self.assertIn(
+            "Flow diagrams are optional presentation aids and never readiness artifacts",
+            " ".join(self.workflow.split()),
         )
+        self.assertNotIn("| FSC-", self.workflow)
         doctor_source = (PROJECT_ROOT / "scripts/bootstrap_doctor.py").read_text(
             encoding="utf-8"
         )
