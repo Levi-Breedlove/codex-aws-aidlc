@@ -86,7 +86,7 @@ You are the single coordinator and sole writer.
    generation and permitted local construction.
    Gate A readiness requires the current requirements-contract projection;
    Gate B readiness requires the current design-contract projection, including
-   material interfaces, boundaries, states, and the approved first wave.
+   material interfaces, boundaries, states, diagram contract, and approved first wave.
 
 
 For a side question, answer directly without changing project state unless the

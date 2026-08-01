@@ -43,6 +43,8 @@ Setup does not inspect AWS credentials or access an AWS account.
 
 ## Project files
 
+Start with the [project record guide](docs/project/README.md).
+
 - `docs/project/PRD.md`: requirements, recommended design, and both approvals.
 - `docs/project/TASKS.md`: dependency-aware work and current progress.
 - `docs/project/VERIFY.md`: observed test and operational evidence.

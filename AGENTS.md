@@ -10,16 +10,16 @@ restore route/action.
 
 Under `docs/project/`, `PRD.md` owns requirements, design, gates, construction,
 architecture, and technology; `BUGFIX.md` defects; `TASKS.md` task state;
-`VERIFY.md` evidence; `RUNBOOK.md` operations. ADRs are history. `bootstrap.yaml`
+`VERIFY.md` evidence; `RUNBOOK.md` operations. `bootstrap.yaml`
 is a mirror; the manifest inventories the package. Code/tests/schemas/config/IaC
 own behavior. Stop conflicting authority. Nested `AGENTS.md` only narrows this guide.
 ## Invariants
 
-- Exactly two owner gates: Gate A requirements; Gate B PRD/construction.
+- Exactly two owner gates: Gate A requirements; Gate B design/construction.
 - Only the owner accepts assumptions, approves gates, or authorizes external
   actions; reject `Codex`, `agent`, `automation`, `system`, `AI`, or services.
-- Credentials and connector availability are not authorization. Tool access
-  never widens filesystem, GitHub, Codex, or AWS boundaries.
+- Credentials and connectors grant no authority or broader filesystem, GitHub,
+  Codex, or AWS boundary.
 - Requirement changes stale both gates; design/envelope changes stale Gate B.
   A stale Gate B with a current Gate A routes to `DESIGN-10`.
 - Every descendant subagent is read-only and cannot spawn a writer, edit state,
@@ -35,7 +35,7 @@ Before Gate A record mode (`greenfield`/`brownfield`), profile (`quick-mvp`,
 `standard`, `high-risk`), and lane (`documentation-only`, `read-only`,
 `fast-dev`, `explicit-gate`). A Quick MVP is one small, reversible development release.
 Use `high-risk` for production, regulated data, payments/identity, shared or
-irreversible work, or large outage/cost impact. Profiles change depth without adding lifecycle gates or weakening safeguards/evidence.
+irreversible work, or large outage/cost impact. Profiles change depth, never gates or safeguards/evidence.
 
 Default `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED`; preserve owner caps as
 `MINIMIZE_TOTAL_COST; HARD_CAP: <ISO> <AMOUNT>`. Caps are ceilings, not targets.
@@ -48,8 +48,8 @@ requires exact account, Region, environment, resources, operations, positive
 cost ceiling, rollback, and expiry.
 ## Lifecycle
 
-Run `python scripts/bootstrap_doctor.py --root . --json` before routing and
-after checkpoints; load only resolved slices and the selected prompt. Route:
+Run the Engine before routing and after checkpoints; load only resolved slices
+and the selected prompt. Route:
 BOOT-00 -> INTAKE-10/REQ-10 -> Gate A -> DESIGN-10 -> Gate B -> TASK-10 ->
 BUILD-10/20 -> RELEASE-10 -> optional AWS-10..50. After the initial three settings, intake asks exactly one question per owner
 turn; exact receipts bind both gates and Gate B binds construction.
@@ -67,9 +67,8 @@ otherwise. `explain-fastlane` runs only when asked, changes no state, and
 restores the action.
 ## Tasks, tests, evidence
 
-Run only dependency-ready `READY` tasks through `scripts/task_waves.py`; preserve
-IDs, boundaries, attempts, checkpoints, and transitions. Task completion evidence
-is recorded only after passing. Trace acceptance/`PROP-*`/design/tasks/tests/evidence;
+Run dependency-ready `READY` tasks through `scripts/task_waves.py`; preserve IDs,
+boundaries, attempts, checkpoints, transitions, and passing evidence. Trace acceptance/`PROP-*`/design/tasks/tests/evidence;
 preserve seeds, classify failures, and never weaken an invariant/generator,
 discard seeds, or hide failure.
 ## AWS Core and external actions
@@ -84,8 +83,8 @@ plugin/trust; planning never changes them, inspects credentials, or accesses AWS
 GitHub and AWS stages follow the Engine; AWS stages require explicit
 `operate-fastlane-aws`. That skill owns execution, journal, retry,
 reconciliation, and teardown procedure; the prompt registry owns exact
-receipts. The Engine alone projects current or closure authority. Ordinary
-authority remains NONE unless current, and every defect fails closed.
+receipts. The Engine projects current/closure authority. Otherwise authority is NONE;
+every defect fails closed.
 ## Brownfield and completion
 
 Before brownfield writes record baseline behavior, tests, interfaces, data,

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 try:
     from fastlane_context import (
@@ -404,8 +404,65 @@ LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
     "Acceptance form",
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
-PROJECT_CONTRACT_SCHEMA = "1.3"
-PROJECT_DESIGN_CONTRACT_SCHEMA = "5"
+PROJECT_CONTRACT_SCHEMA = "1.4"
+PROJECT_DESIGN_CONTRACT_SCHEMA = "6"
+REQUIREMENTS_CHANGE_LINEAGE_HEADING = "### Requirements change lineage"
+REQUIREMENTS_CHANGE_LINEAGE_HEADERS = (
+    "Current revision",
+    "Prior revision",
+    "Trigger",
+    "Added IDs",
+    "Changed IDs",
+    "Removed IDs",
+    "Preserved IDs",
+    "Stale reason",
+    "Required revalidation",
+)
+ASSUMPTION_LIFECYCLE_HEADING = "### Assumption lifecycle"
+ASSUMPTION_LIFECYCLE_HEADERS = (
+    "Assumption ID",
+    "Assumption",
+    "Status",
+    "Basis IDs",
+    "Validation or successor",
+)
+ASSUMPTION_STATUSES = {
+    "PROPOSED",
+    "ACCEPTED",
+    "VALIDATED",
+    "INVALIDATED",
+    "SUPERSEDED",
+}
+REQUIREMENTS_REVISION_ID = re.compile(r"REQ-\d{4,}")
+ASSUMPTION_ID = re.compile(r"ASM-\d{3,}")
+DIAGRAM_CONTRACT_HEADING = "### Project diagram contract"
+DIAGRAM_CONTRACT_HEADERS = (
+    "Diagram ID",
+    "Kind",
+    "Applicability",
+    "Status",
+    "Anchor",
+    "Basis IDs",
+    "Referenced IDs",
+)
+DIAGRAM_ID = re.compile(r"DIAGRAM-\d{4,}")
+DIAGRAM_KINDS = {
+    "SYSTEM_CONTEXT",
+    "PRIMARY_OUTCOME",
+    "DATA_LIFECYCLE",
+    "FAILURE_RECOVERY",
+    "MIGRATION",
+    "JOURNEY",
+    "STATE",
+}
+DIAGRAM_APPLICABILITY = {"REQUIRED", "CONDITIONAL", "NOT_APPLICABLE"}
+DIAGRAM_STATUSES = {"NOT_YET_CREATED", "CURRENT", "STALE", "NOT_APPLICABLE"}
+DIAGRAM_REQUIRED_KINDS = {"SYSTEM_CONTEXT", "PRIMARY_OUTCOME"}
+DIAGRAM_RELATIONSHIP = re.compile(
+    r"^\s*(?P<from>[A-Z][A-Z0-9_]*-\d{3,})\s*"
+    r"-->\|(?P<relation>[^|\r\n]+)\|\s*"
+    r"(?P<to>[A-Z][A-Z0-9_]*-\d{3,})\s*$"
+)
 ACTOR_HEADING = "## 4. Users and outcomes"
 ACTOR_HEADERS = (
     "Actor ID",
@@ -946,8 +1003,52 @@ class ContractTable:
 
 
 @dataclass(frozen=True)
+class RequirementsChangeLineage:
+    current_revision: str
+    prior_revision: str
+    trigger: str
+    added_ids: tuple[str, ...]
+    changed_ids: tuple[str, ...]
+    removed_ids: tuple[str, ...]
+    preserved_ids: tuple[str, ...]
+    stale_reason: str
+    required_revalidation: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "current_revision": self.current_revision,
+            "prior_revision": self.prior_revision,
+            "trigger": self.trigger,
+            "added_ids": list(self.added_ids),
+            "changed_ids": list(self.changed_ids),
+            "removed_ids": list(self.removed_ids),
+            "preserved_ids": list(self.preserved_ids),
+            "stale_reason": self.stale_reason,
+            "required_revalidation": list(self.required_revalidation),
+        }
+
+
+@dataclass(frozen=True)
+class AssumptionLifecycleRecord:
+    assumption_id: str
+    assumption: str
+    status: str
+    basis_ids: tuple[str, ...]
+    validation_or_successor: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "assumption_id": self.assumption_id,
+            "assumption": self.assumption,
+            "status": self.status,
+            "basis_ids": list(self.basis_ids),
+            "validation_or_successor": self.validation_or_successor,
+        }
+
+
+@dataclass(frozen=True)
 class RequirementsContract:
-    schema_version: str = "1.3"
+    schema_version: str = "1.4"
     status: str = "UNINITIALIZED"
     actor_ids: tuple[str, ...] = ()
     requirement_ids: tuple[str, ...] = ()
@@ -956,6 +1057,8 @@ class RequirementsContract:
     use_case_ids: tuple[str, ...] = ()
     business_rule_ids: tuple[str, ...] = ()
     rich_use_case_triggers: tuple[str, ...] = ()
+    change_lineage: RequirementsChangeLineage | None = None
+    assumptions: tuple[AssumptionLifecycleRecord, ...] = ()
     missing_records: tuple[str, ...] = ()
     canonical_sha256: str | None = None
     grandfathered_approved_gate_a: bool = False
@@ -972,6 +1075,8 @@ class RequirementsContract:
             "use_case_ids": list(self.use_case_ids),
             "business_rule_ids": list(self.business_rule_ids),
             "rich_use_case_triggers": list(self.rich_use_case_triggers),
+            "change_lineage": self.change_lineage.to_dict() if self.change_lineage else None,
+            "assumptions": [item.to_dict() for item in self.assumptions],
             "missing_records": list(self.missing_records),
             "canonical_sha256": self.canonical_sha256,
             "grandfathered_approved_gate_a": self.grandfathered_approved_gate_a,
@@ -1461,8 +1566,60 @@ class SpikeContract:
 
 
 @dataclass(frozen=True)
+class DiagramRecord:
+    diagram_id: str
+    kind: str
+    applicability: str
+    status: str
+    anchor: str
+    basis_ids: tuple[str, ...]
+    referenced_ids: tuple[str, ...]
+    relationships: tuple[tuple[str, str, str], ...]
+    semantic_sha256: str | None
+    rendered_sha256: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "diagram_id": self.diagram_id,
+            "kind": self.kind,
+            "applicability": self.applicability,
+            "status": self.status,
+            "anchor": self.anchor,
+            "basis_ids": list(self.basis_ids),
+            "referenced_ids": list(self.referenced_ids),
+            "relationships": [
+                {"from_id": source, "relation": relation, "to_id": target}
+                for source, relation, target in self.relationships
+            ],
+            "semantic_sha256": self.semantic_sha256,
+            "rendered_sha256": self.rendered_sha256,
+        }
+
+
+@dataclass(frozen=True)
+class DiagramContract:
+    schema_version: int = 1
+    status: str = "TEMPLATE"
+    architecture_basis_id: str | None = None
+    records: tuple[DiagramRecord, ...] = ()
+    canonical_sha256: str | None = None
+    grandfathered_schema5: bool = False
+    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "architecture_basis_id": self.architecture_basis_id,
+            "records": [item.to_dict() for item in self.records],
+            "canonical_sha256": self.canonical_sha256,
+            "grandfathered_schema5": self.grandfathered_schema5,
+        }
+
+
+@dataclass(frozen=True)
 class ProjectDesignContract:
-    schema_version: int = 5
+    schema_version: int = 6
     status: str = "UNINITIALIZED"
     interface_ids: tuple[str, ...] = ()
     boundary_ids: tuple[str, ...] = ()
@@ -1472,6 +1629,7 @@ class ProjectDesignContract:
     missing_records: tuple[str, ...] = ()
     canonical_sha256: str | None = None
     grandfathered_v4: bool = False
+    grandfathered_v5: bool = False
     canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
@@ -1486,6 +1644,7 @@ class ProjectDesignContract:
             "missing_records": list(self.missing_records),
             "canonical_sha256": self.canonical_sha256,
             "grandfathered_v4": self.grandfathered_v4,
+            "grandfathered_v5": self.grandfathered_v5,
         }
 
 
@@ -1499,6 +1658,7 @@ class DesignContract:
     architecture: ArchitectureContract = field(default_factory=ArchitectureContract)
     harness: HarnessContract = field(default_factory=HarnessContract)
     change_impact: ChangeImpactContract = field(default_factory=ChangeImpactContract)
+    diagram_contract: DiagramContract = field(default_factory=DiagramContract)
     canonical_sha256: str | None = None
     project_contract: ProjectDesignContract = field(
         default_factory=ProjectDesignContract
@@ -1516,6 +1676,7 @@ class DesignContract:
             "architecture": self.architecture.to_dict(),
             "harness": self.harness.to_dict(),
             "change_impact": self.change_impact.to_dict(),
+            "diagram_contract": self.diagram_contract.to_dict(),
             "canonical_sha256": self.canonical_sha256,
             "project_contract": self.project_contract.to_dict(),
         }
@@ -4942,7 +5103,7 @@ def derive_requirements_contract(
     required: bool,
     grandfather_current_gate_a: bool,
 ) -> tuple[RequirementsContract, list[tuple[str, str]]]:
-    """Derive the owner-grounded schema 1.3 requirements projection."""
+    """Derive the owner-grounded schema 1.4 requirements projection."""
 
     issues: list[tuple[str, str]] = []
 
@@ -4971,6 +5132,8 @@ def derive_requirements_contract(
         RICH_USE_CASE_HEADERS: RICH_USE_CASE_HEADING,
         BUSINESS_RULE_HEADERS: BUSINESS_RULE_HEADING,
         REQUIREMENT_COVERAGE_HEADERS: REQUIREMENT_COVERAGE_HEADING,
+        REQUIREMENTS_CHANGE_LINEAGE_HEADERS: REQUIREMENTS_CHANGE_LINEAGE_HEADING,
+        ASSUMPTION_LIFECYCLE_HEADERS: ASSUMPTION_LIFECYCLE_HEADING,
     }
     current_present_headers = observed_headers & set(current_header_map)
     header_sections = (
@@ -4980,6 +5143,8 @@ def derive_requirements_contract(
         (RICH_USE_CASE_HEADING, RICH_USE_CASE_HEADERS),
         (BUSINESS_RULE_HEADING, BUSINESS_RULE_HEADERS),
         (REQUIREMENT_COVERAGE_HEADING, REQUIREMENT_COVERAGE_HEADERS),
+        (REQUIREMENTS_CHANGE_LINEAGE_HEADING, REQUIREMENTS_CHANGE_LINEAGE_HEADERS),
+        (ASSUMPTION_LIFECYCLE_HEADING, ASSUMPTION_LIFECYCLE_HEADERS),
     )
     for heading, headers in header_sections:
         try:
@@ -4987,7 +5152,10 @@ def derive_requirements_contract(
                 current_present_headers.add(headers)
         except ValueError:
             pass
-    if project_schema != PROJECT_CONTRACT_SCHEMA:
+    grandfather_schema_13 = bool(
+        project_schema == "1.3" and grandfather_current_gate_a
+    )
+    if project_schema != PROJECT_CONTRACT_SCHEMA and not grandfather_schema_13:
         legacy_headers = observed_headers & {
             LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
             LEGACY_REQUIREMENT_HEADERS,
@@ -5040,14 +5208,14 @@ def derive_requirements_contract(
             return contract, []
         if not required:
             return RequirementsContract(status="UNINITIALIZED"), []
-        migration_targets = ["Project contract schema 1.3"]
+        migration_targets = ["Project contract schema 1.4"]
         migration_targets.extend(
             label
             for headers, label in current_header_map.items()
             if headers not in current_present_headers
         )
         message = (
-            "Project contract schema 1.3 is required before Gate A readiness; "
+            "Project contract schema 1.4 is required before Gate A readiness; "
             "migrate only the listed generated records without inventing owner facts: "
             + ", ".join(migration_targets)
         )
@@ -5069,7 +5237,7 @@ def derive_requirements_contract(
     if required and intake_contract.status != "READY_FOR_REQUIREMENTS":
         add(
             "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
-            "Schema 1.3 actor and success-measure bases require a complete confirmed intake foundation",
+            "Schema 1.4 actor and success-measure bases require a complete confirmed intake foundation",
         )
 
     table_specs = (
@@ -5093,10 +5261,32 @@ def derive_requirements_contract(
         for heading, headers, code in table_specs
     )
     actors, journeys, applicability, use_cases, business_rules, coverage = tables
+    lineage_table: ContractTable | None = None
+    assumption_table: ContractTable | None = None
+    if not grandfather_schema_13:
+        lineage_table = _contract_table_or_issue(
+            text,
+            REQUIREMENTS_CHANGE_LINEAGE_HEADING,
+            REQUIREMENTS_CHANGE_LINEAGE_HEADERS,
+            issues,
+            missing_records,
+            "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+        )
+        assumption_table = _contract_table_or_issue(
+            text,
+            ASSUMPTION_LIFECYCLE_HEADING,
+            ASSUMPTION_LIFECYCLE_HEADERS,
+            issues,
+            missing_records,
+            "ASSUMPTION_LIFECYCLE_INVALID",
+        )
+    contract_tables = (*tables, lineage_table, assumption_table)
+    if grandfather_schema_13:
+        contract_tables = tables
     if legacy_ids:
         add(
             "PROJECT_CONTRACT_MIGRATION_REQUIRED",
-            "Migrate legacy normative rows to schema 1.3: " + ", ".join(legacy_ids),
+            "Migrate legacy normative rows to schema 1.4: " + ", ".join(legacy_ids),
         )
         missing_records.extend(legacy_ids)
     requirement_ids = [row[0] for row in requirement_rows]
@@ -5114,7 +5304,7 @@ def derive_requirements_contract(
     if not requirement_rows:
         add(
             "REQUIREMENT_COVERAGE_INVALID",
-            "Schema 1.3 requires at least one normative requirement",
+            "Schema 1.4 requires at least one normative requirement",
         )
     acceptance_ids: list[str] = []
     for row in requirement_rows:
@@ -5146,12 +5336,143 @@ def derive_requirements_contract(
             "Duplicate acceptance IDs: " + ", ".join(duplicate_acceptance),
         )
     requirement_set = set(requirement_ids)
+    change_lineage: RequirementsChangeLineage | None = None
+    assumptions: list[AssumptionLifecycleRecord] = []
+    if lineage_table is not None:
+        if len(lineage_table.rows) != 1:
+            add(
+                "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+                "Requirements change lineage requires exactly one current-revision row",
+            )
+        else:
+            raw = lineage_table.rows[0]
+            current, prior, trigger, added, changed, removed, preserved, stale, revalidate = raw
+            parsed_lists: dict[str, list[str]] = {}
+            for label, value in (
+                ("Added IDs", added),
+                ("Changed IDs", changed),
+                ("Removed IDs", removed),
+                ("Preserved IDs", preserved),
+            ):
+                try:
+                    parsed_lists[label] = parse_exact_id_list(
+                        value, STABLE_CONTRACT_ID, label
+                    )
+                except ValueError as exc:
+                    add("REQUIREMENTS_CHANGE_LINEAGE_INVALID", str(exc))
+                    parsed_lists[label] = []
+            if revalidate == "FULL_REVALIDATION":
+                revalidation_ids: list[str] = []
+            else:
+                try:
+                    revalidation_ids = parse_exact_id_list(
+                        revalidate, STABLE_CONTRACT_ID, "Required revalidation"
+                    )
+                except ValueError as exc:
+                    add("REQUIREMENTS_CHANGE_LINEAGE_INVALID", str(exc))
+                    revalidation_ids = []
+            expected_revision = clean_cell(
+                document.get("Current requirements revision", "")
+            )
+            if current != expected_revision or REQUIREMENTS_REVISION_ID.fullmatch(current) is None:
+                add(
+                    "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+                    "Current lineage revision must match Document status",
+                )
+            if prior != "NONE" and REQUIREMENTS_REVISION_ID.fullmatch(prior) is None:
+                add(
+                    "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+                    "Prior revision must be REQ-nnnn or NONE",
+                )
+            if prior == current:
+                add(
+                    "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+                    "Prior and current requirements revisions must differ",
+                )
+            if not explicit_value(trigger, allow_none=False) or not explicit_value(
+                stale, allow_none=True
+            ):
+                add(
+                    "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+                    "Lineage trigger and stale reason must be explicit",
+                )
+            classified = [
+                identifier
+                for label in ("Added IDs", "Changed IDs", "Removed IDs", "Preserved IDs")
+                for identifier in parsed_lists[label]
+            ]
+            duplicates = sorted(
+                identifier
+                for identifier in set(classified)
+                if classified.count(identifier) > 1
+            )
+            if duplicates:
+                add(
+                    "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+                    "Lineage IDs appear in multiple dispositions: " + ", ".join(duplicates),
+                )
+            current_declared = set(parsed_lists["Added IDs"]) | set(
+                parsed_lists["Changed IDs"]
+            ) | set(parsed_lists["Preserved IDs"])
+            if current_declared != requirement_set:
+                add(
+                    "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+                    "Added, changed, and preserved IDs must enumerate the current requirement set",
+                )
+            change_lineage = RequirementsChangeLineage(
+                current_revision=current,
+                prior_revision=prior,
+                trigger=trigger,
+                added_ids=tuple(parsed_lists["Added IDs"]),
+                changed_ids=tuple(parsed_lists["Changed IDs"]),
+                removed_ids=tuple(parsed_lists["Removed IDs"]),
+                preserved_ids=tuple(parsed_lists["Preserved IDs"]),
+                stale_reason=stale,
+                required_revalidation=tuple(revalidation_ids),
+            )
+    if assumption_table is not None:
+        seen_assumptions: set[str] = set()
+        for assumption_id, statement, status, basis_value, validation in assumption_table.rows:
+            if ASSUMPTION_ID.fullmatch(assumption_id) is None or assumption_id in seen_assumptions:
+                add(
+                    "ASSUMPTION_LIFECYCLE_INVALID",
+                    f"Invalid or duplicate assumption ID {assumption_id!r}",
+                )
+            seen_assumptions.add(assumption_id)
+            if status not in ASSUMPTION_STATUSES:
+                add(
+                    "ASSUMPTION_LIFECYCLE_INVALID",
+                    f"{assumption_id}: invalid assumption status {status!r}",
+                )
+            if not explicit_value(statement, allow_none=False) or not explicit_value(
+                validation, allow_none=False
+            ):
+                add(
+                    "ASSUMPTION_LIFECYCLE_INVALID",
+                    f"{assumption_id}: statement and validation/successor must be explicit",
+                )
+            try:
+                basis_ids = parse_exact_id_list(
+                    basis_value, STABLE_CONTRACT_ID, f"{assumption_id} Basis IDs"
+                )
+            except ValueError as exc:
+                add("ASSUMPTION_LIFECYCLE_INVALID", str(exc))
+                basis_ids = []
+            assumptions.append(
+                AssumptionLifecycleRecord(
+                    assumption_id=assumption_id,
+                    assumption=statement,
+                    status=status,
+                    basis_ids=tuple(basis_ids),
+                    validation_or_successor=validation,
+                )
+            )
 
     if not required and (
-        any(table is None for table in tables)
+        any(table is None for table in contract_tables)
         or any(
             unresolved(cell)
-            for table in tables
+            for table in contract_tables
             if table
             for row in table.rows
             for cell in row
@@ -5641,7 +5962,7 @@ def derive_requirements_contract(
 
     canonical_bytes: bytes | None = None
     canonical_sha256: str | None = None
-    if all(table is not None for table in tables):
+    if all(table is not None for table in contract_tables):
         requirement_payload = (
             json.dumps(
                 requirement_rows, ensure_ascii=False, separators=(",", ":")
@@ -5649,15 +5970,24 @@ def derive_requirements_contract(
             + b"\n"
         )
         canonical_bytes = (
-            PROJECT_CONTRACT_SCHEMA.encode("utf-8")
+            ("1.3" if grandfather_schema_13 else PROJECT_CONTRACT_SCHEMA).encode("utf-8")
             + b"\n"
             + requirement_payload
-            + b"".join(table.canonical_bytes for table in tables if table is not None)
+            + b"".join(
+                table.canonical_bytes for table in contract_tables if table is not None
+            )
         )
         canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
     return (
         RequirementsContract(
-            status="READY" if not issues else "BLOCKED",
+            schema_version="1.3" if grandfather_schema_13 else PROJECT_CONTRACT_SCHEMA,
+            status=(
+                "GRANDFATHERED"
+                if grandfather_schema_13 and not issues
+                else "READY"
+                if not issues
+                else "BLOCKED"
+            ),
             actor_ids=tuple(actor_ids),
             journey_ids=tuple(journey_ids),
             acceptance_ids=tuple(
@@ -5668,8 +5998,11 @@ def derive_requirements_contract(
             business_rule_ids=tuple(business_rule_ids),
             requirement_ids=tuple(sorted(requirement_set)),
             rich_use_case_triggers=tuple(sorted(declared_rich_triggers)),
+            change_lineage=change_lineage,
+            assumptions=tuple(assumptions),
             missing_records=tuple(dict.fromkeys(missing_records)),
             canonical_sha256=canonical_sha256,
+            grandfathered_approved_gate_a=grandfather_schema_13,
             canonical_bytes=canonical_bytes,
         ),
         issues,
@@ -7842,7 +8175,7 @@ def derive_project_design_contract(
     required: bool,
     grandfather_approved_v4: bool,
 ) -> tuple[ProjectDesignContract, list[str]]:
-    """Validate the schema-5 interface, boundary, state, and delivery contract."""
+    """Validate the schema-6 interface, boundary, state, and delivery contract."""
 
     issues: list[str] = []
     add = issues.append
@@ -7854,7 +8187,12 @@ def derive_project_design_contract(
         if required:
             issues.append(str(exc))
     design_schema = clean_cell(document.get("Project design contract schema", ""))
-    if design_schema != PROJECT_DESIGN_CONTRACT_SCHEMA:
+    grandfather_schema_5 = bool(
+        design_schema == "5"
+        and grandfather_approved_v4
+        and DIAGRAM_CONTRACT_HEADING not in without_fenced_code(text)
+    )
+    if design_schema != PROJECT_DESIGN_CONTRACT_SCHEMA and not grandfather_schema_5:
         observed_tables = [table for table in markdown_tables(text) if table]
         observed_headers = {tuple(table[0]) for table in observed_tables}
         current_headers = {
@@ -7864,6 +8202,7 @@ def derive_project_design_contract(
             STATE_REGISTER_HEADERS,
             FIRST_WAVE_HEADERS,
             SPIKE_HEADERS,
+            DIAGRAM_CONTRACT_HEADERS,
         }
         legacy_interface_tables = [
             table
@@ -7916,18 +8255,19 @@ def derive_project_design_contract(
             ProjectDesignContract(
                 status="MIGRATION_REQUIRED",
                 missing_records=(
-                    "Project design contract schema 5",
+                    "Project design contract schema 6",
                     INTERFACE_HEADING,
                     LAYER_BOUNDARY_HEADING,
                     STATE_APPLICABILITY_HEADING,
                     STATE_REGISTER_HEADING,
                     FIRST_WAVE_HEADING,
                     SPIKE_HEADING,
+                    DIAGRAM_CONTRACT_HEADING,
                 ),
             ),
             [
-                "Project design contract schema 5 requires current interface, "
-                "layer-boundary, state-applicability, first-wave, and spike records"
+                "Project design contract schema 6 requires current interface, "
+                "layer-boundary, state-applicability, first-wave, spike, and diagram records"
             ],
         )
 
@@ -8382,7 +8722,11 @@ def derive_project_design_contract(
             required_next_action=next_action,
         )
 
-    canonical_parts: list[bytes] = [b"PROJECT_DESIGN_CONTRACT_SCHEMA: 5\n"]
+    canonical_parts: list[bytes] = [
+        f"PROJECT_DESIGN_CONTRACT_SCHEMA: {'5' if grandfather_schema_5 else PROJECT_DESIGN_CONTRACT_SCHEMA}\n".encode(
+            "utf-8"
+        )
+    ]
     if (
         requirements_contract.grandfathered_approved_gate_a
         and requirements_contract.canonical_sha256 is None
@@ -8419,7 +8763,14 @@ def derive_project_design_contract(
         return ProjectDesignContract(status="UNINITIALIZED"), []
     return (
         ProjectDesignContract(
-            status="READY" if not issues else "BLOCKED",
+            schema_version=5 if grandfather_schema_5 else 6,
+            status=(
+                "GRANDFATHERED"
+                if grandfather_schema_5 and not issues
+                else "READY"
+                if not issues
+                else "BLOCKED"
+            ),
             interface_ids=tuple(interface_ids),
             boundary_ids=tuple(boundary_ids),
             state_ids=tuple(state_ids),
@@ -8427,14 +8778,292 @@ def derive_project_design_contract(
             spike=spike,
             missing_records=tuple(dict.fromkeys(missing_records)),
             canonical_sha256=canonical_sha256,
+            grandfathered_v5=grandfather_schema_5,
             canonical_bytes=canonical_bytes,
         ),
         issues,
     )
 
 
-def derive_design_contract(
+def required_diagram_kinds(
     text: str,
+    requirement_ids: Iterable[str],
+    work_kind: str | None,
+) -> set[str]:
+    """Return diagram kinds required by the current canonical project records."""
+
+    required = set(DIAGRAM_REQUIRED_KINDS)
+    identifiers = set(requirement_ids)
+    if any(identifier.startswith("DATA-") for identifier in identifiers):
+        required.add("DATA_LIFECYCLE")
+    if any(identifier.startswith("REL-") for identifier in identifiers):
+        required.add("FAILURE_RECOVERY")
+    try:
+        document = table_after_heading(text, "## Document status")
+    except ValueError:
+        document = {}
+    if work_kind == "MIGRATION" or clean_cell(
+        document.get("Project mode", "")
+    ).lower() == "brownfield":
+        required.add("MIGRATION")
+    return required
+
+def _diagram_heading_for_anchor(text: str, anchor: str) -> str:
+    """Resolve one stable Markdown anchor through the shared fenced-code rules."""
+
+    structural = without_fenced_code(text)
+    matches: list[str] = []
+    for match in re.finditer(r"^(#{1,6})[ \t]+(.+?)[ \t]*\r?$", structural, re.MULTILINE):
+        title = re.sub(r"^\d+(?:\.\d+)*\.?[ \t]+", "", match.group(2)).strip()
+        candidate = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        if candidate == anchor:
+            matches.append(match.group(0).rstrip("\r"))
+    if len(matches) != 1:
+        raise ValueError(
+            f"diagram anchor {anchor!r} must resolve to exactly one heading; found {len(matches)}"
+        )
+    return matches[0]
+
+
+def _canonical_mermaid_block(text: str, anchor: str) -> tuple[bytes, str]:
+    heading = _diagram_heading_for_anchor(text, anchor)
+    offsets = _heading_section_offsets(text, heading)
+    if offsets is None:
+        raise ValueError(f"diagram anchor {anchor!r} has no source section")
+    _, body_start, end = offsets
+    section = text[body_start:end]
+    matches = list(
+        re.finditer(r"(?ms)^```mermaid[ \t]*\r?\n.*?^```[ \t]*\r?$", section)
+    )
+    if len(matches) != 1:
+        raise ValueError(
+            f"diagram anchor {anchor!r} requires exactly one Mermaid block; found {len(matches)}"
+        )
+    block = matches[0].group(0).replace("\r\n", "\n").replace("\r", "\n")
+    canonical = block.rstrip("\n") + "\n"
+    return canonical.encode("utf-8"), canonical
+
+
+def derive_diagram_contract(
+    text: str,
+    architecture: ArchitectureContract,
+    requirements: RequirementsContract,
+    coverage: CoverageContract,
+    *,
+    required: bool,
+    grandfathered_schema5: bool,
+) -> tuple[DiagramContract, list[str]]:
+    """Validate project-specific Mermaid views without making them authority."""
+
+    if grandfathered_schema5:
+        return (
+            DiagramContract(status="CURRENT", grandfathered_schema5=True),
+            [],
+        )
+    issues: list[str] = []
+    try:
+        table = contract_table_after_heading(
+            text, DIAGRAM_CONTRACT_HEADING, DIAGRAM_CONTRACT_HEADERS
+        )
+    except ValueError as exc:
+        table = None
+        issues.append(str(exc))
+    if table is None:
+        if not required:
+            return DiagramContract(status="TEMPLATE"), []
+        return DiagramContract(status="INVALID"), [
+            f"Missing {DIAGRAM_CONTRACT_HEADING}"
+        ]
+    if not required and (
+        any(unresolved(cell) for row in table.rows for cell in row)
+        or all(
+            row[3] in {"NOT_YET_CREATED", "NOT_APPLICABLE"}
+            for row in table.rows
+        )
+    ):
+        return DiagramContract(status="TEMPLATE"), []
+
+    architecture_id = (
+        architecture.selection.architecture_id
+        if architecture.selection is not None
+        else None
+    )
+    expected_required = required_diagram_kinds(
+        text,
+        requirements.requirement_ids,
+        coverage.work_kind,
+    )
+
+    records: list[DiagramRecord] = []
+    seen_ids: set[str] = set()
+    seen_kinds: set[str] = set()
+    semantic_rows: list[tuple[str, str]] = []
+    stale = False
+    incomplete = False
+    for raw in table.rows:
+        diagram_id, kind, applicability, status, anchor, basis_value, referenced_value = raw
+        if DIAGRAM_ID.fullmatch(diagram_id) is None or diagram_id in seen_ids:
+            issues.append(f"Invalid or duplicate diagram ID {diagram_id!r}")
+        seen_ids.add(diagram_id)
+        if kind not in DIAGRAM_KINDS or kind in seen_kinds:
+            issues.append(f"Invalid or duplicate diagram kind {kind!r}")
+        seen_kinds.add(kind)
+        if applicability not in DIAGRAM_APPLICABILITY:
+            issues.append(f"{diagram_id}: invalid applicability {applicability!r}")
+        if status not in DIAGRAM_STATUSES:
+            issues.append(f"{diagram_id}: invalid status {status!r}")
+        if re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", anchor) is None:
+            issues.append(f"{diagram_id}: invalid stable anchor {anchor!r}")
+        try:
+            basis_ids = parse_exact_id_list(
+                basis_value, STABLE_CONTRACT_ID, f"{diagram_id} Basis IDs"
+            )
+        except ValueError as exc:
+            issues.append(str(exc))
+            basis_ids = []
+        try:
+            referenced_ids = parse_exact_id_list(
+                referenced_value, STABLE_CONTRACT_ID, f"{diagram_id} Referenced IDs"
+            )
+        except ValueError as exc:
+            issues.append(str(exc))
+            referenced_ids = []
+        must_be_current = kind in expected_required or status == "CURRENT"
+        if kind in expected_required and applicability == "NOT_APPLICABLE":
+            issues.append(f"{diagram_id}: {kind} is required by current canonical records")
+        if kind in expected_required and status != "CURRENT":
+            incomplete = True
+            issues.append(f"{diagram_id}: required {kind} diagram is not CURRENT")
+        if status == "STALE":
+            stale = True
+            issues.append(f"{diagram_id}: rendered project diagram is STALE")
+
+        relationships: tuple[tuple[str, str, str], ...] = ()
+        semantic_sha256: str | None = None
+        rendered_sha256: str | None = None
+        if must_be_current and status == "CURRENT":
+            if architecture_id is None or architecture_id not in basis_ids:
+                issues.append(
+                    f"{diagram_id}: CURRENT diagram must cite the selected ARCH-* basis"
+                )
+            if not referenced_ids:
+                issues.append(f"{diagram_id}: CURRENT diagram requires referenced IDs")
+            try:
+                rendered_bytes, rendered_text = _canonical_mermaid_block(text, anchor)
+                rendered_sha256 = "sha256:" + hashlib.sha256(rendered_bytes).hexdigest()
+                body = rendered_text.split("\n", 1)[1].rsplit("\n```", 1)[0]
+                if re.search(r"\b(?:TODO|PLACEHOLDER|GENERIC)\b", body, re.IGNORECASE):
+                    issues.append(f"{diagram_id}: Mermaid block contains generic placeholder content")
+                parsed_relationships = sorted(
+                    {
+                        (
+                            match.group("from"),
+                            clean_cell(match.group("relation")),
+                            match.group("to"),
+                        )
+                        for line in body.splitlines()
+                        if (match := DIAGRAM_RELATIONSHIP.fullmatch(line)) is not None
+                    }
+                )
+                relationships = tuple(parsed_relationships)
+                if not relationships:
+                    issues.append(f"{diagram_id}: Mermaid block has no canonical relationships")
+                endpoint_ids = {
+                    identifier
+                    for source, _relation, target in relationships
+                    for identifier in (source, target)
+                }
+                if endpoint_ids != set(referenced_ids):
+                    issues.append(
+                        f"{diagram_id}: Referenced IDs must exactly match Mermaid relationship endpoints"
+                    )
+                for identifier in referenced_ids:
+                    if re.search(
+                        rf"(?<![A-Z0-9-]){re.escape(identifier)}(?![A-Z0-9-])",
+                        body,
+                    ) is None:
+                        issues.append(
+                            f"{diagram_id}: referenced ID {identifier} is absent from Mermaid"
+                        )
+                semantic_payload = {
+                    "kind": kind,
+                    "basis_ids": sorted(basis_ids),
+                    "referenced_ids": sorted(referenced_ids),
+                    "relationships": [
+                        {"from_id": source, "relation": relation, "to_id": target}
+                        for source, relation, target in relationships
+                    ],
+                }
+                semantic_bytes = (
+                    json.dumps(
+                        semantic_payload,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                    + b"\n"
+                )
+                semantic_sha256 = "sha256:" + hashlib.sha256(
+                    semantic_bytes
+                ).hexdigest()
+                semantic_rows.append((diagram_id, semantic_sha256))
+            except ValueError as exc:
+                issues.append(f"{diagram_id}: {exc}")
+        records.append(
+            DiagramRecord(
+                diagram_id=diagram_id,
+                kind=kind,
+                applicability=applicability,
+                status=status,
+                anchor=anchor,
+                basis_ids=tuple(basis_ids),
+                referenced_ids=tuple(referenced_ids),
+                relationships=relationships,
+                semantic_sha256=semantic_sha256,
+                rendered_sha256=rendered_sha256,
+            )
+        )
+
+    missing_kinds = sorted(expected_required - seen_kinds)
+    if missing_kinds:
+        incomplete = True
+        issues.append("Missing required diagram kinds: " + ", ".join(missing_kinds))
+    canonical_bytes: bytes | None = None
+    canonical_sha256: str | None = None
+    if not issues or all(
+        issue.endswith("rendered project diagram is STALE") for issue in issues
+    ):
+        canonical_bytes = (
+            json.dumps(
+                semantic_rows,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            + b"\n"
+        )
+        canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
+    status_value = (
+        "STALE"
+        if stale
+        else "INVALID"
+        if issues and not incomplete
+        else "INCOMPLETE"
+        if issues
+        else "CURRENT"
+    )
+    return (
+        DiagramContract(
+            status=status_value,
+            architecture_basis_id=architecture_id,
+            records=tuple(records),
+            canonical_sha256=canonical_sha256,
+            canonical_bytes=canonical_bytes,
+        ),
+        issues,
+    )
+
+
+def derive_design_contract(    text: str,
     design_revision: str | None,
     *,
     required: bool = False,
@@ -8860,6 +9489,18 @@ def derive_design_contract(
     )
     if required:
         issues.extend(project_contract_issues)
+    diagram_contract, diagram_issues = derive_diagram_contract(
+        text,
+        architecture,
+        requirements_contract,
+        coverage_contract,
+        required=required,
+        grandfathered_schema5=(
+            project_contract.grandfathered_v4 or project_contract.grandfathered_v5
+        ),
+    )
+    if required:
+        issues.extend(diagram_issues)
 
     if not project_contract.grandfathered_v4:
         issues.extend(example_issues)
@@ -8885,11 +9526,17 @@ def derive_design_contract(
             or project_contract.grandfathered_v4
         )
         and (example_table is not None or project_contract.grandfathered_v4)
+        and (
+            diagram_contract.canonical_bytes is not None
+            or project_contract.grandfathered_v4
+            or project_contract.grandfathered_v5
+        )
     ):
         architecture_bytes = architecture.canonical_bytes or b""
         harness_bytes = harness.canonical_bytes or b""
         change_impact_bytes = change_impact.canonical_bytes or b""
         project_contract_bytes = project_contract.canonical_bytes or b""
+        diagram_contract_bytes = diagram_contract.canonical_bytes or b""
         canonical_sha256 = (
             "sha256:"
             + hashlib.sha256(
@@ -8897,6 +9544,7 @@ def derive_design_contract(
                 + harness_bytes
                 + change_impact_bytes
                 + project_contract_bytes
+                + diagram_contract_bytes
                 + technology_table.canonical_bytes
                 + (example_table.canonical_bytes if example_table is not None else b"")
                 + applicability_table.canonical_bytes
@@ -8917,6 +9565,8 @@ def derive_design_contract(
                 max(4, architecture.schema_version)
                 if project_contract.grandfathered_v4
                 else 5
+                if project_contract.grandfathered_v5
+                else 6
             ),
             status=status,
             design_revision=design_revision,
@@ -8926,6 +9576,7 @@ def derive_design_contract(
             harness=harness,
             canonical_sha256=canonical_sha256,
             change_impact=change_impact,
+            diagram_contract=diagram_contract,
             project_contract=project_contract,
         ),
         issues,
@@ -11456,7 +12107,7 @@ def validate_prd(
         if requirements_contract.status not in {"READY", "GRANDFATHERED"}:
             ctx.error(
                 "PROJECT_CONTRACT_MIGRATION_REQUIRED",
-                "Gate A requires a complete schema 1.3 requirements contract or an unchanged approved legacy Gate A",
+                "Gate A requires a complete schema 1.4 requirements contract or an unchanged approved legacy Gate A",
                 PRD_FILE,
             )
     design_contract_required = gate_b_agent_ready or gate_b_ready_or_current
@@ -14968,6 +15619,9 @@ def _context_request(
         elif path == PRD_FILE:
             priority = 3
             reason = "Controlling PRD record"
+        elif path.startswith(".agents/skills/fastlane/references/"):
+            priority = 0
+            reason = "Current phase procedure"
         else:
             priority = 4
             reason = "Consequential evidence or authority"
@@ -14990,7 +15644,12 @@ def _context_request(
     # decision requires it. Task blocks and controlling state records remain
     # atomic and required.
     required = initial and (
-        selector_kind == "TASK_ID" or selector in required_selectors
+        selector_kind == "TASK_ID"
+        or selector in required_selectors
+        or (
+            selector_kind == "HEADING"
+            and path.startswith(".agents/skills/fastlane/references/")
+        )
     )
     return SliceRequest(
         path=path,
@@ -15050,7 +15709,7 @@ def derive_context_plan(
     closure_context = deployment_closure_context or teardown_closure_context
     if teardown_closure_context:
         source_slices = [
-            ".agents/skills/fastlane/references/deliver.md",
+            ".agents/skills/fastlane/references/deliver.md#Teardown and residuals",
             f"{VERIFY_FILE}#Teardown reconciliation evidence",
         ]
         on_demand_slices = [
@@ -15066,7 +15725,7 @@ def derive_context_plan(
         ]
     elif deployment_closure_context:
         source_slices = [
-            ".agents/skills/fastlane/references/deliver.md",
+            ".agents/skills/fastlane/references/deliver.md#AWS handoff and reconciliation",
             f"{VERIFY_FILE}#AWS deployment action and reconciliation evidence",
         ]
         on_demand_slices = [
@@ -15086,17 +15745,19 @@ def derive_context_plan(
             )
     elif stage == "DEFINE":
         source_slices = [
-            ".agents/skills/fastlane/references/define.md",
+            ".agents/skills/fastlane/references/define.md#Setup and intake",
             f"{PRD_FILE}#Document status",
-            f"{PRD_FILE}#Part I — Requirements",
+            f"{PRD_FILE}#Product Agreement",
         ]
         on_demand_slices = [
-            f"{PRD_FILE}#Part II — Requirements Analysis and Gate A",
+            ".agents/skills/fastlane/references/define.md#Requirements and Gate A",
+            ".agents/skills/fastlane/references/define.md#Review and AWS evidence",
+            f"{PRD_FILE}#Gate A Review",
             BUGFIX_FILE,
         ]
     elif stage == "DESIGN":
         source_slices = [
-            ".agents/skills/fastlane/references/design.md",
+            ".agents/skills/fastlane/references/design.md#Architecture selection and records",
             f"{PRD_FILE}#Adaptive coverage plan",
             f"{PRD_FILE}#Architecture drivers",
             f"{PRD_FILE}#Whole-system candidates",
@@ -15104,17 +15765,23 @@ def derive_context_plan(
             f"{VERIFY_FILE}#AWS Core evidence",
         ]
         on_demand_slices = [
+            ".agents/skills/fastlane/references/design.md#Architecture and AWS evidence",
+            ".agents/skills/fastlane/references/design.md#Validation, diagrams, and Gate B",
+            ".agents/skills/fastlane/references/design.md#Challenger and approval",
             f"{PRD_FILE}#Architecture traceability",
             f"{PRD_FILE}#Change impact record",
+            f"{PRD_FILE}#Project diagram contract",
             f"{PRD_FILE}#Gate B Harness Profile",
             f"{PRD_FILE}#Construction envelope",
         ]
     elif stage == "DELIVER":
         source_slices = [
-            ".agents/skills/fastlane/references/deliver.md",
+            ".agents/skills/fastlane/references/deliver.md#Tasks and local construction",
             f"{TASKS_FILE}#Active execution snapshot",
         ]
         on_demand_slices = [
+            ".agents/skills/fastlane/references/deliver.md#AWS handoff and reconciliation",
+            ".agents/skills/fastlane/references/deliver.md#Teardown and residuals",
             f"{PRD_FILE}#Construction envelope",
             f"{VERIFY_FILE}#Task completion evidence",
             f"{VERIFY_FILE}#Construction and release readiness checks",
@@ -15154,7 +15821,7 @@ def derive_context_plan(
     )
     if teardown_phase_context and not closure_context:
         source_slices = [
-            ".agents/skills/fastlane/references/deliver.md",
+            ".agents/skills/fastlane/references/deliver.md#Teardown and residuals",
             f"{VERIFY_FILE}#Teardown reconciliation evidence",
         ]
         on_demand_slices.extend(
@@ -15212,6 +15879,27 @@ def derive_context_plan(
                 f"{VERIFY_FILE}#Current release decision",
             ]
         )
+    if stage == "DESIGN" and source_texts is not None:
+        prd_source = source_texts.get(PRD_FILE)
+        if isinstance(prd_source, str):
+            try:
+                diagram_table = contract_table_after_heading(
+                    prd_source, DIAGRAM_CONTRACT_HEADING, DIAGRAM_CONTRACT_HEADERS
+                )
+            except ValueError:
+                diagram_table = None
+            required_kinds = required_diagram_kinds(
+                prd_source,
+                authoritative_requirement_ids(prd_source),
+                coverage.work_kind,
+            )
+            if diagram_table is not None and any(
+                row[1] in required_kinds and row[3] != "CURRENT"
+                for row in diagram_table.rows
+            ):
+                on_demand_slices.append(
+                    ".agents/skills/fastlane/references/diagram-patterns.md"
+                )
     source_slices = list(dict.fromkeys(source_slices))
     on_demand_slices = list(dict.fromkeys(on_demand_slices))
 

@@ -759,7 +759,7 @@ previous local blocker.
    to TASK-10. Otherwise use the Engine state or stop on conflict. Never restart
    BOOT-00 or prerequisites after initialization.
 
-   Contract migration is Codex-owned generated work, not owner setup. Preserve an unchanged approved schema 1.2 Gate A as the design-only bridge to schema 5, and preserve an unchanged approved schema 4 Gate B for its exact design and envelope.
+   Contract migration is Codex-owned generated work, not owner setup. Preserve unchanged approved requirements schema 1.2 as a design-only bridge and schema 1.3 until requirements change; preserve unchanged approved design schema 4 or 5 for its exact design and envelope. New or controlled work uses requirements 1.4 and design 6.
    Ask the owner only for a missing owner fact, a material requirements decision, or the fresh Gate B required after a design-controlled change.
 
 7. For a routine interaction, render `interaction` through
@@ -915,8 +915,7 @@ external constraints; read-only requirements-review findings.
 
 **Permitted writes:** docs/project/PRD.md requirements-revision-controlled content plus the
 Document status requirements revision and derived Gate A/Gate B states;
-docs/project/TASKS.md's Active execution snapshot identity, Gate B, run-stop, and next-action
-fields only. Update the summary, detailed analysis, task snapshot, and matching
+docs/project/TASKS.md active execution identity and routing fields only. Update the summary, detailed analysis, task snapshot, and matching
 `bootstrap.yaml` lifecycle mirror as one coordinator checkpoint. Do not
 generate a replacement graph. When invalidating an existing plan, reconcile
 IN_PROGRESS tasks to DONE with evidence or BLOCKED with the revision reason,
@@ -980,8 +979,8 @@ STRIDE, LINDDUN, ATAM, or ADR only at the phase reference's material trigger,
 using existing authorities and no extra stage, gate, or document. Hide method
 names unless the owner asks.
 
-Complete schema 1.3 actors, journeys, conditional rich use cases, business
-rules, acceptance IDs, coverage, and existing state-machine records when their
+Complete schema 1.4 actors, journeys, conditional rich use cases, business
+rules, acceptance IDs, coverage, requirements change lineage, assumption lifecycle, and existing state-machine records when their
 validated trigger applies. Mermaid flow diagrams are optional presentation aids
 for validated `JOURNEY-*` or `STATE-*` records, never readiness artifacts. Ask
 only for missing product facts; never expose the internal profile or invent them.
@@ -1142,7 +1141,7 @@ receipt last after a concise readiness summary.
 
 **Authoritative inputs:** AGENTS.md, PRD, VERIFY, brownfield evidence, current AWS Core/docs.
 
-**Permitted writes:** PRD III/IV, envelope/status, ADR, VERIFY, TASKS snapshot, bootstrap.yaml checkpoint; no tasks/implementation.
+**Permitted writes:** PRD design/envelope/status, ADR, VERIFY, TASKS snapshot, and bootstrap.yaml checkpoint; no tasks or implementation.
 
 **GitHub mode:** READ_ONLY only when authorized.
 
@@ -1151,8 +1150,7 @@ records only the Gate B ceiling; authenticated reads route through AWS-10.
 
 **Required authorization:** Design writes only.
 
-**Stop conditions:** Invalid Gate A; requirements/design conflict; incomplete/stale
-design; unavailable AWS Core; unverified, missing, failed, stale, or wrong DESIGN-10 evidence.
+**Stop conditions:** Invalid Gate A; conflict; incomplete/stale design; unavailable AWS Core; or non-current DESIGN-10 evidence.
 
 **Receipt:** Status with REQ, DES, and proposed AUTH IDs.
 
@@ -1177,16 +1175,14 @@ After design, run `fastlane-architecture-challenger` once per revision only when
 Load the Design reference and Adaptive Coverage Plan. `SELECT` compares complete
 candidates; `AMEND` revalidates affected drivers and alternatives; `PRESERVE`
 proves architecture, technology, trust, data, recovery, Region, and Harness
-unchanged. The reference owns legacy bridges; changed designs need schema 5,
-new digests, and fresh Gate B. Never invent owner facts or widen authority.
+unchanged. The reference owns legacy bridges; new, unapproved, or changed designs need schema 6, new digests, and fresh Gate B. Never invent owner facts or widen authority.
 
 - For `SELECT`, compare at least two complete, credible, non-straw whole-system
   candidates, including the secure managed-serverless baseline unless Gate A
   forbids it. Complete `DRV-*`/`CAND-*`/`ARCH-*`/`AWS-EV-*` and traceability;
   apply hard constraints before preferences and select only an eligible candidate.
   `NO_VIABLE_ALTERNATIVE` requires at least two total candidates and exactly one is eligible.
-- Trace only declared `ARCH-*`, `API/EVENT/CLI/FILE-*`, `BOUNDARY-*`, `STATE-*`,
-  applicable `PROP-*`, or declared `EX-*` IDs; preserve schema 4 grandfathering.
+
 - Record alternatives, risks/mitigations, security/reliability/operations,
   cost/breakpoints, migration, revisit triggers, and validation.
 - Complete in-scope `TECH-*`. Only `EXACT` accepts opaque versions; Active `PROPERTY_TESTING` uses `EXACT`, `COMPATIBLE_MAJOR`, or numeric `MINIMUM`.
@@ -1199,13 +1195,9 @@ new digests, and fresh Gate B. Never invent owner facts or widen authority.
   At Gate B resolve every Harness row to `REQUIRED` or `NOT_APPLICABLE —
   <concrete reason>`; the Design reference owns layer routing. Use
   `FULL_REVALIDATION` for uncertain impact. Duplicate layers are intentional.
-- Complete material interfaces/layers, applicable state models, and the
-  NEW_BUILD first-wave/spike record. Give each referenced `EX-*` one concrete
-  Example-based scenarios row and bind it into the modern design digest.
 
-Update existing PRD Mermaid blocks in place, name the selected `ARCH-*` as the
-shared basis, and do not append by default. Route material Part I flow changes through REQ-10. Preserve required controls and measurable expansion or migration
-triggers. Never weaken one of those required controls to lower cost.
+
+Complete the schema-6 Project diagram contract. Replace required `NOT_YET_CREATED` slots at their bound anchors with project-specific Mermaid blocks. Use canonical IDs as nodes, plain labels, the selected `ARCH-*` basis, exact relationship tuples, and separate semantic/rendered digests. Require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`; derive conditional data, recovery, and migration views from canonical records. A semantic change stales Gate B; render-only drift blocks the brief until regenerated. Route material requirements-flow changes through REQ-10. Diagrams never prove implementation, deployment, or authority.
 
 Fill the Gate B readiness card with these exact fields: Design basis IDs;
 Architecture/components; Technology/toolchains/version policy; Interfaces/data
@@ -1221,10 +1213,7 @@ For `explicit-gate`, `MUTATE_LISTED_RESOURCES` must satisfy scope, cost,
 provenance, expiry, rollback, and teardown and needs a separate AWS-20 action
 receipt; AWS-50 needs its own receipt. Fast-dev remains non-production.
 
-Require a local Git baseline. Hash Architecture driver, Candidate, Selection,
-Traceability, Material AWS evidence, Technology decision, Property applicability,
-Property definition, and Property execution plus all other PRD-listed design
-tables into the Design contract SHA-256; include the selected `ARCH-*`, current
+Require a local Git baseline. Hash Architecture driver, Candidate, Selection, Traceability, Material AWS evidence, Harness, Change impact, Project design, Diagram semantic contract, Technology decision, Example-based scenarios, Property applicability, Property definition, and Property execution in canonical order into the Design contract SHA-256; include the selected `ARCH-*`, current
 `TECH-*`, and applicable `PROP-*` in `SCOPE_IDS`, copy it to the envelope, then
 hash the envelope into Gate B review/proposed receipt.
 
@@ -1282,8 +1271,7 @@ technical decision index and exact source locations. It must cover:
 - canonical complete construction-envelope SHA-256;
 - all current readiness-card fields;
 - architecture and key tradeoffs;
-- confirmation that the existing diagram slots were specialized in place and
-  agree with the component, interface, data, and failure design;
+- the current Diagram Contract, required project views, semantic basis, rendered integrity, and agreement with component, interface, data, and failure records;
 - material AWS facts verified through AWS Core, primary sources, and any AWS
   advisor finding the coordinator rejected with its reason;
 - requirement-to-design/test traceability;

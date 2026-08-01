@@ -127,7 +127,7 @@ def replace_contract_table_with_sentinel(
 
 def exact_legacy_requirements_projection(text: str) -> str:
     text = re.sub(
-        r"(?m)^\| Project contract schema \| `1\.3` \|\r?\n",
+        r"(?m)^\| Project contract schema \| `1\.4` \|\r?\n",
         "",
         text,
         count=1,
@@ -155,6 +155,8 @@ def exact_legacy_requirements_projection(text: str) -> str:
         doctor.RICH_USE_CASE_HEADING,
         doctor.BUSINESS_RULE_HEADING,
         doctor.REQUIREMENT_COVERAGE_HEADING,
+        doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADING,
+        doctor.ASSUMPTION_LIFECYCLE_HEADING,
     ):
         heading_start = text.index(heading)
         table_start = text.index("|", heading_start)
@@ -165,7 +167,7 @@ def exact_legacy_requirements_projection(text: str) -> str:
 
 def exact_legacy_schema_four_projection(text: str) -> str:
     text = re.sub(
-        r"(?m)^\| Project design contract schema \| `5` \|\r?\n",
+        r"(?m)^\| Project design contract schema \| `6` \|\r?\n",
         "",
         text,
         count=1,
@@ -189,8 +191,9 @@ def exact_legacy_schema_four_projection(text: str) -> str:
         end_index = value.index(end, start_index)
         return value[:start_index] + value[end_index:]
 
+    text = remove_region(text, doctor.DIAGRAM_CONTRACT_HEADING, "## 14. Architecture overview")
     text = remove_region(text, doctor.LAYER_BOUNDARY_HEADING, doctor.INTERFACE_HEADING)
-    text = remove_region(text, doctor.STATE_APPLICABILITY_HEADING, "```mermaid")
+    text = remove_region(text, doctor.STATE_APPLICABILITY_HEADING, "### Data lifecycle view")
     text = remove_region(
         text,
         doctor.FIRST_WAVE_HEADING,
@@ -452,7 +455,7 @@ def complete_requirements_contract(text: str) -> str:
         "## Document status",
         "## 1. Workload profile",
         "Project contract schema",
-        "`1.3`",
+        "`1.4`",
     )
     requirement_ids = sorted(doctor.authoritative_requirement_ids(text))
     requirement_list = ", ".join(requirement_ids)
@@ -506,7 +509,7 @@ def complete_requirements_contract(text: str) -> str:
     text = replace_contract_table(
         text, doctor.BUSINESS_RULE_HEADING, doctor.BUSINESS_RULE_HEADERS, []
     )
-    return replace_contract_table(
+    text = replace_contract_table(
         text,
         doctor.REQUIREMENT_COVERAGE_HEADING,
         doctor.REQUIREMENT_COVERAGE_HEADERS,
@@ -521,6 +524,30 @@ def complete_requirements_contract(text: str) -> str:
             )
             for requirement_id in requirement_ids
         ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADING,
+        doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADERS,
+        [
+            (
+                "REQ-0001",
+                "NONE",
+                "INITIAL_DEFINITION",
+                requirement_list,
+                "NONE",
+                "NONE",
+                "NONE",
+                "NONE - first definition",
+                "FULL_REVALIDATION",
+            )
+        ],
+    )
+    return replace_contract_table(
+        text,
+        doctor.ASSUMPTION_LIFECYCLE_HEADING,
+        doctor.ASSUMPTION_LIFECYCLE_HEADERS,
+        [],
     )
 
 
@@ -1152,7 +1179,7 @@ def complete_project_design_contract(text: str) -> str:
         "## Document status",
         "## 1. Workload profile",
         "Project design contract schema",
-        "`5`",
+        "`6`",
     )
     text = replace_contract_table(
         text,
@@ -1234,6 +1261,72 @@ def complete_project_design_contract(text: str) -> str:
         text,
         doctor.SPIKE_HEADING,
         "no prerequisite discovery is needed before the walking skeleton",
+    )
+
+
+def set_diagram_block(text: str, heading: str, next_heading: str, block: str) -> str:
+    start = text.index(heading) + len(heading)
+    end = text.index(next_heading, start)
+    return text[:start] + "\n\n" + block.strip() + "\n\n" + text[end:]
+
+
+def complete_diagram_contract(text: str) -> str:
+    rows = [
+        ("DIAGRAM-0001", "SYSTEM_CONTEXT", "REQUIRED", "CURRENT", "proposed-system-at-a-glance", "ARCH-0001, FR-001", "ARCH-0001, API-001"),
+        ("DIAGRAM-0002", "PRIMARY_OUTCOME", "REQUIRED", "CURRENT", "sequence-primary-outcome", "ARCH-0001, JOURNEY-001", "ACT-001, API-001"),
+        ("DIAGRAM-0003", "DATA_LIFECYCLE", "CONDITIONAL", "CURRENT", "data-lifecycle-view", "ARCH-0001, DATA-001", "API-001, DATA-001"),
+        ("DIAGRAM-0004", "FAILURE_RECOVERY", "CONDITIONAL", "CURRENT", "sequence-failure-and-recovery", "ARCH-0001, REL-005", "API-001, REL-005"),
+        ("DIAGRAM-0005", "MIGRATION", "CONDITIONAL", "NOT_YET_CREATED", "migration-view", "NONE", "NONE"),
+        ("DIAGRAM-0006", "JOURNEY", "CONDITIONAL", "NOT_YET_CREATED", "journey-view", "NONE", "NONE"),
+        ("DIAGRAM-0007", "STATE", "CONDITIONAL", "NOT_YET_CREATED", "state-view", "NONE", "NONE"),
+    ]
+    text = replace_contract_table(
+        text, doctor.DIAGRAM_CONTRACT_HEADING, doctor.DIAGRAM_CONTRACT_HEADERS, rows
+    )
+    text = set_diagram_block(
+        text,
+        "### Proposed system at a glance",
+        "## 15. Component design",
+        """```mermaid
+flowchart LR
+    ARCH-0001[\"Managed application\"]
+    API-001[\"Approved interface\"]
+    ARCH-0001 -->|serves| API-001
+```""",
+    )
+    text = set_diagram_block(
+        text,
+        "### Data lifecycle view",
+        "## 18. Detailed sequence diagrams",
+        """```mermaid
+flowchart LR
+    API-001[\"Approved interface\"]
+    DATA-001[\"Approved data lifecycle\"]
+    API-001 -->|stores approved data| DATA-001
+```""",
+    )
+    text = set_diagram_block(
+        text,
+        "### Sequence — primary outcome",
+        "### Sequence — failure and recovery",
+        """```mermaid
+flowchart LR
+    ACT-001[\"Development user\"]
+    API-001[\"Approved interface\"]
+    ACT-001 -->|requests approved outcome| API-001
+    API-001 -->|returns approved outcome| ACT-001
+```""",
+    )
+    return set_diagram_block(
+        text,
+        "### Sequence — failure and recovery",
+        "## 19. Error handling strategy",
+        """```mermaid
+flowchart LR
+    API-001[\"Approved interface\"]
+    REL-005[\"Rollback requirement\"]
+    API-001 -->|fails health checks and invokes| REL-005
+```""",
     )
 
 
@@ -1469,7 +1562,7 @@ def complete_design_contract(text: str) -> str:
         harness_table,
         "## 27. Gate B agent review record",
     )
-    return complete_project_design_contract(text)
+    return complete_diagram_contract(complete_project_design_contract(text))
 
 
 def complete_legacy_design_bridge(text: str) -> str:
@@ -2502,7 +2595,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["authorizations"],
             {"construction": "NONE", "aws": "NONE"},
         )
-        self.assertEqual(report["design_contract"]["schema_version"], 5)
+        self.assertEqual(report["design_contract"]["schema_version"], 6)
         self.assertIn(
             report["design_contract"]["status"],
             {"UNINITIALIZED", "BLOCKED"},
@@ -3521,7 +3614,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 5)
+        self.assertEqual(ready.schema_version, 6)
         self.assertEqual(ready.architecture.schema_version, 4)
         self.assertEqual(ready.change_impact.status, "READY")
         self.assertEqual(ready.architecture.status, "READY")
@@ -3673,7 +3766,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(invalidated.status, "BLOCKED")
         self.assertTrue(
             any(
-                "Project design contract schema 5" in issue
+                "Project design contract schema 6" in issue
                 for issue in invalidated_issues
             ),
             invalidated_issues,
@@ -3883,9 +3976,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertTrue(ready_report["ok"], ready_report["diagnostics"])
             self.assertEqual(ready_report["status"], "RESUME")
             self.assertEqual(ready_report["next_prompt"], "TASK-10")
-            self.assertEqual(contract["schema_version"], 5)
+            self.assertEqual(contract["schema_version"], 6)
             self.assertEqual(
-                ready_report["requirements_contract"]["schema_version"], "1.3"
+                ready_report["requirements_contract"]["schema_version"], "1.4"
             )
             self.assertEqual(ready_report["requirements_contract"]["status"], "READY")
             self.assertEqual(contract["project_contract"]["status"], "READY")
@@ -8230,7 +8323,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(issues, [])
         self.assertEqual(contract.status, "READY")
-        self.assertEqual(contract.schema_version, "1.3")
+        self.assertEqual(contract.schema_version, "1.4")
         self.assertEqual(contract.actor_ids, ("ACT-001",))
         self.assertEqual(contract.journey_ids, ("JOURNEY-001",))
         self.assertEqual(
@@ -8258,7 +8351,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
 
         legacy = text.replace(
-            "| Project contract schema | `1.3` |",
+            "| Project contract schema | `1.4` |",
             "| Project contract schema | `1.2` |",
             1,
         )
@@ -8272,7 +8365,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(migration.status, "MIGRATION_REQUIRED")
         self.assertEqual(
             migration.missing_records,
-            ("Project contract schema 1.3",),
+            ("Project contract schema 1.4",),
         )
         self.assertEqual(
             {code for code, _message in migration_issues},
@@ -8316,6 +8409,108 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(grandfathered.requirement_ids, ("FR-001",))
         self.assertTrue(grandfathered.grandfathered_approved_gate_a)
 
+    def test_requirements_lineage_and_assumption_lifecycle_fail_closed(
+        self,
+    ) -> None:
+        source = approve_gate_a(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        intake, intake_issues = doctor.derive_intake_foundation_contract(
+            source,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+
+        invalid_lineage = source.replace(
+            "| REQ-0001 | NONE | INITIAL_DEFINITION |",
+            "| REQ-0001 | REQ-0001 | INITIAL_DEFINITION |",
+            1,
+        )
+        blocked, issues = doctor.derive_requirements_contract(
+            invalid_lineage,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertIn(
+            "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+            {code for code, _message in issues},
+        )
+
+        invalid_assumption = replace_contract_table(
+            source,
+            doctor.ASSUMPTION_LIFECYCLE_HEADING,
+            doctor.ASSUMPTION_LIFECYCLE_HEADERS,
+            [
+                (
+                    "ASM-001",
+                    "The development user can access the approved outcome",
+                    "DRAFT",
+                    "FR-001",
+                    "PENDING_OWNER_DECISION",
+                )
+            ],
+        )
+        blocked, issues = doctor.derive_requirements_contract(
+            invalid_assumption,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertIn(
+            "ASSUMPTION_LIFECYCLE_INVALID",
+            {code for code, _message in issues},
+        )
+    def test_approved_schema_13_is_grandfathered_until_requirements_change(
+        self,
+    ) -> None:
+        source = approve_gate_a(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        intake, intake_issues = doctor.derive_intake_foundation_contract(
+            source,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+        legacy = source.replace(
+            "| Project contract schema | `1.4` |",
+            "| Project contract schema | `1.3` |",
+            1,
+        )
+        start = legacy.index(doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADING)
+        end = legacy.index("### Open decisions", start)
+        legacy = legacy[:start] + legacy[end:]
+
+        grandfathered, issues = doctor.derive_requirements_contract(
+            legacy,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "GRANDFATHERED")
+        self.assertEqual(grandfathered.schema_version, "1.3")
+        self.assertTrue(grandfathered.grandfathered_approved_gate_a)
+
+        migration, migration_issues = doctor.derive_requirements_contract(
+            legacy,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(migration.status, "MIGRATION_REQUIRED")
+        self.assertIn(
+            "PROJECT_CONTRACT_MIGRATION_REQUIRED",
+            {code for code, _message in migration_issues},
+        )
     def test_schema_13_requires_inverse_actor_and_journey_coverage(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         text = approve_gate_a(source)
@@ -8754,6 +8949,127 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertNotIn("PROJECT_CONTRACT_MIGRATION_REQUIRED", codes(report))
         self.assertEqual(report["next_prompt"], "DESIGN-10")
 
+    def test_approved_schema_five_design_is_grandfathered_without_diagrams(
+        self,
+    ) -> None:
+        source = complete_design_contract(
+            approve_gate_a(
+                (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+            )
+        )
+        legacy = source.replace(
+            "| Project design contract schema | `6` |",
+            "| Project design contract schema | `5` |",
+            1,
+        )
+        start = legacy.index(doctor.DIAGRAM_CONTRACT_HEADING)
+        end = legacy.index("## 14. Architecture overview", start)
+        legacy = legacy[:start] + legacy[end:]
+
+        grandfathered, issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "READY")
+        self.assertEqual(grandfathered.schema_version, 5)
+        self.assertTrue(grandfathered.project_contract.grandfathered_v5)
+        self.assertTrue(grandfathered.diagram_contract.grandfathered_schema5)
+
+        migration, migration_issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=False,
+        )
+        self.assertEqual(migration.status, "BLOCKED")
+        self.assertEqual(migration.project_contract.status, "MIGRATION_REQUIRED")
+        self.assertTrue(migration_issues)
+
+    def test_diagram_semantics_and_rendering_are_bound_separately(self) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        baseline, baseline_issues = doctor.derive_design_contract(
+            source,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(baseline_issues, [])
+        baseline_record = next(
+            item
+            for item in baseline.diagram_contract.records
+            if item.diagram_id == "DIAGRAM-0001"
+        )
+
+        relabeled, relabeled_issues = doctor.derive_design_contract(
+            source.replace(
+                "Managed application",
+                "Managed Fastlane application",
+                1,
+            ),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(relabeled_issues, [])
+        relabeled_record = next(
+            item
+            for item in relabeled.diagram_contract.records
+            if item.diagram_id == "DIAGRAM-0001"
+        )
+        self.assertEqual(baseline.canonical_sha256, relabeled.canonical_sha256)
+        self.assertEqual(
+            baseline_record.semantic_sha256,
+            relabeled_record.semantic_sha256,
+        )
+        self.assertNotEqual(
+            baseline_record.rendered_sha256,
+            relabeled_record.rendered_sha256,
+        )
+
+        semantic, semantic_issues = doctor.derive_design_contract(
+            source.replace("-->|serves|", "-->|routes through|", 1),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(semantic_issues, [])
+        self.assertNotEqual(baseline.canonical_sha256, semantic.canonical_sha256)
+        self.assertNotEqual(
+            baseline.diagram_contract.canonical_sha256,
+            semantic.diagram_contract.canonical_sha256,
+        )
+
+    def test_required_project_diagrams_fail_closed_when_stale_or_generic(
+        self,
+    ) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        cases = {
+            "stale": (
+                source.replace(
+                    "| DIAGRAM-0001 | SYSTEM_CONTEXT | REQUIRED | CURRENT |",
+                    "| DIAGRAM-0001 | SYSTEM_CONTEXT | REQUIRED | STALE |",
+                    1,
+                ),
+                "required SYSTEM_CONTEXT diagram is not CURRENT",
+            ),
+            "generic": (
+                source.replace("Managed application", "TODO", 1),
+                "generic placeholder content",
+            ),
+        }
+        for label, (candidate, expected) in cases.items():
+            with self.subTest(case=label):
+                blocked, issues = doctor.derive_design_contract(
+                    candidate,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(blocked.status, "BLOCKED")
+                self.assertTrue(any(expected in issue for issue in issues), issues)
     def test_schema_five_project_design_is_digest_bound_and_fail_closed(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(source)
@@ -8764,7 +9080,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 5)
+        self.assertEqual(ready.schema_version, 6)
         self.assertEqual(ready.project_contract.status, "READY")
         self.assertEqual(ready.project_contract.interface_ids, ("API-001",))
         self.assertEqual(ready.project_contract.boundary_ids, ("BOUNDARY-001",))
@@ -8876,7 +9192,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertTrue(any(expected in issue for issue in issues), issues)
 
         mislabeled_current = complete.replace(
-            "| Project design contract schema | `5` |\n", "", 1
+            "| Project design contract schema | `6` |\n", "", 1
         )
         migration, migration_issues = doctor.derive_design_contract(
             mislabeled_current,
@@ -8888,7 +9204,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertFalse(migration.project_contract.grandfathered_v4)
         self.assertTrue(
             any(
-                "Project design contract schema 5" in issue
+                "Project design contract schema 6" in issue
                 for issue in migration_issues
             ),
             migration_issues,
@@ -9093,14 +9409,14 @@ class BootstrapDoctorTests(unittest.TestCase):
                     unsafe_issues,
                 )
 
-    def test_real_approved_schema_12_gate_a_reaches_schema_five(self) -> None:
+    def test_real_approved_schema_12_gate_a_reaches_schema_six(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         approved_modern = complete_design_contract(approve_gate_a(source))
         legacy_basis = exact_legacy_requirements_projection(approved_modern)
         migrated = complete_legacy_design_bridge(source)
         self.assertEqual(
-            legacy_basis.split("# Part III", 1)[0],
-            migrated.split("# Part III", 1)[0],
+            legacy_basis.split("# Technical Plan", 1)[0],
+            migrated.split("# Technical Plan", 1)[0],
         )
         requirements, requirement_issues = doctor.derive_requirements_contract(
             migrated,

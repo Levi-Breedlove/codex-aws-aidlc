@@ -279,7 +279,7 @@ class PromptPackContractTests(unittest.TestCase):
     def test_tool_access_is_not_authorization(self) -> None:
         self.assertIn("Tool availability is never authorization", self.prompts)
         self.assertIn(
-            "Credentials and connector availability are not authorization", self.agents
+            "Credentials and connectors grant no authority", self.agents
         )
 
     def test_markdown_fences_and_launch_commands_are_complete(self) -> None:
@@ -520,21 +520,27 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("unavailable or unobservable calls", self.prompts)
         self.assertIn("Persist no raw skill content", self.prompts)
 
-    def test_design_edits_existing_diagrams_in_place_and_gate_b_checks_them(
+    def test_design_binds_project_diagram_slots_and_gate_b_checks_them(
         self,
     ) -> None:
         design = self.prompt_section("DESIGN-10")
         gate_b = self.prompt_section("DESIGN-20")
-        self.assertIn("existing PRD Mermaid blocks in place", design)
-        self.assertIn("not append by default", design)
-        self.assertIn("Part I flow changes through REQ-10", design)
+        design_reference = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
+        ).read_text(encoding="utf-8")
+        for phrase in (
+            "schema-6 Project diagram contract",
+            "required `NOT_YET_CREATED` slots",
+            "canonical IDs as nodes",
+            "separate semantic/rendered digests",
+            "SYSTEM_CONTEXT",
+            "PRIMARY_OUTCOME",
+            "Diagrams never prove implementation, deployment, or authority",
+        ):
+            self.assertIn(phrase, design)
         self.assertIn("diagram-to-design conflict", gate_b)
-        self.assertIn("unused optional\ndiagram paths", gate_b)
-        self.assertIn(
-            "existing diagram slots were specialized in place",
-            gate_b,
-        )
-
+        self.assertIn("current Diagram Contract", gate_b)
+        self.assertIn("Load `diagram-patterns.md` only on demand", design_reference)
     def test_architecture_selection_contract_is_explicit_and_fail_closed(self) -> None:
         design = self.prompt_section("DESIGN-10")
         design_reference = (
@@ -562,9 +568,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("managed-serverless baseline", design)
         self.assertIn("never add a straw option", design_reference)
         self.assertIn("arbitrary numerical scoring", design_reference)
-        self.assertIn("Generic connectors, memory, or", design_reference)
+        self.assertIn("Generic connectors, memory, installed metadata, or", design_reference)
         self.assertIn("challenger prose cannot replace those calls", design_reference)
-        self.assertIn("name the selected `ARCH-*` as the", design)
+        self.assertIn("Select one eligible `ARCH-*` recommendation", design_reference)
         self.assertIn("include the selected `ARCH-*`", design)
         self.assertIn("full design-contract digest", self.prd)
         self.assertIn("Adaptive Coverage Plan", design)
@@ -1041,7 +1047,7 @@ Approver: <name/handle>"""
             self.assertIn("`standard`", document)
             self.assertIn("`high-risk`", document)
         self.assertIn("All profiles still use only Gate A and Gate B", self.prompts)
-        self.assertIn("without adding lifecycle gates", self.agents)
+        self.assertIn("Profiles change depth, never gates or safeguards/evidence", self.agents)
 
     def test_owner_facing_profile_and_security_language_is_concrete(self) -> None:
         owner_documents = (
@@ -1599,8 +1605,8 @@ Approver: <name/handle>"""
             self.root_readme,
             r"lowest practical total cost without\s+weakening required safeguards",
         )
-        self.assertIn("Never weaken one of those required controls", design)
-        self.assertIn("measurable expansion or migration\ntriggers", design)
+        self.assertIn("Never weaken an invariant", self.agents)
+        self.assertIn("cost/breakpoints, migration, revisit triggers", design)
         self.assertIn(
             "Cost ceiling: <finite positive ISO-currency amount, for example USD: 20.00>",
             self.prompts,
@@ -1724,8 +1730,9 @@ Approver: <name/handle>"""
         )
         self.assertIn("## Task completion evidence", self.verify)
         self.assertIn(header, self.verify)
-        for document in (self.agents, self.tasks, self.prompts):
+        for document in (self.tasks, self.prompts):
             self.assertIn("Task completion evidence", document)
+        self.assertIn("passing evidence", self.agents)
         for field in (
             "command/result",
             "actor",
@@ -1998,7 +2005,7 @@ Approver: <name/handle>"""
         self.assertIn("Mikado Method", maintain_skill)
         self.assertIn("not a lifecycle phase or task state", maintain_skill)
         self.assertIn("Use STRIDE only when", define_reference)
-        self.assertIn("Use LINDDUN only when", define_reference)
+        self.assertIn("LINDDUN only when", define_reference)
         self.assertIn("Use ATAM only", design_reference)
         self.assertIn("Nygard-style ADR only", design_reference)
         self.assertIn(
@@ -2039,7 +2046,7 @@ Approver: <name/handle>"""
         ):
             self.assertIn(status, self.prd)
         self.assertIn("does not impose a universal scanner", self.prd)
-        self.assertIn("Gate B also records a risk-derived Harness Profile", workflow)
+        self.assertIn("Gate B records one risk-derived Harness Profile", workflow)
 
         evidence_header = (
             "| Evidence ID | Harness ID | Layer | Basis IDs | Exact command or API | "
@@ -2056,23 +2063,22 @@ Approver: <name/handle>"""
         self.assertIn("Do not add Harness\nmetadata fields", task_prompt)
         self.assertIn("Harness execution evidence", build_prompt)
         self.assertIn("current observed evidence", release_prompt)
-        self.assertIn("without adding task metadata", deliver_reference)
+        self.assertIn("INVEST profile without task metadata", deliver_reference)
         design_words = " ".join(design_reference.split())
-        self.assertIn("do not impose a universal scanner", design_words)
+        self.assertIn("Do not add a second Harness table or universal scanner", design_reference)
         for concern in (
             "syntax/build",
             "type checking when supported",
-            "formatting or canonicalization",
+            "formatting/canonicalization",
             "linting",
             "secret scanning",
             "dependency/SCA",
-            "container scanning when containers apply",
-            "IaC/policy validation",
-            "license checks when material",
+            "conditional container and IaC/policy scanning",
+            "material license checks",
         ):
             self.assertIn(concern, design_words)
-        self.assertIn("`REQUIRED` with an exact command", design_reference)
-        self.assertIn("`CONDITIONAL — <trigger>` with an exact", design_reference)
+        self.assertIn("Each `HARNESS-*` has one exact command or API", design_reference)
+        self.assertIn("`CONDITIONAL — <trigger>`", design_reference)
         self.assertIn("`NOT_APPLICABLE — <technology/risk reason>`", design_reference)
         self.assertIn("Do not add a second Harness table", design_reference)
         self.assertIn(
@@ -2287,15 +2293,11 @@ Approver: <name/handle>"""
         normalized = " ".join(workflow.split())
         self.assertNotIn("| FSC-", workflow)
         for phrase in (
-            "Fastlane EARS Contract",
-            "complete architecture comparison",
-            "walking-skeleton",
+            "internal conditional techniques, not lifecycle stages or approval gates",
             "STRIDE, LINDDUN, OWASP Top 10, ATAM, ADR",
-            "Flow diagrams are optional presentation aids",
             "risk-derived Harness Profile",
             "No universal scanner",
-            "optional design vocabulary",
-            "not a Fastlane package, runtime dependency, owner workflow, authority",
+            "Project diagrams are validated presentation of canonical records",
             "procedural technique selection never claims deterministic proof",
         ):
             self.assertIn(phrase, normalized)
@@ -2331,7 +2333,7 @@ Approver: <name/handle>"""
         ):
             self.assertIn(trigger, self.prd)
         self.assertIn("MAX_ATTEMPTS: <positive integer>", self.prd)
-        self.assertIn("retry/resume", normalized)
+        self.assertIn("RETRY_OR_RESUME", self.prd)
 
     def test_request_scoped_adjuncts_never_become_engine_routes(self) -> None:
         coordinator = (PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_text(
@@ -2573,13 +2575,14 @@ Approver: <name/handle>"""
         self.assertIn("only AWS-20 may mutate", prompt_words)
         self.assertIn("only AWS-50 may mutate", prompt_words)
 
-    def test_flow_diagrams_are_optional_and_never_readiness_artifacts(self) -> None:
+    def test_project_diagrams_are_conditional_views_not_authority(self) -> None:
         for document in (self.prd, self.prompts):
             self.assertNotIn("### Primary flow", document)
-        self.assertIn(
-            "Flow diagrams are optional presentation aids and never readiness artifacts",
-            " ".join(self.workflow.split()),
-        )
+        workflow = " ".join(self.workflow.split())
+        self.assertIn("New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`", workflow)
+        self.assertIn("data, recovery, and migration views are conditional", workflow)
+        self.assertIn("Project diagrams are validated presentation of canonical records", workflow)
+        self.assertIn("do not replace traceability, tests, or evidence", workflow)
         self.assertNotIn("| FSC-", self.workflow)
         doctor_source = (PROJECT_ROOT / "scripts/bootstrap_doctor.py").read_text(
             encoding="utf-8"
@@ -2590,7 +2593,9 @@ Approver: <name/handle>"""
             'STATE_APPLICABILITY_HEADING = "### State-model applicability"',
             doctor_source,
         )
-
-
+        self.assertIn(
+            'DIAGRAM_CONTRACT_HEADING = "### Project diagram contract"',
+            doctor_source,
+        )
 if __name__ == "__main__":
     unittest.main()

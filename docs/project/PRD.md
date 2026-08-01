@@ -2,19 +2,19 @@
 
 Canonical path: `docs/project/PRD.md`.
 
-## How to use this document
+## Current project state
 
-The owner does not need to complete this template alone. Codex asks short,
-plain-language questions, writes the answers into Part I, and presents one
-compact Gate A decision card. After Gate A, Codex completes the technical
-sections and presents one Gate B decision card. Those are the only routine
-human gates.
+This is the single canonical product and design record. Start here, then follow
+the current Fastlane Engine action in conversation. Codex records the owner's
+answers, shows one decision at a time, and prepares two complete reviews:
 
-Read the owner-facing summaries and decision cards first. The detailed IDs,
-tables, hashes, and receipt rules are the exact agent reference that makes the
-approved work resumable and auditable.
+- [Product Agreement](#product-agreement) leads to Gate A.
+- [Technical Plan](#technical-plan) leads to Gate B.
+- [Contract Appendices](#contract-appendices) keep exact IDs and validation records auditable.
 
-## Agent reference — exact requirements and design record
+Gate A approves what to build. Gate B approves the design and bounded local
+construction. Neither gate authorizes an AWS account change. Exact records stay
+in this document; the owner-facing briefs are derived views, not editable copies.
 
 ## Document status
 
@@ -22,8 +22,8 @@ approved work resumable and auditable.
 |---|---|
 | Bootstrap release | TODO (release version and source commit/tag) |
 | Workflow mode | `codex-native` |
-| Project contract schema | `1.3` |
-| Project design contract schema | `5` |
+| Project contract schema | `1.4` |
+| Project design contract schema | `6` |
 | Project mode | `greenfield` / `brownfield` |
 | Delivery profile | `quick-mvp` / `standard` / `high-risk` |
 | Effective risk | `low` / `moderate` / `high` / `critical` |
@@ -114,6 +114,8 @@ An existing initialized project without this table uses full coverage until its
 next requirements-controlled change. Current official AWS Core evidence remains
 required whenever an AWS fact is material.
 
+
+# Product Agreement
 
 ## 1. Workload profile
 
@@ -255,7 +257,7 @@ are nullable, using these exact forms: known defects and accepted debt
 `NONE_OBSERVED`; repository-to-environment drift `NONE_OBSERVED`; dirty or
 user-owned changes `NONE`; unresolved overlay collisions `NONE`.
 
-# Part I — Requirements
+## Product requirements
 
 ## 2. Product statement
 
@@ -316,11 +318,12 @@ stories, facts, assumptions, decisions, architecture, tasks, tests, receipts,
 or evidence. Replace undefined terms such as "fast," "secure," "large," or
 "user friendly" with measurable conditions.
 
-Compatibility is revision-bound. An unchanged approved schema 1.2 Gate A remains
-the basis for a design-only move to schema 5. Codex completes generated design
+Compatibility is revision-bound. An unchanged approved schema 1.3 Gate A is
+grandfathered until a requirements-controlled change. An unchanged approved
+schema 1.2 Gate A remains the basis for a design-only move to schema 6. Codex completes generated design
 records without rewriting Part I or asking the owner to repeat confirmed facts;
 only a missing required owner fact returns to the owner. Unapproved schema 1.2
-migrates before Gate A, while a requirements change requires schema 1.3 and
+migrates before Gate A, while a requirements change requires schema 1.4 and
 invalidates both gates. The design-only bridge derives `AC-<requirement ID>`
 from approved acceptance rows; legacy `NEW_BUILD` uses journey `NONE` and binds
 its end-to-end Harness to the wave plus every selected approved requirement.
@@ -344,6 +347,10 @@ every journey with any trigger other than `NONE` requires a rich use case bound
 to that same journey. At high or critical risk, every declared journey requires
 one. The typed journey rows are authoritative; the applicability summary cannot
 transfer a trigger to a different journey.
+
+### Journey view
+
+NOT_YET_CREATED - Codex adds a project-specific journey diagram only when the approved flow needs one.
 
 ### Rich-use-case applicability
 
@@ -488,12 +495,12 @@ measure. Every declared `ACT-*` and `JOURNEY-*` also appears in at least one
 coverage row. For each requirement, `Acceptance/test IDs` is exactly its
 canonical `AC-*` followed only by `TEST-*`, `PROP-*`, or `EV-*` IDs explicitly
 named in that same requirement's acceptance criterion, in occurrence order.
-For a modern requirements-schema 1.3 approval, these rows define the exact
+For a current requirements-schema 1.4 approval, these rows define the exact
 first-release requirement universe that TASK-10 must disposition after Gate B.
 The task-plan projection is derived and does not add a second requirements
 table or owner approval.
 
-# Part II — Requirements Analysis and Gate A
+# Gate A Review
 
 ## 13. Cross-requirement analysis
 
@@ -520,15 +527,25 @@ Valid types:
 - Security or privacy gap
 - Cost or operational gap
 
-### Proposed assumptions
+### Requirements change lineage
 
-| ID | Proposed assumption | Why needed | Risk if wrong | Validation plan | Required to proceed? |
-|---|---|---|---|---|---|
-| ASM-001 | TODO | TODO | TODO | TODO | Yes |
+This row explains why the current requirements revision exists and what must be
+revalidated. Use `FULL_REVALIDATION` when impact cannot be proven; preserve an
+unchanged ID only while its existing basis and digest remain current.
 
-Every assumption remains `PROPOSED` unless its ID is explicitly listed in the
-owner acceptance record below. Silence, a prior similar decision, or an agent
-recommendation is not acceptance.
+| Current revision | Prior revision | Trigger | Added IDs | Changed IDs | Removed IDs | Preserved IDs | Stale reason | Required revalidation |
+|---|---|---|---|---|---|---|---|---|
+| REQ-0001 | NONE | INITIAL_DEFINITION | TODO | NONE | NONE | NONE | NONE - first definition | FULL_REVALIDATION |
+
+### Assumption lifecycle
+
+| Assumption ID | Assumption | Status | Basis IDs | Validation or successor |
+|---|---|---|---|---|
+| ASM-001 | TODO | PROPOSED | TODO | PENDING_OWNER_DECISION |
+
+Only the owner may accept an assumption. Accepted assumptions remain visible
+until validated, invalidated, or superseded; silence and recommendations never
+change their status.
 
 ### Open decisions
 
@@ -685,7 +702,7 @@ ledger before setting Task-plan state to `STALE`. No old task becomes runnable
 under the new revision. TASK-10 archives the stale graph by commit and replaces
 it only after the new Gate B is current.
 
-# Part III — Technical Architecture and Implementation Approach
+# Technical Plan
 
 Complete this part only after Gate A is valid.
 
@@ -793,7 +810,7 @@ otherwise enumerate every nonselected `CAND-*` in table order.
 ### Architecture traceability
 
 Map each current requirement exactly once to the selected `ARCH-*` and at least
-one other declared design ID. In a current schema 5 design, those IDs must be
+one other declared design ID. In a current schema 6 design, those IDs must be
 declared by the interface register (`API-*`, `EVENT-*`, `CLI-*`, or `FILE-*`),
 layer-boundary register (`BOUNDARY-*`), or state register (`STATE-*`). The
 modern contract has no authoritative `COMP-*`, `DATA-*`, or `CTRL-*`
@@ -848,80 +865,52 @@ requires a new `DES-*` revision and makes the prior Gate B approval stale. An
 ordinary dependency addition does not invalidate Gate B unless it changes
 architecture, validation, security, cost, or deployment behavior.
 
+### Project diagram contract
+
+These bindings describe planned project views, never observed deployment. Fresh
+slots remain `NOT_YET_CREATED` until Design has a selected architecture and
+canonical basis. The Engine validates current Mermaid blocks and keeps semantic
+changes separate from presentation-only changes.
+
+| Diagram ID | Kind | Applicability | Status | Anchor | Basis IDs | Referenced IDs |
+|---|---|---|---|---|---|---|
+| DIAGRAM-0001 | SYSTEM_CONTEXT | REQUIRED | NOT_YET_CREATED | proposed-system-at-a-glance | NONE | NONE |
+| DIAGRAM-0002 | PRIMARY_OUTCOME | REQUIRED | NOT_YET_CREATED | sequence-primary-outcome | NONE | NONE |
+| DIAGRAM-0003 | DATA_LIFECYCLE | CONDITIONAL | NOT_YET_CREATED | data-lifecycle-view | NONE | NONE |
+| DIAGRAM-0004 | FAILURE_RECOVERY | CONDITIONAL | NOT_YET_CREATED | sequence-failure-and-recovery | NONE | NONE |
+| DIAGRAM-0005 | MIGRATION | CONDITIONAL | NOT_YET_CREATED | migration-view | NONE | NONE |
+| DIAGRAM-0006 | JOURNEY | CONDITIONAL | NOT_YET_CREATED | journey-view | NONE | NONE |
+| DIAGRAM-0007 | STATE | CONDITIONAL | NOT_YET_CREATED | state-view | NONE | NONE |
+
+New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`. Canonical data,
+dependency, recovery, asynchronous, brownfield, or migration records may also
+require `DATA_LIFECYCLE`, `FAILURE_RECOVERY`, or `MIGRATION`; unknown
+applicability fails toward requiring the view. `JOURNEY` and `STATE` are
+optional until their source records require them.
+
+A `CURRENT` row binds the selected `ARCH-*`, exact basis/referenced IDs, and
+normalized `{from_id, relation, to_id}` relationships. Its semantic SHA-256 is
+canonical JSON over sorted IDs/relationships and enters the design digest. Its
+rendered SHA-256 covers the complete LF-normalized Mermaid block with one final
+LF. Semantic change stales Gate B. Render-only drift blocks the brief until
+Codex regenerates the diagram, without changing architecture. Diagrams are
+planned views and never prove implementation, deployment, or authority.
+
+### Migration view
+
+NOT_YET_CREATED - Codex adds a project-specific migration diagram only when brownfield or migration work makes it material.
+
 ## 14. Architecture overview
 
-For a greenfield application, evaluate a secure managed serverless baseline
-first. Prefer the smallest pay-per-use design that meets the requirements,
-minimizes idle infrastructure and operational burden, and preserves clear
-identity, data, failure, and observability boundaries. This is a design
-hypothesis, not a mandate. Record why a non-serverless option is better when
-current AWS evidence shows a material latency, sustained-utilization, service
-limit, networking, compliance, portability, or total-cost advantage. Define
-measurable expansion triggers instead of provisioning future capacity early.
+### Proposed system at a glance
 
-The Mermaid blocks in Parts III and IV are editable starter patterns, not
-claims about the finished system. During `DESIGN-10`, update the existing
-blocks in place: replace generic roles with selected components, remove unused
-optional paths, and keep the diagrams consistent with the written design. Do
-not append another diagram by default. If a path is not applicable, remove it
-and record the reason beside the existing diagram. A diagram records intended
-design; implementation and deployment proof belongs in code, IaC, tests, and
-`docs/project/VERIFY.md`.
+NOT_YET_CREATED - After Gate A, Codex replaces this slot with the selected
+project architecture. The diagram uses canonical record IDs as Mermaid node
+identifiers and plain-language labels. It expresses intended design only;
+implementation and deployment proof belongs in code, tests, IaC, and VERIFY.
 
-Architecture basis for every Mermaid view: TODO (replace with the selected
-`ARCH-*` during `DESIGN-10`).
-
-```mermaid
-flowchart LR
-    subgraph External["External trust boundary"]
-        Actor[User or system actor]
-        ExternalDependency[Optional external dependency]
-    end
-
-    subgraph AWS["Approved AWS account, Region, and environment"]
-        subgraph Edge["Managed entry and identity boundary"]
-            Entry[Managed entry point]
-            Identity[Identity verification]
-        end
-        subgraph Processing["Application processing boundary"]
-            App[Application authorization, validation, and compute]
-            Queue[Optional queue]
-            Worker[Optional worker]
-        end
-        subgraph DataBoundary["Data boundary"]
-            Data[(Authoritative encrypted data)]
-        end
-        subgraph Operations["Operations boundary"]
-            Obs[Logs, metrics, traces, and alarms without secrets]
-        end
-    end
-
-    Actor --> Entry
-    Entry -. Authenticate when required .-> Identity
-    Identity -. Claims or denial .-> Entry
-    Entry --> App
-    App --> Data
-    App -. When asynchronous work is required .-> Queue
-    Queue -.-> Worker
-    Worker -. Validated and idempotent write .-> Data
-    App -. Approved call only .-> ExternalDependency
-    Entry --> Obs
-    Identity -. Authentication outcomes .-> Obs
-    App --> Obs
-    Queue -. Queue age and delivery outcomes .-> Obs
-    Worker -.-> Obs
-    Data -. Access and change events .-> Obs
-```
-
-Describe:
-
-- major components;
-- trust boundaries;
-- public and private network boundaries;
-- identity boundaries;
-- data movement;
-- external dependencies;
-- failure boundaries.
+Describe the selected components, trust and identity boundaries, data movement,
+external dependencies, and failure boundaries in the written design below.
 
 ## 15. Component design
 
@@ -962,29 +951,14 @@ Use ordered `CATEGORY: ID, ID; CATEGORY: ID`: `LIFECYCLE_RESOURCE`, `ASYNCHRONOU
 |---|---|---|---|---|---|---|---|---|
 | STATE-001 | RESOURCE-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
-```mermaid
-flowchart TD
-    Input[Received untrusted input]
-    Decision{Authorization and validation decision}
-    Rejected[Rejected input]
-    Classification[Apply approved data classification]
-    Active[(Encrypted active data)]
-    Retention[Approved retention period]
-    Backup[(Optional encrypted backup)]
-    Restore[Verified restore test]
-    RecoveryEvidence[Recovery evidence without sensitive values]
-    Deleted[Approved deletion]
-    DeletionEvidence[Deletion evidence without sensitive values]
-    BackupExpiry[Backup expiry]
+### State view
 
-    Input --> Decision
-    Decision -->|Denied or invalid| Rejected
-    Decision -->|Approved| Classification --> Active
-    Active --> Retention --> Deleted --> DeletionEvidence
-    Active -. Only when recovery requirements justify it .-> Backup
-    Backup --> Restore --> RecoveryEvidence
-    Backup --> BackupExpiry
-```
+NOT_YET_CREATED - Codex adds a project-specific state diagram only when a meaningful lifecycle contract requires one.
+
+### Data lifecycle view
+
+NOT_YET_CREATED - Codex adds this project-specific view when approved data,
+retention, deletion, backup, or recovery requirements make it material.
 
 Define:
 
@@ -1001,96 +975,17 @@ Define:
 
 ### Sequence — primary outcome
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant Client
-    participant Identity
-    participant API
-    participant Queue as Optional queue
-    participant Worker
-    participant Data
-    participant Telemetry
-
-    User->>Client: Request outcome
-    Client->>API: Request with untrusted input and identity context
-    opt Sign-in required
-        API->>Identity: Verify identity
-        Identity-->>API: Claims or denial
-    end
-    API->>API: Authorize, validate, and apply idempotency
-    alt Request rejected
-        API->>Telemetry: Rejection outcome and correlation ID
-        API-->>Client: Safe rejection
-    else Request approved
-        alt Bounded asynchronous work is required
-            API->>Queue: Enqueue approved work with idempotency key
-            Queue-->>API: Durable enqueue acknowledged
-            API->>Telemetry: Acceptance and correlation ID
-            API-->>Client: Accepted response with correlation ID
-            Queue->>Worker: Deliver work
-            Worker->>Worker: Validate trusted source, schema, and idempotency
-            alt Message rejected or already complete
-                Worker->>Telemetry: Safe rejection or duplicate outcome
-            else Work accepted
-                Worker->>Data: Persist approved data
-                Data-->>Worker: Result
-                Worker->>Telemetry: Completion and correlation ID
-            end
-        else Synchronous completion
-            API->>Data: Persist approved data
-            Data-->>API: Result
-            API->>Telemetry: Outcome and correlation ID
-            API-->>Client: Completed response with correlation ID
-        end
-    end
-    Client-->>User: Safe result
-```
+NOT_YET_CREATED - Codex adds the selected application's primary end-to-end
+outcome after its components and interfaces have canonical IDs.
 
 ### Sequence — failure and recovery
 
-```mermaid
-sequenceDiagram
-    participant Caller
-    participant Service
-    participant Dependency
-    participant Recovery
-    participant Telemetry
-    participant Owner as Operational owner
+NOT_YET_CREATED - Codex adds the selected application's failure and recovery
+flow when current reliability, asynchronous, or recovery records require it.
 
-    Caller->>Service: Request
-    Service->>Dependency: Call with explicit timeout
-    Dependency--xService: Timeout or failure
-    Service->>Service: Classify failure
-    alt Retry is safe and attempts remain
-        Service->>Dependency: Bounded retry
-        alt Retry succeeds
-            Dependency-->>Service: Result
-        else Retry budget is exhausted
-            Dependency--xService: Final failure
-            Service->>Recovery: Record safe recovery work
-        end
-    else Durable recovery is required
-        Service->>Recovery: Record safe recovery work
-    else No durable recovery is required
-        Service->>Service: Stop without retry
-    end
-    Service->>Telemetry: Failure class, attempts, correlation ID, and alarm
-    opt Durable recovery record exists
-        Recovery->>Telemetry: Recovery backlog, age, and outcome
-        Telemetry-->>Owner: Actionable alarm with correlation ID
-        opt Manual reconciliation is required
-            Owner->>Recovery: Reconcile documented recovery item
-            Recovery->>Telemetry: Reconciliation evidence
-        end
-    end
-    Service-->>Caller: Safe terminal response with correlation ID
-```
-
-Edit these sequence diagrams in place for the selected workload. Remove unused
-participants and branches. Add another sequence only when the existing primary
-and failure slots cannot accurately represent a materially different flow and
-the owner explicitly requests the additional diagram.
+Replace required slots with project-specific diagrams. Keep each canonical block
+at its bound anchor. Add an optional view only when it materially improves owner
+understanding and its canonical records justify it.
 
 ## 19. Error handling strategy
 
@@ -1177,7 +1072,7 @@ canonical acceptance trace, already satisfied by current scoped no-task
 evidence, or not applicable under the optional-feature evidence rule. A missing
 or mismatched disposition is Codex-owned replanning, not another owner gate.
 
-# Part IV — Testing Strategy
+## Validation strategy
 
 ## 22. Test layers
 
@@ -1418,7 +1313,7 @@ authority: a new exact deployment receipt for explicit-gate or freshly approved
 construction authorization for fast-dev, plus a new Attempt ID.
 
 
-# Part V — Gate B: PRD and Construction Authorization
+# Gate B Review
 
 Gate B approves the complete PRD and a bounded construction run. It does not
 grant authority outside the envelope below. Codex may recommend approval, but
@@ -1540,14 +1435,14 @@ Property execution records in that order. The baseline
 must resolve in the current local Git repository. Prefix lists are literal argv
 prefixes separated by semicolons, not shell fragments, command substitutions,
 or wildcards. Gate B therefore binds the full design-contract digest. An unchanged,
-already approved schema 4 Gate B remains grandfathered until the next design-controlled change
-and remains runnable; schema 5 support does not itself
+already approved schema 4 or schema 5 Gate B remains grandfathered until the next design-controlled change
+and remains runnable; schema 6 support does not itself
 stale or rewrite that approval. A new or unapproved design, or any
-design-controlled change, requires every schema 5 design record, a new design
+design-controlled change, requires every schema 6 design record, a new design
 hash and envelope digest, and fresh Gate B approval. Codex owns the generated
 migration. It asks the owner only when migration exposes a missing owner fact or
 a true requirements decision. Grandfathering never authorizes invented schema
-5 values, an expanded construction envelope, or bypass of task validation.
+6 values, an expanded construction envelope, or bypass of task validation.
 Paths
 and external targets must be repository-relative or exact named targets and
 remain inside the approved scope.
@@ -1588,7 +1483,7 @@ property-execution change first makes the stored design hash invalid; updating
 it changes the envelope digest and requires new Gate B approval. A project with
 a grandfathered schema 4 Gate B may keep that exact approval only while its
 design and envelope remain unchanged. Before any replacement Gate B, Codex
-migrates the generated design records to schema 5, computes the new design and
+migrates the generated design records to schema 6, computes the new design and
 envelope digests, and presents the fresh approval. Gate A reopens only when the
 requirements themselves change or a required owner fact is missing.
 
@@ -1646,6 +1541,13 @@ marked receipt with the current proposed card. The proposed and recorded card
 must contain the freshly computed canonical complete-envelope SHA-256; never
 reuse a digest after any envelope edit.
 
+# Contract Appendices
+
+Exact records below remain machine-validated and auditable. They do not add an owner gate or authority.
+
+## Agent reference — exact record maintenance
+
+Project facts and owner decisions remain in this PRD. Phase procedures, receipt syntax, and Engine schemas remain in their designated Fastlane authorities; `docs/project/AGENTS.md` narrows safe edits here.
 ## 30. Gate B validation and invalidation rules
 
 The design and construction authorization use monotonic IDs (`DES-0001` and
