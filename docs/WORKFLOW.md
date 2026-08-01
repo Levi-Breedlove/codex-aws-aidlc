@@ -29,9 +29,10 @@ The repository state and the owner's work are separate facts. After setup,
 Fastlane asks whether the owner is starting a new application, changing an
 existing one, or repairing/migrating a system; an empty repository does not
 answer that question. It then grounds intake in the users, problem, observable
-outcome, first-release boundary, success measure, and material data/operating
-boundaries. Decisions use no more than three plain-language A/B/C choices with
-one exact reply; factual questions remain short free text.
+outcome, first-release boundary, success measure, data types, sensitivity,
+release audience, and operating geography. After the three initial settings, each turn contains exactly
+one plain-language intake question and one reply; factual questions remain short
+free text.
 
 The Engine projects one current card from PRD intake provenance. Rendering it
 ends that assistant turn. Only a new owner message can resolve the card, and a
@@ -47,17 +48,23 @@ shows a neutral reply such as `1: <choose A, B, or C>`.
 
 When the owner replies to a pending card, the Engine parses that message against
 the exact current card before writing project state. It accepts bounded
-whitespace, lowercase or uppercase A/B/C choices, semicolon or newline-separated
-answers, factual answers, and valid partial replies. It rejects unknown or
+whitespace, lowercase or uppercase A/B/C choices, a factual answer, or the exact current A/B/C choice. It rejects unknown or
 duplicate keys, stale-card replies, placeholders, contradictory choices,
 missing required detail, unresolved sentinel values, secret-like assignments,
 and extra unparsed text. A rejected reply changes no project file and returns
-one owner-safe correction without echoing the input. A valid partial reply
-records only the supplied answers and leaves the other questions pending under
-their original stable reply keys.
+one owner-safe correction without echoing the input. A valid reply records only that answer; the Engine then projects the next question.
 
+After one valid answer is normalized and written, the Engine revalidates the
+canonical records. Fastlane then confirms what was recorded, explains the
+practical project effect, and gives one plain correction command. That
+confirmation is bound to the new owner message from that turn and is not
+replayed when a project resumes.
+
+At Gate A, a correction uses "Change the requirements: <correction>." At
+Gate B, it uses "Change the design: <correction>." Corrections update the
+recorded basis and make affected approvals stale; they never count as approval.
 The `Accept all recommendations.` payload is safe only when the exact current
-card ID, revision, and canonical digest match and every question is a decision
+card ID, revision, and canonical digest match and the current question is a decision
 with a complete recommendation that needs no supporting detail. It requires no
 visible reply token. A matching legacy token-prefixed reply remains hidden 1.0.x
 compatibility input for that exact card only. Accept-all is unavailable for

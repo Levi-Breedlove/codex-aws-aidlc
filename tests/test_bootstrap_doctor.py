@@ -236,7 +236,6 @@ def complete_intake_foundation(
         if initial.status == "READY_FOR_REQUIREMENTS":
             return text
         raise AssertionError("Initial intake card is unavailable before readiness")
-    first_digest = initial.pending_card.canonical_sha256
     context_values = {
         "A": ("NEW_APPLICATION", "NONE"),
         "B": ("EXISTING_APPLICATION_CHANGE", "Existing application"),
@@ -248,15 +247,15 @@ def complete_intake_foundation(
     register_rows: list[tuple[str, ...]] = []
     provenance_by_intake: dict[str, str] = {}
 
-    def resolve(
+    def resolve_current(
+        *,
         owner_response_id: str,
         card_id: str,
         card_digest: str,
-        reply_key: str,
         question_id: str,
         selection: str,
         detail: str,
-        basis_ids: tuple[str, ...],
+        basis_id: str,
     ) -> None:
         nonlocal text
         provenance = intake_provenance(
@@ -280,124 +279,139 @@ def complete_intake_foundation(
                 card_id,
                 "1",
                 card_digest,
-                reply_key,
+                "1",
                 question_id,
                 selection,
                 detail,
-                ", ".join(basis_ids),
+                basis_id,
             )
         )
-        for basis_id in basis_ids:
-            provenance_by_intake[basis_id] = provenance
+        provenance_by_intake[basis_id] = provenance
 
-    resolve(
-        "OWNER-MSG-0001",
-        "INTAKE-CARD-0001",
-        first_digest,
-        "1",
-        "INTAKE-Q-0001",
-        work_context_choice,
-        work_context_detail,
-        ("INTAKE-0001",),
-    )
-    resolve(
-        "OWNER-MSG-0001",
-        "INTAKE-CARD-0001",
-        first_digest,
-        "2",
-        "INTAKE-Q-0002",
-        "RESPONSE",
-        "Development users need to see the approved project outcome.",
-        ("INTAKE-0002", "INTAKE-0003"),
-    )
-    resolve(
-        "OWNER-MSG-0001",
-        "INTAKE-CARD-0001",
-        first_digest,
-        "3",
-        "INTAKE-Q-0003",
-        "RESPONSE",
-        "The first release displays the approved outcome locally.",
-        ("INTAKE-0004", "INTAKE-0005"),
+    resolve_current(
+        owner_response_id="OWNER-MSG-0001",
+        card_id="INTAKE-CARD-0001",
+        card_digest=initial.pending_card.canonical_sha256,
+        question_id="INTAKE-Q-0001",
+        selection=work_context_choice,
+        detail=work_context_detail,
+        basis_id="INTAKE-0001",
     )
 
-    text = replace_contract_table(
-        text,
-        doctor.INTAKE_CARD_HEADING,
-        doctor.INTAKE_CARD_HEADERS,
-        [
+    facts = (
+        (
+            "INTAKE-0002",
+            "Who will use the app?",
+            "Name the primary people or teams.",
+            "Development teams",
+        ),
+        (
+            "INTAKE-0003",
+            "What are they trying to do, and what makes that difficult today?",
+            "Describe their current task and the obstacle.",
+            "They need a clear view of approved project outcomes.",
+        ),
+        (
+            "INTAKE-0004",
+            "What should the app let them accomplish first?",
+            "Describe one useful, observable result.",
+            "See the current approved project outcome.",
+        ),
+        (
+            "INTAKE-0005",
+            "What must the first release include, and what can wait?",
+            "Name the smallest useful app boundary and anything deferred.",
+            "Include one local outcome view; defer external integrations.",
+        ),
+        (
+            "INTAKE-0006",
+            "What visible result would convince you the first trial succeeded?",
+            "Name a result a person can see or measure.",
+            "An invited tester can view the approved outcome without help.",
+        ),
+        (
+            "INTAKE-0007",
+            "What information will people enter, upload, view, or generate?",
+            "List the app's important data in ordinary language.",
+            "Synthetic project names, status, and outcome summaries.",
+        ),
+        (
+            "INTAKE-0008",
             (
-                "INTAKE-CARD-0002",
-                "1",
-                "1",
-                "INTAKE-Q-0004",
-                "FACT",
-                "INTAKE-0006",
-                "How will you know the first release succeeds?",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NONE",
-                "RESPONSE",
-                "Name one observable success measure.",
-                "PENDING",
-                "NONE",
-                "NONE",
+                "Could that information reveal identity, health, money, location, "
+                "credentials, or another sensitive detail?"
             ),
+            "Say no, or name the sensitive information and who may see it.",
+            "No sensitive data in the first trial.",
+        ),
+        (
+            "INTAKE-0009",
+            "Who should be allowed to use the first release?",
+            "Describe the initial audience and any sign-in boundary.",
+            "Invited development testers only.",
+        ),
+        (
+            "INTAKE-0010",
             (
-                "INTAKE-CARD-0002",
-                "1",
-                "2",
-                "INTAKE-Q-0005",
-                "FACT",
-                "INTAKE-0007",
-                "What data and operating boundaries materially affect the first release?",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NONE",
-                "RESPONSE",
-                "Describe sensitive data, Region, release audience, or other boundaries.",
-                "PENDING",
-                "NONE",
-                "NONE",
+                "Where will the first users be, and are there places the data "
+                "must stay?"
             ),
-        ],
+            "Name the user geography and any data-location rule.",
+            "United States users; data remains in us-west-2.",
+        ),
     )
-    second_table = doctor.contract_table_after_heading(
-        text, doctor.INTAKE_CARD_HEADING, doctor.INTAKE_CARD_HEADERS
-    )
-    if second_table is None:
-        raise AssertionError("Second intake card is missing")
-    second_digest = "sha256:" + hashlib.sha256(second_table.canonical_bytes).hexdigest()
-    resolve(
-        "OWNER-MSG-0002",
-        "INTAKE-CARD-0002",
-        second_digest,
-        "1",
-        "INTAKE-Q-0004",
-        "RESPONSE",
-        "A rendered-output test confirms the approved outcome",
-        ("INTAKE-0006",),
-    )
-    resolve(
-        "OWNER-MSG-0002",
-        "INTAKE-CARD-0002",
-        second_digest,
-        "2",
-        "INTAKE-Q-0005",
-        "RESPONSE",
-        "Synthetic internal development data; us-west-2 only",
-        ("INTAKE-0007",),
-    )
+    for index, (basis_id, prompt, detail_prompt, value) in enumerate(
+        facts, start=2
+    ):
+        card_id = f"INTAKE-CARD-{index:04d}"
+        question_id = f"INTAKE-Q-{index:04d}"
+        text = replace_contract_table(
+            text,
+            doctor.INTAKE_CARD_HEADING,
+            doctor.INTAKE_CARD_HEADERS,
+            [
+                (
+                    card_id,
+                    "1",
+                    "1",
+                    question_id,
+                    "FACT",
+                    basis_id,
+                    prompt,
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NONE",
+                    "RESPONSE",
+                    detail_prompt,
+                    "PENDING",
+                    "NONE",
+                    "NONE",
+                )
+            ],
+        )
+        table = doctor.contract_table_after_heading(
+            text, doctor.INTAKE_CARD_HEADING, doctor.INTAKE_CARD_HEADERS
+        )
+        if table is None:
+            raise AssertionError(f"{card_id} is missing")
+        digest = "sha256:" + hashlib.sha256(table.canonical_bytes).hexdigest()
+        resolve_current(
+            owner_response_id=f"OWNER-MSG-{index:04d}",
+            card_id=card_id,
+            card_digest=digest,
+            question_id=question_id,
+            selection="RESPONSE",
+            detail=value,
+            basis_id=basis_id,
+        )
+
     values = {
         "INTAKE-0001": work_context,
-        "INTAKE-0002": "Development users",
-        "INTAKE-0003": "Users need to see the approved project outcome",
-        "INTAKE-0004": "Display the current approved project outcome",
-        "INTAKE-0005": "Local development slice only",
-        "INTAKE-0006": "A rendered-output test confirms the approved outcome",
-        "INTAKE-0007": "Synthetic internal development data; us-west-2 only",
+        **{
+            basis_id: value
+            for basis_id, _prompt, _detail_prompt, value in facts
+        },
     }
     text = confirm_intake_foundation(text, values, provenance_by_intake)
     return replace_contract_table(
@@ -406,7 +420,6 @@ def complete_intake_foundation(
         doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
         register_rows,
     )
-
 
 def set_intake_card_resolution(
     text: str,
@@ -4296,6 +4309,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             report = doctor.inspect_project(project)
 
         self.assertIn("REQUIRED_FILE_MISSING", codes(report))
+        self.assertIn("OWNER_BRIEF_SOURCE_MISMATCH", codes(report))
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["owner_decision_brief"]["schema_version"], 1)
+        self.assertEqual(report["owner_answer_confirmation"]["schema_version"], 1)
         self.assertFalse(report["resume_safe"])
 
     def test_required_file_symlink_is_rejected(self) -> None:
@@ -7229,7 +7246,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertIn("OWNER_WORK_CONTEXT", contract.missing_fields)
         self.assertIsNotNone(contract.pending_card)
         assert contract.pending_card is not None
-        self.assertEqual(len(contract.pending_card.questions), 3)
+        self.assertEqual(len(contract.pending_card.questions), 1)
         self.assertEqual(
             contract.pending_card.questions[0].prompt,
             "What are you starting with?",
@@ -7297,7 +7314,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(issues, [])
         self.assertEqual(contract.status, "READY_FOR_REQUIREMENTS")
         self.assertEqual(contract.owner_work_context, "NEW_APPLICATION")
-        self.assertEqual(len(contract.basis_ids), 7)
+        self.assertEqual(len(contract.basis_ids), 10)
         self.assertEqual(contract.missing_fields, ())
         self.assertIsNone(contract.pending_card)
         self.assertEqual(contract.schema_version, 2)
@@ -7305,20 +7322,20 @@ class BootstrapDoctorTests(unittest.TestCase):
             contract.current_understanding,
             (
                 "Starting point: a new application.",
-                "Users and problem: Development users — Users need to see the approved project outcome",
-                "First useful outcome: Display the current approved project outcome",
-                "First release: Local development slice only",
-                "Success and material boundaries: A rendered-output test confirms the approved outcome — Synthetic internal development data; us-west-2 only",
+                "Users and problem: Development teams — They need a clear view of approved project outcomes.",
+                "First useful outcome and release: See the current approved project outcome. — Include one local outcome view; defer external integrations.",
+                "Success and first audience: An invited tester can view the approved outcome without help. — Invited development testers only.",
+                "Data and operating boundaries: Synthetic project names, status, and outcome summaries. — No sensitive data in the first trial. — United States users; data remains in us-west-2.",
             ),
         )
         assert response_table is not None
         assert card_table is not None
-        self.assertEqual(len(response_table.rows), 5)
+        self.assertEqual(len(response_table.rows), 10)
         self.assertEqual(
             {row[0] for row in response_table.rows},
-            {"OWNER-MSG-0001", "OWNER-MSG-0002"},
+            {f"OWNER-MSG-{index:04d}" for index in range(1, 11)},
         )
-        self.assertEqual({row[0] for row in card_table.rows}, {"INTAKE-CARD-0002"})
+        self.assertEqual({row[0] for row in card_table.rows}, {"INTAKE-CARD-0010"})
         foundation_table = doctor.contract_table_after_heading(
             completed,
             doctor.INTAKE_FOUNDATION_HEADING,
@@ -7327,9 +7344,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         assert foundation_table is not None
         historical = {row[0]: row[5] for row in foundation_table.rows}
         self.assertIn("OWNER-MSG-0001", historical["INTAKE-0001"])
-        self.assertIn("OWNER-MSG-0001", historical["INTAKE-0005"])
-        self.assertIn("OWNER-MSG-0002", historical["INTAKE-0006"])
-        self.assertIn("OWNER-MSG-0002", historical["INTAKE-0007"])
+        self.assertIn("OWNER-MSG-0005", historical["INTAKE-0005"])
+        self.assertIn("OWNER-MSG-0006", historical["INTAKE-0006"])
+        self.assertIn("OWNER-MSG-0007", historical["INTAKE-0007"])
 
     def test_owner_work_context_choices_map_exactly_to_semantic_values(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -7348,28 +7365,32 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertEqual(issues, [])
                 self.assertEqual(contract.owner_work_context, owner_work_context)
 
-    def test_partial_intake_rerenders_and_parses_original_remaining_keys(self) -> None:
+    def test_resolved_card_requires_the_next_one_question_card(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         initial, issues = doctor.derive_intake_foundation_contract(
             source, "greenfield", grandfather_current_gate_a=False
         )
         self.assertEqual(issues, [])
         assert initial.pending_card is not None
-        self.assertEqual(initial.current_understanding, ())
         digest = initial.pending_card.canonical_sha256
         provenance = intake_provenance(
-            "OWNER-MSG-0001", "INTAKE-CARD-0001", 1, digest, "INTAKE-Q-0001", "A"
+            "OWNER-MSG-0001",
+            "INTAKE-CARD-0001",
+            1,
+            digest,
+            "INTAKE-Q-0001",
+            "A",
         )
-        partial = set_intake_card_resolution(
+        resolved = set_intake_card_resolution(
             source, "INTAKE-Q-0001", "A", owner_response=provenance
         )
-        partial = confirm_intake_foundation(
-            partial,
+        resolved = confirm_intake_foundation(
+            resolved,
             {"INTAKE-0001": "NEW_APPLICATION"},
             {"INTAKE-0001": provenance},
         )
-        partial = replace_contract_table(
-            partial,
+        resolved = replace_contract_table(
+            resolved,
             doctor.INTAKE_RESPONSE_REGISTER_HEADING,
             doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
             [
@@ -7387,29 +7408,56 @@ class BootstrapDoctorTests(unittest.TestCase):
             ],
         )
         contract, issues = doctor.derive_intake_foundation_contract(
-            partial, "greenfield", grandfather_current_gate_a=False
+            resolved, "greenfield", grandfather_current_gate_a=False
         )
-        self.assertEqual(issues, [])
-        assert contract.pending_card is not None
+        self.assertIn("INTAKE_CARD_REQUIRED", {code for code, _ in issues})
+        self.assertIsNone(contract.pending_card)
         self.assertEqual(
             contract.current_understanding,
             ("Starting point: a new application.",),
         )
-        self.assertEqual(
-            [question.reply_key for question in contract.pending_card.questions],
-            ["2", "3"],
+
+        next_card = replace_contract_table(
+            resolved,
+            doctor.INTAKE_CARD_HEADING,
+            doctor.INTAKE_CARD_HEADERS,
+            [
+                (
+                    "INTAKE-CARD-0002",
+                    "1",
+                    "1",
+                    "INTAKE-Q-0002",
+                    "FACT",
+                    "INTAKE-0002",
+                    "Who will use the app?",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NONE",
+                    "RESPONSE",
+                    "Name the primary people or teams.",
+                    "PENDING",
+                    "NONE",
+                    "NONE",
+                )
+            ],
         )
-        remaining_digest = contract.pending_card.canonical_sha256
+        contract, issues = doctor.derive_intake_foundation_contract(
+            next_card, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertEqual(issues, [])
+        assert contract.pending_card is not None
+        self.assertEqual(len(contract.pending_card.questions), 1)
         parsed = doctor.parse_intake_owner_response(
-            "2: Users; 3: First useful result",
+            "1: Development teams",
             contract.pending_card.to_dict(),
-            expected_card_id="INTAKE-CARD-0001",
+            expected_card_id="INTAKE-CARD-0002",
             expected_revision=1,
-            expected_sha256=remaining_digest,
+            expected_sha256=contract.pending_card.canonical_sha256,
             owner_response_id="OWNER-MSG-0002",
         )
         self.assertEqual(parsed.status, "PASS", parsed.to_dict())
-        self.assertEqual([answer.reply_key for answer in parsed.answers], ["2", "3"])
+        self.assertEqual([answer.reply_key for answer in parsed.answers], ["1"])
 
     def test_response_register_rejects_repeated_questions_and_empty_facts(self) -> None:
         source = complete_intake_foundation(
@@ -7482,7 +7530,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             "INTAKE_RESPONSE_REGISTER_INVALID", {code for code, _message in issues}
         )
 
-    def test_intake_parser_cli_is_normalizing_partial_stale_and_zero_write(
+    def test_intake_parser_cli_is_current_card_bound_and_zero_write(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -7540,43 +7588,31 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertEqual(completed.stderr, "", completed.stderr)
                 return completed.returncode, json.loads(completed.stdout)
 
-            valid_exit, valid = parse(
-                "1a; 2: Development users need a clear outcome; "
-                "3: The first release displays that outcome"
-            )
-            partial_exit, partial = parse("2: Development users need a clear outcome")
+            valid_exit, valid = parse("1a")
             stale_exit, stale = parse("1A", stale=True)
-            rejected_exit, rejected = parse("1A; 1B")
-            secret_exit, secret = parse("2: aws_secret_access_key=synthetic-value")
+            duplicate_exit, duplicate = parse("1A; 1B")
+            wrong_key_exit, wrong_key = parse("2: Development teams")
 
             self.assertEqual(valid_exit, 0)
             self.assertEqual(valid["status"], "PASS")
             self.assertEqual(valid["owner_response_id"], "OWNER-MSG-0001")
             self.assertEqual(valid["answers"][0]["selection"], "A")
             self.assertEqual(valid["unresolved_reply_keys"], [])
-            self.assertEqual(partial_exit, 0)
-            self.assertEqual(partial["status"], "PASS")
-            self.assertEqual(partial["unresolved_reply_keys"], ["1", "3"])
-            self.assertEqual(
-                partial["owner_status"]["required_from_you"],
-                "Nothing until Codex records them and presents only the remaining questions.",
-            )
             self.assertEqual(stale_exit, 2)
             self.assertIn(
                 "INTAKE_CARD_STALE",
                 {item["code"] for item in stale["errors"]},
             )
-            self.assertEqual(rejected_exit, 2)
+            self.assertEqual(duplicate_exit, 2)
             self.assertIn(
                 "INTAKE_REPLY_KEY_DUPLICATE",
-                {item["code"] for item in rejected["errors"]},
+                {item["code"] for item in duplicate["errors"]},
             )
-            self.assertEqual(secret_exit, 2)
+            self.assertEqual(wrong_key_exit, 2)
             self.assertIn(
-                "INTAKE_SECRET_MATERIAL",
-                {item["code"] for item in secret["errors"]},
+                "INTAKE_REPLY_KEY_UNKNOWN",
+                {item["code"] for item in wrong_key["errors"]},
             )
-            self.assertNotIn("synthetic-value", json.dumps(secret, sort_keys=True))
             self.assertEqual(snapshot(), baseline)
 
     def test_cli_rejects_a_delayed_reply_bound_to_the_previous_card(self) -> None:
@@ -9239,6 +9275,22 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertTrue(any("State trigger" in issue for issue in issues), issues)
 
 
+    @source_template_only
+    def test_additive_owner_projections_preserve_engine_schema_and_template_route(
+        self,
+    ) -> None:
+        report = doctor.inspect_project(PROJECT_ROOT)
+
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["classification"], "UNCONFIGURED_TEMPLATE")
+        self.assertEqual(report["owner_decision_brief"]["schema_version"], 1)
+        self.assertEqual(report["owner_decision_brief"]["status"], "NONE")
+        self.assertEqual(report["owner_answer_confirmation"]["schema_version"], 1)
+        self.assertEqual(report["owner_answer_confirmation"]["status"], "NONE")
+        self.assertEqual(
+            report["interaction"]["owner_action_kind"],
+            "COMPLETE_PREREQUISITE_CHECKLIST",
+        )
 class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
     _DEPLOYMENT_ARTIFACT = "sha256:" + "a" * 64
     _DEPLOYMENT_PLAN = (

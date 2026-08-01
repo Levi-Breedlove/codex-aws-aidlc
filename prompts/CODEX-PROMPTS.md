@@ -770,8 +770,8 @@ previous local blocker.
    `formal_receipt_required` is true.
 
 8. Execute the selected action immediately when
-   `automatic_continuation_allowed` is true. At first intake, ask one to three
-   plain-language questions below the Define update. At later stages, resume
+   `automatic_continuation_allowed` is true. After the initial three settings, ask exactly one plain-language intake
+   question below each Define update. At later stages, resume
    the selected phase. After each phase checkpoint, rerun the Engine in the
    same turn and repeat this loop until a declared stop condition. A changed
    internal prompt ID is never itself a reason to pause.
@@ -815,7 +815,7 @@ evidence to REQ-10; it never inspects credentials or accesses an AWS account.
 
 **Required authorization:** Intake and its declared local write only.
 
-**Stop conditions:** More than three unanswered questions; secrets appear in
+**Stop conditions:** A current owner-input card contains anything other than one question; secrets appear in
 input; repository facts contradict the request; a decision would materially
 change scope without human input.
 
@@ -831,7 +831,7 @@ facts from recommendations.
 
 In each response:
 1. summarize the current understanding in at most five bullets;
-2. ask at most three questions;
+2. after the three initial settings, ask exactly one intake question;
 3. ask only questions needed to avoid a material scope, user, outcome, data,
    security, deployment, or success-measure mistake;
 4. give two or three understandable choices when helpful;
@@ -847,71 +847,44 @@ In each response:
    default is independently safe and complete.
 
 Before requirements analysis:
-- Keep repository mode (`GREENFIELD` or `BROWNFIELD`) separate from owner
-  work context (`NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, or
-  `REPAIR_OR_MIGRATION`). Empty code never proves a new application.
-- Record the seven canonical `INTAKE-*` foundation rows. Only a direct owner
-  statement may become a confirmed `OWNER_FACT`; repository observations,
-  recommendations, inferred risk, assumptions, and questions remain separate.
-- Keep normative requirements provisional while any material foundation field
-  or current card question is unresolved.
-- Store one current `INTAKE-CARD-*` in PRD intake provenance. Decision rows
-  use uppercase A/B/C, one practical effect and tradeoff per option, a
-  recommendation only when one is justified, any required supporting detail,
-  and an exact reply. When none is justified, show the exact no-recommendation
-  sentence above and use `1: <choose A, B, or C>` for that decision in the
-  copyable reply. Factual rows use short free text and no invented choices.
-- A selection is current only when it is bound to the current card and revision
-  with normalized `OWNER_RESPONSE` provenance. A recommendation, assistant
-  example, prior owner message, ambiguous shorthand, stale-card reply, or
-  absent reply never confirms a choice.
-- Before any project write for a possible card answer, run the deterministic
-  parser against the exact current card ID, revision, digest, and a new
-  `OWNER-MSG-*` ID. Failure is atomic: make zero writes, preserve the card,
-  and return its owner-safe correction without echoing secret-like input.
-  Partial success updates only returned reply keys; all others remain pending
-  on the same card under their original stable keys.
-- Accept bounded ASCII whitespace, lowercase or uppercase A/B/C input normalized
-  to uppercase, semicolon or newline separators, factual responses, valid
-  partial replies, and the exact safe accept-all phrase. Reject unknown or
-  duplicate reply keys, stale card identity or digest, placeholders,
-  unresolved sentinel values, secret-like assignments, contradictory choices,
-  missing required detail, unsupported whitespace, and unparsed extra content.
-- Unapproved legacy intake reopens facts from unconfirmed context, never synthesizes `OWNER-MSG-*` provenance, and grandfathers only unchanged approved Gate A.
-- An unchanged approved schema 1.2 Gate A may remain the exact requirements basis for a design-only schema 5 migration. Do not reopen intake or ask the owner to repeat confirmed facts unless a current required owner fact is absent.
-- The `Accept all recommendations.` payload selects only complete
-  recommendations on the exact current card when every question is a decision
-  and no selected option needs detail. Do not offer or
-  accept it for factual questions, missing recommendations, required detail,
-  partial eligibility, an altered phrase, or a stale card.
-- Project each successful parsed answer into the normalized owner-response
-  register, the matching card row, and every foundation row named by that
-  question's basis IDs. All foundation facts derived from one question cite the
-  same parsed owner-response record. For the initial work-context question, map
-  `A` to `NEW_APPLICATION`, `B` to `EXISTING_APPLICATION_CHANGE`, and `C` to
-  `REPAIR_OR_MIGRATION`. This parsed card binding
-  does not authenticate the owner's identity.
-- `NEW_APPLICATION` deterministically requires `NEW_BUILD`; never infer owner
-  context from work kind or repository state.
-- If the owner asks for advice or says `recommend one`, explain the options
-  and practical tradeoff, state that project state did not change, and restore
-  the unchanged card.
-- When `interaction.turn_boundary_required` is true, the rendered card is the
-  final action of the assistant turn. Do not call another tool, edit the PRD,
-  rerun the Engine, interpret the copyable example, or continue until a new
-  inbound owner message arrives.
+- Keep repository mode (`GREENFIELD`/`BROWNFIELD`) separate from owner work
+  context (`NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, or
+  `REPAIR_OR_MIGRATION`). Never infer owner context. Empty code never proves a new application. Record
+  explicit brief facts first; ask only the next missing app-focused fact about
+  users and their current problem, first useful end-to-end outcome, release
+  boundary, observable success, entered/uploaded/viewed/generated data,
+  sensitivity and access, initial audience, material geography, then required
+  reliability, recovery, legal, or operational constraints.
+- Keep requirements provisional while a material foundation fact is open.
+  The current card contains exactly one `INTAKE-CARD-*` question. Decisions use uppercase
+  A/B/C, practical effects, an evidence-backed recommendation or the exact
+  no-recommendation sentence, required detail, and a tokenless copyable reply;
+  facts use bounded free text.
+- Before any project write, parse the new message against the exact card ID,
+  revision, digest, and new `OWNER-MSG-*`. A recommendation, assistant example,
+  prior message, stale or ambiguous reply, or absent reply never confirms a
+  choice. On failure write nothing, preserve the card, and return the safe
+  correction without echoing secret-like content. On success update the
+  normalized `OWNER_RESPONSE` register, card row, and cited foundation rows
+  with the same provenance; map `A` to `NEW_APPLICATION`, `B` to
+  `EXISTING_APPLICATION_CHANGE`, and `C` to `REPAIR_OR_MIGRATION`. This
+  does not authenticate the owner's identity. `NEW_APPLICATION` deterministically requires `NEW_BUILD`.
+- After the canonical write, rerun the Engine and render
+  `owner_answer_confirmation` only for that matching new `OWNER-MSG-*`; never
+  replay it on resume. Plain `Accept all recommendations.` is valid only for
+  the exact current eligible recommendation with no required detail.
+- Advice or `recommend one` changes no state and restores the same card. Gate A
+  and Gate B corrections use only `Change the requirements: <correction>.` and
+  `Change the design: <correction>.`; they apply staleness but never approval.
+- When `interaction.turn_boundary_required` is true, rendering the card is the
+  final action. Do not call tools, write, rerun the Engine, interpret the
+  example, or continue before a new inbound owner message.
+- Unapproved legacy intake reopens unproven facts and reissues its first
+  unresolved question. Preserve only an unchanged approved legacy Gate A.
 
-Capture:
-- owner work context: new application, existing application change, or
-  repair/migration, independent of repository mode;
-- project mode: greenfield or brownfield;
-- delivery profile: quick-mvp, standard, or high-risk;
-- users, problem, observable outcome, and success measures;
-- in-scope behavior and explicit non-goals;
-- data sensitivity, identity boundary, integrations, and failure impact;
-- environment, Region constraints, cost sensitivity or a real hard cap, and release expectation;
-- brownfield compatibility, migration, and operational constraints.
-
+Capture the selected mode, profile, risk, and AWS lane plus the confirmed app
+facts, scope/non-goals, data and identity boundaries, integrations, failure
+impact, Region/cost/release constraints, and brownfield preservation needs.
 For quick-mvp, propose a thin first release: one primary actor, one observable
 outcome, one core entity or state transition, one entry point, one Region, one
 development environment, measurable requirements, explicit non-goals, and one
@@ -973,7 +946,7 @@ coordinator challenges the complete requirement set and remains the only
 writer. Quick MVP uses no
 subagent by default. Use the read-only `fastlane-requirements-challenger` only
 at the Define-reference triggers, after a complete draft has no open owner
-decision. Allow one attempt per requirements revision and 60 seconds. If it is
+decision. Allow one attempt per requirements revision: 5 minutes for Quick MVP or Standard, and 30 minutes for high-risk or explicit deep review. Check progress at least every 60 seconds and finish early. If it is
 unavailable, record `Independent requirements challenge: UNAVAILABLE — coordinator checklist completed`,
 apply that checklist, rerun the Engine and presenter, and continue. Never
 expose reviewer timing or orchestration or make availability an owner action.
@@ -1055,7 +1028,7 @@ Set readiness to exactly one:
 
 Do not silently resolve contradictions, choose architecture, approve
 assumptions, or mark Gate A accepted. If blocked, set Gate A to `BLOCKED` and
-ask at most three plain questions using the INTAKE-10 style. When either ready
+ask exactly one plain question using the INTAKE-10 style. When either ready
 recommendation is recorded, atomically set both the Document status and detailed
 Gate A owner state to `PENDING_OWNER_APPROVAL`, keep Gate B `BLOCKED` for a new
 project or `STALE` after invalidating an earlier design. Mirror both gate states
@@ -1104,7 +1077,11 @@ change or stale requirements basis, not for invalid receipt formatting alone.
 [INTAKE-20]
 Present the current requirements for human Gate A.
 
-Show a concise decision brief:
+Render the current Engine `owner_decision_brief` with
+`python scripts/fastlane_presenter.py gate-a-brief --input-stdin`. The caller
+supplies the current Engine JSON inside the required `report` object. Continue
+only when the projection is `GATE_A`, `READY`, digest-bound, and free of
+Owner Brief diagnostics. It must cover:
 - requirements revision and delivery profile;
 - all ten fields from the current Gate A readiness card;
 - user outcome and measurable success;
@@ -1115,6 +1092,11 @@ Show a concise decision brief:
 - material AWS feasibility facts verified through AWS Core, their sources, and
   any advisor finding the coordinator rejected with its reason;
 - what Gate A does and does not approve.
+
+If the owner requests a change, accept only
+`Change the requirements: <correction>.`, record its owner provenance, apply
+the existing requirements staleness rules, and return to Define. A correction
+never approves Gate A.
 
 Do not approve the gate yourself. Render a copyable receipt using the exact
 field names below and the actual current IDs. List every assumption ID or NONE.
@@ -1190,15 +1172,13 @@ search precedes retrieve and IDs match. Bind each `AWS-EV-*` as
 Persist no raw skill content/transcripts; install/cache/connectors/memory do not count. Codex, the only writer, selects the design.
 Unavailable AWS Core is owner setup; Codex repairs evidence; unsafe/unexplained conflicts need human review.
 
-After completing the proposed design, conditionally run `fastlane-architecture-challenger`;
-it cannot select, write, approve, authorize, or replace evidence.
+After design, run `fastlane-architecture-challenger` once per revision only when triggered: 10 minutes Quick MVP/Standard; 45 high-risk/deep. Poll every 60 seconds; finish early. It is read-only and cannot select, write, approve, authorize, or replace evidence.
 
 Load the Design reference and Adaptive Coverage Plan. `SELECT` compares complete
-candidates; `AMEND` revalidates affected drivers/alternatives; `PRESERVE` proves
-architecture, technology, trust, data, recovery, Region, and Harness unchanged.
-The reference owns schema 4 grandfathering and the legacy 1.2 bridge; changed
-designs need schema 5, new digests, and fresh Gate B. Use `Need from you:
-Nothing` unless an owner fact is missing; never invent facts or widen authority.
+candidates; `AMEND` revalidates affected drivers and alternatives; `PRESERVE`
+proves architecture, technology, trust, data, recovery, Region, and Harness
+unchanged. The reference owns legacy bridges; changed designs need schema 5,
+new digests, and fresh Gate B. Never invent owner facts or widen authority.
 
 - For `SELECT`, compare at least two complete, credible, non-straw whole-system
   candidates, including the secure managed-serverless baseline unless Gate A
@@ -1292,7 +1272,12 @@ requirements change or stale basis, not for invalid receipt formatting alone.
 [DESIGN-20]
 Review the complete PRD and proposed construction envelope for human Gate B.
 
-Show a concise decision brief:
+Render the current Engine `owner_decision_brief` with
+`python scripts/fastlane_presenter.py gate-b-brief --input-stdin`. The caller
+supplies the current Engine JSON inside the required `report` object. Continue
+only when the projection is `GATE_B`, `READY`, digest-bound, and free of
+Owner Brief diagnostics. Start with its executive decision, then its grouped
+technical decision index and exact source locations. It must cover:
 - REQ, DES, and AUTH IDs;
 - canonical complete construction-envelope SHA-256;
 - all current readiness-card fields;
@@ -1310,6 +1295,11 @@ Show a concise decision brief:
 Set the Gate B agent recommendation to exactly `BLOCKED` or
 `READY_FOR_CONSTRUCTION_APPROVAL`. The recommendation is advisory and does not
 approve the gate.
+
+If the owner requests a change, accept only
+`Change the design: <correction>.`, record its owner provenance, apply the
+existing design staleness rules, and return to Design. A correction never
+approves Gate B.
 
 Do not approve the gate yourself. Render a copyable receipt with the exact
 field names below and actual current IDs. The human must replace the approver

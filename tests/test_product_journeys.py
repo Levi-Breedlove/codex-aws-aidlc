@@ -252,11 +252,11 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertTrue(first_resume["interaction"]["turn_boundary_required"])
             self.assertEqual(foundation, second_resume["intake_foundation"])
             card = foundation["pending_card"]
-            self.assertEqual(len(card["questions"]), 3)
+            self.assertEqual(len(card["questions"]), 1)
             self.assertFalse(card["accept_all_allowed"])
             self.assertEqual(
                 card["owner_reply"],
-                "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
+                "1: <choose A, B, or C>",
             )
             self.assertEqual(
                 card["exact_reply"],
@@ -276,7 +276,7 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertNotIn("INTAKE-CARD", resumed)
             self.assertNotIn(str(card["reply_token"]), resumed)
             parsed = doctor.parse_intake_owner_response(
-                "1A; 2: Development team; 3: Show the first useful result",
+                "1A",
                 card,
                 expected_card_id=str(card["card_id"]),
                 expected_revision=int(card["revision"]),
@@ -1424,7 +1424,7 @@ class ProductJourneyTests(unittest.TestCase):
         self.assertEqual(foundation["repository_mode"], "GREENFIELD")
         self.assertIsNone(foundation["owner_work_context"])
         self.assertEqual(foundation["status"], "FOUNDATION_REQUIRED")
-        self.assertEqual(len(foundation["pending_card"]["questions"]), 3)
+        self.assertEqual(len(foundation["pending_card"]["questions"]), 1)
         self.assertTrue(report["interaction"]["turn_boundary_required"])
         self.assertNotIn("Current understanding:", rendered)
         self.assertIn("1. What are you starting with?", rendered)
@@ -1436,7 +1436,7 @@ class ProductJourneyTests(unittest.TestCase):
             rendered,
         )
         self.assertIn(
-            "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>", rendered
+            "1: <choose A, B, or C>", rendered
         )
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)

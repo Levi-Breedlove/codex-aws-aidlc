@@ -119,6 +119,102 @@ class IntakeResponseParse:
         }
 
 
+@dataclass(frozen=True)
+class GateCorrectionParse:
+    status: str
+    gate: str | None = None
+    correction: str | None = None
+    errors: tuple[dict[str, str], ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "status": self.status,
+            "gate": self.gate,
+            "correction": self.correction,
+            "approval_granted": False,
+            "errors": list(self.errors),
+        }
+
+
+def parse_gate_correction(raw_response: str) -> GateCorrectionParse:
+    """Parse one exact owner correction without treating it as approval."""
+
+    if not isinstance(raw_response, str) or not _ascii_strip(raw_response):
+        return GateCorrectionParse(
+            status="FAIL",
+            errors=(
+                _error(
+                    "GATE_CORRECTION_EMPTY",
+                    "Correction is empty",
+                ),
+            ),
+        )
+    if len(raw_response) > MAX_RESPONSE_CHARACTERS:
+        return GateCorrectionParse(
+            status="FAIL",
+            errors=(
+                _error(
+                    "GATE_CORRECTION_TOO_LONG",
+                    "Correction exceeds the bounded owner-input limit",
+                ),
+            ),
+        )
+    if _contains_unsupported_whitespace(raw_response) or _contains_unsupported_control(
+        raw_response
+    ):
+        return GateCorrectionParse(
+            status="FAIL",
+            errors=(
+                _error(
+                    "GATE_CORRECTION_CHARACTER",
+                    "Correction contains unsupported whitespace or control characters",
+                ),
+            ),
+        )
+    normalized = _normalized_detail(raw_response)
+    prefixes = (
+        ("GATE_A", "Change the requirements: "),
+        ("GATE_B", "Change the design: "),
+    )
+    matched = next(
+        (
+            (gate, prefix)
+            for gate, prefix in prefixes
+            if normalized.startswith(prefix)
+        ),
+        None,
+    )
+    if matched is None or not normalized.endswith("."):
+        return GateCorrectionParse(
+            status="FAIL",
+            errors=(
+                _error(
+                    "GATE_CORRECTION_FORMAT",
+                    "Use exactly Change the requirements: <correction>. or "
+                    "Change the design: <correction>.",
+                ),
+            ),
+        )
+    gate, prefix = matched
+    correction = _normalized_detail(normalized[len(prefix) : -1])
+    safety = intake_detail_safety_code(correction)
+    if not correction or safety is not None:
+        return GateCorrectionParse(
+            status="FAIL",
+            errors=(
+                _error(
+                    "GATE_CORRECTION_UNSAFE",
+                    "Correction must be concrete and must not contain secret-like or record-unsafe material",
+                ),
+            ),
+        )
+    return GateCorrectionParse(
+        status="PASS",
+        gate=gate,
+        correction=correction,
+    )
+
 def _error(code: str, message: str, *, reply_key: str | None = None) -> dict[str, str]:
     result = {"code": code, "message": message}
     if reply_key is not None:
@@ -182,12 +278,12 @@ def _question_contracts(
     if (
         not isinstance(raw_questions, Sequence)
         or isinstance(raw_questions, (str, bytes))
-        or not 1 <= len(raw_questions) <= 3
+        or len(raw_questions) != 1
     ):
         return [], [
             _error(
                 "INTAKE_CARD_INVALID",
-                "Current card must contain one to three questions",
+                "Current card must contain exactly one question",
             )
         ]
 

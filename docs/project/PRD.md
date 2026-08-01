@@ -171,7 +171,10 @@ An empty repository never proves that the owner is creating a new product.
 | INTAKE-0004 | OBSERVABLE_OUTCOME | TODO | OPEN_QUESTION | OPEN | NONE |
 | INTAKE-0005 | FIRST_RELEASE_BOUNDARY | TODO | OPEN_QUESTION | OPEN | NONE |
 | INTAKE-0006 | SUCCESS_MEASURE | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0007 | MATERIAL_DATA_AND_OPERATING_BOUNDARIES | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0007 | DATA_TYPES | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0008 | DATA_SENSITIVITY | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0009 | RELEASE_AUDIENCE | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0010 | OPERATING_GEOGRAPHY | TODO | OPEN_QUESTION | OPEN | NONE |
 
 `CONFIRMED` rows require a concrete value, `OWNER_FACT` provenance, and an
 `Owner response` value that matches a normalized record below. Every fact
@@ -195,8 +198,8 @@ historical `OWNER-MSG-*` provenance.
 
 #### Current intake decision card
 
-Keep exactly one current `INTAKE-CARD-*` here. It contains at most three
-questions. Decision choices use uppercase A/B/C; A is the recommendation only
+Keep exactly one current `INTAKE-CARD-*` here with exactly one question.
+Decision choices use uppercase A/B/C; A is the recommendation only
 when the card explicitly records it. When no recommendation exists, the Engine
 presents a neutral choice and never preselects A. A choice remains unresolved
 until its required detail is supplied.
@@ -204,8 +207,6 @@ until its required detail is supplied.
 | Card ID | Revision | Reply key | Question ID | Kind | Basis IDs | Prompt | Option A | Option B | Option C | Recommended | Required detail for | Detail prompt | Selection | Selection detail | Owner response |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | INTAKE-CARD-0001 | 1 | 1 | INTAKE-Q-0001 | DECISION | INTAKE-0001 | What are you starting with? | A new application; no existing product behavior is assumed. | A change to an existing application; preserve its users, data, and behavior unless you approve otherwise. | A repair, replacement, or migration; assess continuity and migration risk first. | NONE | B, C | Name the existing application or system. | PENDING | NONE | NONE |
-| INTAKE-CARD-0001 | 1 | 2 | INTAKE-Q-0002 | FACT | INTAKE-0002, INTAKE-0003 | Who will use this, and what problem should it solve for them? | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NONE | RESPONSE | Name the primary users and describe their current problem. | PENDING | NONE | NONE |
-| INTAKE-CARD-0001 | 1 | 3 | INTAKE-Q-0003 | FACT | INTAKE-0004, INTAKE-0005 | What is the first useful result they should get from the initial release? | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NONE | RESPONSE | Describe one observable first-release result. | PENDING | NONE | NONE |
 
 Persist only normalized selections and necessary details. A resolved row uses
 `OWNER_RESPONSE: OWNER-MSG-nnnn; CARD: INTAKE-CARD-nnnn; REVISION: n; SHA256: sha256:<64-lowercase-hex>; QUESTION: INTAKE-Q-nnnn; ANSWER: <A-or-B-or-C-or-RESPONSE>`.

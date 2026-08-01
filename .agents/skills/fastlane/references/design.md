@@ -108,8 +108,11 @@ Use for DESIGN-10 and Gate B.
 - Keep method names internal. Explain them only when the owner explicitly asks;
   routine owner questions remain short and plain-language.
 - Use the architecture challenger only after the proposal is complete and only
-  for high-risk, hard-to-reverse, shared-infrastructure, isolation, recovery,
-  or explicitly requested review.
+  for hard-to-reverse, shared-infrastructure, isolation, recovery, material
+  risk, or explicitly requested review. Attempt once per exact design revision.
+  Allow 10 minutes for Quick MVP or Standard and 45 minutes for high-risk or
+  explicit deep review. Check progress at least every 60 seconds and finish
+  early.
 - Require the challenger to return unsupported claims, unmet requirements,
   hard-constraint failures, IAM/isolation/recovery/cost/operations gaps, and
   concerns with rejected alternatives using current IDs. The coordinator fixes

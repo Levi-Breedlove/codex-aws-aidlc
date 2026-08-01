@@ -346,7 +346,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("fastlane-requirements-challenger", requirements)
         self.assertIn("Quick MVP uses no\nsubagent by default", requirements)
         self.assertIn("fastlane-architecture-challenger", design)
-        self.assertIn("after completing the proposed design", design.lower())
+        self.assertIn("once per revision only when triggered", design.lower())
         self.assertIn("only writer", requirements)
         self.assertIn("only writer", design)
         self.assertIn("continue ordinary\nrequirements work", requirements)
@@ -1218,8 +1218,12 @@ Approver: <name/handle>"""
             "Next prompt:",
         ):
             self.assertNotIn(removed_field, boot)
-        self.assertIn("At first intake, ask one to three", boot)
-        self.assertIn("plain-language questions below the Define update", boot)
+        boot_compact = " ".join(boot.split())
+        self.assertIn(
+            "After the initial three settings, ask exactly one plain-language intake",
+            boot_compact,
+        )
+        self.assertIn("question below each Define update", boot_compact)
         self.assertIn("PREREQUISITES_READY", boot)
         self.assertNotIn("OWNER_ATTESTED_AND_PROBES_VERIFIED", boot)
         self.assertNotIn("hook conflict review", boot)
@@ -2181,7 +2185,7 @@ Approver: <name/handle>"""
             "at least 95 out of every 100 requests",
             "people using the product at the same time",
             "hidden location and device details",
-            "at most three numbered questions",
+            "exactly one numbered intake question",
             "Accept all recommendations.",
             "short copyable reply",
         ):
@@ -2203,6 +2207,10 @@ Approver: <name/handle>"""
             self.assertIn("60 seconds", surface)
             self.assertIn("requirements revision", surface)
             self.assertIn("unavailable", surface.lower())
+        self.assertIn("5 minutes", requirements)
+        self.assertIn("30 minutes", requirements)
+        self.assertIn("10 minutes", self.prompt_section("DESIGN-10"))
+        self.assertIn("45 high-risk/deep", self.prompt_section("DESIGN-10"))
         self.assertIn(
             "Independent requirements challenge: UNAVAILABLE",
             requirements,
@@ -2240,7 +2248,7 @@ Approver: <name/handle>"""
         self.assertIn("`1: <choose A, B, or C>`", owner)
         self.assertIn(
             "`A` to `NEW_APPLICATION`, `B` to `EXISTING_APPLICATION_CHANGE`, and `C` to",
-            intake,
+            intake_compact,
         )
         self.assertIn("`REPAIR_OR_MIGRATION`", intake)
         self.assertIn(

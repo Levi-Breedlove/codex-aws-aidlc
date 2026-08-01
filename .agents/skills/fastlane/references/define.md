@@ -12,10 +12,22 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
 - Keep repository mode separate from owner work context. A greenfield or empty
   repository does not prove a new application. Ground `INTAKE-*` rows in the
   owner's users, problem, observable outcome, first-release boundary, success
-  measure, and material data/operating boundaries before requirements are ready.
+  measure, data types, data sensitivity, release audience, and operating
+  geography before requirements are ready. Record clear facts from the owner's
+  brief first and ask only for missing or ambiguous material facts.
+- Frame missing facts as a human consultation, not field labels. Ask in this
+  order when still unanswered: what the owner is starting with; who it is for;
+  what is hardest for them today; what useful result the first version should
+  provide; what must be included now and what can wait; what visible result
+  would prove the first trial helped; what information people will enter,
+  upload, view, or generate; whether it can reveal identity, health, money,
+  location, credentials, or another sensitive detail; who may use the first
+  release; and where users will be or data must stay. Use concrete examples
+  sparingly, accept `recommend one` or `not sure`, and ask only the next missing
+  question. A complete owner brief may ground several rows without repetition.
 - Store one current `INTAKE-CARD-*` in PRD intake provenance. Decisions use
-  uppercase A/B/C, at most three questions, an effect, tradeoff, required
-  detail, and exact reply. Facts use short free text, not invented choices.
+  uppercase A/B/C, exactly one question, an effect, tradeoff, required detail,
+  and exact reply. Facts use short free text, not invented choices.
 - Recommend only with current owner or repository evidence. Otherwise render
   exactly
   `No recommendation—choose the option that matches your situation.` and use
@@ -25,27 +37,29 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   response. Before a PRD or derived-state write, run the deterministic parser
   against its exact ID, revision, digest, and a new `OWNER-MSG-*` ID. Rejection
   writes nothing: use its owner-safe status, preserve the card, and give the
-  exact reply correction without echoing secret-like input. Partial success
-  updates only returned keys and keeps other questions on that card. Rerun the
-  Engine; when set, the card's turn boundary makes it the final action.
+  exact reply correction without echoing secret-like input. A valid response
+  resolves only that question. Rerun the
+  Engine; render `owner_answer_confirmation` only with that turn's matching
+  `OWNER-MSG-*` identity before the next question. Never replay it on resume.
+  When set, the card's turn boundary makes it the final action.
 - Never synthesize owner provenance for unapproved legacy intake. Keep prior
   values as unconfirmed context, reopen affected facts, and present the smallest
   current card. Grandfather only an unchanged approved Gate A.
 - `Accept all recommendations.` applies only to the exact current card when
-  every question is a decision with a complete recommendation and no supporting
-  detail. Never apply it to factual, partly recommended, stale, or changed cards.
+  the current question is a decision with a complete recommendation and no
+  supporting detail. Never apply it to factual, stale, or changed cards.
 - Normalize lowercase decision letters to uppercase. For the initial work
   context decision, project `A` to `NEW_APPLICATION`, `B` to
   `EXISTING_APPLICATION_CHANGE`, and `C` to `REPAIR_OR_MIGRATION`. Record each
   answer in the owner-response register, card row, and cited foundation rows
   with the same card-bound provenance. Facts from one question cite the same
   parsed record. This proves deterministic interpretation, not identity.
-- Ask no more than three related, plain-language owner decisions per response.
+- After the three initial settings, ask exactly one plain-language intake question per owner turn.
 - Lead with the real-world consequence. Keep `RTO`, `RPO`, `p95`, concurrency,
   metadata, and methodology labels internal unless the owner used them or asks
   for technical detail. Translate via the Owner responses reference; give one
   justified recommendation with its main tradeoff and a short copyable reply.
-  Permit plain `Accept all recommendations.` only when every question
+  Permit plain `Accept all recommendations.` only when the current question
   is a decision with a complete recommendation and no supporting detail.
 - Separate owner facts, repository facts, recommendations, proposed
   assumptions, and unresolved decisions.
@@ -90,13 +104,16 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
   the review method itself occurred.
 - Default cost posture to `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED`; preserve
   an owner cap exactly.
-- Quick MVP has no challenger by default. Use one only for ambiguity,
-  contradiction, sensitive data, identity, payments, migrations, shared
-  interfaces, high risk, or owner request, after a complete draft with no open
-  owner decision. Attempt once per requirements revision for at most 60 seconds.
-  If it fails, times out, or is unavailable, record that in the existing
-  recommendation rationale, run the checklist, and continue without exposing
-  reviewer orchestration or adding an owner action.
+- Quick MVP has no challenger by default. When ambiguity, contradiction,
+  sensitive data, identity, payments, migration, a shared interface, material
+  risk, or an owner request justifies review, use one read-only attempt per exact
+  requirements revision after
+  the complete draft has no open owner decision. Allow 5 minutes for Quick MVP
+  or Standard requirements review and 30 minutes for high-risk or explicit
+  deep review. Check progress at least every 60 seconds and finish early. If it
+  fails, times out, or is unavailable, record that in the existing
+  recommendation rationale, run the coordinator checklist, and continue
+  without exposing reviewer orchestration or adding an owner action.
 - Classify REQ-10 AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
   `NOT_MATERIAL`. Use `REQUIRED` when Gate A depends on a current AWS fact about
   Region/service feasibility, identity/authorization, sensitive data/uploads,

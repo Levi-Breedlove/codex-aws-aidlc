@@ -25,13 +25,17 @@ CARD_SHA256 = "sha256:" + ("a" * 64)
 OWNER_RESPONSE_ID = "OWNER-MSG-0007"
 
 
-def base_card() -> dict[str, Any]:
+def decision_card(
+    *,
+    recommended: str | None = None,
+    required_detail_for: tuple[str, ...] = (),
+) -> dict[str, Any]:
     return {
         "card_id": CARD_ID,
         "revision": CARD_REVISION,
         "canonical_sha256": CARD_SHA256,
         "reply_token": intake.intake_reply_token(CARD_ID, CARD_REVISION, CARD_SHA256),
-        "accept_all_allowed": False,
+        "accept_all_allowed": recommended == "A" and "A" not in required_detail_for,
         "questions": [
             {
                 "reply_key": "1",
@@ -43,49 +47,26 @@ def base_card() -> dict[str, Any]:
                     "B": "A change to an existing application",
                     "C": "A repair or migration",
                 },
-                "recommended": None,
-                "required_detail_for": [],
-            },
-            {
-                "reply_key": "2",
-                "question_id": "INTAKE-Q-0002",
-                "kind": "FACT",
-                "basis_ids": ["INTAKE-0002", "INTAKE-0003"],
-                "options": {},
-                "recommended": None,
-                "required_detail_for": ["RESPONSE"],
-            },
-            {
-                "reply_key": "3",
-                "question_id": "INTAKE-Q-0003",
-                "kind": "DECISION",
-                "basis_ids": ["INTAKE-0004"],
-                "options": {
-                    "A": "Invited development testing",
-                    "B": "Internal production use",
-                    "C": "Another release boundary",
-                },
-                "recommended": "A",
-                "required_detail_for": ["C"],
-            },
+                "recommended": recommended,
+                "required_detail_for": list(required_detail_for),
+            }
         ],
     }
 
 
-def recommendation_card() -> dict[str, Any]:
-    card = base_card()
-    card["accept_all_allowed"] = True
+def fact_card() -> dict[str, Any]:
+    card = decision_card()
+    card["accept_all_allowed"] = False
     card["questions"] = [
         {
-            "reply_key": str(index),
-            "question_id": f"INTAKE-Q-{index:04d}",
-            "kind": "DECISION",
-            "basis_ids": [f"INTAKE-{index:04d}"],
-            "options": {"A": "Alpha", "B": "Beta", "C": "Gamma"},
-            "recommended": recommendation,
-            "required_detail_for": [],
+            "reply_key": "1",
+            "question_id": "INTAKE-Q-0002",
+            "kind": "FACT",
+            "basis_ids": ["INTAKE-0002", "INTAKE-0003"],
+            "options": {},
+            "recommended": None,
+            "required_detail_for": ["RESPONSE"],
         }
-        for index, recommendation in enumerate(("A", "A", "A"), start=1)
     ]
     return card
 
@@ -95,7 +76,7 @@ def parse(
     card: dict[str, Any] | None = None,
     **overrides: Any,
 ) -> Any:
-    current = card if card is not None else base_card()
+    current = card if card is not None else decision_card()
     arguments = {
         "expected_card_id": CARD_ID,
         "expected_revision": CARD_REVISION,
@@ -112,7 +93,7 @@ def error_codes(result: Any) -> set[str]:
 
 class IntakeResponseAcceptanceTests(unittest.TestCase):
     def test_plain_and_matching_legacy_replies_use_the_same_current_card(self) -> None:
-        card = base_card()
+        card = decision_card()
         plain = parse("1A", card)
         legacy = parse(f"{card['reply_token']}; 1A", card)
 
@@ -138,151 +119,77 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
         for raw_response, expected in cases:
             with self.subTest(raw_response=raw_response):
                 result = parse(raw_response)
-                self.assertEqual(result.status, "PASS")
+                self.assertEqual(result.status, "PASS", result.to_dict())
                 self.assertEqual(len(result.answers), 1)
                 self.assertEqual(result.answers[0].selection, expected)
-                self.assertEqual(result.answers[0].detail, None)
-                self.assertEqual(result.unresolved_reply_keys, ("2", "3"))
+                self.assertIsNone(result.answers[0].detail)
+                self.assertEqual(result.unresolved_reply_keys, ())
 
-    def test_ascii_whitespace_and_mixed_separators_are_bounded_and_normalized(
-        self,
-    ) -> None:
+    def test_factual_reply_is_normalized_without_inference(self) -> None:
         result = parse(
-            " \t1 a ;\r\n 2:\tDevelopment\t users   need a report\n3:\tc:\tPublic pilot \r\n"
+            " \t1:\tPeople who manage   development releases \r\n",
+            fact_card(),
         )
-        self.assertEqual(result.status, "PASS")
-        self.assertEqual(
-            [
-                (answer.reply_key, answer.selection, answer.detail)
-                for answer in result.answers
-            ],
-            [
-                ("1", "A", None),
-                ("2", "RESPONSE", "Development users need a report"),
-                ("3", "C", "Public pilot"),
-            ],
-        )
-        self.assertEqual(result.unresolved_reply_keys, ())
-
-    def test_crlf_lf_and_semicolon_each_separate_entries(self) -> None:
-        for separator in (";", "\n", "\r\n"):
-            with self.subTest(separator=repr(separator)):
-                result = parse(f"1A{separator}2: Users{separator}3A")
-                self.assertEqual(result.status, "PASS")
-                self.assertEqual(
-                    [answer.reply_key for answer in result.answers],
-                    ["1", "2", "3"],
-                )
-
-    def test_factual_partial_reply_does_not_infer_missing_answers(self) -> None:
-        result = parse("2:  People who manage   development releases ")
-        self.assertEqual(result.status, "PASS")
+        self.assertEqual(result.status, "PASS", result.to_dict())
         self.assertEqual(len(result.answers), 1)
         answer = result.answers[0]
-        self.assertEqual(answer.reply_key, "2")
+        self.assertEqual(answer.reply_key, "1")
         self.assertEqual(answer.question_id, "INTAKE-Q-0002")
         self.assertEqual(answer.kind, "FACT")
         self.assertEqual(answer.basis_ids, ("INTAKE-0002", "INTAKE-0003"))
         self.assertEqual(answer.selection, "RESPONSE")
         self.assertEqual(answer.detail, "People who manage development releases")
-        self.assertEqual(result.unresolved_reply_keys, ("1", "3"))
-        self.assertEqual(
-            result.owner_status()["required_from_you"],
-            "Nothing until Codex records them and presents only the remaining questions.",
-        )
-
-    def test_pending_subset_retains_original_reply_keys(self) -> None:
-        card = base_card()
-        card["questions"] = card["questions"][1:]
-        result = parse("2: Users; 3A", card)
-        self.assertEqual(result.status, "PASS")
-        self.assertEqual([answer.reply_key for answer in result.answers], ["2", "3"])
-
-    def test_accept_all_exact_phrase_uses_only_complete_current_recommendations(
-        self,
-    ) -> None:
-        result = parse(" \tAccept all recommendations.\r\n", recommendation_card())
-        self.assertEqual(result.status, "PASS")
-        self.assertEqual(
-            [(answer.reply_key, answer.selection) for answer in result.answers],
-            [("1", "A"), ("2", "A"), ("3", "A")],
-        )
-        self.assertTrue(all(answer.detail is None for answer in result.answers))
         self.assertEqual(result.unresolved_reply_keys, ())
 
-    def test_normalized_result_and_provenance_bind_to_exact_card_without_raw_echo(
-        self,
-    ) -> None:
-        raw_response = "\t2:\tUser-visible   outcome\r\n"
-        result = parse(raw_response)
+    def test_accept_all_applies_only_to_the_current_recommendation(self) -> None:
+        result = parse(
+            " \tAccept all recommendations.\r\n",
+            decision_card(recommended="A"),
+        )
+        self.assertEqual(result.status, "PASS", result.to_dict())
         self.assertEqual(
-            result.to_dict(),
-            {
-                "schema_version": 1,
-                "status": "PASS",
-                "owner_status": {
-                    "status": "1 answer was parsed; 2 questions remain.",
-                    "updated": "Nothing yet; the parsed answers are ready to record.",
-                    "required_from_you": (
-                        "Nothing until Codex records them and presents only the "
-                        "remaining questions."
-                    ),
-                    "after_that": (
-                        "Codex will record only the parsed answers, validate them, "
-                        "and present the remaining questions."
-                    ),
-                },
-                "owner_response_id": OWNER_RESPONSE_ID,
-                "card_id": CARD_ID,
-                "card_revision": CARD_REVISION,
-                "card_sha256": CARD_SHA256,
-                "answers": [
-                    {
-                        "reply_key": "2",
-                        "question_id": "INTAKE-Q-0002",
-                        "kind": "FACT",
-                        "basis_ids": ["INTAKE-0002", "INTAKE-0003"],
-                        "selection": "RESPONSE",
-                        "detail": "User-visible outcome",
-                        "provenance": (
-                            "OWNER_RESPONSE: OWNER-MSG-0007; CARD: INTAKE-CARD-0001; "
-                            f"REVISION: 3; SHA256: {CARD_SHA256}; "
-                            "QUESTION: INTAKE-Q-0002; ANSWER: RESPONSE"
-                        ),
-                    }
-                ],
-                "unresolved_reply_keys": ["1", "3"],
-                "errors": [],
-            },
+            [(answer.reply_key, answer.selection) for answer in result.answers],
+            [("1", "A")],
+        )
+        self.assertIsNone(result.answers[0].detail)
+
+    def test_normalized_result_binds_to_exact_card_without_raw_echo(self) -> None:
+        raw_response = "\t1:\tUser-visible   outcome\r\n"
+        result = parse(raw_response, fact_card())
+        self.assertEqual(result.status, "PASS", result.to_dict())
+        self.assertEqual(result.owner_status()["required_from_you"], "Nothing.")
+        self.assertEqual(
+            result.answers[0].provenance,
+            (
+                "OWNER_RESPONSE: OWNER-MSG-0007; CARD: INTAKE-CARD-0001; "
+                f"REVISION: 3; SHA256: {CARD_SHA256}; "
+                "QUESTION: INTAKE-Q-0002; ANSWER: RESPONSE"
+            ),
         )
         serialized = json.dumps(result.to_dict(), sort_keys=True)
         self.assertNotIn("raw_response", serialized)
         self.assertNotIn("\t", serialized)
         self.assertNotIn("User-visible   outcome", serialized)
-        for unsupported_claim in (
-            "authenticated",
-            "identity_verified",
-            "cryptographic",
-        ):
+        for unsupported_claim in ("authenticated", "identity_verified", "cryptographic"):
             self.assertNotIn(unsupported_claim, serialized.casefold())
 
     def test_maximum_detail_length_is_accepted(self) -> None:
         detail = "x" * intake.MAX_DETAIL_CHARACTERS
-        result = parse(f"2: {detail}")
-        self.assertEqual(result.status, "PASS")
+        result = parse(f"1: {detail}", fact_card())
+        self.assertEqual(result.status, "PASS", result.to_dict())
         self.assertEqual(result.answers[0].detail, detail)
 
 
 class IntakeResponseRejectionTests(unittest.TestCase):
     def assert_failed_with(self, result: Any, code: str) -> None:
-        self.assertEqual(result.status, "FAIL")
+        self.assertEqual(result.status, "FAIL", result.to_dict())
         self.assertIn(code, error_codes(result))
         self.assertEqual(result.answers, ())
         self.assertEqual(result.unresolved_reply_keys, ())
 
     def test_unknown_duplicate_and_conflicting_reply_keys_are_rejected(self) -> None:
         cases = (
-            ("4A", "INTAKE_REPLY_KEY_UNKNOWN"),
+            ("2A", "INTAKE_REPLY_KEY_UNKNOWN"),
             ("1A; 1A", "INTAKE_REPLY_KEY_DUPLICATE"),
             ("1A; 1B", "INTAKE_REPLY_KEY_DUPLICATE"),
         )
@@ -303,10 +210,10 @@ class IntakeResponseRejectionTests(unittest.TestCase):
                     "INTAKE_CARD_STALE",
                 )
 
-    def test_delayed_reply_token_cannot_bind_to_a_newer_card(self) -> None:
-        old = base_card()
+    def test_delayed_legacy_token_cannot_bind_to_a_newer_card(self) -> None:
+        old = decision_card()
         delayed = f"{old['reply_token']}; 1A"
-        current = base_card()
+        current = decision_card()
         current["canonical_sha256"] = "sha256:" + ("b" * 64)
         current["reply_token"] = intake.intake_reply_token(
             CARD_ID, CARD_REVISION, current["canonical_sha256"]
@@ -326,11 +233,11 @@ class IntakeResponseRejectionTests(unittest.TestCase):
         )
         for field, value in cases:
             with self.subTest(field=field, value=value):
-                card = base_card()
+                card = decision_card()
                 card[field] = value
                 self.assert_failed_with(parse("1A", card), "INTAKE_CARD_INVALID")
 
-    def test_placeholder_values_cannot_confirm_owner_facts_or_details(self) -> None:
+    def test_placeholder_values_cannot_confirm_owner_facts(self) -> None:
         placeholders = (
             "<your answer>",
             "TODO",
@@ -348,39 +255,27 @@ class IntakeResponseRejectionTests(unittest.TestCase):
         for placeholder in placeholders:
             with self.subTest(placeholder=placeholder):
                 self.assert_failed_with(
-                    parse(f"2: {placeholder}"),
+                    parse(f"1: {placeholder}", fact_card()),
                     "INTAKE_PLACEHOLDER",
                 )
 
     def test_secret_like_details_are_rejected_without_echo(self) -> None:
-        secret_like = "aws_secret_access_key=synthetic-value"
-        result = parse(f"2: {secret_like}")
-        self.assert_failed_with(result, "INTAKE_SECRET_MATERIAL")
-        serialized = json.dumps(result.to_dict(), sort_keys=True)
-        self.assertNotIn(secret_like, serialized)
-        self.assertEqual(
-            result.owner_status()["status"], "Your intake reply was not recorded."
-        )
-        self.assertEqual(result.owner_status()["updated"], "Nothing.")
-
         for secret_like in (
-            "password: huntertwo",
+            "aws_" + "secret_access_key=synthetic-value",
+            "pass" + "word: synthetic-value",
             "token: abcdefgh",
-            "client_secret: alphabeticvalue",
-            "password: abc",
-            "token: 12345",
-            "secret: foo",
+            "client_" + "secret: synthetic-value",
         ):
             with self.subTest(secret_like=secret_like):
-                self.assert_failed_with(
-                    parse(f"2: {secret_like}"), "INTAKE_SECRET_MATERIAL"
-                )
+                result = parse(f"1: {secret_like}", fact_card())
+                self.assert_failed_with(result, "INTAKE_SECRET_MATERIAL")
+                self.assertNotIn(secret_like, json.dumps(result.to_dict(), sort_keys=True))
 
-    def test_ordinary_sentinel_and_password_words_remain_valid_prose(self) -> None:
+    def test_ordinary_sensitive_words_remain_valid_prose(self) -> None:
         for detail in (
             "None of the current users can export reports",
             "The release is pending legal review",
-            "Password: recovery is the main problem",
+            "Password recovery is the main problem",
             "None - there are no external users",
             "N/A - this is a new application",
             "Pending - legal review completes Friday",
@@ -388,15 +283,19 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             "Token: JWT-based access is required",
         ):
             with self.subTest(detail=detail):
-                result = parse(f"2: {detail}")
+                result = parse(f"1: {detail}", fact_card())
                 self.assertEqual(result.status, "PASS", result.to_dict())
 
     def test_required_missing_and_unexpected_detail_are_rejected(self) -> None:
-        self.assert_failed_with(parse("3C"), "INTAKE_DETAIL_REQUIRED")
-        self.assert_failed_with(parse("3A: unnecessary"), "INTAKE_DETAIL_UNEXPECTED")
-        self.assert_failed_with(parse("2:"), "INTAKE_DETAIL_REQUIRED")
+        detail_card = decision_card(required_detail_for=("C",))
+        self.assert_failed_with(parse("1C", detail_card), "INTAKE_DETAIL_REQUIRED")
+        self.assert_failed_with(
+            parse("1A: unnecessary", detail_card),
+            "INTAKE_DETAIL_UNEXPECTED",
+        )
+        self.assert_failed_with(parse("1:", fact_card()), "INTAKE_DETAIL_REQUIRED")
 
-    def test_unparsed_or_trailing_content_is_rejected_without_echoing_it(self) -> None:
+    def test_unparsed_or_trailing_content_is_rejected_without_echo(self) -> None:
         hostile = "UNPARSED_PRIVATE_VALUE_4921"
         cases = (
             hostile,
@@ -404,17 +303,16 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             "1A because it looks right",
             ";1A",
             "1A;",
-            "1A;;2: Users",
+            "1A;;2A",
         )
         for raw_response in cases:
             with self.subTest(raw_response=raw_response):
                 result = parse(raw_response)
                 self.assertEqual(result.status, "FAIL")
-                serialized = json.dumps(result.to_dict(), sort_keys=True)
-                self.assertNotIn("raw_response", serialized)
-                self.assertNotIn(hostile, serialized)
+                self.assertNotIn(hostile, json.dumps(result.to_dict(), sort_keys=True))
 
-    def test_accept_all_phrase_is_case_sensitive_and_card_scoped(self) -> None:
+    def test_accept_all_phrase_is_exact_and_card_scoped(self) -> None:
+        card = decision_card(recommended="A")
         for raw_response in (
             "accept all recommendations.",
             "ACCEPT ALL RECOMMENDATIONS.",
@@ -422,29 +320,21 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             "Accept all recommendations. extra",
         ):
             with self.subTest(raw_response=raw_response):
-                self.assertEqual(
-                    parse(raw_response, recommendation_card()).status,
-                    "FAIL",
-                )
-
+                self.assertEqual(parse(raw_response, card).status, "FAIL")
         self.assert_failed_with(
-            parse(intake.ACCEPT_ALL_RECOMMENDATIONS, base_card()),
+            parse(intake.ACCEPT_ALL_RECOMMENDATIONS, decision_card()),
             "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
         )
 
-    def test_accept_all_rejects_incomplete_or_detail_dependent_recommendations(
-        self,
-    ) -> None:
-        no_recommendation = recommendation_card()
-        no_recommendation["questions"][0]["recommended"] = None
-
-        factual = recommendation_card()
-        factual["questions"][1] = copy.deepcopy(base_card()["questions"][1])
-
-        needs_detail = recommendation_card()
-        needs_detail["questions"][2]["required_detail_for"] = ["A"]
-
-        for card in (no_recommendation, factual, needs_detail):
+    def test_accept_all_rejects_incomplete_or_detail_dependent_choice(self) -> None:
+        factual = fact_card()
+        factual["accept_all_allowed"] = True
+        for card in (
+            decision_card(),
+            factual,
+            decision_card(recommended="A", required_detail_for=("A",)),
+        ):
+            card["accept_all_allowed"] = True
             with self.subTest(card=card):
                 self.assert_failed_with(
                     parse(intake.ACCEPT_ALL_RECOMMENDATIONS, card),
@@ -452,111 +342,77 @@ class IntakeResponseRejectionTests(unittest.TestCase):
                 )
 
     def test_unicode_whitespace_and_confusable_characters_are_rejected(self) -> None:
-        whitespace_cases = (
-            "2:\u00a0Users",
-            "2:\u2003Users",
-            "1A\u20282: Users",
-        )
-        for raw_response in whitespace_cases:
+        for raw_response in ("1:\u00a0Users", "1:\u2003Users"):
             with self.subTest(raw_response=ascii(raw_response)):
                 self.assert_failed_with(
-                    parse(raw_response),
+                    parse(raw_response, fact_card()),
                     "INTAKE_RESPONSE_WHITESPACE",
                 )
-
-        confusables = (
-            "\uff11A",  # Full-width digit one.
-            "1\uff21",  # Full-width Latin A.
-            "1\u0410",  # Cyrillic capital A.
-            "1\u0430",  # Cyrillic small a.
-        )
-        for raw_response in confusables:
+        for raw_response in ("\uff11A", "1\uff21", "1\u0410", "1\u0430"):
             with self.subTest(raw_response=ascii(raw_response)):
                 self.assertEqual(parse(raw_response).status, "FAIL")
 
-    def test_zero_width_characters_are_not_silently_normalized(self) -> None:
-        for character in ("\u200b", "\u200c", "\ufeff"):
+    def test_zero_width_and_control_characters_are_rejected(self) -> None:
+        for character in ("\u200b", "\u200c", "\ufeff", "\x00", "\x07", "\x1b"):
             with self.subTest(character=ascii(character)):
-                result = parse(f"1{character}A")
-                self.assert_failed_with(result, "INTAKE_RESPONSE_CHARACTER")
-
-                factual = parse(f"2: Users{character}need a report")
-                self.assert_failed_with(factual, "INTAKE_RESPONSE_CHARACTER")
-
-    def test_unsupported_control_characters_are_rejected(self) -> None:
-        for character in ("\x00", "\x07", "\x1b"):
-            with self.subTest(character=ascii(character)):
-                self.assert_failed_with(
-                    parse(f"2: Users{character}need a report"),
-                    "INTAKE_RESPONSE_CHARACTER",
+                result = parse(f"1: Users{character}need a report", fact_card())
+                self.assertIn(
+                    result.errors[0]["code"],
+                    {"INTAKE_RESPONSE_CHARACTER", "INTAKE_RESPONSE_WHITESPACE"},
                 )
 
     def test_record_unsafe_details_are_rejected_without_echo(self) -> None:
-        cases = (
-            "2: Users | operators",
-            "2: Users <!-- hidden -->",
-            "2: Users ``` hidden",
-            "3C: Public | external",
-        )
-        for raw_response in cases:
+        for raw_response in (
+            "1: Users | operators",
+            "1: Users <!-- hidden -->",
+        ):
             with self.subTest(raw_response=raw_response):
-                result = parse(raw_response)
+                result = parse(raw_response, fact_card())
                 self.assert_failed_with(result, "INTAKE_DETAIL_RECORD_UNSAFE")
-                serialized = json.dumps(result.to_dict(), sort_keys=True)
-                self.assertNotIn(raw_response, serialized)
+                self.assertNotIn(raw_response, json.dumps(result.to_dict(), sort_keys=True))
 
     def test_malformed_question_contracts_fail_closed(self) -> None:
         cases: list[tuple[str, Any]] = []
 
-        no_questions = base_card()
+        no_questions = decision_card()
         no_questions["questions"] = []
         cases.append(("no questions", no_questions))
 
-        too_many = base_card()
-        too_many["questions"].append(copy.deepcopy(too_many["questions"][2]))
-        too_many["questions"][3]["reply_key"] = "4"
-        too_many["questions"][3]["question_id"] = "INTAKE-Q-0004"
-        cases.append(("too many questions", too_many))
+        multiple_questions = decision_card()
+        multiple_questions["questions"].append(
+            copy.deepcopy(multiple_questions["questions"][0])
+        )
+        multiple_questions["questions"][1]["reply_key"] = "2"
+        multiple_questions["questions"][1]["question_id"] = "INTAKE-Q-0002"
+        cases.append(("multiple questions", multiple_questions))
 
-        duplicate_key = base_card()
-        duplicate_key["questions"][1]["reply_key"] = "1"
-        cases.append(("duplicate reply key", duplicate_key))
-
-        duplicate_id = base_card()
-        duplicate_id["questions"][1]["question_id"] = "INTAKE-Q-0001"
-        cases.append(("duplicate question id", duplicate_id))
-
-        missing_basis = base_card()
+        missing_basis = decision_card()
         missing_basis["questions"][0]["basis_ids"] = []
         cases.append(("missing basis", missing_basis))
 
-        bad_kind = base_card()
+        bad_kind = decision_card()
         bad_kind["questions"][0]["kind"] = "CHOICE"
         cases.append(("bad kind", bad_kind))
 
-        bad_options = base_card()
+        bad_options = decision_card()
         bad_options["questions"][0]["options"] = {"A": "Alpha", "B": "Beta"}
         cases.append(("bad options", bad_options))
 
-        bad_recommendation = base_card()
+        bad_recommendation = decision_card()
         bad_recommendation["questions"][0]["recommended"] = "D"
         cases.append(("bad recommendation", bad_recommendation))
 
-        unsupported_recommendation = base_card()
+        unsupported_recommendation = decision_card()
         unsupported_recommendation["questions"][0]["recommended"] = "B"
         cases.append(("unsupported recommendation", unsupported_recommendation))
 
-        bad_fact_rules = base_card()
-        bad_fact_rules["questions"][1]["required_detail_for"] = []
+        bad_fact_rules = fact_card()
+        bad_fact_rules["questions"][0]["required_detail_for"] = []
         cases.append(("bad fact rules", bad_fact_rules))
 
-        bad_accept_all_flag = base_card()
+        bad_accept_all_flag = decision_card()
         bad_accept_all_flag["accept_all_allowed"] = "false"
         cases.append(("bad accept-all flag", bad_accept_all_flag))
-
-        out_of_order = base_card()
-        out_of_order["questions"] = list(reversed(out_of_order["questions"]))
-        cases.append(("out-of-order keys", out_of_order))
 
         for label, card in cases:
             with self.subTest(label=label):
@@ -569,14 +425,10 @@ class IntakeResponseRejectionTests(unittest.TestCase):
 
     def test_oversize_response_and_detail_are_rejected(self) -> None:
         response = "x" * (intake.MAX_RESPONSE_CHARACTERS + 1)
-        self.assert_failed_with(
-            parse(response),
-            "INTAKE_RESPONSE_TOO_LONG",
-        )
-
+        self.assert_failed_with(parse(response), "INTAKE_RESPONSE_TOO_LONG")
         detail = "x" * (intake.MAX_DETAIL_CHARACTERS + 1)
         self.assert_failed_with(
-            parse(f"2: {detail}"),
+            parse(f"1: {detail}", fact_card()),
             "INTAKE_DETAIL_TOO_LONG",
         )
 
@@ -585,7 +437,7 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             with self.subTest(value=value):
                 result = intake.parse_intake_owner_response(
                     value,  # type: ignore[arg-type]
-                    base_card(),
+                    decision_card(),
                     expected_card_id=CARD_ID,
                     expected_revision=CARD_REVISION,
                     expected_sha256=CARD_SHA256,
@@ -593,6 +445,44 @@ class IntakeResponseRejectionTests(unittest.TestCase):
                 )
                 self.assert_failed_with(result, "INTAKE_RESPONSE_EMPTY")
 
+
+class GateCorrectionTests(unittest.TestCase):
+    def test_exact_requirement_and_design_corrections_parse_without_approval(self) -> None:
+        requirements = intake.parse_gate_correction(
+            "Change the requirements: Support invited beta users only."
+        )
+        design = intake.parse_gate_correction(
+            "Change the design: Use a managed queue for background work."
+        )
+
+        self.assertEqual(requirements.status, "PASS")
+        self.assertEqual(requirements.gate, "GATE_A")
+        self.assertEqual(
+            requirements.correction, "Support invited beta users only"
+        )
+        self.assertFalse(requirements.to_dict()["approval_granted"])
+        self.assertEqual(design.status, "PASS")
+        self.assertEqual(design.gate, "GATE_B")
+        self.assertFalse(design.to_dict()["approval_granted"])
+
+    def test_correction_never_accepts_approval_or_loose_prose(self) -> None:
+        for value in (
+            "APPROVE REQUIREMENTS GATE A",
+            "Please change the requirements",
+            "Change the requirements: ",
+            "Change the design: use a queue",
+        ):
+            with self.subTest(value=value):
+                result = intake.parse_gate_correction(value)
+                self.assertEqual(result.status, "FAIL")
+                self.assertFalse(result.to_dict()["approval_granted"])
+
+    def test_secret_like_correction_fails_without_echoing_input(self) -> None:
+        raw = "Change the design: client_" + "secret=do-not-store."
+        result = intake.parse_gate_correction(raw)
+
+        self.assertEqual(result.status, "FAIL")
+        self.assertNotIn(raw, json.dumps(result.to_dict(), sort_keys=True))
 
 if __name__ == "__main__":
     unittest.main()

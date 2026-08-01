@@ -730,6 +730,29 @@ class FastlaneHookTests(unittest.TestCase):
         self.assertLessEqual(len(context), fastlane_hook.MAX_CONTEXT_CHARS)
         self.assertNotIn("sha256", context.casefold())
 
+    def test_additive_owner_projections_do_not_change_hook_routing(self) -> None:
+        baseline = report()
+        enriched = json.loads(json.dumps(baseline))
+        enriched["schema_version"] = 2
+        enriched["owner_decision_brief"] = {
+            "schema_version": 1,
+            "kind": "NONE",
+            "status": "NONE",
+        }
+        enriched["owner_answer_confirmation"] = {
+            "schema_version": 1,
+            "status": "NONE",
+        }
+        event = payload("SessionStart", self.root)
+
+        self.assertEqual(
+            fastlane_hook.handle_event(
+                "session-start", event, root=self.root, doctor_report=enriched
+            ),
+            fastlane_hook.handle_event(
+                "session-start", event, root=self.root, doctor_report=baseline
+            ),
+        )
     def test_unconfigured_template_session_start_routes_to_prerequisites(self) -> None:
         observed = fastlane_hook.run_doctor(self.root)
         self.assertEqual(observed["classification"], "UNCONFIGURED_TEMPLATE")

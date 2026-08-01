@@ -61,7 +61,7 @@ may resolve it.
   recent data might need recovery, `p95` into “at least 95 out of every 100
   requests,” concurrency into people using the product at the same time, and
   metadata into concrete examples such as hidden location and device details.
-- Present at most three numbered questions. For a decision, mark one
+- After the three initial settings, present exactly one numbered intake question. For a decision, mark one
   `Recommended` choice only when justified, state its principal benefit or
   limitation, and offer no more than two understandable alternatives. Do not
   label factual questions as decisions. Use `1 question remains before
@@ -74,14 +74,22 @@ may resolve it.
   write and use the parser's deterministic owner-safe status. If parsing fails,
   say that nothing was recorded, state the specific invalid reply key or format,
   preserve the unchanged questions, and show the valid reply form; do not
-  narrate internal IDs or hashes or echo secret-like input. If parsing succeeds
-  with only some answers, acknowledge only those answers and present the
-  still-pending questions using their original stable reply keys.
+  narrate internal IDs or hashes or echo secret-like input. If parsing succeeds, acknowledge that one answer and let the Engine project the next card.
+- After the normalized write and Engine revalidation, render Answer
+  Confirmation only when the caller supplies the matching new owner-response
+  identity from that turn. Show "Recorded", "Project effect", and
+  "Correct it"; never replay the confirmation on resume and never persist a
+  shown flag.
+- At Gate A, accept a correction only as
+  "Change the requirements: <correction>." At Gate B, accept one only as
+  "Change the design: <correction>." Parse before writing, record owner
+  provenance, apply existing staleness rules, and never treat a correction as
+  approval.
 - The `Accept all recommendations.` payload is available only after the current
-  card is presented and only when every question is a decision with a complete
+  card is presented and only when the current question is a decision with a complete
   recommendation that requires no detail. A factual question, missing
   recommendation, required detail, stale card, or altered phrase makes it unavailable.
-- “Explain these questions” is a clarification, not learning mode. Explain each
+- “Explain this question” or the legacy “Explain these questions” is a clarification, not learning mode. Explain each
   pending choice directly, state `Project state changed: No.`, rerun the Engine,
   and restore the same pending decision through the side-question presenter.
 
@@ -100,3 +108,24 @@ receipt, give one short decision card with exactly these labels:
 The card summarizes but never replaces or alters the exact formal receipt.
 Do not add it to routine status, side-question restoration, or an internal
 checkpoint. Keep methodology and context-management terms out of the card.
+## Owner Decision Briefs
+
+Before a Gate A or Gate B receipt, render the matching
+`owner_decision_brief` from the current Engine JSON. Never improvise or retain
+a second editable brief.
+
+- Gate A explains the outcome, users, first-release journey and boundary,
+  success, data and access, resilience, Region and cost, assumptions, risks,
+  change lineage, approval effect, and what remains unauthorized.
+- Gate B starts with a one-minute executive decision, then groups every
+  consequential technical decision by application/runtime, identity, data,
+  messaging, edge/networking, observability, deployment/recovery, and
+  validation/construction. It ends with repository-relative source locations.
+- Render each claim with its exact maturity in plain language. Planned work and
+  unobserved deployment never appear as proven.
+- A missing, duplicate, orphaned, conflicting, stale, unsafe, or unresolved
+  supporting record blocks the brief. Do not catch the diagnostic as prose or
+  bypass it.
+- The exact approval receipt remains last and byte-identical. Receipt-only
+  owner approval remains valid; after acceptance, continue in the same run and
+  show the next project section.

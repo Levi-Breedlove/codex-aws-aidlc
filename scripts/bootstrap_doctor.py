@@ -36,6 +36,23 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     )
 
 try:
+    from fastlane_owner_briefs import (
+        answer_confirmation,
+        claim as owner_claim,
+        empty_owner_decision_brief,
+        finalize_owner_decision_brief,
+        source_locator as owner_source_locator,
+    )
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.fastlane_owner_briefs import (
+        answer_confirmation,
+        claim as owner_claim,
+        empty_owner_decision_brief,
+        finalize_owner_decision_brief,
+        source_locator as owner_source_locator,
+    )
+
+try:
     from fastlane_process import resolve_trusted_git
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     from scripts.fastlane_process import resolve_trusted_git
@@ -64,6 +81,7 @@ try:
         intake_detail_safety_code,
         intake_reply_token,
         parse_intake_owner_response,
+        parse_gate_correction,
     )
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     from scripts.intake_response import (
@@ -71,6 +89,7 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
         intake_detail_safety_code,
         intake_reply_token,
         parse_intake_owner_response,
+        parse_gate_correction,
     )
 
 
@@ -173,7 +192,10 @@ INTAKE_FOUNDATION_FIELDS = (
     ("INTAKE-0004", "OBSERVABLE_OUTCOME"),
     ("INTAKE-0005", "FIRST_RELEASE_BOUNDARY"),
     ("INTAKE-0006", "SUCCESS_MEASURE"),
-    ("INTAKE-0007", "MATERIAL_DATA_AND_OPERATING_BOUNDARIES"),
+    ("INTAKE-0007", "DATA_TYPES"),
+    ("INTAKE-0008", "DATA_SENSITIVITY"),
+    ("INTAKE-0009", "RELEASE_AUDIENCE"),
+    ("INTAKE-0010", "OPERATING_GEOGRAPHY"),
 )
 INTAKE_CORE_FIELDS = frozenset(
     {
@@ -451,7 +473,7 @@ REQUIREMENT_COVERAGE_HEADERS = (
     "Acceptance/test IDs",
     "Approved success measure ID",
 )
-INTAKE_FOUNDATION_IDS = {f"INTAKE-{index:04d}" for index in range(1, 8)}
+INTAKE_FOUNDATION_IDS = {f"INTAKE-{index:04d}" for index in range(1, 11)}
 INTERFACE_HEADING = "## 16. Interfaces and contracts"
 INTERFACE_HEADERS = (
     "Contract ID",
@@ -799,6 +821,7 @@ MANDATORY_REQUIRED_FILES = {
     "infrastructure/AGENTS.md",
     "prompts/CODEX-PROMPTS.md",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_owner_briefs.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
@@ -1065,6 +1088,10 @@ class IntakeFoundationContract:
     missing_fields: tuple[str, ...] = ()
     pending_card: IntakeCard | None = None
     grandfathered_approved_gate_a: bool = False
+    normalized_responses: tuple[NormalizedOwnerResponse, ...] = field(
+        default=(), repr=False, compare=False
+    )
+    all_questions: tuple[IntakeQuestion, ...] = field(default=(), repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -6280,7 +6307,7 @@ def derive_intake_foundation_contract(
         issues.append(
             (
                 "INTAKE_FOUNDATION_INVALID",
-                "Intake foundation rows and order must match the seven canonical INTAKE IDs",
+                "Intake foundation rows and order must match the ten canonical INTAKE IDs",
             )
         )
 
@@ -6323,21 +6350,37 @@ def derive_intake_foundation_contract(
     elif problem:
         current_understanding.append(f"Problem: {problem}")
     outcome = confirmed_values.get("OBSERVABLE_OUTCOME")
-    if outcome:
-        current_understanding.append(f"First useful outcome: {outcome}")
     boundary = confirmed_values.get("FIRST_RELEASE_BOUNDARY")
-    if boundary:
+    if outcome and boundary:
+        current_understanding.append(
+            f"First useful outcome and release: {outcome} — {boundary}"
+        )
+    elif outcome:
+        current_understanding.append(f"First useful outcome: {outcome}")
+    elif boundary:
         current_understanding.append(f"First release: {boundary}")
     success = confirmed_values.get("SUCCESS_MEASURE")
-    material_boundaries = confirmed_values.get("MATERIAL_DATA_AND_OPERATING_BOUNDARIES")
-    if success and material_boundaries:
+    audience = confirmed_values.get("RELEASE_AUDIENCE")
+    if success and audience:
         current_understanding.append(
-            f"Success and material boundaries: {success} — {material_boundaries}"
+            f"Success and first audience: {success} — {audience}"
         )
     elif success:
         current_understanding.append(f"Success measure: {success}")
-    elif material_boundaries:
-        current_understanding.append(f"Material boundaries: {material_boundaries}")
+    elif audience:
+        current_understanding.append(f"First audience: {audience}")
+    data_types = confirmed_values.get("DATA_TYPES")
+    sensitivity = confirmed_values.get("DATA_SENSITIVITY")
+    geography = confirmed_values.get("OPERATING_GEOGRAPHY")
+    boundaries = [
+        value
+        for value in (data_types, sensitivity, geography)
+        if value is not None
+    ]
+    if boundaries:
+        current_understanding.append(
+            "Data and operating boundaries: " + " — ".join(boundaries)
+        )
     all_questions: list[IntakeQuestion] = []
     pending_questions: list[IntakeQuestion] = []
     card_ids: set[str] = set()
@@ -6581,11 +6624,18 @@ def derive_intake_foundation_contract(
         if not resolved:
             pending_questions.append(question)
 
-    if not 1 <= len(all_questions) <= 3:
+    if len(all_questions) > 1:
+        issues.append(
+            (
+                "INTAKE_CARD_MIGRATION_REQUIRED",
+                "Reissue the first unresolved intake question alone with a new card revision and digest",
+            )
+        )
+    elif len(all_questions) != 1:
         issues.append(
             (
                 "INTAKE_CARD_INVALID",
-                "Current intake card must contain one to three questions",
+                "Current intake card must contain exactly one question",
             )
         )
     if len(card_ids) != 1 or len(revisions) != 1:
@@ -6601,7 +6651,12 @@ def derive_intake_foundation_contract(
         )
 
     pending_card = None
-    if pending_questions and len(card_ids) == 1 and len(revisions) == 1:
+    if (
+        len(all_questions) == 1
+        and pending_questions
+        and len(card_ids) == 1
+        and len(revisions) == 1
+    ):
         card_id = next(iter(card_ids))
         revision = next(iter(revisions))
         accept_all = all(
@@ -6628,7 +6683,7 @@ def derive_intake_foundation_contract(
         issues.append(
             (
                 "INTAKE_CARD_REQUIRED",
-                "Create the next one-to-three-question intake card for the remaining foundation fields",
+                "Create the next one-question intake card for the remaining foundation fields",
             )
         )
 
@@ -6658,6 +6713,8 @@ def derive_intake_foundation_contract(
             basis_ids=basis_ids,
             missing_fields=missing_fields,
             pending_card=pending_card,
+            normalized_responses=tuple(normalized_responses),
+            all_questions=tuple(all_questions),
         ),
         issues,
     )
@@ -9273,6 +9330,614 @@ def table_after_heading(text: str, heading: str) -> dict[str, str]:
         result[key] = clean_cell(cells[1])
     return result
 
+
+OWNER_CONFIRMATION_FIELDS = {
+    "INTAKE-0001": "starting point",
+    "INTAKE-0002": "users",
+    "INTAKE-0003": "problem",
+    "INTAKE-0004": "first useful outcome",
+    "INTAKE-0005": "first-release boundary",
+    "INTAKE-0006": "success measure",
+    "INTAKE-0007": "data handled",
+    "INTAKE-0008": "data access and sensitivity",
+    "INTAKE-0009": "initial audience",
+    "INTAKE-0010": "operating geography",
+}
+
+
+def _owner_locator_for_heading(
+    text: str,
+    *,
+    key: str,
+    label: str,
+    heading: str,
+    required: bool = True,
+) -> dict[str, Any]:
+    """Resolve a brief locator through the Engine's canonical heading parser."""
+
+    span = _heading_title_span(text, heading)
+    start_line = text.count("\n", 0, span.start) + 1
+    end_offset = max(span.start, span.end - 1)
+    end_line = text.count("\n", 0, end_offset) + 1
+    return owner_source_locator(
+        key=key,
+        label=label,
+        path=PRD_FILE,
+        heading=heading,
+        start_line=start_line,
+        end_line=end_line,
+        section_text=text[span.start : span.end],
+        required=required,
+    )
+
+
+def _owner_decision_section(
+    section_id: str,
+    title: str,
+    items: Sequence[str],
+    basis_ids: Sequence[str],
+) -> dict[str, Any]:
+    return {
+        "section_id": section_id,
+        "title": title,
+        "items": [clean_cell(item) for item in items if clean_cell(item)],
+        "basis_ids": sorted(
+            {
+                clean_cell(item)
+                for item in basis_ids
+                if explicit_value(clean_cell(item), allow_none=False)
+            }
+        ),
+    }
+
+
+def _owner_technical_domain(concern: str) -> str:
+    lowered = concern.lower()
+    groups = (
+        ("identity", ("identity", "auth", "access", "secret")),
+        ("data", ("data", "database", "storage", "schema")),
+        ("messaging", ("message", "event", "queue", "stream")),
+        ("edge/networking", ("edge", "network", "dns", "cdn", "api gateway")),
+        ("observability", ("observ", "logging", "metric", "trace", "alarm")),
+        (
+            "deployment/recovery",
+            ("deploy", "release", "rollback", "recover", "migration", "iac"),
+        ),
+        (
+            "validation/construction",
+            ("test", "validation", "build", "lint", "format", "harness"),
+        ),
+    )
+    for domain, markers in groups:
+        if any(marker in lowered for marker in markers):
+            return domain
+    return "application/runtime"
+
+
+def derive_owner_decision_brief(
+    prd_text: str,
+    prd_fields: Mapping[str, str],
+    intake_contract: IntakeFoundationContract,
+    requirements_contract: RequirementsContract,
+    design_contract: DesignContract,
+    envelope: Mapping[str, str],
+    *,
+    has_errors: bool,
+    enabled: bool,
+) -> tuple[dict[str, Any], list[tuple[str, str]]]:
+    """Derive one fail-closed gate decision view from canonical project records."""
+
+    if not enabled:
+        return empty_owner_decision_brief(), []
+    requirements_revision = clean_cell(prd_fields.get("requirements_revision", ""))
+    design_revision = clean_cell(prd_fields.get("design_revision", ""))
+    authorization_id = clean_cell(prd_fields.get("construction_authorization", ""))
+    gate_a = clean_cell(prd_fields.get("gate_a", "BLOCKED"))
+    gate_b = clean_cell(prd_fields.get("gate_b", "BLOCKED"))
+    if gate_a != "APPROVED_FOR_DESIGN":
+        kind = "GATE_A"
+    elif gate_b != "APPROVED_FOR_CONSTRUCTION":
+        kind = "GATE_B"
+    else:
+        return empty_owner_decision_brief(), []
+
+    basis = {
+        "requirements_revision": (
+            requirements_revision if REQ_ID.fullmatch(requirements_revision) else None
+        ),
+        "design_revision": (
+            design_revision if kind == "GATE_B" and DES_ID.fullmatch(design_revision) else None
+        ),
+        "construction_authorization": (
+            authorization_id if kind == "GATE_B" and AUTH_ID.fullmatch(authorization_id) else None
+        ),
+        "design_contract_sha256": (
+            design_contract.canonical_sha256 if kind == "GATE_B" else None
+        ),
+    }
+    state_value = gate_a if kind == "GATE_A" else gate_b
+    contract_ready = (
+        requirements_contract.status in {"READY", "GRANDFATHERED"}
+        if kind == "GATE_A"
+        else design_contract.status == "READY"
+    )
+    if state_value == "STALE":
+        status = "STALE"
+    elif state_value == "PENDING_OWNER_APPROVAL":
+        status = "READY" if contract_ready and not has_errors else "BLOCKED"
+    else:
+        status = "BUILDING"
+
+    issues: list[tuple[str, str]] = []
+    try:
+        gate_a_card = table_after_heading(prd_text, "### Gate A — readiness card")
+    except ValueError as exc:
+        gate_a_card = {}
+        issues.append(("OWNER_BRIEF_SOURCE_MISMATCH", str(exc)))
+    sections: list[dict[str, Any]] = []
+    claims: list[dict[str, Any]] = []
+    locators: list[dict[str, Any]] = []
+    technical_groups: list[dict[str, Any]] = []
+
+    if kind == "GATE_A":
+        try:
+            gate_a_analysis = table_after_heading(
+                prd_text, "### Gate A — agent analysis record"
+            )
+        except ValueError as exc:
+            gate_a_analysis = {}
+            issues.append(("OWNER_BRIEF_SOURCE_MISMATCH", str(exc)))
+        sections = [
+            _owner_decision_section(
+                "GATE-A-OUTCOME",
+                "Outcome, users, and first useful journey",
+                [
+                    "Outcome: " + gate_a_card.get("Outcome", "Not yet recorded."),
+                    "Owner and users: "
+                    + gate_a_card.get("Owner and users", "Not yet recorded."),
+                    "First-release journey: "
+                    + (
+                        ", ".join(requirements_contract.journey_ids)
+                        or "Not yet recorded."
+                    ),
+                ],
+                [requirements_revision, *intake_contract.basis_ids],
+            ),
+            _owner_decision_section(
+                "GATE-A-BOUNDARY",
+                "First-release boundary",
+                [
+                    "Scope and non-goals: "
+                    + gate_a_card.get("Scope and non-goals", "Not yet recorded."),
+                    "Data handled: "
+                    + gate_a_card.get("Data boundary", "Not yet recorded."),
+                    "Who can access it: "
+                    + gate_a_card.get(
+                        "Identity/security boundary", "Not yet recorded."
+                    ),
+                ],
+                [requirements_revision, *requirements_contract.requirement_ids],
+            ),
+            _owner_decision_section(
+                "GATE-A-SUCCESS",
+                "Success, resilience, Region, and cost",
+                [
+                    "Success measures: "
+                    + gate_a_card.get(
+                        "Measurable requirement/acceptance IDs", "Not yet recorded."
+                    ),
+                    "Outage and recovery expectation: "
+                    + gate_a_card.get("Failure/recovery", "Not yet recorded."),
+                    "AWS Region: "
+                    + gate_a_card.get("Environment/Region", "Not yet recorded."),
+                    "Cost posture: "
+                    + gate_a_card.get("Cost posture", "Not yet recorded."),
+                ],
+                [requirements_revision, *requirements_contract.acceptance_ids],
+            ),
+            _owner_decision_section(
+                "GATE-A-RISK",
+                "Assumptions, risks, and change impact",
+                [
+                    "Proposed assumptions: "
+                    + gate_a_card.get("Assumptions", "None recorded."),
+                    "Open decisions: "
+                    + gate_a_analysis.get(
+                        "Open blocking decision IDs", "None recorded."
+                    ),
+                    "Open findings: "
+                    + gate_a_analysis.get(
+                        "Open blocking finding IDs", "None recorded."
+                    ),
+                    "Brownfield preservation: "
+                    + gate_a_card.get(
+                        "Brownfield baseline and preservation", "Not applicable."
+                    ),
+                ],
+                [requirements_revision, *requirements_contract.requirement_ids],
+            ),
+        ]
+        claims = [
+            owner_claim(
+                "The recorded product direction and confirmed intake facts came from the owner.",
+                "CONFIRMED_BY_OWNER",
+                basis_ids=intake_contract.basis_ids,
+            ),
+            owner_claim(
+                "The requirements are planned work; application behavior and AWS deployment have not been observed.",
+                "NOT_YET_OBSERVED",
+                basis_ids=requirements_contract.requirement_ids,
+            ),
+            owner_claim(
+                "Gate A does not authorize technical design selection, construction, publication, deployment, or teardown.",
+                "NOT_AUTHORIZED",
+                basis_ids=[requirements_revision],
+            ),
+        ]
+        locator_specs = (
+            ("product-statement", "Product statement", "2. Product statement"),
+            ("requirements", "Product requirements", "6. Feature specifications"),
+            ("gate-a-readiness", "Gate A readiness", "Gate A — readiness card"),
+            (
+                "gate-a-acceptance",
+                "Gate A acceptance record",
+                "Gate A — owner acceptance record",
+            ),
+        )
+        authorization = {
+            "approves": [
+                "The current product outcome, users, first-release boundary, requirements, constraints, and cost posture."
+            ],
+            "does_not_approve": [
+                "A technical design, local construction, GitHub publication, AWS account access, deployment, or teardown."
+            ],
+        }
+    else:
+        try:
+            table_after_heading(prd_text, "### Gate B — readiness card")
+        except ValueError as exc:
+            issues.append(("OWNER_BRIEF_SOURCE_MISMATCH", str(exc)))
+        selection = design_contract.architecture.selection
+        sections = [
+            _owner_decision_section(
+                "GATE-B-EXECUTIVE",
+                "Executive decision",
+                [
+                    (
+                        "Recommendation: "
+                        + (
+                            selection.selected_candidate
+                            if selection is not None
+                            else "Not yet selected."
+                        )
+                    ),
+                    (
+                        "Why it fits: "
+                        + (
+                            selection.rationale
+                            if selection is not None
+                            else "The architecture analysis is still in progress."
+                        )
+                    ),
+                    (
+                        "Main tradeoff: "
+                        + (
+                            selection.risks
+                            if selection is not None
+                            else "Not yet recorded."
+                        )
+                    ),
+                    "Construction boundary: "
+                    + envelope.get("Authorized outcome", "Not yet recorded."),
+                ],
+                [
+                    requirements_revision,
+                    design_revision,
+                    authorization_id,
+                    *([selection.architecture_id] if selection is not None else []),
+                ],
+            )
+        ]
+        grouped: dict[str, list[dict[str, Any]]] = {
+            key: []
+            for key in (
+                "application/runtime",
+                "identity",
+                "data",
+                "messaging",
+                "edge/networking",
+                "observability",
+                "deployment/recovery",
+                "validation/construction",
+            )
+        }
+        if selection is not None:
+            architecture_basis = sorted(
+                set(
+                    re.findall(
+                        r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b",
+                        selection.requirement_and_driver_basis,
+                    )
+                )
+            )
+            grouped["application/runtime"].append(
+                {
+                    "decision_id": selection.architecture_id,
+                    "decision": "Whole-system architecture",
+                    "selection": selection.selected_candidate,
+                    "why": selection.rationale,
+                    "tradeoff": selection.risks,
+                    "basis_ids": architecture_basis,
+                    "evidence_ids": [
+                        item.evidence_id
+                        for item in design_contract.architecture.aws_evidence
+                    ],
+                    "source_locator_keys": ["selected-architecture"],
+                }
+            )
+        for decision in design_contract.technology_decisions:
+            decision_basis = sorted(
+                set(
+                    re.findall(
+                        r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b",
+                        decision.basis_ids,
+                    )
+                )
+            )
+            grouped[_owner_technical_domain(decision.concern)].append(
+                {
+                    "decision_id": decision.decision_id,
+                    "decision": decision.concern,
+                    "selection": decision.selection,
+                    "why": decision.alternatives_and_rationale,
+                    "tradeoff": decision.compatibility_migration,
+                    "basis_ids": decision_basis,
+                    "evidence_ids": [],
+                    "source_locator_keys": ["technology-decisions"],
+                }
+            )
+        if design_contract.harness.rows:
+            grouped["validation/construction"].append(
+                {
+                    "decision_id": "HARNESS-PROFILE",
+                    "decision": "Validation and construction checks",
+                    "selection": (
+                        f"{len(design_contract.harness.rows)} applicable checks "
+                        "are recorded."
+                    ),
+                    "why": (
+                        "The checks are bound to the approved design and "
+                        "requirements."
+                    ),
+                    "tradeoff": (
+                        "More validation takes time but reduces undetected defects."
+                    ),
+                    "basis_ids": list(design_contract.harness.required_ids),
+                    "evidence_ids": [],
+                    "source_locator_keys": ["harness-profile"],
+                }
+            )
+        technical_groups = [
+            {"domain": domain, "decisions": decisions}
+            for domain, decisions in grouped.items()
+            if decisions
+        ]
+        evidence_ids = [
+            item.evidence_id for item in design_contract.architecture.aws_evidence
+        ]
+        claims = []
+        if evidence_ids:
+            claims.append(
+                owner_claim(
+                    (
+                        "Current official AWS references support the material "
+                        "AWS design claims recorded in the technical plan."
+                    ),
+                    "SOURCE_VERIFIED",
+                    basis_ids=[design_revision],
+                    evidence_ids=evidence_ids,
+                )
+            )
+        claims.extend(
+            (
+                owner_claim(
+                    (
+                        "The recommended architecture, construction work, "
+                        "rollback, and operational procedures are planned after "
+                        "approval."
+                    ),
+                    "PLANNED_AFTER_APPROVAL",
+                    basis_ids=[design_revision, authorization_id],
+                ),
+                owner_claim(
+                    (
+                        "Deployment, recovery, and teardown have not yet been "
+                        "observed."
+                    ),
+                    "NOT_YET_OBSERVED",
+                    basis_ids=[design_revision],
+                ),
+                owner_claim(
+                    (
+                        "Gate B does not authorize GitHub publication, AWS "
+                        "account access, deployment, or teardown."
+                    ),
+                    "NOT_AUTHORIZED",
+                    basis_ids=[authorization_id],
+                ),
+            )
+        )
+        locator_specs = (
+            ("technical-plan", "Technical plan", "14. Architecture overview"),
+            (
+                "technology-decisions",
+                "Technology decisions",
+                "Technology and toolchain decision register",
+            ),
+            (
+                "selected-architecture",
+                "Selected architecture",
+                "Selected architecture",
+            ),
+            ("harness-profile", "Harness Profile", "Gate B Harness Profile"),
+            (
+                "gate-b-readiness",
+                "Gate B readiness",
+                "Gate B — readiness card",
+            ),
+            (
+                "construction-boundary",
+                "Construction boundary",
+                "28. Construction envelope",
+            ),
+            (
+                "gate-b-authorization",
+                "Gate B authorization record",
+                "29. Gate B owner authorization record",
+            ),
+        )
+        authorization = {
+            "approves": [
+                (
+                    "The complete technical design and the exact bounded local "
+                    "construction envelope."
+                )
+            ],
+            "does_not_approve": [
+                (
+                    "GitHub publication, AWS account access, deployment, "
+                    "rollback execution, or teardown."
+                )
+            ],
+        }
+
+    for key, label, heading in locator_specs:
+        try:
+            locators.append(
+                _owner_locator_for_heading(
+                    prd_text, key=key, label=label, heading=heading
+                )
+            )
+        except ValueError as exc:
+            issues.append(
+                (
+                    "OWNER_BRIEF_SOURCE_MISMATCH",
+                    f"{label} source could not be resolved: {exc}",
+                )
+            )
+
+    projection = {
+        "schema_version": 1,
+        "kind": kind,
+        "status": status,
+        "basis": basis,
+        "executive_sections": sections,
+        "technical_decision_groups": technical_groups,
+        "claims": claims,
+        "source_locators": locators,
+        "authorization_effect": authorization,
+        "formal_receipt_required": status == "READY",
+    }
+    finalized, validation_issues = finalize_owner_decision_brief(projection)
+    for issue in validation_issues:
+        if "unsafe" in issue or "secret" in issue:
+            code = "OWNER_BRIEF_UNSAFE_CONTENT"
+        elif "output budget" in issue:
+            code = "OWNER_BRIEF_OUTPUT_BUDGET_UNRESOLVED"
+        else:
+            code = "OWNER_BRIEF_COVERAGE_INCOMPLETE"
+        issues.append((code, issue))
+    if status == "STALE":
+        issues.append(
+            (
+                "OWNER_BRIEF_SOURCE_STALE",
+                "the gate basis is stale; regenerate the derived decision brief from current canonical records",
+            )
+        )
+    return finalized, issues
+
+
+def derive_owner_answer_confirmation(
+    prd_text: str,
+    intake_contract: IntakeFoundationContract,
+) -> dict[str, Any]:
+    """Project only the latest canonical normalized intake response."""
+
+    if not intake_contract.normalized_responses:
+        return answer_confirmation()
+    latest_number = max(
+        int(item.owner_response_id.rsplit("-", 1)[1])
+        for item in intake_contract.normalized_responses
+    )
+    latest = [
+        item
+        for item in intake_contract.normalized_responses
+        if int(item.owner_response_id.rsplit("-", 1)[1]) == latest_number
+    ]
+    identities = {
+        (
+            item.owner_response_id,
+            item.card_id,
+            item.revision,
+            item.presented_card_digest,
+        )
+        for item in latest
+    }
+    if len(identities) != 1:
+        return answer_confirmation(status="BLOCKED")
+    question_by_id = {
+        question.question_id: question for question in intake_contract.all_questions
+    }
+    recorded: list[str] = []
+    fields: list[str] = []
+    for response in latest:
+        question = question_by_id.get(response.question_id)
+        if question is None:
+            return answer_confirmation(status="BLOCKED")
+        if response.selection == "RESPONSE":
+            value = response.selection_detail or ""
+        else:
+            value = {
+                "A": question.option_a,
+                "B": question.option_b,
+                "C": question.option_c,
+            }.get(response.selection, "")
+            if response.selection_detail:
+                value += f" ({response.selection_detail})"
+        if not value:
+            return answer_confirmation(status="BLOCKED")
+        recorded.append(f"{question.prompt}: {value}")
+        fields.extend(
+            OWNER_CONFIRMATION_FIELDS.get(item, "project answer")
+            for item in response.basis_ids
+        )
+    owner_response_id, card_id, revision, digest = next(iter(identities))
+    try:
+        locator = _owner_locator_for_heading(
+            prd_text,
+            key="intake-provenance",
+            label="Recorded intake answers",
+            heading="1.1 Intake provenance",
+        )
+    except ValueError:
+        return answer_confirmation(status="BLOCKED")
+    field_name = fields[0] if fields else "project answer"
+    return answer_confirmation(
+        status="READY",
+        owner_response_id=owner_response_id,
+        card_id=card_id,
+        revision=revision,
+        presented_sha256=digest,
+        recorded=recorded,
+        project_effect=(
+            "Fastlane will use this confirmed answer to shape the next "
+            "requirements. It does not approve construction, publication, or "
+            "AWS changes."
+        ),
+        correction_prompt=f"Change {field_name} to <new value>.",
+        basis_ids=[item for response in latest for item in response.basis_ids],
+        source_locators=[locator],
+    )
 
 def marked_receipt(text: str, gate: str) -> str:
     start = f"<!-- bootstrap:{gate}-receipt:start -->"
@@ -13506,10 +14171,15 @@ DEFINE_AGENT_DIAGNOSTICS = frozenset(
         "BUSINESS_RULE_INVALID",
         "REQUIREMENT_COVERAGE_INVALID",
         "INTAKE_CARD_REQUIRED",
+        "INTAKE_CARD_MIGRATION_REQUIRED",
         "INTAKE_CONTRACT_MIGRATION_REQUIRED",
         "INTAKE_SELECTION_PROVENANCE_INVALID",
         "INTAKE_FOUNDATION_PROVENANCE_INVALID",
         "INTAKE_RESPONSE_REGISTER_INVALID",
+        "OWNER_BRIEF_SOURCE_STALE",
+        "OWNER_BRIEF_COVERAGE_INCOMPLETE",
+        "OWNER_BRIEF_SOURCE_MISMATCH",
+        "OWNER_BRIEF_OUTPUT_BUDGET_UNRESOLVED",
         "GATE_A_LIFECYCLE_TRANSITION",
         "GATE_A_READINESS_CARD",
         "GATE_A_RECOMMENDATION",
@@ -13533,6 +14203,10 @@ DESIGN_AGENT_DIAGNOSTICS = frozenset(
         "GATE_B_READINESS_CARD",
         "GATE_B_RECOMMENDATION",
         "GATE_B_REVISION_MISMATCH",
+        "OWNER_BRIEF_SOURCE_STALE",
+        "OWNER_BRIEF_COVERAGE_INCOMPLETE",
+        "OWNER_BRIEF_SOURCE_MISMATCH",
+        "OWNER_BRIEF_OUTPUT_BUDGET_UNRESOLVED",
         "AWS_CORE_EVIDENCE_REQUIRED",
         "AWS_CORE_DISCOVERY_REQUIRED",
         "AWS_CORE_EVIDENCE_STALE",
@@ -19635,6 +20309,24 @@ def build_report(
         authorization_field=transition_authorization_field,
         receipt_digest_field=transition_receipt_field,
     )
+    owner_decision_brief, owner_brief_issues = derive_owner_decision_brief(
+        ctx.texts.get(PRD_FILE, ""),
+        prd_fields,
+        intake_contract,
+        requirements_contract,
+        design_contract,
+        envelope,
+        has_errors=ctx.has_errors,
+        enabled=classification not in {"TEMPLATE_SOURCE", "UNCONFIGURED_TEMPLATE"},
+    )
+    for code, message in owner_brief_issues:
+        if code == "OWNER_BRIEF_SOURCE_STALE":
+            ctx.warning(code, message, PRD_FILE)
+        else:
+            ctx.error(code, message, PRD_FILE)
+    owner_answer_confirmation = derive_owner_answer_confirmation(
+        ctx.texts.get(PRD_FILE, ""), intake_contract
+    )
     diagnostic_codes = [item.code for item in ctx.diagnostics]
     aws_mutation_authority_ready = external_authority.get(
         "validity"
@@ -19743,6 +20435,16 @@ def build_report(
                 external_authority,
                 lifecycle_intent=lifecycle_intent_projection,
             )
+        )
+        owner_decision_brief, _owner_brief_issues = derive_owner_decision_brief(
+            ctx.texts.get(PRD_FILE, ""),
+            prd_fields,
+            intake_contract,
+            requirements_contract,
+            design_contract,
+            envelope,
+            has_errors=ctx.has_errors,
+            enabled=classification not in {"TEMPLATE_SOURCE", "UNCONFIGURED_TEMPLATE"},
         )
         diagnostic_codes = [item.code for item in ctx.diagnostics]
         remediation = derive_remediation(
@@ -19862,6 +20564,8 @@ def build_report(
                 else "NONE"
             ),
         },
+        "owner_decision_brief": owner_decision_brief,
+        "owner_answer_confirmation": owner_answer_confirmation,
         "intake_foundation": intake_contract.to_dict(),
         "requirements_contract": requirements_contract.to_dict(),
         "coverage_plan": coverage_contract.to_dict(),
@@ -20053,6 +20757,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Prior sha256 remediation fingerprint for one bounded retry",
     )
     parser.add_argument("--parse-intake-response", action="store_true")
+    parser.add_argument("--parse-gate-correction", action="store_true")
     parser.add_argument("--validate-gate-receipt", action="store_true")
     parser.add_argument("--input-stdin", action="store_true")
     parser.add_argument("--presented-card-id")
@@ -20067,7 +20772,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(
             "--prior-remediation-fingerprint must be sha256:<64 lowercase hex>"
         )
-    if args.parse_intake_response and args.validate_gate_receipt:
+    owner_input_modes = sum(
+        (
+            args.parse_intake_response,
+            args.parse_gate_correction,
+            args.validate_gate_receipt,
+        )
+    )
+    if owner_input_modes > 1:
         print(
             json.dumps(
                 {
@@ -20085,6 +20797,29 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 1
+    if args.parse_gate_correction:
+        if not args.input_stdin or not args.json:
+            print(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "status": "FAIL",
+                        "errors": [
+                            {
+                                "code": "GATE_CORRECTION_USAGE",
+                                "message": "Gate correction parsing requires stdin and JSON",
+                            }
+                        ],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 1
+        candidate = sys.stdin.read(MAX_RESPONSE_CHARACTERS + 1)
+        result = parse_gate_correction(candidate).to_dict()
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if result["status"] == "PASS" else 2
     if args.parse_intake_response:
         if (
             not args.input_stdin

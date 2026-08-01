@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -11,9 +12,11 @@ from datetime import datetime
 from typing import Any, Mapping, Sequence
 
 try:
+    from fastlane_owner_briefs import finalize_owner_decision_brief
     from intake_response import intake_reply_token
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
+    from scripts.fastlane_owner_briefs import finalize_owner_decision_brief
     from scripts.intake_response import intake_reply_token
     from scripts.fastlane_stdio import configure_utf8_standard_streams
 
@@ -1239,7 +1242,7 @@ def _pending_intake_card(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
         or revision < 1
         or not isinstance(questions, Sequence)
         or isinstance(questions, (str, bytes))
-        or not 1 <= len(questions) <= 3
+        or len(questions) != 1
         or not isinstance(owner_reply, str)
         or not owner_reply.strip()
         or not isinstance(exact_reply, str)
@@ -1378,27 +1381,17 @@ def _render_intake_card(
     *,
     updated: str,
 ) -> str:
-    question_count = len(card["questions"])
-    if question_count == 1:
-        status = "1 question remains before requirements analysis."
-    else:
-        status = f"{question_count} questions remain before requirements analysis."
     lines = [
         "FASTLANE \u00b7 DEFINE",
         "",
-        f"Status: {status}",
+        "Status: 1 question remains before requirements analysis.",
         f"Updated: {updated}",
     ]
     current_understanding = _intake_current_understanding(report)
     if current_understanding:
         lines.append("Current understanding:")
         lines.extend(f"- {item}" for item in current_understanding)
-    if question_count == 1:
-        lines.append("Need from you: Answer this remaining question.")
-    else:
-        lines.append(
-            f"Need from you: Answer these {question_count} remaining questions."
-        )
+    lines.append("Need from you: Answer this remaining question.")
     lines.extend(_intake_question_lines(card))
     lines.extend(
         (
@@ -1659,12 +1652,348 @@ def render_prerequisite_update(report: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+OWNER_MATURITY_LABELS = {
+    "CONFIRMED_BY_OWNER": "Confirmed by you",
+    "OBSERVED_IN_REPOSITORY": "Observed in the repository",
+    "SOURCE_VERIFIED": "Verified from current sources",
+    "LOCALLY_OBSERVED": "Observed in local validation",
+    "AWS_READ_OBSERVED": "Observed through authorized AWS read access",
+    "DEPLOYED_OBSERVED": "Observed after deployment",
+    "RECOVERY_OBSERVED": "Observed during recovery",
+    "PLANNED_AFTER_APPROVAL": "Planned after approval",
+    "NOT_YET_OBSERVED": "Not yet observed",
+    "NOT_AUTHORIZED": "Not authorized",
+}
+
+
+def _canonical_projection_digest(projection: Mapping[str, Any]) -> str:
+    canonical = dict(projection)
+    canonical.pop("canonical_sha256", None)
+    return "sha256:" + hashlib.sha256(
+        json.dumps(
+            canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _validated_owner_decision_brief(
+    report: Mapping[str, Any], expected_kind: str
+) -> Mapping[str, Any]:
+    brief = report.get("owner_decision_brief")
+    if not isinstance(brief, Mapping):
+        raise PresentationError(
+            "Fastlane Engine report is missing the Owner Decision Brief"
+        )
+    finalized, validation_issues = finalize_owner_decision_brief(dict(brief))
+    if validation_issues or finalized.get("canonical_sha256") != brief.get(
+        "canonical_sha256"
+    ):
+        raise PresentationError(
+            "Owner Decision Brief does not satisfy the canonical derived contract or digest"
+        )
+    if brief.get("schema_version") != 1 or brief.get("kind") != expected_kind:
+        raise PresentationError(
+            "Owner Decision Brief kind does not match the requested gate"
+        )
+    if brief.get("status") not in {"BUILDING", "READY", "STALE", "BLOCKED"}:
+        raise PresentationError("Owner Decision Brief has an invalid status")
+    digest = brief.get("canonical_sha256")
+    if (
+        not isinstance(digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
+        or digest != _canonical_projection_digest(brief)
+    ):
+        raise PresentationError(
+            "Owner Decision Brief digest does not match its content"
+        )
+    sections = brief.get("executive_sections")
+    if (
+        not isinstance(sections, Sequence)
+        or isinstance(sections, (str, bytes))
+        or not sections
+    ):
+        raise PresentationError(
+            "Owner Decision Brief has no executive decision sections"
+        )
+    for section in sections:
+        if not isinstance(section, Mapping) or any(
+            not isinstance(section.get(field), str) or not section.get(field)
+            for field in ("section_id", "title")
+        ):
+            raise PresentationError(
+                "Owner Decision Brief contains an invalid section"
+            )
+        items = section.get("items")
+        if (
+            not isinstance(items, Sequence)
+            or isinstance(items, (str, bytes))
+            or not items
+            or any(not isinstance(item, str) or not item for item in items)
+        ):
+            raise PresentationError(
+                "Owner Decision Brief section content is invalid"
+            )
+    groups = brief.get("technical_decision_groups")
+    if not isinstance(groups, Sequence) or isinstance(groups, (str, bytes)):
+        raise PresentationError("Owner Decision Brief decision index is invalid")
+    if expected_kind == "GATE_B" and brief.get("status") == "READY" and not groups:
+        raise PresentationError("Ready Gate B brief has no technical decision index")
+    for group in groups:
+        if not isinstance(group, Mapping) or not isinstance(
+            group.get("domain"), str
+        ):
+            raise PresentationError(
+                "Owner Decision Brief contains an invalid decision group"
+            )
+        decisions = group.get("decisions")
+        if not isinstance(decisions, Sequence) or isinstance(
+            decisions, (str, bytes)
+        ):
+            raise PresentationError(
+                "Owner Decision Brief contains an invalid decision list"
+            )
+        for decision in decisions:
+            if not isinstance(decision, Mapping) or any(
+                not isinstance(decision.get(field), str) or not decision.get(field)
+                for field in (
+                    "decision_id",
+                    "decision",
+                    "selection",
+                    "why",
+                    "tradeoff",
+                )
+            ):
+                raise PresentationError(
+                    "Owner Decision Brief contains an incomplete technical decision"
+                )
+    claims = brief.get("claims")
+    if not isinstance(claims, Sequence) or isinstance(claims, (str, bytes)):
+        raise PresentationError("Owner Decision Brief claims are invalid")
+    for claim in claims:
+        if (
+            not isinstance(claim, Mapping)
+            or claim.get("maturity") not in OWNER_MATURITY_LABELS
+            or not isinstance(claim.get("text"), str)
+            or not claim.get("text")
+        ):
+            raise PresentationError("Owner Decision Brief claim is invalid")
+    locators = brief.get("source_locators")
+    if not isinstance(locators, Sequence) or isinstance(locators, (str, bytes)):
+        raise PresentationError("Owner Decision Brief source locations are invalid")
+    for locator in locators:
+        if not isinstance(locator, Mapping) or any(
+            not isinstance(locator.get(field), expected)
+            for field, expected in (
+                ("key", str),
+                ("label", str),
+                ("path", str),
+                ("heading", str),
+                ("start_line", int),
+                ("end_line", int),
+                ("section_sha256", str),
+                ("required", bool),
+            )
+        ):
+            raise PresentationError(
+                "Owner Decision Brief source location is invalid"
+            )
+        path = str(locator["path"])
+        if (
+            path.startswith(("/", "\\"))
+            or "\\" in path
+            or ".." in path.split("/")
+            or re.match(r"^[A-Za-z]:", path)
+        ):
+            raise PresentationError(
+                "Owner Decision Brief source location is not repository-relative"
+            )
+    authorization = brief.get("authorization_effect")
+    if not isinstance(authorization, Mapping):
+        raise PresentationError(
+            "Owner Decision Brief approval boundary is missing"
+        )
+    for field in ("approves", "does_not_approve"):
+        values = authorization.get(field)
+        if (
+            not isinstance(values, Sequence)
+            or isinstance(values, (str, bytes))
+            or not values
+            or any(not isinstance(value, str) or not value for value in values)
+        ):
+            raise PresentationError(
+                "Owner Decision Brief approval boundary is invalid"
+            )
+    if brief.get("formal_receipt_required") is not (
+        brief.get("status") == "READY"
+    ):
+        raise PresentationError(
+            "Owner Decision Brief receipt state conflicts with readiness"
+        )
+    return brief
+
+
+def _markdown_anchor(heading: str) -> str:
+    value = re.sub(r"[^\w -]", "", heading.lower(), flags=re.UNICODE)
+    return re.sub(r"[\s-]+", "-", value).strip("-")
+
+
+def render_owner_decision_brief(
+    report: Mapping[str, Any], expected_kind: str
+) -> str:
+    """Render one deterministic Gate A or Gate B owner decision view."""
+
+    brief = _validated_owner_decision_brief(report, expected_kind)
+    stage = "DEFINE" if expected_kind == "GATE_A" else "DESIGN"
+    name = (
+        "Gate A Owner Decision Brief"
+        if expected_kind == "GATE_A"
+        else "Gate B Technical Owner Decision Brief"
+    )
+    status_copy = {
+        "BUILDING": "This decision brief is still being prepared.",
+        "READY": "This decision brief is ready for your review.",
+        "STALE": "This decision brief changed and must be refreshed before approval.",
+        "BLOCKED": "Validation found an issue that must be resolved before approval.",
+    }[str(brief["status"])]
+    lines = [f"FASTLANE · {stage}", "", name, "", f"Status: {status_copy}"]
+    for section in brief["executive_sections"]:
+        lines.extend(("", f"## {section['title']}"))
+        lines.extend(f"- {item}" for item in section["items"])
+
+    groups = brief["technical_decision_groups"]
+    if groups:
+        lines.extend(("", "## Technical decision index"))
+        for group in groups:
+            domain = str(group["domain"]).replace("/", " and ").title()
+            lines.extend(("", f"### {domain}"))
+            for decision in group["decisions"]:
+                lines.extend(
+                    (
+                        f"- **{decision['decision']}** — {decision['selection']}",
+                        f"  Why: {decision['why']}",
+                        f"  Tradeoff: {decision['tradeoff']}",
+                    )
+                )
+
+    lines.extend(("", "## Evidence and authorization"))
+    for claim in brief["claims"]:
+        lines.append(
+            f"- {OWNER_MATURITY_LABELS[str(claim['maturity'])]}: "
+            f"{claim['text']}"
+        )
+    lines.extend(("", "## Approval boundary", "", "This approval covers:"))
+    lines.extend(
+        f"- {item}" for item in brief["authorization_effect"]["approves"]
+    )
+    lines.extend(("", "This approval does not cover:"))
+    lines.extend(
+        f"- {item}"
+        for item in brief["authorization_effect"]["does_not_approve"]
+    )
+
+    lines.extend(("", "## Review the exact sources"))
+    for locator in brief["source_locators"]:
+        anchor = _markdown_anchor(str(locator["heading"]))
+        lines.append(
+            f"- [{locator['label']}]({locator['path']}#{anchor}) "
+            f"(lines {locator['start_line']}–{locator['end_line']})"
+        )
+    lines.extend(
+        (
+            "",
+            (
+                "Next: Review the exact approval receipt shown after this brief."
+                if brief["status"] == "READY"
+                else "Next: Codex will resolve the reported issue and refresh this brief."
+            ),
+        )
+    )
+    return "\n".join(lines)
+
+
+def _validated_answer_confirmation(
+    report: Mapping[str, Any], owner_response_id: str
+) -> Mapping[str, Any]:
+    confirmation = report.get("owner_answer_confirmation")
+    if not isinstance(confirmation, Mapping):
+        raise PresentationError(
+            "Fastlane Engine report is missing Answer Confirmation"
+        )
+    if confirmation.get("schema_version") != 1:
+        raise PresentationError("Answer Confirmation schema is unsupported")
+    if confirmation.get("status") != "READY":
+        raise PresentationError("No validated owner answer is ready to confirm")
+    if confirmation.get("owner_response_id") != owner_response_id:
+        raise PresentationError(
+            "Answer Confirmation does not match the current owner response"
+        )
+    digest = confirmation.get("canonical_sha256")
+    if (
+        not isinstance(digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
+        or digest != _canonical_projection_digest(confirmation)
+    ):
+        raise PresentationError(
+            "Answer Confirmation digest does not match its content"
+        )
+    binding = confirmation.get("card_binding")
+    if (
+        not isinstance(binding, Mapping)
+        or not isinstance(binding.get("card_id"), str)
+        or not isinstance(binding.get("revision"), int)
+        or not isinstance(binding.get("presented_sha256"), str)
+    ):
+        raise PresentationError("Answer Confirmation card binding is invalid")
+    recorded = confirmation.get("recorded")
+    if (
+        not isinstance(recorded, Sequence)
+        or isinstance(recorded, (str, bytes))
+        or not recorded
+        or any(not isinstance(item, str) or not item for item in recorded)
+    ):
+        raise PresentationError("Answer Confirmation has no recorded value")
+    for field in ("project_effect", "correction_prompt"):
+        if not isinstance(confirmation.get(field), str) or not confirmation.get(field):
+            raise PresentationError(f"Answer Confirmation {field} is missing")
+    return confirmation
+
+
+def render_answer_confirmation(
+    report: Mapping[str, Any], owner_response_id: str
+) -> str:
+    """Render a confirmation only for the matching newly processed owner turn."""
+
+    confirmation = _validated_answer_confirmation(report, owner_response_id)
+    lines = ["FASTLANE · DEFINE", ""]
+    for item in confirmation["recorded"]:
+        lines.append(f"Recorded: {item}")
+    lines.extend(
+        (
+            "",
+            f"Project effect: {confirmation['project_effect']}",
+            "",
+            f"Correct it: Say `{confirmation['correction_prompt']}`",
+            "",
+            "Next: Codex will continue with the next unanswered project decision.",
+        )
+    )
+    return "\n".join(lines)
+
 def main(argv: list[str] | None = None) -> int:
     configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(
         description="Render Fastlane owner conversation from JSON on stdin"
     )
-    parser.add_argument("mode", choices=("owner", "side-question"))
+    parser.add_argument(
+        "mode",
+        choices=(
+            "owner",
+            "side-question",
+            "gate-a-brief",
+            "gate-b-brief",
+            "answer-confirmation",
+        ),
+    )
     parser.add_argument(
         "--input-stdin",
         action="store_true",
@@ -1688,6 +2017,14 @@ def main(argv: list[str] | None = None) -> int:
             output = render_owner_update(
                 report,
                 updated=str(payload.get("updated", "Nothing.")),
+            )
+        elif args.mode == "gate-a-brief":
+            output = render_owner_decision_brief(report, "GATE_A")
+        elif args.mode == "gate-b-brief":
+            output = render_owner_decision_brief(report, "GATE_B")
+        elif args.mode == "answer-confirmation":
+            output = render_answer_confirmation(
+                report, str(payload.get("owner_response_id", ""))
             )
         else:
             output = render_side_question_response(
