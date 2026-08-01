@@ -1,487 +1,110 @@
 # AWS Codex Fastlane Workflow
 
-Fastlane turns an idea into owner-approved requirements, an AWS-informed
-technical design, and a build constrained by an explicit construction boundary.
+Fastlane turns an app idea or bounded change into owner-approved requirements, one AWS-informed technical design, and a tested local build inside an explicit boundary. Codex is the sole coordinator/writer; the Fastlane Engine routes and validates; AWS Core supplies current AWS guidance; the owner decides and authorizes.
 
 ## Start
 
-Send:
+Send `init template`. A fresh template checks signed-in Codex, Git, Python 3.11+, sandbox support, `uvx`, and current official AWS Core without inspecting credentials or accessing an AWS account. Missing items appear in one consolidated checklist. Ready setup asks once for project name, preferred Region, and development budget; an initialized project resumes without repeating setup.
 
-```text
-init template
-```
+Repository state and owner work context are separate. After setup, Fastlane asks exactly one unanswered app question per owner turn: starting point; users and current problem; first useful end-to-end result; first-release boundary; observable success; data; sensitivity/access; initial audience; material geography; then only coverage-required reliability, recovery, legal, or operational decisions. It skips facts already supplied.
 
-For a fresh template, Codex first verifies the CLI login, Git, Python,
-platform sandbox tools, `uvx`, and official AWS Core. Missing dependencies are
-returned together as one owner-run checklist. After they pass, Codex welcomes
-the owner and asks once for:
+A decision uses plain A/B/C options, practical consequences, one justified recommendation when possible, its main tradeoff, and a short copyable reply. A factual question uses bounded free text. Rendering the current card ends the turn. Only a new inbound owner message can resolve the exact current card ID, revision, and canonical digest. A recommendation, example, stale reply, assistant text, or absent reply never confirms a choice.
 
-1. one-line project name (ordinary punctuation and international text are supported);
-2. canonical AWS Region ID (for example, `us-west-2`); and
-3. development budget posture.
+The deterministic sequence is owner response → parse → normalized canonical write → Engine revalidation → Answer Confirmation → next question. The confirmation states what was recorded, its practical project effect, and `Change <plain field> to <new value>.` It is bound to the new `OWNER-MSG-*` for that turn and is not replayed on resume.
 
-Use a finite cap with currency when one exists, or answer
-`minimize cost; no hard cap`. Codex initializes the project, runs the Fastlane Engine,
-and immediately begins the next lifecycle prompt. A configured project skips
-fresh prerequisites and resumes its derived stage.
-
-The repository state and the owner's work are separate facts. After setup,
-Fastlane asks whether the owner is starting a new application, changing an
-existing one, or repairing/migrating a system; an empty repository does not
-answer that question. It then grounds intake in the users, problem, observable
-outcome, first-release boundary, success measure, and material data/operating
-boundaries. Decisions use no more than three plain-language A/B/C choices with
-one exact reply; factual questions remain short free text.
-
-The Engine projects one current card from PRD intake provenance. Rendering it
-ends that assistant turn. Only a new owner message can resolve the card, and a
-choice that requires a name, service area, fallback, or other supporting detail
-remains open until the detail is supplied. Recommendations and examples never
-become owner confirmation. Requirements stay provisional until the foundation
-and current card are complete.
-
-Fastlane does not assume that option A is a default. When evidence supports a
-recommendation, the card marks it and explains its main tradeoff. Otherwise it
-says `No recommendation—choose the option that matches your situation.` and
-shows a neutral reply such as `1: <choose A, B, or C>`.
-
-When the owner replies to a pending card, the Engine parses that message against
-the exact current card before writing project state. It accepts bounded
-whitespace, lowercase or uppercase A/B/C choices, semicolon or newline-separated
-answers, factual answers, and valid partial replies. It rejects unknown or
-duplicate keys, stale-card replies, placeholders, contradictory choices,
-missing required detail, unresolved sentinel values, secret-like assignments,
-and extra unparsed text. A rejected reply changes no project file and returns
-one owner-safe correction without echoing the input. A valid partial reply
-records only the supplied answers and leaves the other questions pending under
-their original stable reply keys.
-
-The `Accept all recommendations.` payload is safe only when the exact current
-card ID, revision, and canonical digest match and every question is a decision
-with a complete recommendation that needs no supporting detail. It requires no
-visible reply token. A matching legacy token-prefixed reply remains hidden 1.0.x
-compatibility input for that exact card only. Accept-all is unavailable for
-factual questions or a partially recommended card. For the initial work-context
-question, normalized A/B/C choices map to `NEW_APPLICATION`,
-`EXISTING_APPLICATION_CHANGE`, and `REPAIR_OR_MIGRATION`. The normalized response
-register, card row, and all foundation facts derived from that question share
-one current-card provenance record. That record proves how Fastlane interpreted
-the message; it does not authenticate the owner's identity.
-
-For unapproved legacy intake, prior values remain unconfirmed context: Codex
-reopens the affected facts and asks the smallest current card rather than
-inventing historical owner-response provenance. An unchanged approved Gate A
-remains grandfathered until a requirements-controlled change and may bridge
-directly into current design work without asking the owner to repeat confirmed
-facts.
+`Accept all recommendations.` requires no visible reply token and applies only to the exact current eligible decision with a complete recommendation and no missing detail. Matching `R-*` input remains hidden 1.0.x compatibility for that exact card. Gate corrections are `Change the requirements: <correction>.` and `Change the design: <correction>.`; neither is approval.
 
 ## Lifecycle
 
 | Phase | Outcome | Owner decision |
 |---|---|---|
-| BOOT-00 | Repository initialized or safely resumed | Fresh setup answers; none on resume |
-| INTAKE-10 / REQ-10 | Requirements, assumptions, cost posture, safeguards, and success criteria | Answer questions |
+| BOOT-00 | Repository initialized or safely resumed | Fresh setup only |
+| INTAKE-10 / REQ-10 | Owner-grounded requirements and success criteria | Answer one current question |
 | Gate A / INTAKE-20 | Exact requirements revision reviewed | Approve requirements for design |
-| DESIGN-10 | Technical PRD, current AWS evidence, and construction envelope | None until ready |
+| DESIGN-10 | Complete technical plan, AWS evidence, diagrams, and construction envelope | None unless a material decision remains |
 | Gate B / DESIGN-20 | Exact design and construction boundary reviewed | Approve construction |
-| TASK-10 / BUILD | Dependency-aware tasks run inside the approved boundary | No task-by-task approval |
-| RELEASE-10 | Release evidence evaluated | Only when the release contract requires it |
-| AWS-10 | Read-only deployment preflight | Authorize the exact read-only account, role or profile, Region, resources, operations, and expiry; no mutation |
-| AWS-20 | Exact authorized deployment mutation | Current fast-dev Gate B envelope or separate exact explicit-gate action receipt, after observed preflight |
-| AWS-30 | Read-only deployment evidence reconciliation | Authorize the exact read scope only when no current reusable read receipt covers it |
-| AWS-40 | Residual-state review, teardown readiness, and terminal reconciliation | Choose a residual disposition when required; authorize the exact read scope when needed |
-| AWS-50 | Exact authorized teardown mutation | Separate exact expiring teardown authorization |
+| TASK-10 / BUILD | Dependency-aware local construction and evidence | No task-by-task approval |
+| RELEASE-10 | Release evidence reconciled | Only when its contract requires it |
+| AWS-10 | Read-only deployment preflight | Authorize the exact read-only account, identity, scope, operations, and expiry |
+| AWS-20 | Authorized deployment mutation | Current fast-dev envelope or separate explicit-gate receipt |
+| AWS-30 | Read-only deployment reconciliation | Exact read scope when no current reusable receipt covers it |
+| AWS-40 | Residual review and teardown readiness | Choose a residual disposition when required; authorize reads when needed |
+| AWS-50 | Authorized teardown mutation | Separate exact teardown authorization |
 
-Before a modern task plan becomes `CURRENT`, Fastlane accounts for every
-approved first-release requirement. The Engine derives one disposition per
-requirement from exact task traceability or current no-task evidence. Missing
-or mismatched coverage sends Codex back through task replanning; it does not
-create another owner gate.
+Gate A — approve requirements → Gate B — approve design and construction → Codex builds locally inside that boundary. Gate A continues into Design in the same run. Gate B continues into task generation in the same run. BUILD never deploys.
 
-Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
+After Gate B, Codex builds locally. For AWS preflight, deployment verification, or teardown preparation, ask Codex to use `$operate-fastlane-aws`. Every AWS mutation still requires its exact separate authorization.
 
-After Gate B, Codex builds locally. For AWS preflight, deployment verification,
-or teardown preparation, ask Codex to use `$operate-fastlane-aws`. Every AWS
-mutation still requires its exact separate authorization.
+BUG-10, SYNC-10, and explanation are request-scoped adjuncts, not routes or gates. They preserve the Engine route/action, perform only bounded work, rerun the Engine, and restore the pending action.
 
-BUG-10 and SYNC-10 are current-request-scoped adjunct prompts, not Engine
-routes or extra lifecycle gates. Codex may use BUG-10 only for an explicitly
-requested bounded defect contract and SYNC-10 only for explicitly requested,
-authorized named GitHub reconciliation. It preserves the current Engine route
-and pending owner action, performs only the adjunct's bounded work, reruns the
-Engine, and resumes the derived route. BUILD-10 may advance to BUILD-20 when
-the Engine permits autonomous continuation; BUILD-20 may continue itself until
-RELEASE-10 or a declared stop condition.
+## Owner Decision Briefs
+
+The Engine derives an `owner_decision_brief` from the one canonical PRD. The presenter renders it; it is never another editable ledger.
+
+- Gate A covers outcome, users, first-release journey, scope/non-goals, success, data/access, deletion/recovery, Region/cost, assumptions, risks, brownfield preservation, change lineage, authorization effect, next step, and the exact receipt.
+- Gate B opens with a one-minute executive decision, then groups consequential decisions by application/runtime, identity, data, messaging, edge/networking, observability, deployment/recovery, and validation/construction. Each claim has an exact maturity, basis/evidence IDs, and repository-relative source locator.
+- Claim maturity distinguishes owner confirmation, repository observation, source verification, local observation, AWS read observation, deployment/recovery observation, planning, absence of observation, and absence of authorization.
+- Gate A and Gate B receipts remain the only approvals and appear last. A valid receipt continues automatically; a correction never approves.
+
+Source locators use repository-relative paths, one-based inclusive lines, and SHA-256 of LF-normalized UTF-8 section bytes ending in one LF. They never expose a home path, credential, remote with credentials, or unverified permalink.
+
+## Canonical records and diagrams
+
+Requirements contract 1.4 records revision lineage and the assumption lifecycle. Unchanged approved schema 1.3 is grandfathered until a requirements-controlled change; the older approved 1.2 bridge remains exact and read-only.
+
+Design contract 6 adds the Project diagram contract. New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`; data, recovery, and migration views are conditional on canonical records. Fresh templates show honest `NOT_YET_CREATED` slots, never fake application architecture. Canonical IDs identify Mermaid nodes and plain labels explain them. Semantic relationships affect the design digest; render-only drift blocks the brief until Codex regenerates it. Diagrams describe planned design and never prove code, deployment, evidence, or authority. Unchanged approved schema 4 or 5 designs remain valid only for their exact design/envelope until a controlled design change.
+
+The project record starts at [docs/project/README.md](project/README.md): PRD owns requirements/design/gates; TASKS owns execution state; VERIFY owns evidence; RUNBOOK owns operations. Human summaries come first and exact records remain in appendices. There is no separate human PRD.
 
 ## Internal delivery rules
 
-Owner responses remain short and plain. The terms below are internal selection
-rules, not another lifecycle, approval system, dependency, or public vocabulary.
-They are conditional techniques, not lifecycle stages or approval gates.
+These are internal conditional techniques, not lifecycle stages or approval gates. They stay out of ordinary owner conversation.
 
-- Normative requirements use the Fastlane EARS Contract with Gherkin or
-  measurable acceptance; quality scenarios appear only for material concerns.
-- New builds receive complete architecture comparison. Bounded changes may
-  amend affected decisions or preserve architecture only with current proof;
-  uncertain impact receives full revalidation.
-- Delivery uses existing INVEST, thin-slice, walking-skeleton, property-test,
-  DONE, TDD, refactoring, and Mikado contracts only when their triggers apply.
-- Baseline security, testing, observability, and error handling always apply.
-  STRIDE, LINDDUN, OWASP Top 10, ATAM, ADR, and formal inspection deepen work
-  only for material exposure, privacy, one-way decisions, or high/critical risk.
-- Rich use cases and state models are required for high/critical risk or
-  materially branching, asynchronous, retry/resume, approval, migration,
-  permissioned, or meaningful-transition flows. Flow diagrams are optional
-  presentation aids and never readiness artifacts.
-- Gate B also records a risk-derived Harness Profile. Applicable checks become `REQUIRED`
-  with exact commands; conditional checks name an exact trigger; non-applicable
-  checks state a technology- or risk-based reason. No universal scanner is
-  imposed.
-- Repository Markdown/Mermaid remains canonical. External issue tracking needs
-  current authority and never becomes issue-per-task ceremony.
+- Normative requirements use the Fastlane EARS Contract with measurable/Gherkin acceptance. New builds receive complete architecture comparison; bounded changes use AMEND or evidence-backed PRESERVE. The first NEW_BUILD task is a walking-skeleton/Thin Vertical Slice tied to the approved `WAVE-*`.
+- Baseline security, testing, observability, and error handling always apply. STRIDE, LINDDUN, OWASP Top 10, ATAM, ADR, and formal inspection deepen work only for material exposure, privacy, hard-to-reverse decisions, or high/critical risk. They are not another lifecycle; procedural technique selection never claims deterministic proof.
+- Gate B records one risk-derived Harness Profile. Applicable checks are `REQUIRED` with exact commands, conditional checks name triggers, and inapplicable checks give concrete technology/risk reasons. No universal scanner is imposed.
+- Semantic Anchors are optional design vocabulary, not a Fastlane package, runtime dependency, owner workflow, authority, methodology, or source of truth.
+- Project diagrams are validated presentation of canonical records. They do not replace traceability, tests, or evidence.
 
-Semantic Anchors and related catalogs are optional design vocabulary, not a
-Fastlane package, runtime dependency, owner workflow, authority, or new source
-of truth. The Engine validates the resulting PRD, task, Harness, evidence, and
-digest contracts; procedural technique selection never claims deterministic
-proof by itself.
-## Framework maintenance
-
-Fastlane framework work uses `maintain-fastlane`, never the adopter lifecycle.
-It has four modes: `AUDIT` and `PLAN` are read-only; `IMPLEMENT` permits only
-local edits inside a recorded baseline, outcome, non-goals, file allowlist,
-acceptance criteria, and change budget; and `PUBLISH` requires separate exact
-authority for each Git or release action. Missing implementation scope stops
-before editing. Unrelated findings remain report-only, and publication never
-follows merely from permission to edit.
-A change to an FSC contract updates its workflow rule, applicable phase
-reference, PRD schema, deterministic validator/router, owner-visible
-presentation when affected, tests, and manifest in the same bounded
-maintenance change.
-Use `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`
-to verify the exact baseline, allowlist, change budget, and distinct publication
-authority before maintenance work. The contract is ephemeral and untracked.
-
-For canonical customer-package maintenance, compare the current manifest
-inventory and bytes with one exact existing ancestor using `python
-scripts/package_release.py --check --base-commit <exact-base-commit>`. When the
-package differs, `bootstrap.manifest.json` must contain a strictly greater
-semantic version and its mirrors must match. The guard is read-only, never
-fetches or publishes, and fails closed when the exact history is unavailable.
-It does not require initialized adopter applications to change Fastlane's
-framework version.
-
-The live `fast-lane-maint` customer branch uses short-lived maintenance branches
-and pull requests targeting only that customer branch. The PR branch must be
-current before merge, and these checks must pass: `safety-tests (3.11)`,
-`safety-tests (3.12)`, `safety-tests (3.13)`, `windows-smoke`, and
-`macos-setup-smoke`. Force pushes and deletion of the customer branch are
-prohibited. A direct push to `fast-lane-maint` requires explicit emergency
-publication authorization; ordinary `PUBLISH` work uses the PR-gated flow.
-
-GitHub branch-rule configuration is a separate repository-setting action. The
-repository documents the required policy but does not treat source-edit,
-commit, push, or PR authority as permission to change that setting. Protected
-legacy `Legacy` is not a customer publication target.
-
-
-## AWS Core throughout Fastlane
+## AWS Core and authority
 
 Fastlane requires the current official
-`aws-core@agent-toolkit-for-aws` from `aws/agent-toolkit-for-aws` at the
-material lifecycle points below whenever current AWS facts affect:
+`aws-core@agent-toolkit-for-aws` from `aws/agent-toolkit-for-aws`. Fresh setup runs one credential-free `search_documentation` for `AWS skills`, then matching `retrieve_skill`. Material Define, Design, and AWS-10 questions run their own current discovery chains. Installed metadata, cache, generic connectors, and model memory are not proof of use.
 
-- feasibility and requirements;
-- service and Region fit;
-- architecture, IAM, networking, encryption, and data protection;
-- reliability, quotas, observability, and cost drivers;
-- release readiness, deployment, rollback, operations, and teardown.
+Codex selects and coordinates the architecture. AWS Core supplies current AWS knowledge, decision guidance, procedures, and execution tools; it cannot approve or authorize. Fastlane records attributable `AWS-DISC-*`/`AWS-EV-*` evidence but persists no raw skill content or transcripts.
 
-Official AWS Core is a fresh-template prerequisite and is reused when already
-available. After initialization, a genuinely unavailable capability is owner
-setup. Missing, stale, or safely repairable generated evidence while that
-capability is available is Codex work; unexplained structural drift or unsafe
-evidence conflict requires human review. Each case pauses only the affected
-material AWS step and never repeats completed setup or intake.
-Fresh setup starts with exactly one credential-free `AWS skills`
-`search_documentation` call followed by `retrieve_skill` for an identifier
-returned by that search. Topic-specific AWS discovery begins later only for a
-material Define, Design, or AWS-10 question; it does not repeat or replace the
-completed setup chain.
+An AWS lane is planned access, not authority. Gate B's `AWS allowed operations` is the maximum union across AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50. Each phase may use only its current intersection with exact evidence and action authority. An explicit-gate maximum grants no mutation by itself. IAM remains downstream enforcement.
 
-REQ-10 classifies AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
-`NOT_MATERIAL`. `REQUIRED` applies when Gate A depends on a current AWS fact
-about Region or service feasibility, identity, sensitive data or uploads,
-public exposure, encryption, deletion or recovery, quotas, availability, or
-material cost. The coordinator then records a fresh
-`search_documentation`-then-matching-`retrieve_skill` chain against the current
-REQ and affected requirement IDs without selecting architecture or accessing
-an AWS account.
+`operate-fastlane-aws` owns execution procedure. Deployment flows AWS-10 → AWS-20 → AWS-30 and only AWS-20 may mutate. Teardown flows AWS-40 → AWS-50 → AWS-40 and only AWS-50 may mutate. Read, deployment, and teardown receipts are separate.
 
-REQ-10 when required, DESIGN-10, and AWS-10 record fresh attributable
-`search_documentation` and matching `retrieve_skill` results in
-`docs/project/VERIFY.md`. A generic
-connector, cached prose, or model memory does not satisfy required evidence.
-AWS Core advises; it cannot approve Gate A, Gate B, or an AWS change.
+AWS-30 stores `SOURCE: <stable owner-message source>; AUTHORIZED_AT: <ISO 8601 with timezone>; RESOURCES: <exact canonical list>; OPERATIONS: <exact canonical list>`. `AUTHORIZED_AT` comes from the matching Read-only preflight row in Action authorization provenance. Current exact-scope evidence matches resources/operations; other current reads may observe a subset. STALE never claims fresh reads. STARTED is not proof of a call; terminal evidence and independent read reconciliation determine what occurred.
 
-## Gate A
+For residuals, follow `aws_residual_disposition` while it is PENDING. One set-level choice covers the complete current residual set: RETAIN, INVESTIGATE, or REMOVE. Every choice after `RESIDUALS_REMAIN` must be strictly newer. After READY, RETAIN and INVESTIGATE must be strictly newer, while owner-provenanced TEARDOWN may carry forward as REMOVE. REMOVE may present an exact teardown receipt only after current readiness; lifecycle intent itself never authorizes account access.
 
-Gate A approves one exact requirements revision. It includes users, outcomes,
-scope, data, failure behavior, access, security, recovery, cost posture, and
-measurable success. It does not approve design, construction, GitHub mutation,
-AWS access, or spending.
+## Focused context and continuation
 
-## Gate B
+The Engine resolves exact source slices. `maximum_initial_bytes` and `maximum_initial_source_bytes` both mean at most 12,000 canonical repository source bytes, not tokens or total model context. `resolved_initial_slices` load first; `resolved_on_demand_slices` are not an implicit initial load. Each slice reports path, selector, one-based inclusive lines, digest, bytes, IDs, and reason.
 
-Gate B approves the exact current PRD and a construction envelope naming the
-outcome, scope, write boundaries, prohibited work, task and retry limits,
-checkpoints, GitHub permission, and planned AWS lane.
+Never silently truncate a row or blocking record. Lower-priority material moves on demand. One oversized required atomic record is included once and reported honestly without creating owner work. Invalid/ambiguous sources fail closed. Packets are ephemeral and untracked; runtime AWS skill content is external context and is not counted as repository bytes.
 
-After Gate B, Codex can build normally without repeated approvals. A material
-change in requirements, design, scope, risk, cost, or authority makes the
-applicable gate stale and stops affected work.
-A task-coverage omission or trace mismatch by itself is generated-plan drift:
-Codex replans and revalidates inside the unchanged Gate B boundary. Owner input
-is required only when resolving the gap would change an approved requirement,
-design decision, construction boundary, or authority.
+A ready Quick MVP with a complete brief needs at most one clarification round before Gate A. Setup and completed decisions never repeat. Every pause shows one next action. Safe Codex-owned corrections continue within write and attempt boundaries; owner or human actions appear only at genuine semantic, approval, authorization, protected-boundary, or safety boundaries.
 
-### Legacy contract compatibility
+## Framework maintenance
 
-Schema transitions do not create another owner gate. An unchanged approved schema 1.2 Gate A may be used as the requirements basis while Codex performs a design-only migration to schema 5. Codex writes generated migration records and reports `Need from you: Nothing` unless an owner fact required by the current requirements is genuinely missing. A requirements-controlled change instead requires schema 1.3 and makes the applicable approvals stale.
+Framework work uses `maintain-fastlane`, never the adopter lifecycle. `AUDIT` and `PLAN` are read-only. `IMPLEMENT` requires an exact baseline, outcome, non-goals, allowlist, acceptance criteria, and change budget. Missing implementation scope stops before edits. `PUBLISH` is separately authorized; publication never follows from edit authority. Unrelated findings remain report-only.
 
-That bridge derives acceptance labels from approved legacy rows. A legacy
-`NEW_BUILD` uses first-wave journey `NONE` and binds its end-to-end Harness to
-the wave plus every selected approved requirement; it does not invent a journey.
+The live `fast-lane` customer branch uses short-lived branches and pull requests targeting only that customer branch. Required checks are `safety-tests (3.11)`, `safety-tests (3.12)`, `safety-tests (3.13)`, `windows-smoke`, and `macos-setup-smoke`; the branch must be current. Force pushes and deletion are blocked. A direct push to `fast-lane` requires explicit emergency publication authority. Protected `fast-lane-maint` preserves 1.0.5; legacy `Legacy` is not a customer publication target. Branch-rule changes remain a separate repository-setting action.
 
-An unchanged approved schema 4 Gate B remains valid for its exact design and construction envelope. A new or unapproved design, or any design-controlled change, requires the complete schema 5 design contract and a fresh Gate B. Legacy compatibility cannot expand authority, invent design values, or bypass task and evidence checks. The owner supplies a missing product fact when one is needed and approves the resulting Gate B; Codex owns the mechanical migration.
+Use the read-only maintenance preflight before IMPLEMENT/PUBLISH and deterministic package comparison against the exact base commit. A source change requires a newer package version and current manifest; neither tool publishes.
 
-## AWS authorization
+## Optional hooks, qualification, and resume
 
-An AWS lane describes intended access; it never grants access. Documentation
-guidance is credential-free and accesses no AWS account. Authenticated AWS-10
-preflight requires a separate exact `AUTHORIZE AWS READ-ONLY PREFLIGHT`
-receipt naming:
+Fastlane works with hooks disabled. The reviewed optional hook pack may deny clearly out-of-bound requests but never creates approval, authority, or canonical state. The Engine must remain correct without it.
 
-- profile or role, account, Region, and environment;
-- immutable artifact, exact resources, and allowed read-only operations;
-- expiration; and
-- human approver.
+Before claiming a real AWS execution lane as field-qualified, Codex selects the smallest disposable scenario using current AWS Core guidance. The owner authorizes; IAM enforces; observed evidence proves. AWS Core does not choose the product architecture or grant authority. Field qualification adds no scorer, lifecycle stage, gate, or routine customer action.
 
-That receipt grants no mutation. Fastlane then moves deterministically through
-`AWS_GUIDANCE_REQUIRED`, `AWS_READ_SCOPE_REQUIRED`, `AWS_PREFLIGHT_RUNNING`,
-and an observed `AWS_PREFLIGHT_READY`. Only after observed readiness may an
-explicit-gate workflow enter `WAITING_AWS_MUTATION_AUTH` and present the exact
-deployment receipt.
+On resume, the Engine selects the current route and one next action. Initialized projects skip setup. A missing current AWS capability pauses only the affected material AWS step. Schema-5 model role plays remain opt-in, external-evidence checks for the Fastlane 1.1 customer journeys; they are never ordinary CI or independent release-readiness proof.
 
-For a Gate B boundary that permits authenticated AWS work, `AWS allowed
-operations` names the union of the exact read-only preflight/reconciliation
-operations and any later mutation or teardown operations. This is one maximum
-approved envelope, not authority to run every listed operation: AWS-10,
-AWS-30, and AWS-40 remain read-only, while AWS-20 and AWS-50 still require
-their own current phase evidence and action-specific authority.
+## Agent reference
 
-Before an AWS-20 call, Fastlane appends a STARTED row to the canonical
-append-only deployment action and reconciliation table. Every row keeps the
-attempt's deployment authorization, validity, and stable source unchanged;
-fast-dev stores the exact current construction `AUTH-*`, the expiry timestamp
-parsed from Gate B validity, and Gate B's authorization source; explicit-gate
-derives them from its deployment receipt.
-The terminal result uses the canonical identifiers/result grammar, which
-structures evidence but cannot prove execution alone. Fastlane then routes the
-Attempt ID to AWS-30.
-STARTED is not proof that a call occurred. If only STARTED exists on resume,
-owner action remains NONE while Codex appends UNKNOWN and reruns the Engine;
-only then may AWS-30 request read authority. FAILED, PARTIAL, or UNKNOWN cannot
-be retried before read-only reconciliation. AWS-30 requires independently
-current exact read authority; deployment authority cannot supply those reads,
-carry over, or be replayed. While Gate B remains current, an exact matching
-AWS-10 receipt may be reused if it is still current and covers reconciliation.
-Restricted stale or expired closure instead requires fresh post-action read
-authority. COMPLETE or BLOCKED returns to RELEASE-10, while
-one first STALE remains at AWS-30 until its authority and evidence are current.
-That STALE may be followed by one later COMPLETE or BLOCKED under a different
-current read authorization. A repeated STALE is a safety-review blocker; no
-reconciliation row follows COMPLETE or BLOCKED. RELEASE-10 records that
-terminal AWS-30 Evidence ID as VERIFY's Active evidence cutoff when it decides
-NOT_READY, RELEASE_VERIFIED, or a separately authorized correction path. Once
-acknowledged, the attempt cannot reroute. Retry requires distinct current
-mutation authority: a new exact deployment receipt for explicit-gate or freshly
-approved construction authorization for fast-dev, plus a new Attempt ID.
-
-Every AWS-30 row stores `Read authority source` exactly as `SOURCE: <stable
-owner-message source>; AUTHORIZED_AT: <ISO 8601 with timezone>; RESOURCES:
-<exact canonical list>; OPERATIONS: <exact canonical list>`. `AUTHORIZED_AT` is
-the `Observed at` timestamp of the matching Read-only preflight row in Action
-authorization provenance, not the owner-message creation time or the AWS-30
-evidence-row observation time. The AWS observation stays within that
-authorization window, Resources exactly match the encoded resource list, and
-observed operations are a subset of the encoded allowed operations.
-Current terminal evidence matches the current receipt tuple; an acknowledged
-historical row remains auditable from its stored tuple after later expiry or
-replacement.
-
-Gate B expiry or legitimate REQ/DES/Gate B staleness after a valid STARTED row
-does not abandon the attempted action and does not reauthorize normal work.
-Fastlane keeps ordinary construction, repository-write, and AWS mutation
-authority at NONE and exposes a separate
-`deployment_journal_closure_authority`. That closure is limited to
-`docs/project/VERIFY.md` and the Engine-selected bounded operation: append
-UNKNOWN for a lone STARTED row; record the exact marked read receipt/provenance
-and append its AWS-30 reconciliation row; or atomically update RELEASE-10's
-release decision and Active evidence cutoff. BLOCKED permits only `NOT_READY`;
-stale-basis COMPLETE permits only `NOT_READY`; same-basis COMPLETE permits
-`NOT_READY` or `RELEASE_VERIFIED`. Only deployment journal rows are
-append-only; receipt/provenance and release decisions use their canonical
-update contracts. A fresh exact post-action read receipt may close the
-immutable historical attempt boundary without renewing mutation authority.
-The durable original deployment receipt/provenance must also prove that
-STARTED did not precede its authorization. Only a structurally valid attempt
-that STARTED while its authority was current qualifies; malformed or tampered receipts,
-journal rows, timing, identities, boundaries, or evidence remain blockers. A
-consumed attempt never gains closure authority merely because the release is
-later marked READY_TO_DEPLOY; retry still needs fresh mutation authority and a
-new Attempt ID. A consumed `NOT_READY` attempt stops at
-`RELEASE_REVIEW_BLOCKED` unless the owner separately records a current
-non-authorizing lifecycle intent. That intent may select AWS-40 read-only
-residual review, but it never retries deployment or grants account access.
-
-At a settled release boundary, the optional lifecycle-intent record contains
-the value, source, and recorded-at time. A non-`NONE` value requires source
-exactly `owner-message MSG-AWS-LIFECYCLE-nnnn` plus a timezone-aware ISO 8601
-time. `NONE` requires both provenance fields to be `NONE`. The normal profile is
-`NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`. After current
-`READY_FOR_TEARDOWN` or `RESIDUALS_REMAIN` evidence, the choice profile is
-`RETAIN`, `RESIDUAL_REVIEW`, or `TEARDOWN`, shown to the owner as RETAIN,
-INVESTIGATE, or REMOVE. Follow the Engine's `aws_residual_disposition`
-projection rather than inferring a route from the raw value. The three fields
-change atomically and record the owner's requested follow-up route without
-granting access or mutation:
-
-- `NONE` stops the workflow;
-- RETAIN stores `RETAIN`, ends at `AWS_RESIDUALS_RETAINED`, and explicitly warns
-  that retained resources may continue to incur cost;
-- INVESTIGATE stores `RESIDUAL_REVIEW` and requires separate current read
-  authority before AWS-40; and
-- REMOVE stores `TEARDOWN`; with current READY evidence it may present the exact
-  teardown receipt, while after `RESIDUALS_REMAIN` it first refreshes AWS-40.
-  AWS-50 always returns to AWS-40 for terminal reconciliation.
-
-Every choice after `RESIDUALS_REMAIN` must be strictly newer than that row.
-After `READY_FOR_TEARDOWN`, RETAIN and INVESTIGATE must be strictly newer. An
-earlier owner-provenanced TEARDOWN may carry forward as REMOVE. New residual
-evidence reopens the set-level choice. RETAIN without current READY or residual
-evidence is invalid.
-
-A valid AWS-50 STARTED row, its terminal result, required post-action review,
-or an explicit AWS-40 safety blocker always outranks elective intent and cannot
-be hidden by changing intent to `NONE`. Legacy projects without provenance are
-accepted only when their effective intent is `NONE`. Before authenticated read
-authority becomes current, the owner may atomically return the record to
-`NONE`; no lifecycle-intent write can create AWS authority. Every concrete
-AWS-40 row stores `Read authority source` exactly as `SOURCE: <stable
-owner-message source>; AUTHORIZED_AT: <ISO 8601 with timezone>`.
-`AUTHORIZED_AT` is the `Observed at` timestamp of the matching Read-only
-preflight row in Action authorization provenance. Current observations stay
-inside the receipt window and never exceed its resource/operation scope. Exact
-scope equality applies only when the Engine requires exact-scope reconciliation;
-STALE does not claim fresh reads. Later expiry or replacement does not invalidate
-terminal evidence whose durable tuple was proven at append time.
-
-AWS-50 records only the directly observed mutation attempt. All authenticated
-pre- and post-teardown reads—including inventory, retention, operation
-history, backups, residual resources, and continuing billing signals—belong to
-AWS-40 under current read authority.
-
-Every AWS mutation requires a separate current record naming:
-
-- account, Region, and environment;
-- allowed resources and operations;
-- finite cost ceiling and billing dimensions;
-- rollback or teardown plan; and
-- expiration.
-
-Tools, credentials, sandbox permission, prior access, or AWS Core availability
-never replace either authorization. A read-only receipt cannot authorize
-deployment or teardown, and a deployment receipt is not accepted as retroactive
-read-scope authority.
-
-## Measured context packets
-
-The Engine resolves its compatibility selectors into exact, one-based inclusive
-source ranges. It normalizes selected repository text to LF, ends it with one
-LF, hashes those UTF-8 bytes, and reports the actual initial source-byte total
-against the 12,000-byte source budget. This measures selected repository
-content, not prompts, tool schemas, conversation history, tokens, or total model
-context.
-
-Required atomic lifecycle state is selected before non-atomic guidance.
-Procedural guidance may move on demand even when high priority; lower-priority
-material moves first when otherwise equivalent. One complete required record may
-exceed the remaining budget and is reported honestly without creating an owner action; records are never truncated. Missing, ambiguous, or overlapping required source
-fails closed through normal remediation. Packets are ephemeral and untracked.
-
-## Fast-path expectations
-
-A ready Quick MVP with a complete brief needs at most one clarification round
-before Gate A. Setup questions occur once. Gate A continues into Design in the
-same run; Design reaches pending Gate B without an owner pause unless a material
-owner decision exists; Gate B continues into task generation in the same run.
-Resume never repeats completed setup. Every paused or blocked response identifies
-one next action; it asks the owner only for a genuine decision, setup step,
-approval, authorization, protected-boundary decision, or human safety review.
-Routine responses do not expose internal methodology, Harness, or context terms.
-These expectations add no gate and never override an authority boundary.
-
-The Engine classifies validation diagnostics individually. A safe Codex-owned
-defect continues through correction and revalidation inside the current write
-boundary and attempt budget. Manual-safety findings stop all automatic repair.
-When safe Codex and owner findings coexist, Codex may repair only independent
-agent-owned defects before rerunning the Engine and presenting the remaining
-owner action. Unknown diagnostics fail closed to human review.
-
-During framework maintenance, a stale manifest is regenerated only after the
-read-only `maintain-fastlane` preflight proves every changed source is inside the
-recorded allowlist. The application coordinator never infers that provenance.
-Unexplained control-hash drift, unsafe paths, malformed manifest structure, and
-protected-file changes always require human safety review.
-
-## Optional hook guardrails
-
-Fastlane requires no project hooks. Owners who want an additional native Codex
-guardrail may manually review and enable the opt-in pack described in
-[HOOKS.md](HOOKS.md). It adds read-only Fastlane Engine context, uses Engine-derived write and external boundaries to deny only clearly unauthorized external or out-of-scope file actions, preserves normal approval
-prompts, runs bounded validation, and follows the Engine's automatic-
-continuation result.
-
-Hooks never approve a gate or external action. The Fastlane receipts,
-construction envelope, AWS authorization, sandbox, and owner approvals remain
-authoritative.
-
-## Maintainer field qualification
-
-Before claiming real AWS deployment readiness, maintainers follow the
-[AWS Core field-qualification policy](EVALUATION.md#aws-core-field-qualification).
-Codex selects the smallest disposable scenario using current AWS Core guidance,
-then performs and evaluates it. AWS Core supplies current AWS knowledge,
-decision guidance, procedures, and execution tools; Fastlane applies its
-existing state, gates, authority, rollback, teardown, and evidence contracts.
-The owner authorizes; IAM enforces; observed evidence proves what occurred.
-AWS Core does not choose the product architecture or grant authority. This adds
-no customer setup step, scorer, lifecycle stage, gate, or routine owner action.
-
-## Resume behavior
-
-The Engine selects the next prompt. Fresh templates require current official
-AWS Core before initialization. Initialized projects skip that prerequisite
-during normal resume; missing or stale AWS Core evidence later pauses only the
-affected material AWS step. The Engine assigns unavailable capability to owner
-setup, safely repairable generated evidence to Codex, and unexplained unsafe
-structure to human review. Follow that derived remediation action, rerun the
-Engine, and resume the selected route.
-
-Maintainers can run the optional, credential-free-to-validate
-[model role-play review](EVALUATION.md) before a release. Its schema-4 manifest
-binds external transcript, scorecard, and adjudication files to the exact
-commit and prompt contract. A passing scorer result proves only exported
-evidence integrity and score consistency; it never claims release readiness.
-Live model access is never part of ordinary CI.
+Global invariants live in `AGENTS.md`; phase procedures in Fastlane references; exact receipts in the prompt registry; deterministic schemas/routing in the Engine and tests; operations in `operate-fastlane-aws`; project truth in `docs/project/`.

@@ -9,6 +9,17 @@ selection, checkpoints, verification, deployment preflight, and release checks
 are execution controls inside an approved envelope; they are not additional
 human gates.
 
+## Current progress
+
+Start with the [Active execution snapshot](#active-execution-snapshot). It shows the current plan, run, checkpoint, blocker, and next safe action. This summary is derived from the exact task records below and grants no authority.
+
+## Roadmap
+
+Read [Task definitions](#task-definitions) in dependency order. Only `READY` work in a `CURRENT` plan may run; completed work remains tied to its exact evidence.
+
+## Active work, blockers, and next action
+
+The Active execution snapshot and current task card are the only live view. A blocker names one next action; an owner action appears only for a genuine decision, approval, authorization, protected-boundary choice, or human safety review.
 ## How to read a task card
 
 Start with four visible fields: status, owner, blocker, and GitHub issue. Then

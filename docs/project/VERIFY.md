@@ -5,6 +5,33 @@ remain the only routine human gates. The checks below determine construction and
 release readiness inside the current approved envelope; they are not additional
 human gates.
 
+## Current result
+
+Read the release state and evidence cutoff in [Active evidence scope](#active-evidence-scope). This file reports proof only; it never grants approval or AWS authority.
+
+## Proven
+
+`VERIFIED`, `E4_DEPLOYED_OBSERVED`, and `E5_RECOVERY_OBSERVED` claims appear only when their exact evidence rows and scope are current.
+
+## Source verified
+
+Current official-source support is recorded as `E1_SOURCE_VERIFIED`; it is guidance, not deployed proof.
+
+## Planned
+
+`E0_PROPOSED`, `NOT_STARTED`, and `IMPLEMENTED` describe intended or incomplete work, not observed success.
+
+## Not yet observed
+
+`PENDING_AWS` and `NOT_YET_OBSERVED` identify evidence that still requires a separately authorized environment or operation.
+
+## Failed or stale
+
+`FAILED`, `BLOCKED`, and `STALE` remain visible with their evidence and next action. They never satisfy readiness.
+
+## Evidence appendices
+
+The exact scope, matrices, commands, seeds, timestamps, hashes, AWS journals, and release decision follow.
 ## Active evidence scope
 
 | Field | Value |

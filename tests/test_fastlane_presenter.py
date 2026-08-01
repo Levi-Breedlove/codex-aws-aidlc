@@ -52,12 +52,8 @@ def intake_foundation() -> dict[str, object]:
             "card_id": "INTAKE-CARD-0001",
             "revision": 1,
             "accept_all_allowed": False,
-            "owner_reply": (
-                "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>"
-            ),
-            "exact_reply": (
-                f"{token}; 1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>"
-            ),
+            "owner_reply": "1: <choose A, B, or C>",
+            "exact_reply": f"{token}; 1: <choose A, B, or C>",
             "canonical_sha256": digest,
             "reply_token": token,
             "questions": [
@@ -77,36 +73,40 @@ def intake_foundation() -> dict[str, object]:
                     "detail_prompt": "Name the existing application.",
                     "selection": "PENDING",
                     "selection_detail": None,
-                },
-                {
-                    "reply_key": "2",
-                    "question_id": "INTAKE-Q-0002",
-                    "kind": "FACT",
-                    "basis_ids": ["INTAKE-0002", "INTAKE-0003"],
-                    "prompt": "Who needs this, and what problem should it solve?",
-                    "options": {},
-                    "recommended": None,
-                    "required_detail_for": ["RESPONSE"],
-                    "detail_prompt": "Name the primary users and their problem.",
-                    "selection": "PENDING",
-                    "selection_detail": None,
-                },
-                {
-                    "reply_key": "3",
-                    "question_id": "INTAKE-Q-0003",
-                    "kind": "FACT",
-                    "basis_ids": ["INTAKE-0004", "INTAKE-0005"],
-                    "prompt": "What is the first useful result?",
-                    "options": {},
-                    "recommended": None,
-                    "required_detail_for": ["RESPONSE"],
-                    "detail_prompt": "Describe the first-release outcome.",
-                    "selection": "PENDING",
-                    "selection_detail": None,
-                },
+                }
             ],
         },
     }
+
+
+def factual_intake_foundation() -> dict[str, object]:
+    foundation = intake_foundation()
+    card = foundation["pending_card"]
+    assert isinstance(card, dict)
+    card["owner_reply"] = "1: <your answer>"
+    card["exact_reply"] = f"{card['reply_token']}; 1: <your answer>"
+    card["questions"] = [
+        {
+            "reply_key": "1",
+            "question_id": "INTAKE-Q-0002",
+            "kind": "FACT",
+            "basis_ids": ["INTAKE-0002", "INTAKE-0003"],
+            "prompt": (
+                "Tell me about the app in your own words: who is it for, "
+                "what is hard today, and what should become easier?"
+            ),
+            "options": {},
+            "recommended": None,
+            "required_detail_for": ["RESPONSE"],
+            "detail_prompt": (
+                "Describe the people, their current problem, and the useful result "
+                "you want. More detail is welcome."
+            ),
+            "selection": "PENDING",
+            "selection_detail": None,
+        }
+    ]
+    return foundation
 
 
 def aws_progress_report(
@@ -267,6 +267,27 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertNotIn("INTAKE-10", rendered)
         self.assertNotIn("NONE", rendered)
         self.assertNotIn("Audit:", rendered)
+
+    def test_routine_owner_mode_ignores_additive_neutral_owner_projections(
+        self,
+    ) -> None:
+        baseline = report()
+        enriched = json.loads(json.dumps(baseline))
+        enriched["schema_version"] = 2
+        enriched["owner_decision_brief"] = {
+            "schema_version": 1,
+            "kind": "NONE",
+            "status": "NONE",
+        }
+        enriched["owner_answer_confirmation"] = {
+            "schema_version": 1,
+            "status": "NONE",
+        }
+
+        self.assertEqual(
+            presenter.render_owner_update(enriched),
+            presenter.render_owner_update(baseline),
+        )
 
     def test_automatic_update_says_nothing_and_continues(self) -> None:
         rendered = presenter.render_owner_update(
@@ -1496,8 +1517,11 @@ class FastlanePresenterTests(unittest.TestCase):
             current, updated="I recorded the project brief you supplied."
         )
 
-        self.assertTrue(rendered.startswith("FASTLANE \u00b7 DEFINE"))
+        self.assertTrue(rendered.startswith("FASTLANE · DEFINE"))
         self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn(
+            "Status: 1 question remains before requirements analysis.", rendered
+        )
         self.assertIn("1. What are you starting with?", rendered)
         self.assertIn("A. A new application.", rendered)
         self.assertIn("B. A change to an existing application.", rendered)
@@ -1507,16 +1531,15 @@ class FastlanePresenterTests(unittest.TestCase):
             "No recommendation—choose the option that matches your situation.",
             rendered,
         )
-        self.assertIn("Reply: Name the primary users and their problem.", rendered)
+        self.assertIn(
+            "Copyable reply:\n1: <choose A, B, or C>",
+            rendered,
+        )
+        self.assertNotIn("2.", rendered)
         foundation = current["intake_foundation"]
         assert isinstance(foundation, dict)
         card = foundation["pending_card"]
         assert isinstance(card, dict)
-        self.assertIn(
-            "Copyable reply:\n1: <choose A, B, or C>; "
-            "2: <your answer>; 3: <your answer>",
-            rendered,
-        )
         self.assertNotIn(str(card["reply_token"]), rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("INTAKE-CARD", rendered)
@@ -1603,10 +1626,8 @@ class FastlanePresenterTests(unittest.TestCase):
             "No recommendation—choose the option that matches your situation.",
             rendered,
         )
-        self.assertIn(
-            "1: <choose A, B, or C>; 2: <your answer>; 3: <your answer>",
-            rendered,
-        )
+        self.assertIn("1: <choose A, B, or C>", rendered)
+        self.assertNotIn("2: <your answer>", rendered)
 
     def test_current_understanding_is_bounded_restored_and_backward_compatible(
         self,
@@ -1664,37 +1685,42 @@ class FastlanePresenterTests(unittest.TestCase):
             "Current understanding:", presenter.render_owner_update(legacy_report)
         )
 
-    def test_intake_status_uses_exact_singular_and_plural_question_copy(self) -> None:
+    def test_intake_status_is_singular_and_multi_question_cards_fail_closed(
+        self,
+    ) -> None:
         foundation = intake_foundation()
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = foundation
 
-        plural = presenter.render_owner_update(current)
+        rendered = presenter.render_owner_update(current)
         self.assertIn(
-            "Status: 3 questions remain before requirements analysis.", plural
+            "Status: 1 question remains before requirements analysis.", rendered
         )
+        self.assertNotIn("questions remain", rendered)
 
-        card = foundation["pending_card"]
+        malformed = intake_foundation()
+        card = malformed["pending_card"]
         assert isinstance(card, dict)
-        card["questions"] = [card["questions"][1]]
-        card["owner_reply"] = "2: <your answer>"
-        card["exact_reply"] = f"{card['reply_token']}; 2: <your answer>"
-        singular = presenter.render_owner_update(current)
-        self.assertIn(
-            "Status: 1 question remains before requirements analysis.", singular
-        )
-        self.assertNotIn("1 decision remain", singular)
+        other = factual_intake_foundation()["pending_card"]
+        assert isinstance(other, dict)
+        card["questions"].append(other["questions"][0])
+        malformed_report = report(turn_boundary_required=True)
+        malformed_report["intake_foundation"] = malformed
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(malformed_report)
 
     def test_fact_question_requires_response_marker_and_concrete_prompt(self) -> None:
-        foundation = intake_foundation()
+        foundation = factual_intake_foundation()
         card = foundation["pending_card"]
         assert isinstance(card, dict)
-        fact = card["questions"][1]
-        card["questions"] = [fact]
-        card["owner_reply"] = "2: <your answer>"
-        card["exact_reply"] = f"{card['reply_token']}; 2: <your answer>"
+        fact = card["questions"][0]
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = foundation
+
+        rendered = presenter.render_owner_update(current)
+        self.assertIn("Tell me about the app in your own words", rendered)
+        self.assertIn("More detail is welcome.", rendered)
+        self.assertIn("Copyable reply:\n1: <your answer>", rendered)
 
         fact["required_detail_for"] = []
         with self.assertRaises(presenter.PresentationError):

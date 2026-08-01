@@ -1,114 +1,34 @@
 # Define phase
 
-Use for BOOT-00, INTAKE-10, REQ-10, and Gate A.
+Use for BOOT-00, INTAKE-10, REQ-10, and Gate A. The Engine owns routing and validation; this reference owns the phase procedure.
 
-- Before a fresh-template welcome or write, require read-only
-  `PREREQUISITES_READY`. Render all missing dependencies in one owner checklist;
-  never install or persist client state.
-- Then ask project name, preferred Region, and optional budget once; initialize
-  dry-run-first using the exact ephemeral ready report on stdin for both
-  bootstrap calls. Never persist the report. Initialized projects skip
-  prerequisites and resume without repeated setup.
-- Keep repository mode separate from owner work context. A greenfield or empty
-  repository does not prove a new application. Ground `INTAKE-*` rows in the
-  owner's users, problem, observable outcome, first-release boundary, success
-  measure, and material data/operating boundaries before requirements are ready.
-- Store one current `INTAKE-CARD-*` in PRD intake provenance. Decisions use
-  uppercase A/B/C, at most three questions, an effect, tradeoff, required
-  detail, and exact reply. Facts use short free text, not invented choices.
-- Recommend only with current owner or repository evidence. Otherwise render
-  exactly
-  `No recommendation—choose the option that matches your situation.` and use
-  the neutral copyable form `1: <choose A, B, or C>` for that decision.
-- Recommendations, examples, prior messages, ambiguous shorthand, and absent
-  replies never confirm. Resolve only the current card from a new owner
-  response. Before a PRD or derived-state write, run the deterministic parser
-  against its exact ID, revision, digest, and a new `OWNER-MSG-*` ID. Rejection
-  writes nothing: use its owner-safe status, preserve the card, and give the
-  exact reply correction without echoing secret-like input. Partial success
-  updates only returned keys and keeps other questions on that card. Rerun the
-  Engine; when set, the card's turn boundary makes it the final action.
-- Never synthesize owner provenance for unapproved legacy intake. Keep prior
-  values as unconfirmed context, reopen affected facts, and present the smallest
-  current card. Grandfather only an unchanged approved Gate A.
-- `Accept all recommendations.` applies only to the exact current card when
-  every question is a decision with a complete recommendation and no supporting
-  detail. Never apply it to factual, partly recommended, stale, or changed cards.
-- Normalize lowercase decision letters to uppercase. For the initial work
-  context decision, project `A` to `NEW_APPLICATION`, `B` to
-  `EXISTING_APPLICATION_CHANGE`, and `C` to `REPAIR_OR_MIGRATION`. Record each
-  answer in the owner-response register, card row, and cited foundation rows
-  with the same card-bound provenance. Facts from one question cite the same
-  parsed record. This proves deterministic interpretation, not identity.
-- Ask no more than three related, plain-language owner decisions per response.
-- Lead with the real-world consequence. Keep `RTO`, `RPO`, `p95`, concurrency,
-  metadata, and methodology labels internal unless the owner used them or asks
-  for technical detail. Translate via the Owner responses reference; give one
-  justified recommendation with its main tradeoff and a short copyable reply.
-  Permit plain `Accept all recommendations.` only when every question
-  is a decision with a complete recommendation and no supporting detail.
-- Separate owner facts, repository facts, recommendations, proposed
-  assumptions, and unresolved decisions.
-- Give requirements and assumptions stable IDs and observable acceptance
-  criteria. Preserve brownfield behavior and protected user work.
-- Translate only normative rows into the Fastlane EARS Contract: one canonical
-  form and one `GHERKIN` or `MEASURABLE` acceptance form. Keep goals, stories,
-  facts, assumptions, decisions, tasks, tests, receipts, and evidence outside;
-  expose methodology labels only when the owner asks.
-- Add `QAS-*` rows only for material performance, availability, reliability,
-  recovery, scalability, security-response, or operational-response concerns;
-  otherwise record `NOT_APPLICABLE — <concrete reason>`.
-- Complete the schema 1.3 actor, journey, business-rule, acceptance-ID, and
-  requirement-coverage records before Gate A is ready. Require richer use-case
-  guarantees only for high/critical risk or a declared material journey
-  trigger. Never invent missing owner facts to complete those records.
-- Make traceability bidirectional: every authoritative first-release
-  requirement appears exactly once in coverage, and every declared `ACT-*` and
-  `JOURNEY-*` participates in at least one of those rows. For each requirement,
-  `Acceptance/test IDs` is exactly its canonical `AC-*` followed only by
-  `TEST-*`, `PROP-*`, or `EV-*` IDs explicitly named in that same requirement's
-  acceptance criterion. Never add a convenient but undeclared validation ID.
-- Rich-use-case policy is journey-specific. At low or moderate risk, every
-  journey declaring a material rich-use-case trigger has a rich use case bound
-  to that journey. At high or critical risk, every declared journey has one.
-  The typed journey row is authoritative; applicability prose cannot move the
-  obligation to an easier journey.
-- Derive one internal Adaptive Coverage Plan before Gate A. Infer the work kind
-  and `SELECT`/`AMEND`/`PRESERVE` disposition without adding an owner question.
-  This is a one-way mapping: when confirmed owner work context is
-  `NEW_APPLICATION`, Work kind must be `NEW_BUILD`; `NEW_BUILD` never infers or
-  replaces owner work context. Omissions need current requirement or repository
-  basis; uncertain impact uses full coverage. Quick MVP changes depth, not safety.
-- Use STRIDE only when material security trust boundaries require systematic
-  analysis. Use LINDDUN only when materially privacy-sensitive data requires it.
-  Use an OWASP Top 10 review when a material web, API, or application attack
-  surface applies. Record results in existing requirement, control, test,
-  Harness, and evidence authorities; none of these methods adds a gate.
-  Selecting and applying STRIDE, LINDDUN, or OWASP Top 10 is procedural
-  coordinator review;
-  deterministic validation covers the resulting bound records, not proof that
-  the review method itself occurred.
-- Default cost posture to `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED`; preserve
-  an owner cap exactly.
-- Quick MVP has no challenger by default. Use one only for ambiguity,
-  contradiction, sensitive data, identity, payments, migrations, shared
-  interfaces, high risk, or owner request, after a complete draft with no open
-  owner decision. Attempt once per requirements revision for at most 60 seconds.
-  If it fails, times out, or is unavailable, record that in the existing
-  recommendation rationale, run the checklist, and continue without exposing
-  reviewer orchestration or adding an owner action.
-- Classify REQ-10 AWS Core materiality as `REQUIRED`, `OPTIONAL`, or
-  `NOT_MATERIAL`. Use `REQUIRED` when Gate A depends on a current AWS fact about
-  Region/service feasibility, identity/authorization, sensitive data/uploads,
-  public exposure, encryption, deletion/recovery, quotas, availability, or
-  material cost. The coordinator searches current documentation and retrieves
-  an exact returned identifier in one chain bound to the current REQ and
-  affected requirements. This is documentation-only: inspect no credentials,
-  access no account, and select no final architecture before Gate A.
-- Keep AWS Core remediation ownership exact. A genuinely unavailable official
-  capability is owner setup. Missing, stale, or safely repairable generated
-  discovery/evidence while the capability is available is Codex work; refresh
-  it and revalidate without asking the owner to reinstall. Unexplained
-  structural drift or an unsafe evidence conflict requires human review.
-- The coordinator writes analysis and the readiness card; only the owner may
-  approve the exact Gate A receipt.
+## Setup and intake
+
+- A fresh template requires ephemeral `PREREQUISITES_READY` evidence before any welcome or write. Show every missing dependency in one consolidated checklist; never install dependencies or persist client, credential, plugin, trust, path, or readiness state. Initialized projects resume without setup.
+- Ask project name, preferred Region, and optional budget once, then initialize dry-run-first with the exact ephemeral report supplied on stdin.
+- Repository mode (`GREENFIELD` or `BROWNFIELD`) never determines owner work context. Ground `INTAKE-*` facts in the owner's brief before asking anything. An empty repository does not prove a new application.
+- Ask only the next unanswered app question: starting point; users and their current problem; first useful end-to-end result; first-release inclusions and deferrals; observable success; data entered, uploaded, viewed, or generated; sensitivity and access; first audience; geography or data-location constraints; then only coverage-required reliability, recovery, legal, or operational decisions. One coherent fact question may collect closely related facts. Skip anything already stated or observed.
+- Store one current `INTAKE-CARD-*` with exactly one question. Decisions use uppercase A/B/C and A is recommended only when current evidence justifies it; facts use bounded free text. Explain the real-world consequence before technical terminology, show the main tradeoff, require supporting detail when needed, and provide one exact short reply.
+- With no sound recommendation, say `No recommendation—choose the option that matches your situation.` Recommendations, examples, prior messages, ambiguous shorthand, assistant text, and an absent reply never confirm a choice.
+- Resolve only the exact current card from a new inbound owner message. Run the deterministic parser against its ID, revision, presented digest, and new `OWNER-MSG-*` identity before writing. Invalid or secret-like input changes nothing and receives an owner-safe correction. A valid reply writes normalized `OWNER_RESPONSE` provenance, reruns the Engine, and renders `owner_answer_confirmation` only for that new turn before the next question. An owner-input card ends the assistant turn.
+- `Accept all recommendations.` applies only to the current decision when its recommendation is complete and needs no detail. It never resolves a factual, stale, changed, or multi-question legacy card. Hidden matching `R-*` input remains compatibility-only and is never displayed.
+- Migrate an unapproved multi-question 1.0.x card by reissuing only its first unresolved question with a new revision and digest. Keep remaining facts open. Never synthesize owner provenance. Preserve an unchanged approved Gate A until a requirements-controlled change.
+- After setup, use one owner decision per turn. A complete owner brief may ground several facts without repetition. Keep acronyms such as RTO, RPO, p95, concurrency, metadata, EARS, QAS, and Harness internal unless the owner used them or asks for technical detail.
+
+## Requirements and Gate A
+
+- Keep owner facts, repository observations, Codex recommendations, assumptions, and open decisions distinct. Owner-controlled semantics are never inferred.
+- Requirements contract 1.4 adds the current requirements change lineage and assumption lifecycle. Each change row binds prior/current revision, trigger, added/changed/removed/preserved IDs, stale reason, and required revalidation. Assumptions use `PROPOSED`, `ACCEPTED`, `VALIDATED`, `INVALIDATED`, or `SUPERSEDED`. Existing unchanged approved schema 1.3 is grandfathered; new, unapproved, or changed requirements use 1.4.
+- Give each normative requirement one stable ID, one observable obligation in the Fastlane EARS Contract, one canonical `AC-*`, and `GHERKIN` or `MEASURABLE` acceptance. Goals, stories, facts, assumptions, decisions, tasks, tests, receipts, and evidence are not EARS rows.
+- Build actors, journeys, conditional rich use cases, business rules, and exact requirement coverage from owner-grounded facts. Trace every first-release requirement exactly once and bind every `ACT-*` and `JOURNEY-*`. Never invent an owner fact to complete a record.
+- Add `QAS-*` only for material performance, availability, reliability, recovery, scalability, security-response, or operational-response concerns; otherwise record `NOT_APPLICABLE — <concrete reason>`.
+- Derive the Adaptive Coverage Plan without another question. Confirmed `NEW_APPLICATION` requires `NEW_BUILD`, but never infer owner context from repository state or work kind. `SELECT`, `AMEND`, and `PRESERVE` change design coverage, not safeguards. Unsupported omissions or uncertain impact use full coverage; Quick MVP changes depth, never safety.
+- Use STRIDE only when material trust boundaries warrant it, LINDDUN only when materially privacy-sensitive data warrants it, and OWASP Top 10 only for a material application attack surface. Selecting and applying STRIDE, LINDDUN, or OWASP Top 10 is procedural coordinator review; record conclusions in existing requirements, controls, tests, Harness, and evidence, never a new stage or gate.
+- Default cost posture to `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED`; preserve an owner cap exactly. Gate A remains approval of requirements only and never authorizes AWS access or spend.
+
+## Review and AWS evidence
+
+- Run a read-only requirements challenger only after the complete draft has no open owner decision and only when ambiguity, contradiction, sensitive data, identity, payments, migration, shared interfaces, material risk, explicit deep review, or evaluation mode justifies it. Quick MVP uses none by default; a justified Quick MVP or Standard review gets 5 minutes, and high-risk/deep review gets 30 minutes. Attempt once per exact requirements revision, check progress at least every 60 seconds, and finish early. If unavailable or timed out, record that fact, perform the coordinator checklist, and continue without exposing orchestration or making reviewer failure owner work.
+- Classify REQ-10 AWS materiality as `REQUIRED`, `OPTIONAL`, or `NOT_MATERIAL`. When Gate A depends on a current AWS fact—service/Region feasibility, identity, sensitive data or uploads, public exposure, encryption, deletion/recovery, quotas, availability, or material cost—use `search_documentation`, then matching `retrieve_skill`, and bind one current `AWS-DISC-*` chain to the current REQ and affected IDs. Keep it credential-free, account-free, documentation-only, and architecture-neutral.
+- Capability unavailability is owner setup. Missing or stale generated discovery while capability is available is Codex work. Unsafe or unexplained evidence drift requires human review.
+- The coordinator writes the analysis and readiness card. Only the owner can approve the exact Gate A receipt.

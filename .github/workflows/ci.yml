@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - fast-lane-maint
+      - fast-lane
       - Legacy
 
 permissions:
@@ -60,7 +60,7 @@ jobs:
         run: python scripts/update_manifest.py --check
 
       - name: Enforce customer package version identity
-        if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'fast-lane-maint') || (github.event_name == 'push' && github.ref_name == 'fast-lane-maint') }}
+        if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'fast-lane') || (github.event_name == 'push' && github.ref_name == 'fast-lane') }}
         run: python scripts/package_release.py --check --base-commit "${FASTLANE_BASE_COMMIT}"
 
       - name: Verify deterministic release package

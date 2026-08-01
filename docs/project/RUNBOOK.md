@@ -17,6 +17,29 @@ docs/project/TASKS.md Last known-green/checkpoint commit, and the Fastlane Engin
 checkpoint. Never commit protected dirty paths or infer remote/push authority
 from local Git authorization.
 
+## Safety boundary
+
+This runbook is a procedure, not authorization. Start with the [Active operational boundary](#active-operational-boundary) and stop whenever its identity, scope, cost, rollback, expiry, or evidence does not match the requested action.
+
+## Environments and validation
+
+Use [Environments](#1-environments), [Prerequisites](#2-prerequisites), [Read-only AWS preflight](#3-read-only-aws-preflight), and [Local validation](#4-local-validation) before any mutation.
+
+## Deploy and verify
+
+Follow [Deployment](#6-deployment), then [Smoke tests](#7-smoke-tests), monitoring, and the exact reconciliation route. A successful command is not enough without current evidence.
+
+## Rollback and recover
+
+Use [Rollback](#10-rollback) and [Backup and recovery](#11-backup-and-recovery). Stop before exceeding the current authorization or changing retained data unexpectedly.
+
+## Teardown
+
+Use [Teardown and decommissioning](#13-teardown-and-decommissioning), then [Residual-resource and billing verification](#14-residual-resource-and-billing-verification). Deployment authority never implies teardown authority.
+
+## Authorization appendices
+
+Exact AWS lanes, receipts, operation envelopes, provenance, and evidence rules follow. They remain separate from Gate A and Gate B.
 ## Active operational boundary
 
 Complete this card before authenticated AWS work. It mirrors the authoritative

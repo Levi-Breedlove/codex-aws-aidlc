@@ -418,6 +418,21 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             any("cannot be auto-converted" in error for error in result["errors"])
         )
 
+    def test_schema_four_is_rejected_with_a_migration_message(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            result, passed = self.score(
+                {"schema_version": 4, "evaluation_mode": "RELEASE", "runs": []},
+                Path(temporary),
+            )
+        self.assertFalse(passed)
+        self.assertTrue(
+            any(
+                "required Fastlane 1.1 customer-experience scenarios" in error
+                and "cannot be auto-converted" in error
+                for error in result["errors"]
+            )
+        )
+
     def test_manifest_containment_handles_a_resolved_parent_alias(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)

@@ -110,7 +110,7 @@ def github_envelope(
         "AWS boundary": "NONE",
         "GitHub boundary": boundary,
         "GitHub repository, branch, and merge constraints": (
-            f"REPO: example/project; BRANCH: fast-lane-maint; MERGE: {merge}"
+            f"REPO: example/project; BRANCH: fast-lane; MERGE: {merge}"
         ),
     }
 
@@ -730,6 +730,30 @@ class FastlaneHookTests(unittest.TestCase):
         self.assertLessEqual(len(context), fastlane_hook.MAX_CONTEXT_CHARS)
         self.assertNotIn("sha256", context.casefold())
 
+    def test_additive_owner_projections_do_not_change_hook_routing(self) -> None:
+        baseline = report()
+        enriched = json.loads(json.dumps(baseline))
+        enriched["schema_version"] = 2
+        enriched["owner_decision_brief"] = {
+            "schema_version": 1,
+            "kind": "NONE",
+            "status": "NONE",
+        }
+        enriched["owner_answer_confirmation"] = {
+            "schema_version": 1,
+            "status": "NONE",
+        }
+        event = payload("SessionStart", self.root)
+
+        self.assertEqual(
+            fastlane_hook.handle_event(
+                "session-start", event, root=self.root, doctor_report=enriched
+            ),
+            fastlane_hook.handle_event(
+                "session-start", event, root=self.root, doctor_report=baseline
+            ),
+        )
+
     def test_unconfigured_template_session_start_routes_to_prerequisites(self) -> None:
         observed = fastlane_hook.run_doctor(self.root)
         self.assertEqual(observed["classification"], "UNCONFIGURED_TEMPLATE")
@@ -1054,7 +1078,7 @@ class FastlaneHookTests(unittest.TestCase):
                 tool_name="mcp__codex_apps__github_create_pull_request",
                 tool_input={
                     "repository_full_name": "example/project",
-                    "base_branch": "fast-lane-maint",
+                    "base_branch": "fast-lane",
                     "head_branch": "feature/safe-change",
                     "title": "Reviewed change",
                 },
@@ -1076,7 +1100,7 @@ class FastlaneHookTests(unittest.TestCase):
                 tool_name="mcp__codex_apps__github_create_file",
                 tool_input={
                     "repository_full_name": "example/project",
-                    "branch": "fast-lane-maint",
+                    "branch": "fast-lane",
                     "path": "docs/review.md",
                     "content": "reviewed",
                     "message": "docs: reviewed",
@@ -1090,7 +1114,7 @@ class FastlaneHookTests(unittest.TestCase):
 
         cases = (
             (
-                {"repository_full_name": "other/project", "branch": "fast-lane-maint"},
+                {"repository_full_name": "other/project", "branch": "fast-lane"},
                 "repository",
             ),
             ({"repository_full_name": "example/project", "branch": "other"}, "branch"),
@@ -1102,7 +1126,7 @@ class FastlaneHookTests(unittest.TestCase):
         for override, expected in cases:
             tool_input = {
                 "repository_full_name": "example/project",
-                "branch": "fast-lane-maint",
+                "branch": "fast-lane",
                 "path": "docs/review.md",
                 "content": "reviewed",
                 "message": "docs: reviewed",
@@ -1152,7 +1176,7 @@ class FastlaneHookTests(unittest.TestCase):
                 {
                     "repo_full_name": "example/project",
                     "pr_number": 51,
-                    "base_branch": "fast-lane-maint",
+                    "base_branch": "fast-lane",
                 },
                 github_envelope("MERGE_WHEN_GREEN", merge="ALLOWED"),
                 "target branch is not observable",
@@ -1213,7 +1237,7 @@ class FastlaneHookTests(unittest.TestCase):
                 {
                     "repository_full_name": "example/project",
                     "pr_number": 51,
-                    "base_branch": "fast-lane-maint",
+                    "base_branch": "fast-lane",
                     "expected_head_sha": "a" * 40,
                 },
                 "target branch is not observable",
@@ -1228,7 +1252,7 @@ class FastlaneHookTests(unittest.TestCase):
                 {
                     "repository_full_name": "example/project",
                     "release_id": 99,
-                    "target_commitish": "fast-lane-maint",
+                    "target_commitish": "fast-lane",
                 },
                 "target branch is not observable",
             ),
@@ -1287,7 +1311,7 @@ class FastlaneHookTests(unittest.TestCase):
                 tool_name="mcp__codex_apps__github_create_file",
                 tool_input={
                     "repository_full_name": "example/project",
-                    "branch": "fast-lane-maint",
+                    "branch": "fast-lane",
                     "ref": "Legacy",
                     "path": "README.md",
                     "content": "change",
@@ -1304,10 +1328,10 @@ class FastlaneHookTests(unittest.TestCase):
 
         shell_commands = (
             "git push origin Legacy",
-            "command git push origin fast-lane-maint",
-            "env FASTLANE=1 git.exe push origin fast-lane-maint",
+            "command git push origin fast-lane",
+            "env FASTLANE=1 git.exe push origin fast-lane",
             "gh pr merge 51 --repo other/project",
-            "gh.exe pr create --repo example/project --base fast-lane-maint",
+            "gh.exe pr create --repo example/project --base fast-lane",
         )
         for command in shell_commands:
             with self.subTest(command=command):
@@ -1351,7 +1375,7 @@ class FastlaneHookTests(unittest.TestCase):
         current["hook_constraints"] = {
             "GitHub boundary": "ISSUES",
             "GitHub repository, branch, and merge constraints": (
-                "REPO: example/project; BRANCH: fast-lane-maint; MERGE: PROHIBITED"
+                "REPO: example/project; BRANCH: fast-lane; MERGE: PROHIBITED"
             ),
         }
         with mock.patch.object(
@@ -1387,7 +1411,7 @@ class FastlaneHookTests(unittest.TestCase):
                 tool_input={
                     "repo_full_name": "example/project",
                     "path": "README.md",
-                    "ref": "fast-lane-maint",
+                    "ref": "fast-lane",
                 },
             ),
             root=self.root,
@@ -1469,7 +1493,7 @@ class FastlaneHookTests(unittest.TestCase):
             ),
             (
                 "Bash",
-                "printf safe\r\ngit push origin fast-lane-maint",
+                "printf safe\r\ngit push origin fast-lane",
                 "GitHub publication",
             ),
             (

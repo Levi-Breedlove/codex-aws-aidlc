@@ -48,55 +48,45 @@ You are the single coordinator and sole writer.
    replace a lifecycle phase, cross a gate, create authority, or become a
    persisted next prompt.
 8. Render routine updates with `python scripts/fastlane_presenter.py owner
-   --input-stdin`. Run the selected phase, validate and checkpoint, rerun the
-   Engine in the same turn, and continue while
-   `automatic_continuation_allowed` is true. An internal route change is not an
-   owner checkpoint.
-   When a new owner message may answer a pending `INTAKE-CARD-*`, run the
-   deterministic intake-response parser against that exact card ID, revision,
-   digest, and a new `OWNER-MSG-*` ID before any PRD or derived-state write.
-   A rejected parse causes zero writes: keep the card unchanged and present the
-   parser's precise correction plus its valid reply shape. A successful partial
-   parse updates only the returned reply keys and leaves every other question
-   pending on the same card. Project each parsed answer through the normalized
-   owner-response register, matching card row, and every foundation basis row;
-   all foundation facts derived from one question cite the same parsed record.
-   This provenance proves deterministic interpretation and current-card
-   binding, not that Fastlane authenticated the human's identity.
-   When `turn_boundary_required` is true, rendering the owner card is the
-   final action of the turn. Do not call a tool, edit a file, rerun the
-   lifecycle router, interpret the example reply, or continue until a new
-   inbound owner message arrives.
-   When remediation assigns safe `AGENT_CORRECTION` items to Codex, correct
-   only those items inside the current write boundary and attempt budget,
-   rerun validation, and rerun the Engine before any owner-facing pause. Never
-   rewrite owner requirements, approved architecture or technology, gates,
-   receipts, authority, protected paths, or external state during automatic
-   correction. A manual-safety item blocks automatic correction; when safe
-   Codex and owner items coexist, repair only independent Codex items first,
-   then rerun the Engine to derive the remaining next action.
-   Plugin installation or selecting `@AWS-Core` proves availability, not use.
+   --input-stdin`. Run, validate, checkpoint, and rerun the Engine in the same
+   turn while `automatic_continuation_allowed` is true.
+
+   For a new message that may answer `INTAKE-CARD-*`, run the deterministic
+   parser against that exact card ID, revision, digest, and a new
+   `OWNER-MSG-*` before any write. Rejection writes nothing and preserves the
+   card. Success writes only the normalized response, matching card row, and
+   cited foundation rows, then reruns the Engine. Render Answer Confirmation
+   only with that matching owner-response ID. When `turn_boundary_required` is
+   true, the owner card is the final action; do not call tools, write, rerun,
+   interpret its example, or continue before a new inbound owner message.
+
+   At Gate A/B render the matching digest-bound `owner_decision_brief` through
+   the presenter before the unchanged exact receipt. Owner correction commands
+   change requirements or design and stale affected state; they never approve.
+
+   For safe `AGENT_CORRECTION`, fix only in-bound generated defects, validate,
+   and rerun the Engine. Never rewrite owner facts, approved requirements,
+   architecture/technology, gates, receipts, authority, protected paths, or
+   external state. Manual safety blocks automatic repair; mixed items repair
+   only independent Codex items before deriving the remaining action.
+
    For an immediate safe correction, rerun exactly once with
    `python scripts/bootstrap_doctor.py --root . --json --prior-remediation-fingerprint
-   <report.remediation.fingerprint>`. Pass that value only to this immediate
-   next Engine invocation and never persist it. If the same fingerprint
-   remains, stop automatic repair and route the resulting human
-   safety review. During AWS delivery, obey the Engine's authoritative
-   `aws_execution.progress_state` and explicitly use `operate-fastlane-aws`.
-   Its skill owns AWS execution, journal, retry, reconciliation, and teardown
-   procedure; the prompt registry owns exact receipt syntax; the Engine owns
-   state and authority. Infer or replay no authority; rerun the Engine after
-   every operator checkpoint.
+   <report.remediation.fingerprint>`. Pass it only to this immediate next Engine
+   invocation and never persist it. If the same fingerprint remains, route the
+   resulting human safety review.
 
-   Mention AWS Core in `Audit:` only when the current Engine report projects a
-   validated `search_documentation` then matching `retrieve_skill` chain; never
-   supply audit prose to the presenter.
+   During AWS delivery explicitly use `operate-fastlane-aws` and obey
+   `aws_execution.progress_state`; that skill owns operations and the journal,
+   while the prompt registry owns receipts and the Engine owns state/authority.
+   Mention AWS Core in `Audit:` only for the validated `search_documentation` then matching `retrieve_skill` chain; caller prose,
+   plugin availability, and cached content are not evidence.
 9. After recording an accepted Gate A or Gate B receipt, rerun the Engine
    immediately. Gate A continues into Design. Gate B continues into task
    generation and permitted local construction.
    Gate A readiness requires the current requirements-contract projection;
    Gate B readiness requires the current design-contract projection, including
-   material interfaces, boundaries, states, and the approved first wave.
+   material interfaces, boundaries, states, diagram contract, and approved first wave.
 
 
 For a side question, answer directly without changing project state unless the
@@ -116,9 +106,12 @@ continue automatically.
 synchronous read-only critique at its defined checkpoint. A challenger is not
 a worker: it claims no task and changes no state. Start a requirements
 challenge only after the complete draft exists and no owner decision remains
-open. Make one attempt per current requirements revision and wait no more than
-60 seconds. If it fails, stalls, or is unavailable, stop it, note the
-unavailable independent review in the existing Gate A recommendation
+open. Attempt once per exact requirements revision. Quick MVP uses no challenger by default;
+when material risk justifies one, allow 5 minutes for requirements and 10 for
+architecture. Standard uses 5/10 minutes. High-risk or explicit deep review
+uses 30/45 minutes. Check progress at least every 60 seconds and finish early.
+If it fails, stalls, or is unavailable, stop it, note the unavailable
+independent review in the existing Gate A recommendation
 rationale, perform the same checklist as coordinator, rerun the Engine and
 presenter, and continue. Never narrate this or make reviewer availability an
 owner action. Challengers never write files, choose architecture, approve

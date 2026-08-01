@@ -1,5 +1,5 @@
-# AWS Codex Fastlane 1.0
-Current customer build: **1.0.5**.
+# AWS Codex Fastlane 1.1
+Current customer build: **1.1.0**.
 
 Fastlane Engine gives Codex a disciplined way to turn your AWS idea into clear requirements, one recommended design, and a tested local build. You explain the outcome in plain language; Codex handles the technical planning and keeps you in control of consequential choices.
 
@@ -42,6 +42,8 @@ You do not need an architecture. You can always say, "I'm not sure; recommend on
 Setup does not inspect AWS credentials or access an AWS account.
 
 ## Project files
+
+Start with the [project record guide](docs/project/README.md).
 
 - `docs/project/PRD.md`: requirements, recommended design, and both approvals.
 - `docs/project/TASKS.md`: dependency-aware work and current progress.

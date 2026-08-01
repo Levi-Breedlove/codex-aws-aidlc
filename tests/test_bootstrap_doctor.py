@@ -127,7 +127,7 @@ def replace_contract_table_with_sentinel(
 
 def exact_legacy_requirements_projection(text: str) -> str:
     text = re.sub(
-        r"(?m)^\| Project contract schema \| `1\.3` \|\r?\n",
+        r"(?m)^\| Project contract schema \| `1\.4` \|\r?\n",
         "",
         text,
         count=1,
@@ -155,6 +155,8 @@ def exact_legacy_requirements_projection(text: str) -> str:
         doctor.RICH_USE_CASE_HEADING,
         doctor.BUSINESS_RULE_HEADING,
         doctor.REQUIREMENT_COVERAGE_HEADING,
+        doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADING,
+        doctor.ASSUMPTION_LIFECYCLE_HEADING,
     ):
         heading_start = text.index(heading)
         table_start = text.index("|", heading_start)
@@ -165,7 +167,7 @@ def exact_legacy_requirements_projection(text: str) -> str:
 
 def exact_legacy_schema_four_projection(text: str) -> str:
     text = re.sub(
-        r"(?m)^\| Project design contract schema \| `5` \|\r?\n",
+        r"(?m)^\| Project design contract schema \| `6` \|\r?\n",
         "",
         text,
         count=1,
@@ -189,8 +191,13 @@ def exact_legacy_schema_four_projection(text: str) -> str:
         end_index = value.index(end, start_index)
         return value[:start_index] + value[end_index:]
 
+    text = remove_region(
+        text, doctor.DIAGRAM_CONTRACT_HEADING, "## 14. Architecture overview"
+    )
     text = remove_region(text, doctor.LAYER_BOUNDARY_HEADING, doctor.INTERFACE_HEADING)
-    text = remove_region(text, doctor.STATE_APPLICABILITY_HEADING, "```mermaid")
+    text = remove_region(
+        text, doctor.STATE_APPLICABILITY_HEADING, "### Data lifecycle view"
+    )
     text = remove_region(
         text,
         doctor.FIRST_WAVE_HEADING,
@@ -236,7 +243,6 @@ def complete_intake_foundation(
         if initial.status == "READY_FOR_REQUIREMENTS":
             return text
         raise AssertionError("Initial intake card is unavailable before readiness")
-    first_digest = initial.pending_card.canonical_sha256
     context_values = {
         "A": ("NEW_APPLICATION", "NONE"),
         "B": ("EXISTING_APPLICATION_CHANGE", "Existing application"),
@@ -248,15 +254,15 @@ def complete_intake_foundation(
     register_rows: list[tuple[str, ...]] = []
     provenance_by_intake: dict[str, str] = {}
 
-    def resolve(
+    def resolve_current(
+        *,
         owner_response_id: str,
         card_id: str,
         card_digest: str,
-        reply_key: str,
         question_id: str,
         selection: str,
         detail: str,
-        basis_ids: tuple[str, ...],
+        basis_id: str,
     ) -> None:
         nonlocal text
         provenance = intake_provenance(
@@ -280,124 +286,131 @@ def complete_intake_foundation(
                 card_id,
                 "1",
                 card_digest,
-                reply_key,
+                "1",
                 question_id,
                 selection,
                 detail,
-                ", ".join(basis_ids),
+                basis_id,
             )
         )
-        for basis_id in basis_ids:
-            provenance_by_intake[basis_id] = provenance
+        provenance_by_intake[basis_id] = provenance
 
-    resolve(
-        "OWNER-MSG-0001",
-        "INTAKE-CARD-0001",
-        first_digest,
-        "1",
-        "INTAKE-Q-0001",
-        work_context_choice,
-        work_context_detail,
-        ("INTAKE-0001",),
-    )
-    resolve(
-        "OWNER-MSG-0001",
-        "INTAKE-CARD-0001",
-        first_digest,
-        "2",
-        "INTAKE-Q-0002",
-        "RESPONSE",
-        "Development users need to see the approved project outcome.",
-        ("INTAKE-0002", "INTAKE-0003"),
-    )
-    resolve(
-        "OWNER-MSG-0001",
-        "INTAKE-CARD-0001",
-        first_digest,
-        "3",
-        "INTAKE-Q-0003",
-        "RESPONSE",
-        "The first release displays the approved outcome locally.",
-        ("INTAKE-0004", "INTAKE-0005"),
+    resolve_current(
+        owner_response_id="OWNER-MSG-0001",
+        card_id="INTAKE-CARD-0001",
+        card_digest=initial.pending_card.canonical_sha256,
+        question_id="INTAKE-Q-0001",
+        selection=work_context_choice,
+        detail=work_context_detail,
+        basis_id="INTAKE-0001",
     )
 
-    text = replace_contract_table(
-        text,
-        doctor.INTAKE_CARD_HEADING,
-        doctor.INTAKE_CARD_HEADERS,
-        [
+    facts = (
+        (
+            "INTAKE-0002",
+            "Who will use the app?",
+            "Name the primary people or teams.",
+            "Development teams",
+        ),
+        (
+            "INTAKE-0003",
+            "What are they trying to do, and what makes that difficult today?",
+            "Describe their current task and the obstacle.",
+            "They need a clear view of approved project outcomes.",
+        ),
+        (
+            "INTAKE-0004",
+            "What should the app let them accomplish first?",
+            "Describe one useful, observable result.",
+            "See the current approved project outcome.",
+        ),
+        (
+            "INTAKE-0005",
+            "What must the first release include, and what can wait?",
+            "Name the smallest useful app boundary and anything deferred.",
+            "Include one local outcome view; defer external integrations.",
+        ),
+        (
+            "INTAKE-0006",
+            "What visible result would convince you the first trial succeeded?",
+            "Name a result a person can see or measure.",
+            "An invited tester can view the approved outcome without help.",
+        ),
+        (
+            "INTAKE-0007",
+            "What information will people enter, upload, view, or generate?",
+            "List the app's important data in ordinary language.",
+            "Synthetic project names, status, and outcome summaries.",
+        ),
+        (
+            "INTAKE-0008",
             (
-                "INTAKE-CARD-0002",
-                "1",
-                "1",
-                "INTAKE-Q-0004",
-                "FACT",
-                "INTAKE-0006",
-                "How will you know the first release succeeds?",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NONE",
-                "RESPONSE",
-                "Name one observable success measure.",
-                "PENDING",
-                "NONE",
-                "NONE",
+                "Could that information reveal identity, health, money, location, "
+                "credentials, or another sensitive detail?"
             ),
-            (
-                "INTAKE-CARD-0002",
-                "1",
-                "2",
-                "INTAKE-Q-0005",
-                "FACT",
-                "INTAKE-0007",
-                "What data and operating boundaries materially affect the first release?",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NOT_APPLICABLE",
-                "NONE",
-                "RESPONSE",
-                "Describe sensitive data, Region, release audience, or other boundaries.",
-                "PENDING",
-                "NONE",
-                "NONE",
-            ),
-        ],
+            "Say no, or name the sensitive information and who may see it.",
+            "No sensitive data in the first trial.",
+        ),
+        (
+            "INTAKE-0009",
+            "Who should be allowed to use the first release?",
+            "Describe the initial audience and any sign-in boundary.",
+            "Invited development testers only.",
+        ),
+        (
+            "INTAKE-0010",
+            ("Where will the first users be, and are there places the data must stay?"),
+            "Name the user geography and any data-location rule.",
+            "United States users; data remains in us-west-2.",
+        ),
     )
-    second_table = doctor.contract_table_after_heading(
-        text, doctor.INTAKE_CARD_HEADING, doctor.INTAKE_CARD_HEADERS
-    )
-    if second_table is None:
-        raise AssertionError("Second intake card is missing")
-    second_digest = "sha256:" + hashlib.sha256(second_table.canonical_bytes).hexdigest()
-    resolve(
-        "OWNER-MSG-0002",
-        "INTAKE-CARD-0002",
-        second_digest,
-        "1",
-        "INTAKE-Q-0004",
-        "RESPONSE",
-        "A rendered-output test confirms the approved outcome",
-        ("INTAKE-0006",),
-    )
-    resolve(
-        "OWNER-MSG-0002",
-        "INTAKE-CARD-0002",
-        second_digest,
-        "2",
-        "INTAKE-Q-0005",
-        "RESPONSE",
-        "Synthetic internal development data; us-west-2 only",
-        ("INTAKE-0007",),
-    )
+    for index, (basis_id, prompt, detail_prompt, value) in enumerate(facts, start=2):
+        card_id = f"INTAKE-CARD-{index:04d}"
+        question_id = f"INTAKE-Q-{index:04d}"
+        text = replace_contract_table(
+            text,
+            doctor.INTAKE_CARD_HEADING,
+            doctor.INTAKE_CARD_HEADERS,
+            [
+                (
+                    card_id,
+                    "1",
+                    "1",
+                    question_id,
+                    "FACT",
+                    basis_id,
+                    prompt,
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NONE",
+                    "RESPONSE",
+                    detail_prompt,
+                    "PENDING",
+                    "NONE",
+                    "NONE",
+                )
+            ],
+        )
+        table = doctor.contract_table_after_heading(
+            text, doctor.INTAKE_CARD_HEADING, doctor.INTAKE_CARD_HEADERS
+        )
+        if table is None:
+            raise AssertionError(f"{card_id} is missing")
+        digest = "sha256:" + hashlib.sha256(table.canonical_bytes).hexdigest()
+        resolve_current(
+            owner_response_id=f"OWNER-MSG-{index:04d}",
+            card_id=card_id,
+            card_digest=digest,
+            question_id=question_id,
+            selection="RESPONSE",
+            detail=value,
+            basis_id=basis_id,
+        )
+
     values = {
         "INTAKE-0001": work_context,
-        "INTAKE-0002": "Development users",
-        "INTAKE-0003": "Users need to see the approved project outcome",
-        "INTAKE-0004": "Display the current approved project outcome",
-        "INTAKE-0005": "Local development slice only",
-        "INTAKE-0006": "A rendered-output test confirms the approved outcome",
-        "INTAKE-0007": "Synthetic internal development data; us-west-2 only",
+        **{basis_id: value for basis_id, _prompt, _detail_prompt, value in facts},
     }
     text = confirm_intake_foundation(text, values, provenance_by_intake)
     return replace_contract_table(
@@ -439,7 +452,7 @@ def complete_requirements_contract(text: str) -> str:
         "## Document status",
         "## 1. Workload profile",
         "Project contract schema",
-        "`1.3`",
+        "`1.4`",
     )
     requirement_ids = sorted(doctor.authoritative_requirement_ids(text))
     requirement_list = ", ".join(requirement_ids)
@@ -493,7 +506,7 @@ def complete_requirements_contract(text: str) -> str:
     text = replace_contract_table(
         text, doctor.BUSINESS_RULE_HEADING, doctor.BUSINESS_RULE_HEADERS, []
     )
-    return replace_contract_table(
+    text = replace_contract_table(
         text,
         doctor.REQUIREMENT_COVERAGE_HEADING,
         doctor.REQUIREMENT_COVERAGE_HEADERS,
@@ -508,6 +521,30 @@ def complete_requirements_contract(text: str) -> str:
             )
             for requirement_id in requirement_ids
         ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADING,
+        doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADERS,
+        [
+            (
+                "REQ-0001",
+                "NONE",
+                "INITIAL_DEFINITION",
+                requirement_list,
+                "NONE",
+                "NONE",
+                "NONE",
+                "NONE - first definition",
+                "FULL_REVALIDATION",
+            )
+        ],
+    )
+    return replace_contract_table(
+        text,
+        doctor.ASSUMPTION_LIFECYCLE_HEADING,
+        doctor.ASSUMPTION_LIFECYCLE_HEADERS,
+        [],
     )
 
 
@@ -1139,7 +1176,7 @@ def complete_project_design_contract(text: str) -> str:
         "## Document status",
         "## 1. Workload profile",
         "Project design contract schema",
-        "`5`",
+        "`6`",
     )
     text = replace_contract_table(
         text,
@@ -1221,6 +1258,128 @@ def complete_project_design_contract(text: str) -> str:
         text,
         doctor.SPIKE_HEADING,
         "no prerequisite discovery is needed before the walking skeleton",
+    )
+
+
+def set_diagram_block(text: str, heading: str, next_heading: str, block: str) -> str:
+    start = text.index(heading) + len(heading)
+    end = text.index(next_heading, start)
+    return text[:start] + "\n\n" + block.strip() + "\n\n" + text[end:]
+
+
+def complete_diagram_contract(text: str) -> str:
+    rows = [
+        (
+            "DIAGRAM-0001",
+            "SYSTEM_CONTEXT",
+            "REQUIRED",
+            "CURRENT",
+            "proposed-system-at-a-glance",
+            "ARCH-0001, FR-001",
+            "ARCH-0001, API-001",
+        ),
+        (
+            "DIAGRAM-0002",
+            "PRIMARY_OUTCOME",
+            "REQUIRED",
+            "CURRENT",
+            "sequence-primary-outcome",
+            "ARCH-0001, JOURNEY-001",
+            "ACT-001, API-001",
+        ),
+        (
+            "DIAGRAM-0003",
+            "DATA_LIFECYCLE",
+            "CONDITIONAL",
+            "CURRENT",
+            "data-lifecycle-view",
+            "ARCH-0001, DATA-001",
+            "API-001, DATA-001",
+        ),
+        (
+            "DIAGRAM-0004",
+            "FAILURE_RECOVERY",
+            "CONDITIONAL",
+            "CURRENT",
+            "sequence-failure-and-recovery",
+            "ARCH-0001, REL-005",
+            "API-001, REL-005",
+        ),
+        (
+            "DIAGRAM-0005",
+            "MIGRATION",
+            "CONDITIONAL",
+            "NOT_YET_CREATED",
+            "migration-view",
+            "NONE",
+            "NONE",
+        ),
+        (
+            "DIAGRAM-0006",
+            "JOURNEY",
+            "CONDITIONAL",
+            "NOT_YET_CREATED",
+            "journey-view",
+            "NONE",
+            "NONE",
+        ),
+        (
+            "DIAGRAM-0007",
+            "STATE",
+            "CONDITIONAL",
+            "NOT_YET_CREATED",
+            "state-view",
+            "NONE",
+            "NONE",
+        ),
+    ]
+    text = replace_contract_table(
+        text, doctor.DIAGRAM_CONTRACT_HEADING, doctor.DIAGRAM_CONTRACT_HEADERS, rows
+    )
+    text = set_diagram_block(
+        text,
+        "### Proposed system at a glance",
+        "## 15. Component design",
+        """```mermaid
+flowchart LR
+    ARCH-0001[\"Managed application\"]
+    API-001[\"Approved interface\"]
+    ARCH-0001 -->|serves| API-001
+```""",
+    )
+    text = set_diagram_block(
+        text,
+        "### Data lifecycle view",
+        "## 18. Detailed sequence diagrams",
+        """```mermaid
+flowchart LR
+    API-001[\"Approved interface\"]
+    DATA-001[\"Approved data lifecycle\"]
+    API-001 -->|stores approved data| DATA-001
+```""",
+    )
+    text = set_diagram_block(
+        text,
+        "### Sequence — primary outcome",
+        "### Sequence — failure and recovery",
+        """```mermaid
+flowchart LR
+    ACT-001[\"Development user\"]
+    API-001[\"Approved interface\"]
+    ACT-001 -->|requests approved outcome| API-001
+    API-001 -->|returns approved outcome| ACT-001
+```""",
+    )
+    return set_diagram_block(
+        text,
+        "### Sequence — failure and recovery",
+        "## 19. Error handling strategy",
+        """```mermaid
+flowchart LR
+    API-001[\"Approved interface\"]
+    REL-005[\"Rollback requirement\"]
+    API-001 -->|fails health checks and invokes| REL-005
+```""",
     )
 
 
@@ -1456,7 +1615,7 @@ def complete_design_contract(text: str) -> str:
         harness_table,
         "## 27. Gate B agent review record",
     )
-    return complete_project_design_contract(text)
+    return complete_diagram_contract(complete_project_design_contract(text))
 
 
 def complete_legacy_design_bridge(text: str) -> str:
@@ -1799,7 +1958,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         context = doctor.Context(PROJECT_ROOT)
         manifest = {
             "schema_version": 1,
-            "bootstrap_version": "1.0.5",
+            "bootstrap_version": "1.1.0",
             "python_requires": ">=3.11",
             "required_files": [
                 f"docs/record-{index}.md"
@@ -2477,7 +2636,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.0.5")
+        self.assertEqual(report["bootstrap_version"], "1.1.0")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         self.assertEqual(report["next_prompt"], "INTAKE-10")
         self.assertEqual(
@@ -2489,7 +2648,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["authorizations"],
             {"construction": "NONE", "aws": "NONE"},
         )
-        self.assertEqual(report["design_contract"]["schema_version"], 5)
+        self.assertEqual(report["design_contract"]["schema_version"], 6)
         self.assertIn(
             report["design_contract"]["status"],
             {"UNINITIALIZED", "BLOCKED"},
@@ -3508,7 +3667,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 5)
+        self.assertEqual(ready.schema_version, 6)
         self.assertEqual(ready.architecture.schema_version, 4)
         self.assertEqual(ready.change_impact.status, "READY")
         self.assertEqual(ready.architecture.status, "READY")
@@ -3660,7 +3819,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(invalidated.status, "BLOCKED")
         self.assertTrue(
             any(
-                "Project design contract schema 5" in issue
+                "Project design contract schema 6" in issue
                 for issue in invalidated_issues
             ),
             invalidated_issues,
@@ -3870,9 +4029,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertTrue(ready_report["ok"], ready_report["diagnostics"])
             self.assertEqual(ready_report["status"], "RESUME")
             self.assertEqual(ready_report["next_prompt"], "TASK-10")
-            self.assertEqual(contract["schema_version"], 5)
+            self.assertEqual(contract["schema_version"], 6)
             self.assertEqual(
-                ready_report["requirements_contract"]["schema_version"], "1.3"
+                ready_report["requirements_contract"]["schema_version"], "1.4"
             )
             self.assertEqual(ready_report["requirements_contract"]["status"], "READY")
             self.assertEqual(contract["project_contract"]["status"], "READY")
@@ -4296,6 +4455,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             report = doctor.inspect_project(project)
 
         self.assertIn("REQUIRED_FILE_MISSING", codes(report))
+        self.assertIn("OWNER_BRIEF_SOURCE_MISMATCH", codes(report))
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["owner_decision_brief"]["schema_version"], 1)
+        self.assertEqual(report["owner_answer_confirmation"]["schema_version"], 1)
         self.assertFalse(report["resume_safe"])
 
     def test_required_file_symlink_is_rejected(self) -> None:
@@ -7229,7 +7392,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertIn("OWNER_WORK_CONTEXT", contract.missing_fields)
         self.assertIsNotNone(contract.pending_card)
         assert contract.pending_card is not None
-        self.assertEqual(len(contract.pending_card.questions), 3)
+        self.assertEqual(len(contract.pending_card.questions), 1)
         self.assertEqual(
             contract.pending_card.questions[0].prompt,
             "What are you starting with?",
@@ -7297,7 +7460,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(issues, [])
         self.assertEqual(contract.status, "READY_FOR_REQUIREMENTS")
         self.assertEqual(contract.owner_work_context, "NEW_APPLICATION")
-        self.assertEqual(len(contract.basis_ids), 7)
+        self.assertEqual(len(contract.basis_ids), 10)
         self.assertEqual(contract.missing_fields, ())
         self.assertIsNone(contract.pending_card)
         self.assertEqual(contract.schema_version, 2)
@@ -7305,20 +7468,20 @@ class BootstrapDoctorTests(unittest.TestCase):
             contract.current_understanding,
             (
                 "Starting point: a new application.",
-                "Users and problem: Development users — Users need to see the approved project outcome",
-                "First useful outcome: Display the current approved project outcome",
-                "First release: Local development slice only",
-                "Success and material boundaries: A rendered-output test confirms the approved outcome — Synthetic internal development data; us-west-2 only",
+                "Users and problem: Development teams — They need a clear view of approved project outcomes.",
+                "First useful outcome and release: See the current approved project outcome. — Include one local outcome view; defer external integrations.",
+                "Success and first audience: An invited tester can view the approved outcome without help. — Invited development testers only.",
+                "Data and operating boundaries: Synthetic project names, status, and outcome summaries. — No sensitive data in the first trial. — United States users; data remains in us-west-2.",
             ),
         )
         assert response_table is not None
         assert card_table is not None
-        self.assertEqual(len(response_table.rows), 5)
+        self.assertEqual(len(response_table.rows), 10)
         self.assertEqual(
             {row[0] for row in response_table.rows},
-            {"OWNER-MSG-0001", "OWNER-MSG-0002"},
+            {f"OWNER-MSG-{index:04d}" for index in range(1, 11)},
         )
-        self.assertEqual({row[0] for row in card_table.rows}, {"INTAKE-CARD-0002"})
+        self.assertEqual({row[0] for row in card_table.rows}, {"INTAKE-CARD-0010"})
         foundation_table = doctor.contract_table_after_heading(
             completed,
             doctor.INTAKE_FOUNDATION_HEADING,
@@ -7327,9 +7490,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         assert foundation_table is not None
         historical = {row[0]: row[5] for row in foundation_table.rows}
         self.assertIn("OWNER-MSG-0001", historical["INTAKE-0001"])
-        self.assertIn("OWNER-MSG-0001", historical["INTAKE-0005"])
-        self.assertIn("OWNER-MSG-0002", historical["INTAKE-0006"])
-        self.assertIn("OWNER-MSG-0002", historical["INTAKE-0007"])
+        self.assertIn("OWNER-MSG-0005", historical["INTAKE-0005"])
+        self.assertIn("OWNER-MSG-0006", historical["INTAKE-0006"])
+        self.assertIn("OWNER-MSG-0007", historical["INTAKE-0007"])
 
     def test_owner_work_context_choices_map_exactly_to_semantic_values(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -7348,28 +7511,32 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertEqual(issues, [])
                 self.assertEqual(contract.owner_work_context, owner_work_context)
 
-    def test_partial_intake_rerenders_and_parses_original_remaining_keys(self) -> None:
+    def test_resolved_card_requires_the_next_one_question_card(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         initial, issues = doctor.derive_intake_foundation_contract(
             source, "greenfield", grandfather_current_gate_a=False
         )
         self.assertEqual(issues, [])
         assert initial.pending_card is not None
-        self.assertEqual(initial.current_understanding, ())
         digest = initial.pending_card.canonical_sha256
         provenance = intake_provenance(
-            "OWNER-MSG-0001", "INTAKE-CARD-0001", 1, digest, "INTAKE-Q-0001", "A"
+            "OWNER-MSG-0001",
+            "INTAKE-CARD-0001",
+            1,
+            digest,
+            "INTAKE-Q-0001",
+            "A",
         )
-        partial = set_intake_card_resolution(
+        resolved = set_intake_card_resolution(
             source, "INTAKE-Q-0001", "A", owner_response=provenance
         )
-        partial = confirm_intake_foundation(
-            partial,
+        resolved = confirm_intake_foundation(
+            resolved,
             {"INTAKE-0001": "NEW_APPLICATION"},
             {"INTAKE-0001": provenance},
         )
-        partial = replace_contract_table(
-            partial,
+        resolved = replace_contract_table(
+            resolved,
             doctor.INTAKE_RESPONSE_REGISTER_HEADING,
             doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
             [
@@ -7387,29 +7554,56 @@ class BootstrapDoctorTests(unittest.TestCase):
             ],
         )
         contract, issues = doctor.derive_intake_foundation_contract(
-            partial, "greenfield", grandfather_current_gate_a=False
+            resolved, "greenfield", grandfather_current_gate_a=False
         )
-        self.assertEqual(issues, [])
-        assert contract.pending_card is not None
+        self.assertIn("INTAKE_CARD_REQUIRED", {code for code, _ in issues})
+        self.assertIsNone(contract.pending_card)
         self.assertEqual(
             contract.current_understanding,
             ("Starting point: a new application.",),
         )
-        self.assertEqual(
-            [question.reply_key for question in contract.pending_card.questions],
-            ["2", "3"],
+
+        next_card = replace_contract_table(
+            resolved,
+            doctor.INTAKE_CARD_HEADING,
+            doctor.INTAKE_CARD_HEADERS,
+            [
+                (
+                    "INTAKE-CARD-0002",
+                    "1",
+                    "1",
+                    "INTAKE-Q-0002",
+                    "FACT",
+                    "INTAKE-0002",
+                    "Who will use the app?",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NONE",
+                    "RESPONSE",
+                    "Name the primary people or teams.",
+                    "PENDING",
+                    "NONE",
+                    "NONE",
+                )
+            ],
         )
-        remaining_digest = contract.pending_card.canonical_sha256
+        contract, issues = doctor.derive_intake_foundation_contract(
+            next_card, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertEqual(issues, [])
+        assert contract.pending_card is not None
+        self.assertEqual(len(contract.pending_card.questions), 1)
         parsed = doctor.parse_intake_owner_response(
-            "2: Users; 3: First useful result",
+            "1: Development teams",
             contract.pending_card.to_dict(),
-            expected_card_id="INTAKE-CARD-0001",
+            expected_card_id="INTAKE-CARD-0002",
             expected_revision=1,
-            expected_sha256=remaining_digest,
+            expected_sha256=contract.pending_card.canonical_sha256,
             owner_response_id="OWNER-MSG-0002",
         )
         self.assertEqual(parsed.status, "PASS", parsed.to_dict())
-        self.assertEqual([answer.reply_key for answer in parsed.answers], ["2", "3"])
+        self.assertEqual([answer.reply_key for answer in parsed.answers], ["1"])
 
     def test_response_register_rejects_repeated_questions_and_empty_facts(self) -> None:
         source = complete_intake_foundation(
@@ -7482,7 +7676,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             "INTAKE_RESPONSE_REGISTER_INVALID", {code for code, _message in issues}
         )
 
-    def test_intake_parser_cli_is_normalizing_partial_stale_and_zero_write(
+    def test_intake_parser_cli_is_current_card_bound_and_zero_write(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -7540,43 +7734,31 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertEqual(completed.stderr, "", completed.stderr)
                 return completed.returncode, json.loads(completed.stdout)
 
-            valid_exit, valid = parse(
-                "1a; 2: Development users need a clear outcome; "
-                "3: The first release displays that outcome"
-            )
-            partial_exit, partial = parse("2: Development users need a clear outcome")
+            valid_exit, valid = parse("1a")
             stale_exit, stale = parse("1A", stale=True)
-            rejected_exit, rejected = parse("1A; 1B")
-            secret_exit, secret = parse("2: aws_secret_access_key=synthetic-value")
+            duplicate_exit, duplicate = parse("1A; 1B")
+            wrong_key_exit, wrong_key = parse("2: Development teams")
 
             self.assertEqual(valid_exit, 0)
             self.assertEqual(valid["status"], "PASS")
             self.assertEqual(valid["owner_response_id"], "OWNER-MSG-0001")
             self.assertEqual(valid["answers"][0]["selection"], "A")
             self.assertEqual(valid["unresolved_reply_keys"], [])
-            self.assertEqual(partial_exit, 0)
-            self.assertEqual(partial["status"], "PASS")
-            self.assertEqual(partial["unresolved_reply_keys"], ["1", "3"])
-            self.assertEqual(
-                partial["owner_status"]["required_from_you"],
-                "Nothing until Codex records them and presents only the remaining questions.",
-            )
             self.assertEqual(stale_exit, 2)
             self.assertIn(
                 "INTAKE_CARD_STALE",
                 {item["code"] for item in stale["errors"]},
             )
-            self.assertEqual(rejected_exit, 2)
+            self.assertEqual(duplicate_exit, 2)
             self.assertIn(
                 "INTAKE_REPLY_KEY_DUPLICATE",
-                {item["code"] for item in rejected["errors"]},
+                {item["code"] for item in duplicate["errors"]},
             )
-            self.assertEqual(secret_exit, 2)
+            self.assertEqual(wrong_key_exit, 2)
             self.assertIn(
-                "INTAKE_SECRET_MATERIAL",
-                {item["code"] for item in secret["errors"]},
+                "INTAKE_REPLY_KEY_UNKNOWN",
+                {item["code"] for item in wrong_key["errors"]},
             )
-            self.assertNotIn("synthetic-value", json.dumps(secret, sort_keys=True))
             self.assertEqual(snapshot(), baseline)
 
     def test_cli_rejects_a_delayed_reply_bound_to_the_previous_card(self) -> None:
@@ -8194,7 +8376,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(issues, [])
         self.assertEqual(contract.status, "READY")
-        self.assertEqual(contract.schema_version, "1.3")
+        self.assertEqual(contract.schema_version, "1.4")
         self.assertEqual(contract.actor_ids, ("ACT-001",))
         self.assertEqual(contract.journey_ids, ("JOURNEY-001",))
         self.assertEqual(
@@ -8222,7 +8404,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
 
         legacy = text.replace(
-            "| Project contract schema | `1.3` |",
+            "| Project contract schema | `1.4` |",
             "| Project contract schema | `1.2` |",
             1,
         )
@@ -8236,7 +8418,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(migration.status, "MIGRATION_REQUIRED")
         self.assertEqual(
             migration.missing_records,
-            ("Project contract schema 1.3",),
+            ("Project contract schema 1.4",),
         )
         self.assertEqual(
             {code for code, _message in migration_issues},
@@ -8279,6 +8461,110 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(grandfathered.status, "GRANDFATHERED")
         self.assertEqual(grandfathered.requirement_ids, ("FR-001",))
         self.assertTrue(grandfathered.grandfathered_approved_gate_a)
+
+    def test_requirements_lineage_and_assumption_lifecycle_fail_closed(
+        self,
+    ) -> None:
+        source = approve_gate_a(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        intake, intake_issues = doctor.derive_intake_foundation_contract(
+            source,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+
+        invalid_lineage = source.replace(
+            "| REQ-0001 | NONE | INITIAL_DEFINITION |",
+            "| REQ-0001 | REQ-0001 | INITIAL_DEFINITION |",
+            1,
+        )
+        blocked, issues = doctor.derive_requirements_contract(
+            invalid_lineage,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertIn(
+            "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
+            {code for code, _message in issues},
+        )
+
+        invalid_assumption = replace_contract_table(
+            source,
+            doctor.ASSUMPTION_LIFECYCLE_HEADING,
+            doctor.ASSUMPTION_LIFECYCLE_HEADERS,
+            [
+                (
+                    "ASM-001",
+                    "The development user can access the approved outcome",
+                    "DRAFT",
+                    "FR-001",
+                    "PENDING_OWNER_DECISION",
+                )
+            ],
+        )
+        blocked, issues = doctor.derive_requirements_contract(
+            invalid_assumption,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(blocked.status, "BLOCKED")
+        self.assertIn(
+            "ASSUMPTION_LIFECYCLE_INVALID",
+            {code for code, _message in issues},
+        )
+
+    def test_approved_schema_13_is_grandfathered_until_requirements_change(
+        self,
+    ) -> None:
+        source = approve_gate_a(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        intake, intake_issues = doctor.derive_intake_foundation_contract(
+            source,
+            "greenfield",
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(intake_issues, [])
+        legacy = source.replace(
+            "| Project contract schema | `1.4` |",
+            "| Project contract schema | `1.3` |",
+            1,
+        )
+        start = legacy.index(doctor.REQUIREMENTS_CHANGE_LINEAGE_HEADING)
+        end = legacy.index("### Open decisions", start)
+        legacy = legacy[:start] + legacy[end:]
+
+        grandfathered, issues = doctor.derive_requirements_contract(
+            legacy,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "GRANDFATHERED")
+        self.assertEqual(grandfathered.schema_version, "1.3")
+        self.assertTrue(grandfathered.grandfathered_approved_gate_a)
+
+        migration, migration_issues = doctor.derive_requirements_contract(
+            legacy,
+            "low",
+            intake,
+            required=True,
+            grandfather_current_gate_a=False,
+        )
+        self.assertEqual(migration.status, "MIGRATION_REQUIRED")
+        self.assertIn(
+            "PROJECT_CONTRACT_MIGRATION_REQUIRED",
+            {code for code, _message in migration_issues},
+        )
 
     def test_schema_13_requires_inverse_actor_and_journey_coverage(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -8718,6 +9004,128 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertNotIn("PROJECT_CONTRACT_MIGRATION_REQUIRED", codes(report))
         self.assertEqual(report["next_prompt"], "DESIGN-10")
 
+    def test_approved_schema_five_design_is_grandfathered_without_diagrams(
+        self,
+    ) -> None:
+        source = complete_design_contract(
+            approve_gate_a(
+                (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+            )
+        )
+        legacy = source.replace(
+            "| Project design contract schema | `6` |",
+            "| Project design contract schema | `5` |",
+            1,
+        )
+        start = legacy.index(doctor.DIAGRAM_CONTRACT_HEADING)
+        end = legacy.index("## 14. Architecture overview", start)
+        legacy = legacy[:start] + legacy[end:]
+
+        grandfathered, issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "READY")
+        self.assertEqual(grandfathered.schema_version, 5)
+        self.assertTrue(grandfathered.project_contract.grandfathered_v5)
+        self.assertTrue(grandfathered.diagram_contract.grandfathered_schema5)
+
+        migration, migration_issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=False,
+        )
+        self.assertEqual(migration.status, "BLOCKED")
+        self.assertEqual(migration.project_contract.status, "MIGRATION_REQUIRED")
+        self.assertTrue(migration_issues)
+
+    def test_diagram_semantics_and_rendering_are_bound_separately(self) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        baseline, baseline_issues = doctor.derive_design_contract(
+            source,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(baseline_issues, [])
+        baseline_record = next(
+            item
+            for item in baseline.diagram_contract.records
+            if item.diagram_id == "DIAGRAM-0001"
+        )
+
+        relabeled, relabeled_issues = doctor.derive_design_contract(
+            source.replace(
+                "Managed application",
+                "Managed Fastlane application",
+                1,
+            ),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(relabeled_issues, [])
+        relabeled_record = next(
+            item
+            for item in relabeled.diagram_contract.records
+            if item.diagram_id == "DIAGRAM-0001"
+        )
+        self.assertEqual(baseline.canonical_sha256, relabeled.canonical_sha256)
+        self.assertEqual(
+            baseline_record.semantic_sha256,
+            relabeled_record.semantic_sha256,
+        )
+        self.assertNotEqual(
+            baseline_record.rendered_sha256,
+            relabeled_record.rendered_sha256,
+        )
+
+        semantic, semantic_issues = doctor.derive_design_contract(
+            source.replace("-->|serves|", "-->|routes through|", 1),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(semantic_issues, [])
+        self.assertNotEqual(baseline.canonical_sha256, semantic.canonical_sha256)
+        self.assertNotEqual(
+            baseline.diagram_contract.canonical_sha256,
+            semantic.diagram_contract.canonical_sha256,
+        )
+
+    def test_required_project_diagrams_fail_closed_when_stale_or_generic(
+        self,
+    ) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        cases = {
+            "stale": (
+                source.replace(
+                    "| DIAGRAM-0001 | SYSTEM_CONTEXT | REQUIRED | CURRENT |",
+                    "| DIAGRAM-0001 | SYSTEM_CONTEXT | REQUIRED | STALE |",
+                    1,
+                ),
+                "required SYSTEM_CONTEXT diagram is not CURRENT",
+            ),
+            "generic": (
+                source.replace("Managed application", "TODO", 1),
+                "generic placeholder content",
+            ),
+        }
+        for label, (candidate, expected) in cases.items():
+            with self.subTest(case=label):
+                blocked, issues = doctor.derive_design_contract(
+                    candidate,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(blocked.status, "BLOCKED")
+                self.assertTrue(any(expected in issue for issue in issues), issues)
+
     def test_schema_five_project_design_is_digest_bound_and_fail_closed(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(source)
@@ -8728,7 +9136,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 5)
+        self.assertEqual(ready.schema_version, 6)
         self.assertEqual(ready.project_contract.status, "READY")
         self.assertEqual(ready.project_contract.interface_ids, ("API-001",))
         self.assertEqual(ready.project_contract.boundary_ids, ("BOUNDARY-001",))
@@ -8840,7 +9248,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertTrue(any(expected in issue for issue in issues), issues)
 
         mislabeled_current = complete.replace(
-            "| Project design contract schema | `5` |\n", "", 1
+            "| Project design contract schema | `6` |\n", "", 1
         )
         migration, migration_issues = doctor.derive_design_contract(
             mislabeled_current,
@@ -8852,7 +9260,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertFalse(migration.project_contract.grandfathered_v4)
         self.assertTrue(
             any(
-                "Project design contract schema 5" in issue
+                "Project design contract schema 6" in issue
                 for issue in migration_issues
             ),
             migration_issues,
@@ -9057,14 +9465,14 @@ class BootstrapDoctorTests(unittest.TestCase):
                     unsafe_issues,
                 )
 
-    def test_real_approved_schema_12_gate_a_reaches_schema_five(self) -> None:
+    def test_real_approved_schema_12_gate_a_reaches_schema_six(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         approved_modern = complete_design_contract(approve_gate_a(source))
         legacy_basis = exact_legacy_requirements_projection(approved_modern)
         migrated = complete_legacy_design_bridge(source)
         self.assertEqual(
-            legacy_basis.split("# Part III", 1)[0],
-            migrated.split("# Part III", 1)[0],
+            legacy_basis.split("# Technical Plan", 1)[0],
+            migrated.split("# Technical Plan", 1)[0],
         )
         requirements, requirement_issues = doctor.derive_requirements_contract(
             migrated,
@@ -9237,6 +9645,23 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
             self.assertEqual(blocked.status, "BLOCKED")
             self.assertTrue(any("State trigger" in issue for issue in issues), issues)
+
+    @source_template_only
+    def test_additive_owner_projections_preserve_engine_schema_and_template_route(
+        self,
+    ) -> None:
+        report = doctor.inspect_project(PROJECT_ROOT)
+
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["classification"], "UNCONFIGURED_TEMPLATE")
+        self.assertEqual(report["owner_decision_brief"]["schema_version"], 1)
+        self.assertEqual(report["owner_decision_brief"]["status"], "NONE")
+        self.assertEqual(report["owner_answer_confirmation"]["schema_version"], 1)
+        self.assertEqual(report["owner_answer_confirmation"]["status"], "NONE")
+        self.assertEqual(
+            report["interaction"]["owner_action_kind"],
+            "COMPLETE_PREREQUISITE_CHECKLIST",
+        )
 
 
 class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):

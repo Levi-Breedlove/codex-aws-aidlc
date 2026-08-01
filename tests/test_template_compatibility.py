@@ -51,10 +51,10 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertNotIn("Delegate to `$fastlane`", skill)
         self.assertIn("pull requests targeting only that customer branch", workflow)
         self.assertIn(
-            "direct push to `fast-lane-maint` requires explicit emergency", workflow
+            "direct push to `fast-lane` requires explicit emergency", workflow
         )
         self.assertIn("Force pushes and deletion", workflow)
-        self.assertIn("live `fast-lane-maint` customer branch", workflow)
+        self.assertIn("live `fast-lane` customer branch", workflow)
         self.assertIn("legacy `Legacy` is not a customer publication target", workflow)
         self.assertIn("The protected `Legacy` branch", skill)
         self.assertIn("separate repository-setting action", workflow)
@@ -134,12 +134,26 @@ class TemplateCompatibilityTests(unittest.TestCase):
 
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
         plan = model_roleplay_eval.plan_payload()
-        self.assertEqual(len(plan["scenarios"]), 13)
+        self.assertEqual(len(plan["scenarios"]), 22)
+        scenario_ids = {scenario["id"] for scenario in plan["scenarios"]}
+        self.assertTrue(
+            {
+                "one-question-intake",
+                "answer-confirmation",
+                "gate-a-brief-comprehension",
+                "gate-b-brief-comprehension",
+                "source-navigation",
+                "project-diagram-understanding",
+                "gate-correction",
+                "resume-without-repetition",
+                "agent-owned-correction",
+            }.issubset(scenario_ids)
+        )
         self.assertEqual(set(plan["criteria"]), set(model_roleplay_eval.CRITERIA))
         self.assertFalse(plan["constraints"]["ordinary_ci_invokes_live_model"])
         self.assertTrue(plan["constraints"]["live_execution_is_opt_in"])
         self.assertFalse(plan["constraints"]["release_readiness_claimed_by_scorer"])
-        self.assertEqual(plan["schema_version"], 4)
+        self.assertEqual(plan["schema_version"], 5)
         source = SCRIPT_PATH.read_text(encoding="utf-8")
         for forbidden in (
             "subprocess",
@@ -184,6 +198,23 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertEqual(result["status"], "FAIL")
         self.assertTrue(
             any("cannot be auto-converted" in error for error in result["errors"])
+        )
+
+    def test_model_roleplay_schema_four_requires_explicit_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            result, passed = model_roleplay_eval.score_payload(
+                {"schema_version": 4, "evaluation_mode": "RELEASE", "runs": []},
+                bundle_root=Path(temporary),
+                expected_commit="a" * 40,
+                expected_prompt_contract_sha256="sha256:" + "b" * 64,
+            )
+        self.assertFalse(passed)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertTrue(
+            any(
+                "required Fastlane 1.1 customer-experience scenarios" in error
+                for error in result["errors"]
+            )
         )
 
     def test_model_roleplay_score_rejects_missing_scenarios(self) -> None:
