@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 ARTIFACT_SCHEMA_VERSION = 1
 REQUIRED_RUNS = 3
 MINIMUM_AVERAGE = 4.0
@@ -61,6 +61,56 @@ SCENARIOS = (
         "expect": "Internal methods stay hidden by default.",
     },
     {"id": "harness-selection", "expect": "Smallest justified risk-derived harness."},
+    {
+        "id": "one-question-intake",
+        "expect": "One consequential question per turn after initial settings.",
+    },
+    {
+        "id": "answer-confirmation",
+        "expect": (
+            "The latest owner answer is reflected from canonical state exactly once."
+        ),
+    },
+    {
+        "id": "gate-a-brief-comprehension",
+        "expect": (
+            "The owner can explain the product agreement and approval boundary."
+        ),
+    },
+    {
+        "id": "gate-b-brief-comprehension",
+        "expect": (
+            "The owner can explain the design, construction boundary, and limits."
+        ),
+    },
+    {
+        "id": "source-navigation",
+        "expect": (
+            "Every required source locator resolves to its bound canonical section."
+        ),
+    },
+    {
+        "id": "project-diagram-understanding",
+        "expect": (
+            "Project diagrams communicate planned design without implying observation."
+        ),
+    },
+    {
+        "id": "gate-correction",
+        "expect": "A correction changes canonical state without becoming approval.",
+    },
+    {
+        "id": "resume-without-repetition",
+        "expect": (
+            "Resume restores the exact pending action without repeated setup or questions."
+        ),
+    },
+    {
+        "id": "agent-owned-correction",
+        "expect": (
+            "Codex repairs a safe in-scope defect without assigning it to the owner."
+        ),
+    },
 )
 RUBRICS = {
     "owner_clarity": {
@@ -473,7 +523,15 @@ def score_payload(
     errors: list[str] = []
     if isinstance(payload, dict) and payload.get("schema_version") == 3:
         errors.append(
-            "schema 3 inline attestations cannot be auto-converted; export a schema 4 evidence bundle"
+            "schema 3 inline attestations cannot be auto-converted; rerun the "
+            "required scenarios and export a schema 5 evidence bundle"
+        )
+        return _base_result(errors), False
+    if isinstance(payload, dict) and payload.get("schema_version") == 4:
+        errors.append(
+            "schema 4 evidence does not cover the required Fastlane 1.1 "
+            "customer-experience scenarios and cannot be auto-converted; rerun "
+            "and export a schema 5 evidence bundle"
         )
         return _base_result(errors), False
     root = _exact_object(payload, ROOT_KEYS, "payload", errors)

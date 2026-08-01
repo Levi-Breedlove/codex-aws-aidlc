@@ -21,10 +21,12 @@ python scripts/model_roleplay_eval.py plan --json
 ```
 
 Use only synthetic project facts. Run every scenario at least three times and
-store the complete evidence bundle outside the repository. The schema-4
+store the complete evidence bundle outside the repository. The schema-5
 evaluation manifest binds the expected commit and prompt-contract digest, then
 references one transcript and separate rater scorecard files for each scenario
-and iteration.
+and iteration. Its required set adds one-question intake, Answer Confirmation,
+Gate A and Gate B comprehension, source navigation, project-diagram
+understanding, gate correction, exact resume, and agent-owned correction.
 
 - `DEVELOPMENT` may use one pseudonymous rater, but can never claim release
   readiness.
@@ -41,7 +43,7 @@ and iteration.
 - Only schemas, plans, digests, and non-personal references belong in tracked
   release evidence.
 
-Score the untracked schema-4 bundle:
+Score the untracked schema-5 bundle:
 
 ```text
 python scripts/model_roleplay_eval.py score \
@@ -84,13 +86,13 @@ action, both gates, AWS-access state, and the recommendation basis. Do not retai
 transcripts by default; tracked files may contain only a non-personal reference and
 digest. Pilot metrics are evidence, never a gate or publication authority.
 
-### Schema 3 migration
+### Schema 4 and earlier migration
 
-Schema 3 inline `live_model_observed` booleans, nested score objects, and
-unresolved digest strings cannot establish file provenance and are rejected.
-Do not auto-convert them. Re-export each transcript, scorecard, and required
-adjudication as a schema-4 evidence bundle, calculate the actual file digests,
-and rerun the scorer with the exact tested commit and prompt-contract digest.
+Schema 4 bundles cover the previous scenario set; schema 3 inline attestations
+do not establish file provenance. Neither can be auto-converted into missing
+Fastlane 1.1 observations. Rerun every schema-5 scenario and export fresh
+transcripts, scorecards, and required adjudications with actual file digests,
+the exact tested commit, and the current prompt-contract digest.
 
 ## AWS Core field qualification
 

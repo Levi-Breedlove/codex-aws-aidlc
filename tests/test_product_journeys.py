@@ -308,6 +308,89 @@ class ProductJourneyTests(unittest.TestCase):
             ):
                 self.assertNotIn(forbidden, state_text)
 
+    def test_owner_briefs_and_diagrams_use_real_project_artifacts(self) -> None:
+        fixture = doctor_fixtures.BootstrapDoctorTests()
+
+        def verify_source_locators(
+            project: Path, brief: dict[str, object]
+        ) -> None:
+            locators = brief["source_locators"]
+            self.assertTrue(locators)
+            for locator in locators:
+                self.assertEqual(locator["path"], "docs/project/PRD.md")
+                source = (project / locator["path"]).read_text(encoding="utf-8")
+                selected = "\n".join(
+                    source.splitlines()[
+                        locator["start_line"] - 1 : locator["end_line"]
+                    ]
+                )
+                canonical = context_runtime.canonical_source_bytes(selected)
+                self.assertEqual(
+                    locator["section_sha256"],
+                    "sha256:" + hashlib.sha256(canonical).hexdigest(),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+
+            gate_a_project = self.extract_template(temporary, "gate-a-brief")
+            self.initialize(gate_a_project)
+            fixture.pending_gate_a(gate_a_project)
+            gate_a = doctor.inspect_project(gate_a_project)
+            self.assertTrue(gate_a["ok"], gate_a["diagnostics"])
+            gate_a_brief = gate_a["owner_decision_brief"]
+            self.assertEqual(gate_a_brief["kind"], "GATE_A")
+            self.assertEqual(gate_a_brief["status"], "READY")
+            self.assertTrue(gate_a_brief["formal_receipt_required"])
+            self.assertTrue(gate_a_brief["canonical_sha256"])
+            verify_source_locators(gate_a_project, gate_a_brief)
+            rendered_gate_a = presenter.render_owner_decision_brief(
+                gate_a, "GATE_A"
+            )
+            self.assertIn("Gate A Owner Decision Brief", rendered_gate_a)
+            self.assertIn("Not authorized", rendered_gate_a)
+
+            confirmation = gate_a["owner_answer_confirmation"]
+            self.assertEqual(confirmation["status"], "READY")
+            rendered_confirmation = presenter.render_answer_confirmation(
+                gate_a, confirmation["owner_response_id"]
+            )
+            self.assertIn("Recorded:", rendered_confirmation)
+            self.assertIn("Project effect:", rendered_confirmation)
+            self.assertIn("Correct it:", rendered_confirmation)
+            with self.assertRaises(presenter.PresentationError):
+                presenter.render_answer_confirmation(gate_a, "OWNER-MSG-0001")
+
+            gate_b_project = self.extract_template(temporary, "gate-b-brief")
+            self.initialize(gate_b_project)
+            fixture.pending_gate_b(gate_b_project)
+            gate_b = doctor.inspect_project(gate_b_project)
+            self.assertTrue(gate_b["ok"], gate_b["diagnostics"])
+            gate_b_brief = gate_b["owner_decision_brief"]
+            self.assertEqual(gate_b_brief["kind"], "GATE_B")
+            self.assertEqual(gate_b_brief["status"], "READY")
+            self.assertTrue(gate_b_brief["technical_decision_groups"])
+            verify_source_locators(gate_b_project, gate_b_brief)
+            rendered_gate_b = presenter.render_owner_decision_brief(
+                gate_b, "GATE_B"
+            )
+            self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
+            self.assertIn("Technical decision index", rendered_gate_b)
+
+            diagram_contract = gate_b["design_contract"]["diagram_contract"]
+            self.assertEqual(diagram_contract["schema_version"], 1)
+            self.assertEqual(diagram_contract["status"], "CURRENT")
+            records = {item["kind"]: item for item in diagram_contract["records"]}
+            for kind in ("SYSTEM_CONTEXT", "PRIMARY_OUTCOME"):
+                self.assertEqual(records[kind]["applicability"], "REQUIRED")
+                self.assertEqual(records[kind]["status"], "CURRENT")
+                self.assertRegex(
+                    records[kind]["semantic_sha256"], r"^sha256:[0-9a-f]{64}$"
+                )
+                self.assertRegex(
+                    records[kind]["rendered_sha256"], r"^sha256:[0-9a-f]{64}$"
+                )
+
     def test_gate_evidence_and_construction_routes_use_real_project_artifacts(
         self,
     ) -> None:

@@ -103,7 +103,7 @@ Fastlane works with hooks disabled. The reviewed optional hook pack may deny cle
 
 Before claiming a real AWS execution lane as field-qualified, Codex selects the smallest disposable scenario using current AWS Core guidance. The owner authorizes; IAM enforces; observed evidence proves. AWS Core does not choose the product architecture or grant authority. Field qualification adds no scorer, lifecycle stage, gate, or routine customer action.
 
-On resume, the Engine selects the current route and one next action. Initialized projects skip setup. A missing current AWS capability pauses only the affected material AWS step. Model role plays remain opt-in, external-evidence checks; they are never ordinary CI or independent release-readiness proof.
+On resume, the Engine selects the current route and one next action. Initialized projects skip setup. A missing current AWS capability pauses only the affected material AWS step. Schema-5 model role plays remain opt-in, external-evidence checks for the Fastlane 1.1 customer journeys; they are never ordinary CI or independent release-readiness proof.
 
 ## Agent reference
 
