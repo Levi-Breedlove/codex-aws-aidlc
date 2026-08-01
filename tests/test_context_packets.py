@@ -389,7 +389,6 @@ class ContextPacketTests(unittest.TestCase):
             self.assertIn(required, source_slices)
         self.assertEqual(len(source_slices), len(set(source_slices)))
 
-
     def test_design_loads_exact_subsections_and_patterns_only_when_required(
         self,
     ) -> None:
@@ -398,7 +397,9 @@ class ContextPacketTests(unittest.TestCase):
         prd = (REPOSITORY_ROOT / doctor.PRD_FILE).read_text(encoding="utf-8")
         source_texts = {
             design_path: (REPOSITORY_ROOT / design_path).read_text(encoding="utf-8"),
-            patterns_path: (REPOSITORY_ROOT / patterns_path).read_text(encoding="utf-8"),
+            patterns_path: (REPOSITORY_ROOT / patterns_path).read_text(
+                encoding="utf-8"
+            ),
             doctor.PRD_FILE: prd,
             doctor.VERIFY_FILE: (REPOSITORY_ROOT / doctor.VERIFY_FILE).read_text(
                 encoding="utf-8"
@@ -438,7 +439,9 @@ class ContextPacketTests(unittest.TestCase):
             "DIAGRAM-0003",
             "DIAGRAM-0004",
         ):
-            pattern = rf"(?m)^(\| {diagram_id} \| [^\n]+ \|) NOT_YET_CREATED (\| [^\n]+)$"
+            pattern = (
+                rf"(?m)^(\| {diagram_id} \| [^\n]+ \|) NOT_YET_CREATED (\| [^\n]+)$"
+            )
             current, count = re.subn(pattern, r"\1 CURRENT \2", current, count=1)
             self.assertEqual(count, 1, diagram_id)
         complete = doctor.derive_context_plan(
@@ -449,6 +452,7 @@ class ContextPacketTests(unittest.TestCase):
             source_texts={**source_texts, doctor.PRD_FILE: current},
         )
         self.assertNotIn(patterns_path, complete["on_demand_slices"])
+
 
 if __name__ == "__main__":
     unittest.main()

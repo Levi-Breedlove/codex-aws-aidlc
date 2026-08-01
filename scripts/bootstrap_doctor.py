@@ -1075,7 +1075,9 @@ class RequirementsContract:
             "use_case_ids": list(self.use_case_ids),
             "business_rule_ids": list(self.business_rule_ids),
             "rich_use_case_triggers": list(self.rich_use_case_triggers),
-            "change_lineage": self.change_lineage.to_dict() if self.change_lineage else None,
+            "change_lineage": self.change_lineage.to_dict()
+            if self.change_lineage
+            else None,
             "assumptions": [item.to_dict() for item in self.assumptions],
             "missing_records": list(self.missing_records),
             "canonical_sha256": self.canonical_sha256,
@@ -1196,7 +1198,9 @@ class IntakeFoundationContract:
     normalized_responses: tuple[NormalizedOwnerResponse, ...] = field(
         default=(), repr=False, compare=False
     )
-    all_questions: tuple[IntakeQuestion, ...] = field(default=(), repr=False, compare=False)
+    all_questions: tuple[IntakeQuestion, ...] = field(
+        default=(), repr=False, compare=False
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -5152,9 +5156,7 @@ def derive_requirements_contract(
                 current_present_headers.add(headers)
         except ValueError:
             pass
-    grandfather_schema_13 = bool(
-        project_schema == "1.3" and grandfather_current_gate_a
-    )
+    grandfather_schema_13 = bool(project_schema == "1.3" and grandfather_current_gate_a)
     if project_schema != PROJECT_CONTRACT_SCHEMA and not grandfather_schema_13:
         legacy_headers = observed_headers & {
             LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
@@ -5346,7 +5348,17 @@ def derive_requirements_contract(
             )
         else:
             raw = lineage_table.rows[0]
-            current, prior, trigger, added, changed, removed, preserved, stale, revalidate = raw
+            (
+                current,
+                prior,
+                trigger,
+                added,
+                changed,
+                removed,
+                preserved,
+                stale,
+                revalidate,
+            ) = raw
             parsed_lists: dict[str, list[str]] = {}
             for label, value in (
                 ("Added IDs", added),
@@ -5374,7 +5386,10 @@ def derive_requirements_contract(
             expected_revision = clean_cell(
                 document.get("Current requirements revision", "")
             )
-            if current != expected_revision or REQUIREMENTS_REVISION_ID.fullmatch(current) is None:
+            if (
+                current != expected_revision
+                or REQUIREMENTS_REVISION_ID.fullmatch(current) is None
+            ):
                 add(
                     "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
                     "Current lineage revision must match Document status",
@@ -5398,7 +5413,12 @@ def derive_requirements_contract(
                 )
             classified = [
                 identifier
-                for label in ("Added IDs", "Changed IDs", "Removed IDs", "Preserved IDs")
+                for label in (
+                    "Added IDs",
+                    "Changed IDs",
+                    "Removed IDs",
+                    "Preserved IDs",
+                )
                 for identifier in parsed_lists[label]
             ]
             duplicates = sorted(
@@ -5409,11 +5429,14 @@ def derive_requirements_contract(
             if duplicates:
                 add(
                     "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
-                    "Lineage IDs appear in multiple dispositions: " + ", ".join(duplicates),
+                    "Lineage IDs appear in multiple dispositions: "
+                    + ", ".join(duplicates),
                 )
-            current_declared = set(parsed_lists["Added IDs"]) | set(
-                parsed_lists["Changed IDs"]
-            ) | set(parsed_lists["Preserved IDs"])
+            current_declared = (
+                set(parsed_lists["Added IDs"])
+                | set(parsed_lists["Changed IDs"])
+                | set(parsed_lists["Preserved IDs"])
+            )
             if current_declared != requirement_set:
                 add(
                     "REQUIREMENTS_CHANGE_LINEAGE_INVALID",
@@ -5432,8 +5455,17 @@ def derive_requirements_contract(
             )
     if assumption_table is not None:
         seen_assumptions: set[str] = set()
-        for assumption_id, statement, status, basis_value, validation in assumption_table.rows:
-            if ASSUMPTION_ID.fullmatch(assumption_id) is None or assumption_id in seen_assumptions:
+        for (
+            assumption_id,
+            statement,
+            status,
+            basis_value,
+            validation,
+        ) in assumption_table.rows:
+            if (
+                ASSUMPTION_ID.fullmatch(assumption_id) is None
+                or assumption_id in seen_assumptions
+            ):
                 add(
                     "ASSUMPTION_LIFECYCLE_INVALID",
                     f"Invalid or duplicate assumption ID {assumption_id!r}",
@@ -5970,7 +6002,9 @@ def derive_requirements_contract(
             + b"\n"
         )
         canonical_bytes = (
-            ("1.3" if grandfather_schema_13 else PROJECT_CONTRACT_SCHEMA).encode("utf-8")
+            ("1.3" if grandfather_schema_13 else PROJECT_CONTRACT_SCHEMA).encode(
+                "utf-8"
+            )
             + b"\n"
             + requirement_payload
             + b"".join(
@@ -6706,9 +6740,7 @@ def derive_intake_foundation_contract(
     sensitivity = confirmed_values.get("DATA_SENSITIVITY")
     geography = confirmed_values.get("OPERATING_GEOGRAPHY")
     boundaries = [
-        value
-        for value in (data_types, sensitivity, geography)
-        if value is not None
+        value for value in (data_types, sensitivity, geography) if value is not None
     ]
     if boundaries:
         current_understanding.append(
@@ -8802,18 +8834,22 @@ def required_diagram_kinds(
         document = table_after_heading(text, "## Document status")
     except ValueError:
         document = {}
-    if work_kind == "MIGRATION" or clean_cell(
-        document.get("Project mode", "")
-    ).lower() == "brownfield":
+    if (
+        work_kind == "MIGRATION"
+        or clean_cell(document.get("Project mode", "")).lower() == "brownfield"
+    ):
         required.add("MIGRATION")
     return required
+
 
 def _diagram_heading_for_anchor(text: str, anchor: str) -> str:
     """Resolve one stable Markdown anchor through the shared fenced-code rules."""
 
     structural = without_fenced_code(text)
     matches: list[str] = []
-    for match in re.finditer(r"^(#{1,6})[ \t]+(.+?)[ \t]*\r?$", structural, re.MULTILINE):
+    for match in re.finditer(
+        r"^(#{1,6})[ \t]+(.+?)[ \t]*\r?$", structural, re.MULTILINE
+    ):
         title = re.sub(r"^\d+(?:\.\d+)*\.?[ \t]+", "", match.group(2)).strip()
         candidate = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
         if candidate == anchor:
@@ -8876,10 +8912,7 @@ def derive_diagram_contract(
         ]
     if not required and (
         any(unresolved(cell) for row in table.rows for cell in row)
-        or all(
-            row[3] in {"NOT_YET_CREATED", "NOT_APPLICABLE"}
-            for row in table.rows
-        )
+        or all(row[3] in {"NOT_YET_CREATED", "NOT_APPLICABLE"} for row in table.rows)
     ):
         return DiagramContract(status="TEMPLATE"), []
 
@@ -8901,7 +8934,15 @@ def derive_diagram_contract(
     stale = False
     incomplete = False
     for raw in table.rows:
-        diagram_id, kind, applicability, status, anchor, basis_value, referenced_value = raw
+        (
+            diagram_id,
+            kind,
+            applicability,
+            status,
+            anchor,
+            basis_value,
+            referenced_value,
+        ) = raw
         if DIAGRAM_ID.fullmatch(diagram_id) is None or diagram_id in seen_ids:
             issues.append(f"Invalid or duplicate diagram ID {diagram_id!r}")
         seen_ids.add(diagram_id)
@@ -8930,7 +8971,9 @@ def derive_diagram_contract(
             referenced_ids = []
         must_be_current = kind in expected_required or status == "CURRENT"
         if kind in expected_required and applicability == "NOT_APPLICABLE":
-            issues.append(f"{diagram_id}: {kind} is required by current canonical records")
+            issues.append(
+                f"{diagram_id}: {kind} is required by current canonical records"
+            )
         if kind in expected_required and status != "CURRENT":
             incomplete = True
             issues.append(f"{diagram_id}: required {kind} diagram is not CURRENT")
@@ -8953,7 +8996,9 @@ def derive_diagram_contract(
                 rendered_sha256 = "sha256:" + hashlib.sha256(rendered_bytes).hexdigest()
                 body = rendered_text.split("\n", 1)[1].rsplit("\n```", 1)[0]
                 if re.search(r"\b(?:TODO|PLACEHOLDER|GENERIC)\b", body, re.IGNORECASE):
-                    issues.append(f"{diagram_id}: Mermaid block contains generic placeholder content")
+                    issues.append(
+                        f"{diagram_id}: Mermaid block contains generic placeholder content"
+                    )
                 parsed_relationships = sorted(
                     {
                         (
@@ -8967,7 +9012,9 @@ def derive_diagram_contract(
                 )
                 relationships = tuple(parsed_relationships)
                 if not relationships:
-                    issues.append(f"{diagram_id}: Mermaid block has no canonical relationships")
+                    issues.append(
+                        f"{diagram_id}: Mermaid block has no canonical relationships"
+                    )
                 endpoint_ids = {
                     identifier
                     for source, _relation, target in relationships
@@ -8978,10 +9025,13 @@ def derive_diagram_contract(
                         f"{diagram_id}: Referenced IDs must exactly match Mermaid relationship endpoints"
                     )
                 for identifier in referenced_ids:
-                    if re.search(
-                        rf"(?<![A-Z0-9-]){re.escape(identifier)}(?![A-Z0-9-])",
-                        body,
-                    ) is None:
+                    if (
+                        re.search(
+                            rf"(?<![A-Z0-9-]){re.escape(identifier)}(?![A-Z0-9-])",
+                            body,
+                        )
+                        is None
+                    ):
                         issues.append(
                             f"{diagram_id}: referenced ID {identifier} is absent from Mermaid"
                         )
@@ -9003,9 +9053,7 @@ def derive_diagram_contract(
                     ).encode("utf-8")
                     + b"\n"
                 )
-                semantic_sha256 = "sha256:" + hashlib.sha256(
-                    semantic_bytes
-                ).hexdigest()
+                semantic_sha256 = "sha256:" + hashlib.sha256(semantic_bytes).hexdigest()
                 semantic_rows.append((diagram_id, semantic_sha256))
             except ValueError as exc:
                 issues.append(f"{diagram_id}: {exc}")
@@ -9063,7 +9111,8 @@ def derive_diagram_contract(
     )
 
 
-def derive_design_contract(    text: str,
+def derive_design_contract(
+    text: str,
     design_revision: str | None,
     *,
     required: bool = False,
@@ -10097,10 +10146,14 @@ def derive_owner_decision_brief(
             requirements_revision if REQ_ID.fullmatch(requirements_revision) else None
         ),
         "design_revision": (
-            design_revision if kind == "GATE_B" and DES_ID.fullmatch(design_revision) else None
+            design_revision
+            if kind == "GATE_B" and DES_ID.fullmatch(design_revision)
+            else None
         ),
         "construction_authorization": (
-            authorization_id if kind == "GATE_B" and AUTH_ID.fullmatch(authorization_id) else None
+            authorization_id
+            if kind == "GATE_B" and AUTH_ID.fullmatch(authorization_id)
+            else None
         ),
         "design_contract_sha256": (
             design_contract.canonical_sha256 if kind == "GATE_B" else None
@@ -10357,8 +10410,7 @@ def derive_owner_decision_brief(
                         "are recorded."
                     ),
                     "why": (
-                        "The checks are bound to the approved design and "
-                        "requirements."
+                        "The checks are bound to the approved design and requirements."
                     ),
                     "tradeoff": (
                         "More validation takes time but reduces undetected defects."
@@ -10401,10 +10453,7 @@ def derive_owner_decision_brief(
                     basis_ids=[design_revision, authorization_id],
                 ),
                 owner_claim(
-                    (
-                        "Deployment, recovery, and teardown have not yet been "
-                        "observed."
-                    ),
+                    ("Deployment, recovery, and teardown have not yet been observed."),
                     "NOT_YET_OBSERVED",
                     basis_ids=[design_revision],
                 ),
@@ -10589,6 +10638,7 @@ def derive_owner_answer_confirmation(
         basis_ids=[item for response in latest for item in response.basis_ids],
         source_locators=[locator],
     )
+
 
 def marked_receipt(text: str, gate: str) -> str:
     start = f"<!-- bootstrap:{gate}-receipt:start -->"

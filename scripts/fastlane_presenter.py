@@ -1669,11 +1669,14 @@ OWNER_MATURITY_LABELS = {
 def _canonical_projection_digest(projection: Mapping[str, Any]) -> str:
     canonical = dict(projection)
     canonical.pop("canonical_sha256", None)
-    return "sha256:" + hashlib.sha256(
-        json.dumps(
-            canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
-    ).hexdigest()
+    return (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
+        ).hexdigest()
+    )
 
 
 def _validated_owner_decision_brief(
@@ -1720,9 +1723,7 @@ def _validated_owner_decision_brief(
             not isinstance(section.get(field), str) or not section.get(field)
             for field in ("section_id", "title")
         ):
-            raise PresentationError(
-                "Owner Decision Brief contains an invalid section"
-            )
+            raise PresentationError("Owner Decision Brief contains an invalid section")
         items = section.get("items")
         if (
             not isinstance(items, Sequence)
@@ -1730,25 +1731,19 @@ def _validated_owner_decision_brief(
             or not items
             or any(not isinstance(item, str) or not item for item in items)
         ):
-            raise PresentationError(
-                "Owner Decision Brief section content is invalid"
-            )
+            raise PresentationError("Owner Decision Brief section content is invalid")
     groups = brief.get("technical_decision_groups")
     if not isinstance(groups, Sequence) or isinstance(groups, (str, bytes)):
         raise PresentationError("Owner Decision Brief decision index is invalid")
     if expected_kind == "GATE_B" and brief.get("status") == "READY" and not groups:
         raise PresentationError("Ready Gate B brief has no technical decision index")
     for group in groups:
-        if not isinstance(group, Mapping) or not isinstance(
-            group.get("domain"), str
-        ):
+        if not isinstance(group, Mapping) or not isinstance(group.get("domain"), str):
             raise PresentationError(
                 "Owner Decision Brief contains an invalid decision group"
             )
         decisions = group.get("decisions")
-        if not isinstance(decisions, Sequence) or isinstance(
-            decisions, (str, bytes)
-        ):
+        if not isinstance(decisions, Sequence) or isinstance(decisions, (str, bytes)):
             raise PresentationError(
                 "Owner Decision Brief contains an invalid decision list"
             )
@@ -1794,9 +1789,7 @@ def _validated_owner_decision_brief(
                 ("required", bool),
             )
         ):
-            raise PresentationError(
-                "Owner Decision Brief source location is invalid"
-            )
+            raise PresentationError("Owner Decision Brief source location is invalid")
         path = str(locator["path"])
         if (
             path.startswith(("/", "\\"))
@@ -1809,9 +1802,7 @@ def _validated_owner_decision_brief(
             )
     authorization = brief.get("authorization_effect")
     if not isinstance(authorization, Mapping):
-        raise PresentationError(
-            "Owner Decision Brief approval boundary is missing"
-        )
+        raise PresentationError("Owner Decision Brief approval boundary is missing")
     for field in ("approves", "does_not_approve"):
         values = authorization.get(field)
         if (
@@ -1820,12 +1811,8 @@ def _validated_owner_decision_brief(
             or not values
             or any(not isinstance(value, str) or not value for value in values)
         ):
-            raise PresentationError(
-                "Owner Decision Brief approval boundary is invalid"
-            )
-    if brief.get("formal_receipt_required") is not (
-        brief.get("status") == "READY"
-    ):
+            raise PresentationError("Owner Decision Brief approval boundary is invalid")
+    if brief.get("formal_receipt_required") is not (brief.get("status") == "READY"):
         raise PresentationError(
             "Owner Decision Brief receipt state conflicts with readiness"
         )
@@ -1837,9 +1824,7 @@ def _markdown_anchor(heading: str) -> str:
     return re.sub(r"[\s-]+", "-", value).strip("-")
 
 
-def render_owner_decision_brief(
-    report: Mapping[str, Any], expected_kind: str
-) -> str:
+def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -> str:
     """Render one deterministic Gate A or Gate B owner decision view."""
 
     brief = _validated_owner_decision_brief(report, expected_kind)
@@ -1878,17 +1863,13 @@ def render_owner_decision_brief(
     lines.extend(("", "## Evidence and authorization"))
     for claim in brief["claims"]:
         lines.append(
-            f"- {OWNER_MATURITY_LABELS[str(claim['maturity'])]}: "
-            f"{claim['text']}"
+            f"- {OWNER_MATURITY_LABELS[str(claim['maturity'])]}: {claim['text']}"
         )
     lines.extend(("", "## Approval boundary", "", "This approval covers:"))
-    lines.extend(
-        f"- {item}" for item in brief["authorization_effect"]["approves"]
-    )
+    lines.extend(f"- {item}" for item in brief["authorization_effect"]["approves"])
     lines.extend(("", "This approval does not cover:"))
     lines.extend(
-        f"- {item}"
-        for item in brief["authorization_effect"]["does_not_approve"]
+        f"- {item}" for item in brief["authorization_effect"]["does_not_approve"]
     )
 
     lines.extend(("", "## Review the exact sources"))
@@ -1916,9 +1897,7 @@ def _validated_answer_confirmation(
 ) -> Mapping[str, Any]:
     confirmation = report.get("owner_answer_confirmation")
     if not isinstance(confirmation, Mapping):
-        raise PresentationError(
-            "Fastlane Engine report is missing Answer Confirmation"
-        )
+        raise PresentationError("Fastlane Engine report is missing Answer Confirmation")
     if confirmation.get("schema_version") != 1:
         raise PresentationError("Answer Confirmation schema is unsupported")
     if confirmation.get("status") != "READY":
@@ -1933,9 +1912,7 @@ def _validated_answer_confirmation(
         or re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None
         or digest != _canonical_projection_digest(confirmation)
     ):
-        raise PresentationError(
-            "Answer Confirmation digest does not match its content"
-        )
+        raise PresentationError("Answer Confirmation digest does not match its content")
     binding = confirmation.get("card_binding")
     if (
         not isinstance(binding, Mapping)
@@ -1978,6 +1955,7 @@ def render_answer_confirmation(
         )
     )
     return "\n".join(lines)
+
 
 def main(argv: list[str] | None = None) -> int:
     configure_utf8_standard_streams()

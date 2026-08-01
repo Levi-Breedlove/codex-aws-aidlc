@@ -157,11 +157,20 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
     issues: list[str] = []
     kind = projection.get("kind")
     status = projection.get("status")
-    if projection.get("schema_version") != 1 or kind not in {"NONE", "GATE_A", "GATE_B"}:
+    if projection.get("schema_version") != 1 or kind not in {
+        "NONE",
+        "GATE_A",
+        "GATE_B",
+    }:
         issues.append("brief identity is invalid")
     if status not in BRIEF_STATUSES:
         issues.append("brief status is invalid")
-    for field in ("executive_sections", "technical_decision_groups", "claims", "source_locators"):
+    for field in (
+        "executive_sections",
+        "technical_decision_groups",
+        "claims",
+        "source_locators",
+    ):
         if not _sequence(projection.get(field)):
             issues.append(f"{field} must be an array")
     if kind == "NONE":
@@ -177,8 +186,10 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
             issues.append("brief contains an invalid executive section")
             continue
         items = section.get("items")
-        if not _sequence(items) or not items or any(
-            not isinstance(item, str) or not item.strip() for item in items
+        if (
+            not _sequence(items)
+            or not items
+            or any(not isinstance(item, str) or not item.strip() for item in items)
         ):
             issues.append(f"{section.get('section_id')} has invalid owner-facing items")
     groups = projection.get("technical_decision_groups", [])
@@ -207,7 +218,11 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
                 issues.append("brief contains an invalid technical decision")
                 continue
             decision_id = decision.get("decision_id")
-            if not isinstance(decision_id, str) or not decision_id or decision_id in seen_decisions:
+            if (
+                not isinstance(decision_id, str)
+                or not decision_id
+                or decision_id in seen_decisions
+            ):
                 issues.append("technical decision IDs must be present and unique")
             else:
                 seen_decisions.add(decision_id)
@@ -229,7 +244,10 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
                 referenced_locator_keys.update(str(item) for item in source_keys)
     claims = projection.get("claims", [])
     for item in claims if _sequence(claims) else []:
-        if not isinstance(item, Mapping) or item.get("maturity") not in ALLOWED_MATURITIES:
+        if (
+            not isinstance(item, Mapping)
+            or item.get("maturity") not in ALLOWED_MATURITIES
+        ):
             issues.append("brief contains an invalid claim maturity")
         elif not isinstance(item.get("text"), str) or not item.get("text"):
             issues.append("brief contains an empty claim")
@@ -292,7 +310,9 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
     return issues
 
 
-def finalize_owner_decision_brief(projection: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+def finalize_owner_decision_brief(
+    projection: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
     """Validate and digest a projection without raising into Engine routing."""
 
     projection = dict(projection)
@@ -308,7 +328,9 @@ def finalize_owner_decision_brief(projection: dict[str, Any]) -> tuple[dict[str,
             "brief exceeds the deterministic owner-facing output budget "
             f"({output_bytes} > {MAX_OWNER_BRIEF_OUTPUT_BYTES} bytes)"
         )
-    projection["canonical_sha256"] = canonical_sha256(projection) if not issues else None
+    projection["canonical_sha256"] = (
+        canonical_sha256(projection) if not issues else None
+    )
     return projection, issues
 
 
@@ -355,7 +377,9 @@ def answer_confirmation(
         and project_effect
         and correction_prompt
     )
-    if status not in {"NONE", "READY", "BLOCKED"} or (status == "READY" and not valid_ready):
+    if status not in {"NONE", "READY", "BLOCKED"} or (
+        status == "READY" and not valid_ready
+    ):
         projection["status"] = "BLOCKED"
     digest_source = dict(projection)
     digest_source.pop("canonical_sha256", None)

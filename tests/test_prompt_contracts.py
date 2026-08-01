@@ -278,9 +278,7 @@ class PromptPackContractTests(unittest.TestCase):
 
     def test_tool_access_is_not_authorization(self) -> None:
         self.assertIn("Tool availability is never authorization", self.prompts)
-        self.assertIn(
-            "Credentials and connectors grant no authority", self.agents
-        )
+        self.assertIn("Credentials and connectors grant no authority", self.agents)
 
     def test_markdown_fences_and_launch_commands_are_complete(self) -> None:
         self.assertEqual(self.prompts.count("~~~") % 2, 0)
@@ -541,6 +539,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("diagram-to-design conflict", gate_b)
         self.assertIn("current Diagram Contract", gate_b)
         self.assertIn("Load `diagram-patterns.md` only on demand", design_reference)
+
     def test_architecture_selection_contract_is_explicit_and_fail_closed(self) -> None:
         design = self.prompt_section("DESIGN-10")
         design_reference = (
@@ -568,7 +567,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("managed-serverless baseline", design)
         self.assertIn("never add a straw option", design_reference)
         self.assertIn("arbitrary numerical scoring", design_reference)
-        self.assertIn("Generic connectors, memory, installed metadata, or", design_reference)
+        self.assertIn(
+            "Generic connectors, memory, installed metadata, or", design_reference
+        )
         self.assertIn("challenger prose cannot replace those calls", design_reference)
         self.assertIn("Select one eligible `ARCH-*` recommendation", design_reference)
         self.assertIn("include the selected `ARCH-*`", design)
@@ -1047,7 +1048,9 @@ Approver: <name/handle>"""
             self.assertIn("`standard`", document)
             self.assertIn("`high-risk`", document)
         self.assertIn("All profiles still use only Gate A and Gate B", self.prompts)
-        self.assertIn("Profiles change depth, never gates or safeguards/evidence", self.agents)
+        self.assertIn(
+            "Profiles change depth, never gates or safeguards/evidence", self.agents
+        )
 
     def test_owner_facing_profile_and_security_language_is_concrete(self) -> None:
         owner_documents = (
@@ -2065,7 +2068,9 @@ Approver: <name/handle>"""
         self.assertIn("current observed evidence", release_prompt)
         self.assertIn("INVEST profile without task metadata", deliver_reference)
         design_words = " ".join(design_reference.split())
-        self.assertIn("Do not add a second Harness table or universal scanner", design_reference)
+        self.assertIn(
+            "Do not add a second Harness table or universal scanner", design_reference
+        )
         for concern in (
             "syntax/build",
             "type checking when supported",
@@ -2579,9 +2584,13 @@ Approver: <name/handle>"""
         for document in (self.prd, self.prompts):
             self.assertNotIn("### Primary flow", document)
         workflow = " ".join(self.workflow.split())
-        self.assertIn("New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`", workflow)
+        self.assertIn(
+            "New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`", workflow
+        )
         self.assertIn("data, recovery, and migration views are conditional", workflow)
-        self.assertIn("Project diagrams are validated presentation of canonical records", workflow)
+        self.assertIn(
+            "Project diagrams are validated presentation of canonical records", workflow
+        )
         self.assertIn("do not replace traceability, tests, or evidence", workflow)
         self.assertNotIn("| FSC-", self.workflow)
         doctor_source = (PROJECT_ROOT / "scripts/bootstrap_doctor.py").read_text(
@@ -2597,5 +2606,7 @@ Approver: <name/handle>"""
             'DIAGRAM_CONTRACT_HEADING = "### Project diagram contract"',
             doctor_source,
         )
+
+
 if __name__ == "__main__":
     unittest.main()

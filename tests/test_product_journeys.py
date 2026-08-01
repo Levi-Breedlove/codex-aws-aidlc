@@ -311,18 +311,14 @@ class ProductJourneyTests(unittest.TestCase):
     def test_owner_briefs_and_diagrams_use_real_project_artifacts(self) -> None:
         fixture = doctor_fixtures.BootstrapDoctorTests()
 
-        def verify_source_locators(
-            project: Path, brief: dict[str, object]
-        ) -> None:
+        def verify_source_locators(project: Path, brief: dict[str, object]) -> None:
             locators = brief["source_locators"]
             self.assertTrue(locators)
             for locator in locators:
                 self.assertEqual(locator["path"], "docs/project/PRD.md")
                 source = (project / locator["path"]).read_text(encoding="utf-8")
                 selected = "\n".join(
-                    source.splitlines()[
-                        locator["start_line"] - 1 : locator["end_line"]
-                    ]
+                    source.splitlines()[locator["start_line"] - 1 : locator["end_line"]]
                 )
                 canonical = context_runtime.canonical_source_bytes(selected)
                 self.assertEqual(
@@ -344,9 +340,7 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertTrue(gate_a_brief["formal_receipt_required"])
             self.assertTrue(gate_a_brief["canonical_sha256"])
             verify_source_locators(gate_a_project, gate_a_brief)
-            rendered_gate_a = presenter.render_owner_decision_brief(
-                gate_a, "GATE_A"
-            )
+            rendered_gate_a = presenter.render_owner_decision_brief(gate_a, "GATE_A")
             self.assertIn("Gate A Owner Decision Brief", rendered_gate_a)
             self.assertIn("Not authorized", rendered_gate_a)
 
@@ -371,9 +365,7 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(gate_b_brief["status"], "READY")
             self.assertTrue(gate_b_brief["technical_decision_groups"])
             verify_source_locators(gate_b_project, gate_b_brief)
-            rendered_gate_b = presenter.render_owner_decision_brief(
-                gate_b, "GATE_B"
-            )
+            rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
 
@@ -1518,9 +1510,7 @@ class ProductJourneyTests(unittest.TestCase):
             "No recommendation\u2014choose the option that matches your situation.",
             rendered,
         )
-        self.assertIn(
-            "1: <choose A, B, or C>", rendered
-        )
+        self.assertIn("1: <choose A, B, or C>", rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)
         self.assertNotIn("Welcome to AWS Codex Fastlane", rendered)

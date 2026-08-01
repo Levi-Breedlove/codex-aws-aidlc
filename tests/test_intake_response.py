@@ -170,7 +170,11 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
         self.assertNotIn("raw_response", serialized)
         self.assertNotIn("\t", serialized)
         self.assertNotIn("User-visible   outcome", serialized)
-        for unsupported_claim in ("authenticated", "identity_verified", "cryptographic"):
+        for unsupported_claim in (
+            "authenticated",
+            "identity_verified",
+            "cryptographic",
+        ):
             self.assertNotIn(unsupported_claim, serialized.casefold())
 
     def test_maximum_detail_length_is_accepted(self) -> None:
@@ -269,7 +273,9 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             with self.subTest(secret_like=secret_like):
                 result = parse(f"1: {secret_like}", fact_card())
                 self.assert_failed_with(result, "INTAKE_SECRET_MATERIAL")
-                self.assertNotIn(secret_like, json.dumps(result.to_dict(), sort_keys=True))
+                self.assertNotIn(
+                    secret_like, json.dumps(result.to_dict(), sort_keys=True)
+                )
 
     def test_ordinary_sensitive_words_remain_valid_prose(self) -> None:
         for detail in (
@@ -369,7 +375,9 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             with self.subTest(raw_response=raw_response):
                 result = parse(raw_response, fact_card())
                 self.assert_failed_with(result, "INTAKE_DETAIL_RECORD_UNSAFE")
-                self.assertNotIn(raw_response, json.dumps(result.to_dict(), sort_keys=True))
+                self.assertNotIn(
+                    raw_response, json.dumps(result.to_dict(), sort_keys=True)
+                )
 
     def test_malformed_question_contracts_fail_closed(self) -> None:
         cases: list[tuple[str, Any]] = []
@@ -447,7 +455,9 @@ class IntakeResponseRejectionTests(unittest.TestCase):
 
 
 class GateCorrectionTests(unittest.TestCase):
-    def test_exact_requirement_and_design_corrections_parse_without_approval(self) -> None:
+    def test_exact_requirement_and_design_corrections_parse_without_approval(
+        self,
+    ) -> None:
         requirements = intake.parse_gate_correction(
             "Change the requirements: Support invited beta users only."
         )
@@ -457,9 +467,7 @@ class GateCorrectionTests(unittest.TestCase):
 
         self.assertEqual(requirements.status, "PASS")
         self.assertEqual(requirements.gate, "GATE_A")
-        self.assertEqual(
-            requirements.correction, "Support invited beta users only"
-        )
+        self.assertEqual(requirements.correction, "Support invited beta users only")
         self.assertFalse(requirements.to_dict()["approval_granted"])
         self.assertEqual(design.status, "PASS")
         self.assertEqual(design.gate, "GATE_B")
@@ -483,6 +491,7 @@ class GateCorrectionTests(unittest.TestCase):
 
         self.assertEqual(result.status, "FAIL")
         self.assertNotIn(raw, json.dumps(result.to_dict(), sort_keys=True))
+
 
 if __name__ == "__main__":
     unittest.main()

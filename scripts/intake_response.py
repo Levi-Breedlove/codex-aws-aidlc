@@ -178,11 +178,7 @@ def parse_gate_correction(raw_response: str) -> GateCorrectionParse:
         ("GATE_B", "Change the design: "),
     )
     matched = next(
-        (
-            (gate, prefix)
-            for gate, prefix in prefixes
-            if normalized.startswith(prefix)
-        ),
+        ((gate, prefix) for gate, prefix in prefixes if normalized.startswith(prefix)),
         None,
     )
     if matched is None or not normalized.endswith("."):
@@ -214,6 +210,7 @@ def parse_gate_correction(raw_response: str) -> GateCorrectionParse:
         gate=gate,
         correction=correction,
     )
+
 
 def _error(code: str, message: str, *, reply_key: str | None = None) -> dict[str, str]:
     result = {"code": code, "message": message}

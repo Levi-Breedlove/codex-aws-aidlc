@@ -191,9 +191,13 @@ def exact_legacy_schema_four_projection(text: str) -> str:
         end_index = value.index(end, start_index)
         return value[:start_index] + value[end_index:]
 
-    text = remove_region(text, doctor.DIAGRAM_CONTRACT_HEADING, "## 14. Architecture overview")
+    text = remove_region(
+        text, doctor.DIAGRAM_CONTRACT_HEADING, "## 14. Architecture overview"
+    )
     text = remove_region(text, doctor.LAYER_BOUNDARY_HEADING, doctor.INTERFACE_HEADING)
-    text = remove_region(text, doctor.STATE_APPLICABILITY_HEADING, "### Data lifecycle view")
+    text = remove_region(
+        text, doctor.STATE_APPLICABILITY_HEADING, "### Data lifecycle view"
+    )
     text = remove_region(
         text,
         doctor.FIRST_WAVE_HEADING,
@@ -355,17 +359,12 @@ def complete_intake_foundation(
         ),
         (
             "INTAKE-0010",
-            (
-                "Where will the first users be, and are there places the data "
-                "must stay?"
-            ),
+            ("Where will the first users be, and are there places the data must stay?"),
             "Name the user geography and any data-location rule.",
             "United States users; data remains in us-west-2.",
         ),
     )
-    for index, (basis_id, prompt, detail_prompt, value) in enumerate(
-        facts, start=2
-    ):
+    for index, (basis_id, prompt, detail_prompt, value) in enumerate(facts, start=2):
         card_id = f"INTAKE-CARD-{index:04d}"
         question_id = f"INTAKE-Q-{index:04d}"
         text = replace_contract_table(
@@ -411,10 +410,7 @@ def complete_intake_foundation(
 
     values = {
         "INTAKE-0001": work_context,
-        **{
-            basis_id: value
-            for basis_id, _prompt, _detail_prompt, value in facts
-        },
+        **{basis_id: value for basis_id, _prompt, _detail_prompt, value in facts},
     }
     text = confirm_intake_foundation(text, values, provenance_by_intake)
     return replace_contract_table(
@@ -423,6 +419,7 @@ def complete_intake_foundation(
         doctor.INTAKE_RESPONSE_REGISTER_HEADERS,
         register_rows,
     )
+
 
 def set_intake_card_resolution(
     text: str,
@@ -1272,13 +1269,69 @@ def set_diagram_block(text: str, heading: str, next_heading: str, block: str) ->
 
 def complete_diagram_contract(text: str) -> str:
     rows = [
-        ("DIAGRAM-0001", "SYSTEM_CONTEXT", "REQUIRED", "CURRENT", "proposed-system-at-a-glance", "ARCH-0001, FR-001", "ARCH-0001, API-001"),
-        ("DIAGRAM-0002", "PRIMARY_OUTCOME", "REQUIRED", "CURRENT", "sequence-primary-outcome", "ARCH-0001, JOURNEY-001", "ACT-001, API-001"),
-        ("DIAGRAM-0003", "DATA_LIFECYCLE", "CONDITIONAL", "CURRENT", "data-lifecycle-view", "ARCH-0001, DATA-001", "API-001, DATA-001"),
-        ("DIAGRAM-0004", "FAILURE_RECOVERY", "CONDITIONAL", "CURRENT", "sequence-failure-and-recovery", "ARCH-0001, REL-005", "API-001, REL-005"),
-        ("DIAGRAM-0005", "MIGRATION", "CONDITIONAL", "NOT_YET_CREATED", "migration-view", "NONE", "NONE"),
-        ("DIAGRAM-0006", "JOURNEY", "CONDITIONAL", "NOT_YET_CREATED", "journey-view", "NONE", "NONE"),
-        ("DIAGRAM-0007", "STATE", "CONDITIONAL", "NOT_YET_CREATED", "state-view", "NONE", "NONE"),
+        (
+            "DIAGRAM-0001",
+            "SYSTEM_CONTEXT",
+            "REQUIRED",
+            "CURRENT",
+            "proposed-system-at-a-glance",
+            "ARCH-0001, FR-001",
+            "ARCH-0001, API-001",
+        ),
+        (
+            "DIAGRAM-0002",
+            "PRIMARY_OUTCOME",
+            "REQUIRED",
+            "CURRENT",
+            "sequence-primary-outcome",
+            "ARCH-0001, JOURNEY-001",
+            "ACT-001, API-001",
+        ),
+        (
+            "DIAGRAM-0003",
+            "DATA_LIFECYCLE",
+            "CONDITIONAL",
+            "CURRENT",
+            "data-lifecycle-view",
+            "ARCH-0001, DATA-001",
+            "API-001, DATA-001",
+        ),
+        (
+            "DIAGRAM-0004",
+            "FAILURE_RECOVERY",
+            "CONDITIONAL",
+            "CURRENT",
+            "sequence-failure-and-recovery",
+            "ARCH-0001, REL-005",
+            "API-001, REL-005",
+        ),
+        (
+            "DIAGRAM-0005",
+            "MIGRATION",
+            "CONDITIONAL",
+            "NOT_YET_CREATED",
+            "migration-view",
+            "NONE",
+            "NONE",
+        ),
+        (
+            "DIAGRAM-0006",
+            "JOURNEY",
+            "CONDITIONAL",
+            "NOT_YET_CREATED",
+            "journey-view",
+            "NONE",
+            "NONE",
+        ),
+        (
+            "DIAGRAM-0007",
+            "STATE",
+            "CONDITIONAL",
+            "NOT_YET_CREATED",
+            "state-view",
+            "NONE",
+            "NONE",
+        ),
     ]
     text = replace_contract_table(
         text, doctor.DIAGRAM_CONTRACT_HEADING, doctor.DIAGRAM_CONTRACT_HEADERS, rows
@@ -8466,6 +8519,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             "ASSUMPTION_LIFECYCLE_INVALID",
             {code for code, _message in issues},
         )
+
     def test_approved_schema_13_is_grandfathered_until_requirements_change(
         self,
     ) -> None:
@@ -8511,6 +8565,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             "PROJECT_CONTRACT_MIGRATION_REQUIRED",
             {code for code, _message in migration_issues},
         )
+
     def test_schema_13_requires_inverse_actor_and_journey_coverage(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         text = approve_gate_a(source)
@@ -9070,6 +9125,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 )
                 self.assertEqual(blocked.status, "BLOCKED")
                 self.assertTrue(any(expected in issue for issue in issues), issues)
+
     def test_schema_five_project_design_is_digest_bound_and_fail_closed(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         complete = complete_design_contract(source)
@@ -9590,7 +9646,6 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertEqual(blocked.status, "BLOCKED")
             self.assertTrue(any("State trigger" in issue for issue in issues), issues)
 
-
     @source_template_only
     def test_additive_owner_projections_preserve_engine_schema_and_template_route(
         self,
@@ -9607,6 +9662,8 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["interaction"]["owner_action_kind"],
             "COMPLETE_PREREQUISITE_CHECKLIST",
         )
+
+
 class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
     _DEPLOYMENT_ARTIFACT = "sha256:" + "a" * 64
     _DEPLOYMENT_PLAN = (

@@ -753,6 +753,7 @@ class FastlaneHookTests(unittest.TestCase):
                 "session-start", event, root=self.root, doctor_report=baseline
             ),
         )
+
     def test_unconfigured_template_session_start_routes_to_prerequisites(self) -> None:
         observed = fastlane_hook.run_doctor(self.root)
         self.assertEqual(observed["classification"], "UNCONFIGURED_TEMPLATE")

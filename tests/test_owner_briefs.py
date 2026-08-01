@@ -162,5 +162,6 @@ class OwnerBriefProjectionTests(unittest.TestCase):
         self.assertTrue(any("output budget" in issue for issue in issues), issues)
         self.assertIsNone(finalized["canonical_sha256"])
 
+
 if __name__ == "__main__":
     unittest.main()

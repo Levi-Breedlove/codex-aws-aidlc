@@ -108,6 +108,7 @@ def factual_intake_foundation() -> dict[str, object]:
     ]
     return foundation
 
+
 def aws_progress_report(
     progress_state: str,
     *,
@@ -287,6 +288,7 @@ class FastlanePresenterTests(unittest.TestCase):
             presenter.render_owner_update(enriched),
             presenter.render_owner_update(baseline),
         )
+
     def test_automatic_update_says_nothing_and_continues(self) -> None:
         rendered = presenter.render_owner_update(
             report(
