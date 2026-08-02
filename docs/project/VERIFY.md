@@ -1,8 +1,7 @@
 # {{PROJECT_NAME}} — Verification and Release Evidence
 
-`docs/project/VERIFY.md` records observed proof, not plans or authorization. Gate A and Gate B
-remain the only routine human gates. The checks below determine construction and
-release readiness inside the current approved envelope; they are not additional
+`docs/project/VERIFY.md` owns observed proof and current evidence limits. It records what is confirmed, source-verified, observed, planned, unobserved, failed, or stale; it never grants approval or authority.
+
 <!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
 ## Current state
 
@@ -36,35 +35,50 @@ release readiness inside the current approved envelope; they are not additional
 - [AWS evidence](#aws-core-evidence)
 - [Release decision](#current-release-decision)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
-human gates.
 
 ## Current result
 
-Read the release state and evidence cutoff in [Active evidence scope](#active-evidence-scope). This file reports proof only; it never grants approval or AWS authority.
-
-## Proven
-
-`VERIFIED`, `E4_DEPLOYED_OBSERVED`, and `E5_RECOVERY_OBSERVED` claims appear only when their exact evidence rows and scope are current.
-
-## Source verified
-
-Current official-source support is recorded as `E1_SOURCE_VERIFIED`; it is guidance, not deployed proof.
-
-## Planned
-
-`E0_PROPOSED`, `NOT_STARTED`, and `IMPLEMENTED` describe intended or incomplete work, not observed success.
-
-## Not yet observed
-
-`PENDING_AWS` and `NOT_YET_OBSERVED` identify evidence that still requires a separately authorized environment or operation.
+The current evidence dashboard and important claims appear above. Failed, stale, and unobserved claims stay visible; plans and source guidance never appear as deployed proof.
 
 ## Failed or stale
 
-`FAILED`, `BLOCKED`, and `STALE` remain visible with their evidence and next action. They never satisfy readiness.
+The current count appears above. Every concrete failure, stale claim, and
+accepted gap remains visible in [Known gaps and accepted risks](#known-gaps-and-accepted-risks).
 
-## Evidence appendices
+## Current release decision
 
-The exact scope, matrices, commands, seeds, timestamps, hashes, AWS journals, and release decision follow.
+- Release state: `NOT_READY`
+- AWS lifecycle intent: `NONE`
+- AWS lifecycle intent source: `NONE`
+- AWS lifecycle intent recorded at: `NONE`
+- Active evidence cutoff: TODO
+- Blocking or stale evidence IDs: TODO
+- Pending AWS evidence IDs: TODO / `NONE`
+- Accepted risks: `NONE`
+- Last safe checkpoint: `NONE`
+- Next evidence required: TODO
+
+Release state is exactly `NOT_READY`, `READY_TO_DEPLOY`, or
+`RELEASE_VERIFIED`; only RELEASE-10 may change it. An AWS lifecycle choice is a
+non-authorizing route selection. When the complete current residual set needs
+an owner decision, present `RETAIN`, `INVESTIGATE`, or `REMOVE`; follow the
+Engine's `aws_residual_disposition` and require separate current read or
+teardown authority. Exact provenance, timing, retry, reconciliation, and
+staleness rules are enforced by the Engine and the RELEASE/AWS phase prompts.
+
+## Known gaps and accepted risks
+
+| ID | Risk or gap | Severity | Owner | Review date | Rationale and authority |
+|---|---|---|---|---|---|
+| TODO | TODO | TODO | TODO | TODO | TODO |
+
+An accepted risk cannot contradict a requirement or exceed AUTH. A material
+scope, security, data, cost, or preservation decision routes back to the
+applicable Gate A or Gate B owner decision.
+
+<details>
+<summary>Exact evidence scope, maturity, and recording rules</summary>
+
 ## Active evidence scope
 
 | Field | Value |
@@ -170,6 +184,11 @@ A plan, placeholder, URL alone, unscoped statement, stale observation, or
 task-linked evidence cannot supply a no-task disposition. These rows remain
 observed evidence, not owner approval. Task-covered requirements use their task
 evidence normally and do not need a duplicate no-task row.
+
+</details>
+
+<details>
+<summary>Exact source, AWS preflight, IaC, task, and validation evidence records</summary>
 
 ## AWS Core evidence
 
@@ -402,6 +421,11 @@ An AWS submission is not proof of completion. After a deployment, rollback, or
 teardown attempt, use read-only evidence to record succeeded, failed, partial,
 or unknown state before continuing.
 
+</details>
+
+<details>
+<summary>Exact reviewed AWS execution contracts</summary>
+
 ## Reviewed AWS execution contracts
 
 Codex follows current AWS Core guidance to select a currently supported
@@ -428,19 +452,14 @@ Any stale, duplicate, expired, mismatched, or unbound row is diagnostic only
 and cannot enable reviewed-script execution. Natural-language descriptions do
 not prove script contents.
 
+</details>
+
 ## Action authorization provenance
 
-This table proves which exact owner message was checked before authenticated
-read-only preflight or external mutation; it does not itself authorize an
-action or widen Gate B. The stable
-source must resolve to the applicable complete verbatim receipt in the uniquely
-marked block below, and that receipt must equal the owner's exact message after
-trimming only surrounding whitespace. `Role or profile` and `Approver` must
-match the receipt and current approved boundary. Recompute `Verbatim receipt
-SHA-256` from the exact normalized marked receipt every time any receipt value
-changes. A copied, stale, self-authored, or independently typed digest is not
-authorization. Read-only preflight authority permits only exact reads; it never
-authorizes deployment or teardown.
+This table records the exact owner message checked for authenticated AWS work.
+It is evidence only: it neither grants authority nor widens Gate B. The current
+role, approver, scope, validity, stable source, and recomputed receipt digest
+must match the applicable exact marked receipt and the Engine projection.
 
 | Action | Authorization ID | Construction AUTH | Role or profile | Artifact digest | IaC plan/change-set binding | Account / Region / environment | Resources and operations | Cost ceiling and validity | Rollback boundary | Stable owner-message source | Approver | Observed at | Verbatim receipt SHA-256 | Preflight evidence | Identity and boundary match | Result |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -448,33 +467,9 @@ authorizes deployment or teardown.
 | Deployment | TODO | `AUTH-0001` | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO (ISO 8601 with timezone) | TODO | TODO / `NONE` | TODO | `NOT_STARTED` |
 | Teardown | TODO | `AUTH-0001` | TODO | `NOT_APPLICABLE — teardown binds the observed inventory` | `NOT_APPLICABLE — teardown uses its removal/retention manifest` | TODO | TODO | TODO | TODO | TODO | TODO | TODO (ISO 8601 with timezone) | TODO | TODO / `NONE` | TODO | `NOT_STARTED` |
 
-For a deployment row, use `sha256:<64 lowercase hex>` for Artifact digest;
-`TYPE: <CLOUDFORMATION_CHANGE_SET|TERRAFORM_PLAN|CONTAINER_IMAGE|OTHER>;
-IDENTIFIER: <exact identifier>; DIGEST: sha256:<64 lowercase hex>` for the IaC
-binding; `ACCOUNT: <value>; REGION: <value>; ENVIRONMENT: <value>`; `RESOURCES:
-<comma-separated exact list>; OPERATIONS: <comma-separated exact list>`; and
-`COST: <ISO_CURRENCY: amount>; VALID_UNTIL: <ISO 8601 with timezone>`. These
-fields mirror the owner receipt and observed preflight; they do not create
-authority.
-
-Replace every placeholder in exactly one applicable block only after receiving
-that complete owner message. Preserve its line order and punctuation, then
-recompute the table digest from the exact text between the fence lines. A
-deployment receipt never authorizes teardown, and the teardown receipt remains
-separate even when a deployment used `fast-dev`.
-
-For a read-only preflight row, use `sha256:<64 lowercase hex>` for Artifact
-digest; `ACCOUNT: <value>; REGION: <value>; ENVIRONMENT: <value>`; `RESOURCES:
-<comma-separated exact list>; OPERATIONS: <comma-separated exact read-only
-list>`; and `COST: <explicit expected read-only billing effect>; BOUNDED_BY:
-<exact approved cost posture or explicit monetary ceiling>; VALID_UNTIL: <exact
-receipt Valid until value>`. Read-only does not imply zero cost. The receipt
-must prohibit all mutation and must match the observed preflight before the
-result becomes `READY`.
-
-Replace every placeholder in the read-only block only after receiving that
-complete owner message. Preserve its line order and punctuation, then recompute
-the table digest from the exact text between the fence lines.
+Replace placeholders only from the owner's complete current message. Preserve
+the exact receipt bytes below. Read-only authority permits reads only;
+deployment never authorizes teardown, and any mismatch remains blocked.
 
 <!-- bootstrap:aws-read-preflight-receipt:start -->
 ```text
@@ -534,11 +529,12 @@ Approver: <name/handle>
 ```
 <!-- bootstrap:aws-teardown-receipt:end -->
 
-For an AWS mutation, record the authorization source and receipt digest before
-execution, then link the AWS-10 or AWS-40 identity/boundary evidence. Record
-`FAILED` or `BLOCKED` on any mismatch. Deployment evidence is reconciled by
-AWS-30; residual and teardown evidence is reconciled read-only through AWS-40
-both before a teardown decision and after every AWS-50 attempt.
+The Engine validates receipt equality, provenance, identity, cost, validity,
+and scope before the operational skill may act. AWS-30 and AWS-40 record the
+separately authorized read-only reconciliation evidence.
+
+<details>
+<summary>Exact AWS deployment and teardown reconciliation records</summary>
 
 ## AWS deployment action and reconciliation evidence
 
@@ -731,73 +727,4 @@ identity, read-authority, teardown-digest, or evidence-cutoff mismatch in
 `Blocker or stale reason`. Every other concrete row records `NONE` in that
 field. Malformed IDs and partially populated placeholder rows fail closed.
 
-## Known gaps and accepted risks
-
-| ID | Risk or gap | Severity | Owner | Review date | Rationale and authority |
-|---|---|---|---|---|---|
-| TODO | TODO | TODO | TODO | TODO | TODO |
-
-An accepted risk cannot contradict a requirement or exceed AUTH. A material
-scope, security, data, cost, or preservation decision routes back to the
-applicable Gate A or Gate B owner decision.
-
-## Current release decision
-
-- Release state: `NOT_READY`
-- AWS lifecycle intent: `NONE`
-- AWS lifecycle intent source: `NONE`
-- AWS lifecycle intent recorded at: `NONE`
-- Active evidence cutoff: TODO
-- Blocking or stale evidence IDs: TODO
-- Pending AWS evidence IDs: TODO / `NONE`
-- Accepted risks: `NONE`
-- Last safe checkpoint: `NONE`
-- Next evidence required: TODO
-
-Release state is exactly one of:
-
-- `NOT_READY`: a required task, check, risk disposition, rollback, or evidence
-  item is incomplete, failed, blocked, or stale;
-- `READY_TO_DEPLOY`: all required pre-deployment evidence is current for the
-  immutable artifact and AWS deployment is the remaining required step;
-- `RELEASE_VERIFIED`: every required local and deployed acceptance item is
-  VERIFIED for the identified artifact/environment, or deployed evidence is
-  explicitly not applicable.
-
-AWS lifecycle intent is one atomic three-field owner record. `AWS lifecycle
-intent` uses the normal exact profile `NONE`, `RESIDUAL_REVIEW`, or `TEARDOWN`.
-When current `READY_FOR_TEARDOWN` or `RESIDUALS_REMAIN` evidence requires a
-set-level choice, the exact profile is `RETAIN`, `RESIDUAL_REVIEW`, or
-`TEARDOWN`, shown to the owner as RETAIN, INVESTIGATE, or REMOVE. `NONE`
-requires both source and recorded-at to be exactly `NONE`. Every other value
-requires source exactly `owner-message MSG-AWS-LIFECYCLE-nnnn` and a
-timezone-aware ISO 8601 recorded-at value. Codex must not invent, infer, or
-relabel that owner message. Follow `aws_residual_disposition`, not the raw value,
-for residual routing. The record selects a follow-up route but grants no AWS
-access, mutation, cleanup, or spending authority.
-
-RETAIN stores `RETAIN`, stops at an explicit retained-resources result, and
-does not claim the environment is clean. INVESTIGATE stores `RESIDUAL_REVIEW`
-and requires separate current read authority for AWS-40. REMOVE stores
-`TEARDOWN`; current READY evidence may present AWS-50's exact teardown receipt,
-while a choice after `RESIDUALS_REMAIN` first returns to AWS-40 to refresh the
-proposal. Every AWS-50 attempt returns to AWS-40 for terminal reconciliation.
-Every choice after `RESIDUALS_REMAIN` must be strictly newer than that row.
-After READY, RETAIN and INVESTIGATE must be strictly newer. An earlier
-owner-provenanced `TEARDOWN` may carry forward as REMOVE. New residual
-evidence reopens the choice. RETAIN without current READY or residual evidence
-is invalid. No choice substitutes for read or teardown authority. A direct
-plain-language owner request atomically updates all three fields through the
-bounded capability. The normal record may return to `NONE` before an elective
-authenticated route begins; an active residual-choice boundary does not expose
-`NONE`. Legacy records are compatible
-only when their effective intent is `NONE`; a legacy non-`NONE` value without
-owner provenance fails closed.
-
-Only RELEASE-10 changes release state. AWS-10 requires `READY_TO_DEPLOY`.
-Before a terminal AWS-30 row, Active evidence cutoff may be `TODO` or `NONE`.
-After COMPLETE or BLOCKED, RELEASE-10 stores that exact terminal AWS-30
-Evidence ID as Active evidence cutoff in the same checkpoint that decides
-`NOT_READY`, `RELEASE_VERIFIED`, or records a separately authorized correction
-path. A matching cutoff acknowledges the attempt and prevents it from rerouting.
-Retry requires distinct current mutation authority (a new exact deployment receipt for explicit-gate, or a freshly approved construction authorization for fast-dev) and a new Attempt ID. No prior deployment authority may be replayed.
+</details>
