@@ -743,6 +743,11 @@ class FastlaneHookTests(unittest.TestCase):
             "schema_version": 1,
             "status": "NONE",
         }
+        enriched["document_summaries"] = {
+            "schema_version": 1,
+            "status": "STALE",
+            "documents": [],
+        }
         event = payload("SessionStart", self.root)
 
         self.assertEqual(

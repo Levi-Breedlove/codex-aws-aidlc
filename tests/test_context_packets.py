@@ -41,6 +41,20 @@ def request(
 
 
 class ContextPacketTests(unittest.TestCase):
+    def test_document_summaries_do_not_displace_initial_phase_sources(self) -> None:
+        report = doctor.inspect_project(REPOSITORY_ROOT, template_source=True)
+        packet = report["context_plan"]
+
+        self.assertLessEqual(packet["actual_initial_source_bytes"], 12_000)
+        self.assertEqual(report["document_summaries"]["schema_version"], 1)
+        self.assertEqual(report["document_summaries"]["status"], "CURRENT")
+        for item in packet["resolved_initial_slices"]:
+            source = (REPOSITORY_ROOT / item["path"]).read_text(encoding="utf-8")
+            selected = "\n".join(
+                source.splitlines()[item["start_line"] - 1 : item["end_line"]]
+            )
+            self.assertNotIn("FASTLANE:DOCUMENT_SUMMARY", selected)
+
     def test_canonical_source_bytes_and_heading_range_are_digest_bound(self) -> None:
         text = "# Target\r\nvalue\r\n\r\n# Later\r\nignored\r\n"
         packet, issues = resolve_context_packet(

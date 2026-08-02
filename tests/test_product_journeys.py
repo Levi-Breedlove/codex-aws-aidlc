@@ -172,6 +172,9 @@ class ProductJourneyTests(unittest.TestCase):
             )
             self.assertEqual(untouched["gates"]["gate_a"], "BLOCKED")
             self.assertEqual(untouched["gates"]["gate_b"], "BLOCKED")
+            self.assertEqual(untouched["document_summaries"]["schema_version"], 1)
+            self.assertEqual(untouched["document_summaries"]["status"], "CURRENT")
+            self.assertEqual(len(untouched["document_summaries"]["documents"]), 6)
             self.assertEqual(untouched["authorizations"]["aws"], "NONE")
             packet = untouched["context_plan"]
             self.assertEqual(packet["maximum_initial_source_bytes"], 12_000)
@@ -190,6 +193,10 @@ class ProductJourneyTests(unittest.TestCase):
                 )
                 canonical = context_runtime.canonical_source_bytes(selected)
                 self.assertEqual(item["source_bytes"], len(canonical))
+                self.assertEqual(
+                    "FASTLANE:DOCUMENT_SUMMARY" in selected,
+                    False,
+                )
                 self.assertEqual(
                     item["canonical_sha256"],
                     "sha256:" + hashlib.sha256(canonical).hexdigest(),
@@ -242,6 +249,18 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(first_resume["interaction"], second_resume["interaction"])
             self.assertEqual(
                 first_resume["context_plan"], second_resume["context_plan"]
+            )
+            self.assertEqual(
+                first_resume["document_summaries"],
+                second_resume["document_summaries"],
+            )
+            self.assertEqual(first_resume["document_summaries"]["schema_version"], 1)
+            self.assertEqual(first_resume["document_summaries"]["status"], "STALE")
+            without_summaries = json.loads(json.dumps(first_resume))
+            without_summaries.pop("document_summaries")
+            self.assertEqual(
+                presenter.render_owner_update(first_resume),
+                presenter.render_owner_update(without_summaries),
             )
             foundation = first_resume["intake_foundation"]
             self.assertEqual(foundation["schema_version"], 2)
