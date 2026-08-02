@@ -12,6 +12,30 @@ routing, bounded delivery, side questions, deployment/teardown separation, and
 failure recovery through the real scripts. It is the mandatory deterministic
 workflow baseline; model role plays and adopter pilots supplement it.
 
+## Customer-record readability qualification
+
+Evaluate rendered Markdown, not only raw source. A visible line is a nonblank
+rendered line outside a closed `<details>` body; its `<summary>` counts once.
+The six project records must open with current values, one owner need or
+`Nothing`, the next Codex action, the approval/authority boundary, and useful
+navigation. Exact records remain canonical below that surface.
+
+The final customer-record correction requires all of these conditions:
+
+- Product Agreement appears within the first 45 visible PRD lines.
+- TASKS exposes active progress within 35 visible lines.
+- VERIFY exposes populated claims within 30 visible lines.
+- RUNBOOK exposes the operational path within 45 visible lines.
+- Gate A's visible decision surface is at most 80 lines.
+- Gate B's visible executive decision and technical index are at most 140 lines.
+- Visible PRD, TASKS, VERIFY, and RUNBOOK lines fall at least 35 percent from
+  `2fc50a22f893dce92bc996fe05fe2a57b9d65d71`, and their combined text falls by
+  at least 20,000 characters.
+- Disclosures are balanced and labeled. Current actions, material risks,
+  authorization boundaries, commands, diagrams, and formal receipts stay open.
+- Owner-visible paths contain no digest, parser, schema, routing, EARS, QAS,
+  Harness, or context-management instructions.
+
 ## Model role-play evaluation
 
 Print the scenarios and anchored `1`, `3`, and `5` rubrics for all nine criteria:

@@ -66,6 +66,24 @@ Visible again
             ],
         )
 
+    def test_final_readability_thresholds_are_explicit(self) -> None:
+        rules = (REPOSITORY_ROOT / "docs/project/AGENTS.md").read_text(encoding="utf-8")
+        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(
+            encoding="utf-8"
+        )
+        for phrase in (
+            "within 45 visible PRD lines",
+            "within 35 TASKS lines",
+            "within 30 VERIFY lines",
+            "within 45 RUNBOOK lines",
+            "at most 80 lines",
+            "at most 140 lines",
+            "at least 35 percent",
+            "at least 20,000 characters",
+        ):
+            self.assertIn(phrase, rules + "\n" + evaluation)
+        self.assertIn("balanced, labeled `<details>`", rules)
+
 
 DOCUMENT_PATHS = (
     "docs/project/README.md",
