@@ -3,6 +3,33 @@
 Canonical path: `docs/project/BUGFIX.md`.
 
 Use this file for the active defect or regression. Archive or reset it after the fix is complete.
+<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
+## Current state
+
+| Field | Current value |
+|---|---|
+| Status | No active bounded defect |
+| Defect | None |
+| User impact | None |
+| Reproduction | Not active |
+| Environment | Not active |
+| Related requirements | None |
+| Root cause | Not active |
+| Repair | Not active |
+| Regression evidence | Not active |
+| Architecture impact | None |
+| Updated | Not yet initialized |
+| Need from you | Run `init template`. |
+| Next | Codex will verify prerequisites and initialize the project. |
+
+## Go directly to
+
+- [Summary](#1-summary)
+- [Current behavior](#2-current-behavior)
+- [Root-cause analysis](#7-root-cause-analysis)
+- [Fix constraints](#8-fix-constraints)
+- [Regression evidence](#9-regression-and-property-specification)
+<!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
 ## 1. Summary
 

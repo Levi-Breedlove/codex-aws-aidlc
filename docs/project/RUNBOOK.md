@@ -1,6 +1,34 @@
 # {{PROJECT_NAME}} — Deployment and Operations Runbook
 
 > `docs/project/RUNBOOK.md` owns repeatable operational procedures. Project work and live status belong in `docs/project/TASKS.md` and mirrored GitHub Issues.
+<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
+## Current state
+
+| Field | Current value |
+|---|---|
+| Environment | Not yet initialized |
+| Deployment state | Not deployed |
+| Current AWS authority | None |
+| Construction approval | Not yet initialized |
+| Safest available operation | Local validation only |
+| Deployment approval | Not authorized |
+| Teardown approval | Not authorized |
+| Recovery state | Not yet observed |
+| Emergency condition | No deployed environment exists |
+| AWS account work | Not authorized |
+| Updated | Not yet initialized |
+| Need from you | Run `init template`. |
+| Next | Codex will verify prerequisites and initialize the project. |
+
+## Go directly to
+
+- [Before deploying](#2-prerequisites)
+- [Deploy](#6-deployment)
+- [Verify](#7-smoke-tests)
+- [Roll back](#10-rollback)
+- [Recover](#11-backup-and-recovery)
+- [Tear down](#13-teardown-and-decommissioning)
+<!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
 This document is procedural, not authorization. Gate A and Gate B are the only
 routine human gates. Local validation, AWS preflight, deployment checks, smoke

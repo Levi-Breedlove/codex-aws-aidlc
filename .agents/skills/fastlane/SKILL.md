@@ -50,6 +50,8 @@ You are the single coordinator and sole writer.
 8. Render routine updates with `python scripts/fastlane_presenter.py owner
    --input-stdin`. Run, validate, checkpoint, and rerun the Engine in the same
    turn while `automatic_continuation_allowed` is true.
+   At checkpoints, repair `DOCUMENT_SUMMARY_STALE` only from the module's exact
+   marked block, then rerun the Engine. Never hand-author it; other diagnostics fail closed.
 
    For a new message that may answer `INTAKE-CARD-*`, run the deterministic
    parser against that exact card ID, revision, digest, and a new

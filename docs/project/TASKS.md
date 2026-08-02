@@ -3,6 +3,32 @@
 `docs/project/TASKS.md` is the live construction ledger after Gate B. Task blocks are the
 only authoritative task records. GitHub Issues are conditional mirrors when the
 current construction authorization (`AUTH`) permits the named GitHub writes.
+<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
+## Current state
+
+| Field | Current value |
+|---|---|
+| Progress | No tasks generated |
+| Current wave | None |
+| Active task | None |
+| Readiness | Not yet initialized |
+| Blocker | None |
+| Last passing checkpoint | None |
+| Construction approval | Not yet initialized |
+| Last known-green commit | None |
+| AWS account work | Not authorized |
+| Updated | Not yet initialized |
+| Need from you | Run `init template`. |
+| Next | Codex will verify prerequisites and initialize the project. |
+
+## Go directly to
+
+- [Current progress](#current-progress)
+- [Roadmap](#roadmap)
+- [Active work and blockers](#active-work-blockers-and-next-action)
+- [Task definitions](#task-definitions)
+- [Exact execution state](#agent-reference-exact-run-and-task-state)
+<!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
 Gate A and Gate B are the only routine human gates. Task readiness, wave
 selection, checkpoints, verification, deployment preflight, and release checks

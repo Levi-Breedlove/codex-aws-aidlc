@@ -775,6 +775,10 @@ previous local blocker.
    the selected phase. After each phase checkpoint, rerun the Engine in the
    same turn and repeat this loop until a declared stop condition. A changed
    internal prompt ID is never itself a reason to pause.
+   When the only diagnostic is `DOCUMENT_SUMMARY_STALE`, replace only its marked
+   derived block from the deterministic document-summary projection, rerun the
+   Engine, and continue. Never infer, independently edit, approve, or authorize
+   through a summary.
    Never ask an initialized project for another `init template` or completed
    setup value.
 
