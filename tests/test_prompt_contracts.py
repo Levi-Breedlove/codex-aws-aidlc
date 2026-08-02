@@ -83,6 +83,12 @@ class PromptPackContractTests(unittest.TestCase):
         cls.fastlane_design = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
         ).read_text(encoding="utf-8")
+        cls.fastlane_define = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/define.md"
+        ).read_text(encoding="utf-8")
+        cls.engine_source = (PROJECT_ROOT / "scripts/bootstrap_doctor.py").read_text(
+            encoding="utf-8"
+        )
         cls.authorization_receipts = (
             PROJECT_ROOT
             / ".agents/skills/fastlane/references/authorization-receipts.md"
@@ -602,8 +608,7 @@ class PromptPackContractTests(unittest.TestCase):
     def test_technology_register_is_authoritative_and_exact(self) -> None:
         heading = "### Technology and toolchain decision register"
         self.assertIn(heading, self.prd)
-        register = self.prd.split(heading, 1)[1].split("\n## 14.", 1)[0]
-        self.assertIn("authoritative register", register)
+        register = self.prd.split(heading, 1)[1].split("\n### Architecture drivers", 1)[0]
         self.assertIn(
             "| Decision ID | Concern | Selection | Version policy | Source | "
             "Basis IDs | Alternatives and rationale | Compatibility/migration | "
@@ -629,28 +634,18 @@ class PromptPackContractTests(unittest.TestCase):
                 "TODO | TODO | TODO |",
                 register,
             )
-        self.assertIn("DES-0001; TECH: TECH-0001, TECH-0002", register)
-        self.assertIn("DES-0001; TECH: NONE — no technology/toolchain impact", register)
-        self.assertIn("OFFICIAL_CURRENT_NO_TEMPLATE_PIN", register)
-        self.assertRegex(register, r"observed\s+version is evidence metadata")
-        self.assertIn("exact comma-space-separated stable IDs", register)
-        self.assertIn("never prose, duplicate IDs", register)
-        self.assertIn("`EXACT` may use an opaque ecosystem version", register)
-        self.assertIn(
-            "`MINIMUM`\nuses a machine-comparable numeric dotted version", register
-        )
-        self.assertIn("An active `PROPERTY_TESTING` decision must use", register)
-        self.assertRegex(
-            register,
-            r"`Selection` names the chosen technology or uses exactly\s+"
-            r"`NOT_APPLICABLE — <reason>` when no technology applies",
-        )
-        self.assertRegex(
-            register,
-            r"ordinary dependency addition does not invalidate Gate\s+B unless "
-            r"it changes\s+architecture, validation, security, cost, or deployment\s+"
-            r"behavior",
-        )
+
+        # The PRD stores project truth; Design and the Engine own procedure and
+        # enum validation for the exact table above.
+        self.assertIn("selected `TECH-*`", self.fastlane_design)
+        for engine_contract in (
+            "REQUIRED_TECHNOLOGY_CONCERNS",
+            "invalid version policy",
+            "Technology concern {concern} must appear exactly once",
+            "Framework TECH ID must reference the PROPERTY_TESTING decision",
+            "requires an EXACT, COMPATIBLE_MAJOR, or numeric MINIMUM version policy",
+        ):
+            self.assertIn(engine_contract, self.engine_source)
 
     def test_property_specs_flow_through_tasks_build_and_release_evidence(self) -> None:
         design = self.prompt_section("DESIGN-10")
@@ -678,19 +673,17 @@ class PromptPackContractTests(unittest.TestCase):
             self.assertRegex(section, r"(?i)(?:never|cannot) substitute")
         self.assertIn("Missing or\nunresolved property evidence", release)
 
-        for phrase in (
+        property_section = self.prd.split(
+            "## 24. Property-based testing specification", 1
+        )[1].split("\n## 25.", 1)[0]
+        for record_contract in (
             "classify every measurable Gate A requirement",
             "APPLICABLE` / `NOT_APPLICABLE",
             "### Property execution contract",
             "Seed or reproduction format",
-            "MIN_CASES: <positive integer>",
-            "MAX_SECONDS: <positive integer>",
-            "Never change an approved property",
+            "Every applicable property definition must contain concrete",
         ):
-            self.assertIn(phrase, self.prd)
-        property_section = self.prd.split(
-            "## 24. Property-based testing specification", 1
-        )[1].split("\n## 25.", 1)[0]
+            self.assertIn(record_contract, property_section)
         self.assertLess(
             property_section.index("| PROP-005 |"),
             property_section.index("### Property execution contract"),
@@ -703,21 +696,15 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn(
             "| PROP-001 | TODO | TODO | TODO | TODO | TODO |", property_section
         )
-        self.assertIn(
-            "replay format must explicitly declare either a seed", property_section
-        )
-        self.assertIn(
-            "Every applicable property definition must contain concrete",
-            property_section,
-        )
-        self.assertIn("one runnable local\ncommand, not prose", property_section)
-        self.assertIn("without shell-control\n  chaining", design)
-        for redundant in (
-            "- language-appropriate framework or suite;",
-            "- generated case or run target and time bound;",
-            "- seed and reproduction-command format;",
+        for engine_contract in (
+            "MIN_CASES: <positive integer>",
+            "MAX_SECONDS: <positive number>",
+            "Seed or reproduction format must",
+            "applicable property definition is unresolved",
         ):
-            self.assertNotIn(redundant, property_section)
+            self.assertIn(engine_contract, self.engine_source)
+        self.assertIn("replay format must explicitly declare a", design)
+        self.assertIn("without shell-control\n  chaining", design)
         self.assertIn(
             "Current REQ ID, requirement IDs, applicable acceptance/journey/PROP IDs",
             self.tasks,
@@ -844,7 +831,10 @@ class PromptPackContractTests(unittest.TestCase):
             self.assertIn("Do not invent a source", section)
         self.assertIn("Authorization provided at", self.prd)
         self.assertIn("Authorization source", self.prd)
-        self.assertIn("subset, superset, reordered list", self.prd)
+        self.assertIn("complete exact ordered block", self.engine_source)
+        self.assertIn(
+            "does not match the current exact gate proposal", self.engine_source
+        )
 
     def test_launchpad_routes_from_existing_lifecycle_state(self) -> None:
         boot = self.prompt_section("BOOT-00")
@@ -1071,7 +1061,7 @@ Approver: <name/handle>"""
             for phrase in rejected:
                 self.assertNotIn(phrase, document)
 
-        for document in (self.agents, self.prd, self.prompts):
+        for document in (self.agents, self.prompts):
             self.assertRegex(
                 document,
                 r"A Quick MVP is one small, reversible development release",
@@ -1080,6 +1070,11 @@ Approver: <name/handle>"""
                 document,
                 r"An AWS lane describes planned access; it does not authorize a\s+change",
             )
+        self.assertIn("| Delivery profile | `quick-mvp` / `standard` / `high-risk` |", self.prd)
+        self.assertIn(
+            "| Project AWS lane | `documentation-only` / `read-only` / `fast-dev` / `explicit-gate` |",
+            self.prd,
+        )
         self.assertRegex(
             self.root_readme,
             r"lowest practical total cost without\s+weakening required safeguards",
@@ -1615,7 +1610,7 @@ Approver: <name/handle>"""
             self.prompts,
         )
         self.assertIn("| AWS cost ceiling |", self.prd)
-        self.assertIn("not a guaranteed AWS billing stop", self.prd)
+        self.assertRegex(self.prd, r"not a guaranteed .*billing stop")
         for surface in (self.root_readme, self.agents, self.prd, self.prompts):
             self.assertNotIn("{{MONTHLY_BUDGET}}", surface)
 
@@ -1695,17 +1690,20 @@ Approver: <name/handle>"""
         ):
             self.assertIn(f"| {row} |", self.prd)
         for document in (
-            self.prd,
+            self.fastlane_design,
             self.workflow,
             self.prompts,
         ):
             self.assertRegex(document, r"AWS allowed\s+operations")
             self.assertIn("union", document.lower())
-        for document in (self.prd, self.prompts):
-            self.assertRegex(
-                document,
-                r"(?is)explicit-gate.{0,240}MUTATE_LISTED_RESOURCES.{0,240}separate.{0,120}(?:action|AWS-20)",
-            )
+        self.assertRegex(
+            self.prompts,
+            r"(?is)explicit-gate.{0,240}MUTATE_LISTED_RESOURCES.{0,240}separate.{0,120}(?:action|AWS-20)",
+        )
+        self.assertIn(
+            "A Gate B maximum never authorizes deployment or teardown by itself",
+            self.fastlane_design,
+        )
         self.assertNotIn("If a fast development deployment is proposed", self.prompts)
 
     def test_git_checkpoint_plan_and_release_lifecycles_are_explicit(self) -> None:
@@ -1746,9 +1744,20 @@ Approver: <name/handle>"""
             self.assertIn(field, self.prompts)
 
     def test_brownfield_mandatory_facts_are_not_nullable(self) -> None:
-        self.assertIn("every baseline fact is mandatory", self.prd)
-        self.assertIn("Only these fields\nare nullable", self.prd)
-        self.assertIn("known defects and accepted debt\n`NONE_OBSERVED`", self.prd)
+        baseline_fields = re.search(
+            r"BROWNFIELD_BASELINE_FIELDS = \{(.*?)\}",
+            self.engine_source,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(baseline_fields)
+        for field in (
+            "Repository and baseline commit",
+            "Existing architecture and ownership",
+            "Protected files and components",
+        ):
+            self.assertIn(field, baseline_fields.group(1))
+        self.assertIn("BROWNFIELD_BASELINE_FIELDS - set(baseline)", self.engine_source)
+        self.assertIn("Unknown behavior remains a", self.prd)
         self.assertIn(
             "Only drift, dirty changes, known debt/defects",
             self.prompt_section("REQ-10"),
@@ -1761,8 +1770,8 @@ Approver: <name/handle>"""
         self.assertIn("Authenticated AWS route", self.prompts)
         self.assertIn("Gate B AWS boundary", self.prompts)
         self.assertIn("MUTATE_LISTED_RESOURCES", self.prompts)
-        self.assertIn("Prompt AWS mode", self.prd)
-        self.assertIn("Gate B AWS boundary", self.prd)
+        self.assertIn("| Project AWS lane |", self.prd)
+        self.assertIn("| AWS boundary |", self.prd)
         self.assertIn("MUTATE_LISTED_RESOURCES", self.prd)
         self.assertNotIn("PLAN_ONLY", self.prd)
         self.assertIn(
@@ -1779,7 +1788,6 @@ Approver: <name/handle>"""
         ):
             self.assertIn(phrase, self.prompts)
         for document in (
-            self.prd,
             self.workflow,
             self.runbook,
             self.prompts,
@@ -1952,10 +1960,11 @@ Approver: <name/handle>"""
         deliver_reference = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/deliver.md"
         ).read_text(encoding="utf-8")
-        for surface in (self.tasks, task_prompt, deliver_reference):
+        for surface in (task_prompt, deliver_reference):
             self.assertIn("Fastlane INVEST profile", surface)
             self.assertIn("Thin Vertical Slice", surface)
             self.assertIn("Fastlane Definition of Done", surface)
+        self.assertIn("Deliver phase reference owns generation procedure", self.tasks)
         for attribute in (
             "Independent",
             "Negotiable",
@@ -1964,7 +1973,7 @@ Approver: <name/handle>"""
             "Small",
             "Testable",
         ):
-            self.assertIn(attribute, self.tasks)
+            self.assertIn(attribute, deliver_reference)
         for done_condition in (
             "all acceptance criteria pass",
             "exact validation ran and passed",
@@ -1976,10 +1985,13 @@ Approver: <name/handle>"""
             "required documentation and runbook changes are complete",
         ):
             self.assertIn(done_condition, self.tasks)
-        self.assertIn("migration-only", self.tasks)
-        self.assertIn("security-only", self.tasks)
-        self.assertIn("infrastructure-only", self.tasks)
-        self.assertIn("evidence-only", self.tasks)
+        for horizontal in (
+            "migration-",
+            "security-",
+            "infrastructure-",
+            "evidence-only",
+        ):
+            self.assertIn(horizontal, deliver_reference)
 
     def test_tdd_mikado_and_risk_methods_are_conditional_not_new_gates(self) -> None:
         deliver_reference = (
@@ -2030,25 +2042,25 @@ Approver: <name/handle>"""
             "Exact command or API | Evidence destination | Required or conditional status |"
         )
         self.assertIn(header, self.prd)
-        prd_words = " ".join(self.prd.split())
+        design_words = " ".join(design_reference.split())
         for basis in (
-            "selected `TECH-*` register",
-            "delivery profile",
-            "effective risk",
+            "selected `TECH-*`",
+            "profile",
+            "risk",
             "data classification",
             "identity boundary",
             "public exposure",
             "recovery target",
             "AWS lane",
         ):
-            self.assertIn(basis, prd_words)
+            self.assertIn(basis, design_words)
         for status in (
             "`REQUIRED`",
             "`CONDITIONAL — <trigger>`",
-            "`NOT_APPLICABLE — <concrete reason>`",
+            "`NOT_APPLICABLE — <technology/risk reason>`",
         ):
-            self.assertIn(status, self.prd)
-        self.assertIn("does not impose a universal scanner", self.prd)
+            self.assertIn(status, design_reference)
+        self.assertIn("does not impose a universal", self.prd)
         self.assertIn("Gate B records one risk-derived Harness Profile", workflow)
 
         evidence_header = (
@@ -2246,8 +2258,9 @@ Approver: <name/handle>"""
         self.assertIn("assistant example", intake_compact)
         self.assertIn("absent reply never confirms a choice", intake_compact)
         self.assertIn("OWNER_RESPONSE", intake)
-        self.assertIn("OWNER_RESPONSE", self.prd)
-        self.assertIn("INTAKE-CARD-*", self.prd)
+        self.assertIn("OWNER_RESPONSE", self.engine_source)
+        self.assertIn("Owner response ID", self.prd)
+        self.assertIn("INTAKE-CARD-0001", self.prd)
         self.assertIn("OWNER_WORK_CONTEXT", self.prd)
         self.assertIn("EXISTING_APPLICATION_CHANGE", intake_compact)
         self.assertIn("REPAIR_OR_MIGRATION", intake_compact)
@@ -2267,12 +2280,15 @@ Approver: <name/handle>"""
             self.prd,
         )
         self.assertIn("#### Normalized owner response register", self.prd)
-        self.assertIn("Never store a raw chat transcript", self.prd)
         self.assertIn(
-            "do not cryptographically authenticate", " ".join(self.prd.split())
+            "without storing raw conversation transcripts", " ".join(self.prd.split())
         )
-        self.assertIn("does not authenticate the owner's identity", intake)
-        combined_intake_contract = (intake + define + owner + self.prd).casefold()
+        self.assertIn(
+            "does not authenticate the owner's identity", " ".join(intake.split())
+        )
+        combined_intake_contract = (
+            intake + define + owner + self.prd + self.engine_source
+        ).casefold()
         for phrase in (
             "owner-safe status",
             "secret-like",
@@ -2427,22 +2443,21 @@ Approver: <name/handle>"""
     def test_prd_and_prompt_bind_semantic_design_contracts(self) -> None:
         prd_words = " ".join(self.prd.split())
         prompt_words = " ".join(self.prompts.split())
+        define_words = " ".join(self.fastlane_define.split())
+        design_words = " ".join(self.fastlane_design.split())
 
-        self.assertIn(
-            "when confirmed owner work context is `NEW_APPLICATION`, Work kind "
-            "must be `NEW_BUILD`",
-            prd_words,
-        )
-        self.assertIn(
-            "`NEW_APPLICATION` deterministically requires `NEW_BUILD`",
-            prompt_words,
-        )
-        for document in (prd_words, prompt_words):
+        self.assertIn("| INTAKE-0001 | OWNER_WORK_CONTEXT |", self.prd)
+        self.assertIn("### Whole-system candidates", self.prd)
+        self.assertIn("### Selected architecture", self.prd)
+        self.assertIn("`NEW_APPLICATION` deterministically requires `NEW_BUILD`", prompt_words)
+        self.assertIn("Confirmed `NEW_APPLICATION` requires `NEW_BUILD`", define_words)
+        for document in (define_words, prompt_words):
             with self.subTest(contract="owner-context", document=document[:40]):
                 self.assertRegex(
                     document,
-                    r"(?i)Never infer(?:.{0,100}`NEW_APPLICATION`| owner context)",
+                    r"(?i)never infer(?:.{0,100}`NEW_APPLICATION`| owner context)",
                 )
+        for document in (design_words, prompt_words):
             with self.subTest(contract="candidate-minimum", document=document[:40]):
                 self.assertIn(
                     "at least two complete, credible, non-straw whole-system candidates",
@@ -2458,8 +2473,8 @@ Approver: <name/handle>"""
                     r"(?i)procedural coordinator.{0,40}(?:design )?review",
                 )
                 self.assertIn(
-                    "Deterministic validation begins with the recorded row's status",
-                    document,
+                    "deterministic validation begins with the recorded row's status",
+                    document.lower(),
                 )
 
         harness_rows = {
@@ -2488,12 +2503,9 @@ Approver: <name/handle>"""
                 self.assertEqual(harness_rows[harness_id][2:6], ["TODO"] * 4)
                 self.assertEqual(harness_rows[harness_id][7], "TODO")
 
-        self.assertIn("Duplicate layers are intentional", prd_words)
         self.assertIn("Duplicate layers are intentional", prompt_words)
-        self.assertRegex(
-            prd_words,
-            r"At Gate B, every row is resolved to `REQUIRED` or `NOT_APPLICABLE — <concrete reason>`",
-        )
+        self.assertIn("Each `HARNESS-*` has one exact command", design_words)
+        self.assertIn("deterministic validation begins", design_words.lower())
         self.assertIn(
             "At Gate B resolve every Harness row to `REQUIRED` or "
             "`NOT_APPLICABLE — <concrete reason>`",
