@@ -333,9 +333,22 @@ class ProductJourneyTests(unittest.TestCase):
         def verify_source_locators(project: Path, brief: dict[str, object]) -> None:
             locators = brief["source_locators"]
             self.assertTrue(locators)
+            locator_keys = {locator["key"] for locator in locators}
+            hidden_machine_headings = {
+                "Technology and toolchain decision register",
+                "Selected architecture",
+                "Gate B Harness Profile",
+                "28. Construction envelope",
+            }
             for locator in locators:
                 self.assertEqual(locator["path"], "docs/project/PRD.md")
+                self.assertNotIn(locator["heading"], hidden_machine_headings)
                 source = (project / locator["path"]).read_text(encoding="utf-8")
+                depth = 0
+                for line in source.splitlines()[: locator["start_line"] - 1]:
+                    depth += line.strip() == "<details>"
+                    depth -= line.strip() == "</details>"
+                self.assertEqual(depth, 0, locator)
                 selected = "\n".join(
                     source.splitlines()[locator["start_line"] - 1 : locator["end_line"]]
                 )
@@ -344,6 +357,16 @@ class ProductJourneyTests(unittest.TestCase):
                     locator["section_sha256"],
                     "sha256:" + hashlib.sha256(canonical).hexdigest(),
                 )
+            decision_ids: list[str] = []
+            for group in brief.get("technical_decision_groups", []):
+                for decision in group["decisions"]:
+                    decision_ids.append(decision["decision_id"])
+                    self.assertTrue(decision["source_locator_keys"])
+                    self.assertTrue(
+                        set(decision["source_locator_keys"]).issubset(locator_keys),
+                        decision,
+                    )
+            self.assertEqual(len(decision_ids), len(set(decision_ids)))
 
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)

@@ -17,6 +17,15 @@ from scripts.fastlane_document_summaries import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
+BASELINE_VISIBLE_LINES = {
+    "docs/project/PRD.md": 1292,
+    "docs/project/TASKS.md": 361,
+    "docs/project/VERIFY.md": 649,
+    "docs/project/RUNBOOK.md": 612,
+}
+BASELINE_COMBINED_CHARACTERS = 198_572
+HUMAN_FIRST_RECORDS = tuple(BASELINE_VISIBLE_LINES)
+
 
 def visible_markdown_lines(markdown: str) -> list[str]:
     """Return nonblank rendered lines while hiding closed disclosure bodies."""
@@ -154,6 +163,115 @@ def canonical_sources() -> dict[str, str]:
 def first_screen(markdown: str) -> list[str]:
     end = markdown.index(SUMMARY_END) + len(SUMMARY_END)
     return visible_markdown_lines(markdown[:end])
+
+
+def visible_position(markdown: str, expected: str) -> int:
+    for index, line in enumerate(visible_markdown_lines(markdown), 1):
+        if expected in line:
+            return index
+    raise AssertionError(f"Missing visible content: {expected}")
+
+
+def visible_section_size(markdown: str, start: str, end: str) -> int:
+    lines = visible_markdown_lines(markdown)
+    start_index = lines.index(start)
+    end_index = lines.index(end, start_index + 1)
+    return end_index - start_index
+
+
+class HumanFirstDocumentQualificationTests(unittest.TestCase):
+    def test_visible_reading_path_meets_the_exact_reduction_contract(self) -> None:
+        current_sources = {
+            path: (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
+            for path in HUMAN_FIRST_RECORDS
+        }
+        current_visible = {
+            path: len(visible_markdown_lines(source))
+            for path, source in current_sources.items()
+        }
+        baseline_total = sum(BASELINE_VISIBLE_LINES.values())
+        current_total = sum(current_visible.values())
+        self.assertGreaterEqual(
+            (baseline_total - current_total) / baseline_total,
+            0.35,
+            current_visible,
+        )
+        self.assertLessEqual(
+            sum(len(source) for source in current_sources.values()),
+            BASELINE_COMBINED_CHARACTERS - 20_000,
+        )
+
+    def test_owner_surfaces_arrive_within_their_visible_line_budgets(self) -> None:
+        sources = {
+            path: (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
+            for path in HUMAN_FIRST_RECORDS
+        }
+        self.assertLessEqual(
+            visible_position(sources["docs/project/PRD.md"], "# Product Agreement"),
+            45,
+        )
+        self.assertLessEqual(
+            visible_position(sources["docs/project/TASKS.md"], "## Current progress"),
+            35,
+        )
+        self.assertLessEqual(
+            visible_position(sources["docs/project/VERIFY.md"], "### Important claims"),
+            30,
+        )
+        for destination in (
+            "[Before deploying]",
+            "[Deploy]",
+            "[Verify]",
+            "[Roll back]",
+            "[Recover]",
+            "[Tear down]",
+        ):
+            self.assertLessEqual(
+                visible_position(sources["docs/project/RUNBOOK.md"], destination), 45
+            )
+        self.assertLessEqual(
+            visible_section_size(
+                sources["docs/project/PRD.md"], "# Gate A Review", "# Technical Plan"
+            ),
+            80,
+        )
+        self.assertLessEqual(
+            visible_section_size(
+                sources["docs/project/PRD.md"],
+                "# Gate B Review",
+                "# Contract Appendices",
+            ),
+            140,
+        )
+
+    def test_inactive_bugfix_mirrors_the_global_engine_owner_action(self) -> None:
+        specifications = build_summary_specifications(
+            {
+                "template_like": False,
+                "lifecycle_state": "WAITING_GATE_A",
+                "next_prompt": "INTAKE-20",
+                "gate_a": "PENDING_OWNER_APPROVAL",
+                "gate_b": "BLOCKED",
+                "action_kind": "APPROVE_GATE_A",
+                "automatic_continuation_allowed": False,
+                "tasks": {},
+                "verify": {},
+                "operations": {},
+                "bugfix": {"status": "No active bounded defect"},
+            }
+        )
+        by_path = {item["path"]: item for item in specifications}
+        expected_need = by_path["docs/project/PRD.md"]["need_from_owner"]
+        expected_next = by_path["docs/project/PRD.md"]["next_action"]
+        self.assertEqual(
+            by_path["docs/project/BUGFIX.md"]["need_from_owner"], expected_need
+        )
+        self.assertEqual(
+            by_path["docs/project/BUGFIX.md"]["next_action"], expected_next
+        )
+        self.assertEqual(
+            {item["need_from_owner"] for item in specifications}, {expected_need}
+        )
 
 
 class DocumentSummaryProjectionTests(unittest.TestCase):

@@ -9109,6 +9109,65 @@ class BootstrapDoctorTests(unittest.TestCase):
             semantic.diagram_contract.canonical_sha256,
         )
 
+    def test_moving_unchanged_diagram_preserves_approved_gate_b(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project)
+            self.set_non_material_req_evidence(project)
+            refresh_control_hashes(project)
+            baseline = doctor.inspect_project(project)
+            self.assertTrue(baseline["ok"], baseline["diagnostics"])
+            self.assertEqual(
+                baseline["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION"
+            )
+
+            prd_path = project / "docs/project/PRD.md"
+            source = prd_path.read_text(encoding="utf-8")
+            baseline_locator = doctor._owner_locator_for_heading(
+                source,
+                key="system-context",
+                label="System context",
+                heading="Proposed system at a glance",
+            )
+            start = source.index("### Proposed system at a glance")
+            end = source.index("## 15. Component design", start)
+            section = source[start:end]
+            without_section = source[:start] + source[end:]
+            insertion = without_section.index("# Gate B Review")
+            moved = (
+                without_section[:insertion]
+                + section.rstrip()
+                + "\n\n"
+                + without_section[insertion:]
+            )
+            moved_locator = doctor._owner_locator_for_heading(
+                moved,
+                key="system-context",
+                label="System context",
+                heading="Proposed system at a glance",
+            )
+            self.assertNotEqual(
+                baseline_locator["start_line"], moved_locator["start_line"]
+            )
+            self.assertEqual(
+                baseline_locator["section_sha256"], moved_locator["section_sha256"]
+            )
+            prd_path.write_text(moved, encoding="utf-8")
+            refresh_control_hashes(project)
+            relocated = doctor.inspect_project(project)
+
+        self.assertTrue(relocated["ok"], relocated["diagnostics"])
+        self.assertEqual(relocated["gates"], baseline["gates"])
+        self.assertEqual(relocated["next_prompt"], baseline["next_prompt"])
+        self.assertEqual(
+            relocated["design_contract"]["canonical_sha256"],
+            baseline["design_contract"]["canonical_sha256"],
+        )
+        self.assertEqual(
+            relocated["design_contract"]["diagram_contract"],
+            baseline["design_contract"]["diagram_contract"],
+        )
+
     def test_required_project_diagrams_fail_closed_when_stale_or_generic(
         self,
     ) -> None:
@@ -9701,6 +9760,55 @@ class BootstrapDoctorTests(unittest.TestCase):
             {item["diagnostic_code"] for item in report["remediation"]["items"]},
         )
 
+    def test_summary_hand_edit_changes_only_the_presentation_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project)
+            self.set_non_material_req_evidence(project)
+            refresh_control_hashes(project)
+            baseline = doctor.inspect_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            source = prd_path.read_text(encoding="utf-8")
+            changed = source.replace(
+                "| Product outcome | Not yet confirmed |",
+                "| Product outcome | Hand-edited presentation only |",
+                1,
+            )
+            self.assertNotEqual(source, changed)
+            prd_path.write_text(changed, encoding="utf-8")
+            refresh_control_hashes(project)
+            observed = doctor.inspect_project(project)
+
+        self.assertTrue(baseline["ok"], baseline["diagnostics"])
+        self.assertTrue(observed["ok"], observed["diagnostics"])
+        for key in (
+            "classification",
+            "lifecycle_state",
+            "next_prompt",
+            "interaction",
+            "gates",
+            "evidence_state",
+            "authorizations",
+            "write_authority",
+            "external_authority",
+            "intake_foundation",
+            "requirements_contract",
+            "coverage_plan",
+            "design_contract",
+            "tasks",
+        ):
+            self.assertEqual(observed[key], baseline[key], key)
+        for key in (
+            "requirements_revision",
+            "design_revision",
+            "construction_authorization",
+        ):
+            self.assertEqual(observed["basis"][key], baseline["basis"][key])
+        self.assertNotEqual(
+            observed["basis"]["prd_snapshot_sha256"],
+            baseline["basis"]["prd_snapshot_sha256"],
+        )
+        self.assertEqual(observed["document_summaries"]["status"], "STALE")
 
 class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
     _DEPLOYMENT_ARTIFACT = "sha256:" + "a" * 64
