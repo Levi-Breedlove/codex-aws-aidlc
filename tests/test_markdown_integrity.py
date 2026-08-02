@@ -76,6 +76,35 @@ def mermaid_structure_failures(markdown: str) -> list[str]:
     return failures
 
 
+def disclosure_lines(markdown: str) -> list[tuple[int, str, int]]:
+    """Return normalized lines and their enclosing disclosure depth."""
+
+    result: list[tuple[int, str, int]] = []
+    depth = 0
+    for number, raw_line in enumerate(markdown.splitlines(), 1):
+        line = raw_line.strip()
+        if line == "</details>":
+            depth -= 1
+            if depth < 0:
+                raise AssertionError(f"Unexpected </details> at line {number}")
+            result.append((number, line, depth))
+            continue
+        result.append((number, line, depth))
+        if line == "<details>":
+            depth += 1
+    if depth:
+        raise AssertionError(f"Unclosed <details> depth: {depth}")
+    return result
+
+
+def visible_outside_disclosures(markdown: str) -> str:
+    return "\n".join(
+        line
+        for _number, line, depth in disclosure_lines(markdown)
+        if depth == 0 and line not in {"<details>", "</details>"}
+    )
+
+
 class MarkdownIntegrityTests(unittest.TestCase):
     def markdown_files(self) -> list[Path]:
         return sorted(
@@ -262,6 +291,111 @@ sequenceDiagram
             persistence_order_failures(fixture),
             ["Mermaid block 2 persists before authorization"],
         )
+
+    def test_project_disclosures_are_balanced_labeled_and_keep_critical_content_visible(
+        self,
+    ) -> None:
+        project_documents = tuple(
+            REPOSITORY_ROOT / "docs" / "project" / name
+            for name in ("PRD.md", "TASKS.md", "VERIFY.md", "RUNBOOK.md")
+        )
+        failures: list[str] = []
+        for path in project_documents:
+            source = path.read_text(encoding="utf-8")
+            lines = source.splitlines()
+            annotated = disclosure_lines(source)
+            for index, (_number, line, depth) in enumerate(annotated):
+                if line == "<details>":
+                    next_line = next(
+                        (item.strip() for item in lines[index + 1 :] if item.strip()),
+                        "",
+                    )
+                    if not (
+                        next_line.startswith("<summary>")
+                        and next_line.endswith("</summary>")
+                    ):
+                        failures.append(
+                            f"{path.name}: unlabeled disclosure near line {index + 1}"
+                        )
+                if line == "```mermaid" and depth:
+                    failures.append(
+                        f"{path.name}: Mermaid block hidden near line {index + 1}"
+                    )
+                if (
+                    path.name == "RUNBOOK.md"
+                    and line in {"```bash", "```powershell", "```sh"}
+                    and depth
+                ):
+                    failures.append(
+                        f"{path.name}: operator command hidden near line {index + 1}"
+                    )
+                if "bootstrap:" in line and "-receipt:" in line and depth:
+                    failures.append(
+                        f"{path.name}: formal receipt hidden near line {index + 1}"
+                    )
+        self.assertEqual(failures, [])
+
+    def test_owner_reading_path_keeps_actions_boundaries_and_receipts_visible(
+        self,
+    ) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        tasks = (REPOSITORY_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
+        verify = (REPOSITORY_ROOT / "docs/project/VERIFY.md").read_text(
+            encoding="utf-8"
+        )
+        runbook = (REPOSITORY_ROOT / "docs/project/RUNBOOK.md").read_text(
+            encoding="utf-8"
+        )
+        visible = {
+            "PRD.md": visible_outside_disclosures(prd),
+            "TASKS.md": visible_outside_disclosures(tasks),
+            "VERIFY.md": visible_outside_disclosures(verify),
+            "RUNBOOK.md": visible_outside_disclosures(runbook),
+        }
+        required = {
+            "PRD.md": (
+                "# Gate A Review",
+                "# Gate B Review",
+                "## Construction and authorization boundary",
+                "<!-- bootstrap:gate-a-receipt:start -->",
+                "<!-- bootstrap:gate-b-receipt:start -->",
+            ),
+            "TASKS.md": (
+                "## Current progress",
+                "## Active work, blockers, and next action",
+            ),
+            "VERIFY.md": (
+                "## Current result",
+                "<!-- bootstrap:aws-read-preflight-receipt:start -->",
+                "<!-- bootstrap:aws-deployment-receipt:start -->",
+                "<!-- bootstrap:aws-teardown-receipt:start -->",
+            ),
+            "RUNBOOK.md": (
+                "## Safety boundary",
+                "## 6. Deployment",
+                "## 10. Rollback",
+                "## 11. Backup and recovery",
+                "## 13. Teardown and decommissioning",
+            ),
+        }
+        for name, phrases in required.items():
+            for phrase in phrases:
+                self.assertIn(phrase, visible[name], (name, phrase))
+
+        forbidden_visible_instructions = (
+            "Fastlane EARS Contract",
+            "Compatibility is revision-bound",
+            "modern design digest",
+            "The release lifecycle is",
+            "A Harness Profile row that",
+            "canonical_sha256",
+            "context_plan",
+            "maximum_initial_source_bytes",
+            "parser-controlled",
+        )
+        owner_path = "\n".join(visible.values())
+        for phrase in forbidden_visible_instructions:
+            self.assertNotIn(phrase, owner_path)
 
     def test_automatic_agents_context_has_explicit_headroom(self) -> None:
         root_agents = REPOSITORY_ROOT / "AGENTS.md"

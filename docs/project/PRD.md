@@ -229,6 +229,9 @@ Describe:
 | FR-001 | TODO | UBIQUITOUS | AC-FR-001 | TODO | MEASURABLE |
 | FR-002 | TODO | UNWANTED_BEHAVIOR | AC-FR-002 | TODO | GHERKIN |
 
+<details>
+<summary>Exact requirement grammar and compatibility</summary>
+
 The six columns above are the **Fastlane EARS Contract** for normative
 requirements; they do not redefine EARS outside this template. The EARS form
 states one observable obligation and the acceptance form states how that
@@ -249,6 +252,8 @@ invalidates both gates. The design-only bridge derives `AC-<requirement ID>`
 from approved acceptance rows; legacy `NEW_BUILD` uses journey `NONE` and binds
 its end-to-end Harness to the wave plus every selected approved requirement.
 Fastlane identifies migration rows and never invents owner requirements.
+
+</details>
 
 ## 7. Primary, alternate, and failure flows
 
@@ -861,12 +866,17 @@ when no spike is needed. A spike records learning only and cannot satisfy the
 approved product outcome.
 
 
+<details>
+<summary>Exact task-projection rule</summary>
+
 `docs/project/TASKS.md` will translate this design into discrete executable
 tasks. For every modern approved first-release requirement, the Engine derives
 exactly one construction disposition: covered by a non-skipped task with its
 canonical acceptance trace, already satisfied by current scoped no-task
 evidence, or not applicable under the optional-feature evidence rule. A missing
 or mismatched disposition is Codex-owned replanning, not another owner gate.
+
+</details>
 
 ## Validation strategy
 
@@ -946,6 +956,9 @@ substitute for either observation.
 | EX-001 | Known happy path | TODO | Integration |
 | EX-002 | Known boundary or failure | TODO | Unit |
 
+<details>
+<summary>Exact example-scenario record rules</summary>
+
 Every `EX-*` referenced by architecture traceability or another current design
 record appears exactly once in this table with a concrete scenario, expected
 result, and layer. The complete Example-based scenarios table is
@@ -953,6 +966,8 @@ design-controlled and participates in the modern design digest after the
 Technology decision register and before Property applicability, Property
 definitions, and Property execution. Exact approved schema 4 designs retain
 their grandfathered digest path.
+
+</details>
 
 ## 24. Property-based testing specification
 
@@ -1018,6 +1033,9 @@ Release is acceptable when:
 - deployment, monitoring, rollback, recovery, and cleanup are verified;
 - `docs/project/VERIFY.md` records the exact release decision and remaining gaps.
 
+<details>
+<summary>Exact release-state and AWS evidence rules</summary>
+
 The release lifecycle is `NOT_READY` -> `READY_TO_DEPLOY` ->
 `RELEASE_VERIFIED`. RELEASE-10 is the only prompt that changes this state.
 AWS-10 starts only from READY_TO_DEPLOY. Before each AWS-20 mutation call,
@@ -1045,6 +1063,7 @@ prevents rerouting the same attempt. Retry requires distinct current mutation
 authority: a new exact deployment receipt for explicit-gate or freshly approved
 construction authorization for fast-dev, plus a new Attempt ID.
 
+</details>
 
 # Gate B Review
 
@@ -1091,6 +1110,9 @@ locally inside the approved envelope.
 
 ### Gate B — readiness card
 
+<details>
+<summary>Exact Gate B readiness rules</summary>
+
 Every field summarizes the current design and complete construction envelope.
 Use explicit values and stable IDs. `NOT_APPLICABLE — <reason>` is allowed only
 when genuinely inapplicable; blank values, `TODO`, `TBD`, and `UNKNOWN` are not
@@ -1100,6 +1122,8 @@ gap IDs; any listed gap keeps the recommendation `BLOCKED`.
 `Validation/evidence` cites every current required or triggered conditional
 `HARNESS-*` ID. A Harness Profile row that is incomplete, unjustified, or not
 bound to a current basis ID keeps Gate B blocked.
+
+</details>
 
 | Field | Current design and construction decision basis |
 |---|---|

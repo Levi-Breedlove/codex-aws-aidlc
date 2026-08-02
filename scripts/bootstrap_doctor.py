@@ -10397,7 +10397,7 @@ def derive_owner_decision_brief(
                         item.evidence_id
                         for item in design_contract.architecture.aws_evidence
                     ],
-                    "source_locator_keys": ["selected-architecture"],
+                    "source_locator_keys": ["technical-plan"],
                 }
             )
         for decision in design_contract.technology_decisions:
@@ -10418,7 +10418,7 @@ def derive_owner_decision_brief(
                     "tradeoff": decision.compatibility_migration,
                     "basis_ids": decision_basis,
                     "evidence_ids": [],
-                    "source_locator_keys": ["technology-decisions"],
+                    "source_locator_keys": ["technical-plan"],
                 }
             )
         if design_contract.harness.rows:
@@ -10438,7 +10438,7 @@ def derive_owner_decision_brief(
                     ),
                     "basis_ids": list(design_contract.harness.required_ids),
                     "evidence_ids": [],
-                    "source_locator_keys": ["harness-profile"],
+                    "source_locator_keys": ["validation-strategy"],
                 }
             )
         technical_groups = [
@@ -10490,17 +10490,7 @@ def derive_owner_decision_brief(
         )
         locator_specs = (
             ("technical-plan", "Technical plan", "14. Architecture overview"),
-            (
-                "technology-decisions",
-                "Technology decisions",
-                "Technology and toolchain decision register",
-            ),
-            (
-                "selected-architecture",
-                "Selected architecture",
-                "Selected architecture",
-            ),
-            ("harness-profile", "Harness Profile", "Gate B Harness Profile"),
+            ("validation-strategy", "Validation strategy", "Validation strategy"),
             (
                 "gate-b-readiness",
                 "Gate B readiness",
@@ -10509,7 +10499,7 @@ def derive_owner_decision_brief(
             (
                 "construction-boundary",
                 "Construction boundary",
-                "28. Construction envelope",
+                "Construction and authorization boundary",
             ),
             (
                 "gate-b-authorization",
