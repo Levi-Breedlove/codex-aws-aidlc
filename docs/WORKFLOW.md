@@ -56,6 +56,8 @@ Design contract 6 adds the Project diagram contract. New designs require `SYSTEM
 
 The project record starts at [docs/project/README.md](project/README.md): PRD owns requirements/design/gates; TASKS owns execution state; VERIFY owns evidence; RUNBOOK owns operations. Human summaries come first and exact records remain in appendices. There is no separate human PRD.
 
+Each project record opens with a compact Engine-derived `Current state` view: where the project is, one owner need or `Nothing`, what Codex does next, and what remains unapproved or unauthorized. These views repeat no project authority and cannot approve, authorize, invalidate, or change canonical digests.
+
 ## Internal delivery rules
 
 These are internal conditional techniques, not lifecycle stages or approval gates. They stay out of ordinary owner conversation.

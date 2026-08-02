@@ -3,6 +3,7 @@
 This guide narrows the root rules and never widens approval or authorization.
 
 - Preserve one canonical PRD, task ledger, evidence record, and runbook. Never create separate human and machine copies.
+- Begin each canonical project document with its title, one ownership sentence, one Engine-derived `Current state` table, and one short navigation list. Keep that first screen to 25-40 visible nonblank lines, show exactly one owner need or `Nothing`, and keep hashes, receipt grammar, schemas, parser rules, and methodology below it.
 - Project facts and owner decisions belong here. Codex procedures belong in phase references; receipt syntax in the prompt registry; enum, digest, sorting, and routing behavior in the Engine and tests.
 - Preserve parser-controlled headings, table headers, stable IDs, record order, marked receipts, and appendices. Change a contract and its parser, migration, digest, selectors, and tests atomically.
 - Owner-facing summaries are derived from canonical records. Never hand-edit an Owner Decision Brief into project state.
