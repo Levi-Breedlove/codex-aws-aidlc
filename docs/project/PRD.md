@@ -32,17 +32,15 @@ Canonical path: `docs/project/PRD.md`.
 
 ## Current project state
 
-This is the single canonical product and design record. Start here, then follow
-the current Fastlane Engine action in conversation. Codex records the owner's
-answers, shows one decision at a time, and prepares two complete reviews:
+This document owns the product agreement, technical plan, and both owner gates.
+Read the current state above, then go directly to the section named by Fastlane.
 
-- [Product Agreement](#product-agreement) leads to Gate A.
-- [Technical Plan](#technical-plan) leads to Gate B.
-- [Contract Appendices](#contract-appendices) keep exact IDs and validation records auditable.
+- Gate A approves the product requirements.
+- Gate B approves the technical plan and bounded local construction.
+- AWS account work always remains separately authorized.
 
-Gate A approves what to build. Gate B approves the design and bounded local
-construction. Neither gate authorizes an AWS account change. Exact records stay
-in this document; the owner-facing briefs are derived views, not editable copies.
+<details>
+<summary>Exact document configuration and adaptive-coverage records</summary>
 
 ## Document status
 
@@ -67,46 +65,7 @@ in this document; the owner-facing briefs are derived views, not editable copies
 | Last reviewed | TODO |
 | Primary owner | TODO |
 
-A Quick MVP is one small, reversible development release. Use `high-risk` when
-work involves production, sensitive or regulated data, payments, customer
-isolation, shared infrastructure, irreversible data changes, or a potentially
-large outage or cost increase. Also use it for consequential identity changes,
-public exposure, multi-account or multi-Region coordination, or strict recovery
-targets.
-
-The profile changes scope and review depth; it never reduces required testing
-or approval. An AWS lane describes planned access; it does not authorize a
-change. AWS changes require an approved record naming the account, Region,
-environment, resources, operations, cost limit, rollback plan, and expiration.
-
-Planning starts with `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED` unless the owner
-provides a real limit. Preserve that limit's exact ISO currency and amount as
-`MINIMIZE_TOTAL_COST; HARD_CAP: <ISO_CURRENCY> <OWNER_AMOUNT>`; `USD 20.00` is
-only an example and never a default or substituted value.
-This is an optimization objective, not permission to spend up to a target.
-Gate A records the cost posture and material constraints; a finite positive
-ceiling such as `USD: 20.00` becomes mandatory before an AWS mutation or
-billable deployed test. That ceiling covers the authorization-validity period,
-may not exceed or change the currency of an owner hard cap, and is not a guaranteed AWS billing stop.
-Required security, recovery, and evidence controls
-are never traded away for a lower estimate.
-
-Use this canonical mapping. Project lane, one prompt's access mode, and the
-Gate B boundary are separate fields; do not invent synonyms.
-
-| Project AWS lane | Prompt AWS mode | Gate B AWS boundary |
-|---|---|---|
-| `documentation-only` | `DOCS_ONLY` | `DOCS_ONLY` |
-| `read-only` | `READ_ONLY` | `READ_ONLY` |
-| `fast-dev` | `MUTATION` only after read-only preflight | `MUTATE_LISTED_RESOURCES` |
-| `explicit-gate` | `DOCS_ONLY` or `READ_ONLY` until AWS-20 | `DOCS_ONLY`, `READ_ONLY`, or `MUTATE_LISTED_RESOURCES` for a planned mutation; AWS-20 still requires a separate action-specific receipt |
-
-`NONE` means no AWS access for the current prompt.
-
 ### Delivery profile overlays
-
-The selected profile changes planning depth and task shape, not safety or the
-number of lifecycle gates.
 
 | Profile | Required overlay |
 |---|---|
@@ -114,34 +73,13 @@ number of lifecycle gates.
 | `standard` | Intended-environment operations, integration and migration coverage, with serialized construction by one coordinator. |
 | `high-risk` | Deeper review of identity, data access, customer separation, migration, recovery, rollback, shared-resource impact, audit needs, and failure handling; smaller mutation batches; stronger evidence. |
 
-If the recorded risk is `high` or `critical`, select `high-risk`. Every profile
-keeps the same identity, IAM, data, testing, evidence, cost, and change-approval
-requirements, and none adds a routine owner gate beyond Gate A and Gate B.
-
 ### Adaptive coverage plan
-
-Codex derives this internal plan from approved scope, risk, and repository facts;
-it is not a new owner question or gate. `Work kind` is exactly `NEW_BUILD`,
-`FEATURE`, `BUGFIX`, `REFACTOR`, `MIGRATION`, `INFRASTRUCTURE`, or
-`SECURITY_FIX`. `Architecture disposition` is `SELECT`, `AMEND`, or
-`PRESERVE`. New builds use `SELECT`. Every canonical coverage domain is
-either required or omitted with a concrete requirement ID or
-`REPOSITORY_BASELINE` reason. Quick MVP changes depth, never safety. Uncertain
-impact or high/critical risk falls back to full coverage.
-
-The owner-context mapping is deterministic and one-way: when confirmed owner
-work context is `NEW_APPLICATION`, Work kind must be `NEW_BUILD`. Never infer
-the reverse; `NEW_BUILD` does not prove `NEW_APPLICATION`, and repository state
-cannot replace the direct owner fact.
 
 | Work kind | Delivery profile | Architecture disposition | Required sections | Omitted sections and reasons | Basis IDs |
 |---|---|---|---|---|---|
 | TODO | TODO | TODO | TODO | TODO | TODO |
 
-An existing initialized project without this table uses full coverage until its
-next requirements-controlled change. Current official AWS Core evidence remains
-required whenever an AWS fact is material.
-
+</details>
 
 # Product Agreement
 
@@ -163,12 +101,13 @@ required whenever an AWS fact is material.
 | Expected traffic | TODO |
 | Applicable AWS lenses | TODO |
 
+<details>
+<summary>Exact intake provenance and brownfield preservation records</summary>
+
 ### 1.1 Intake provenance
 
-Keep the intake concise, but make every requirement traceable to a human or an
-observed brownfield fact. After Gate A is approved, this repository is the
-authoritative specification; Notion or chat remains provenance, not a competing
-source of truth.
+These records bind confirmed owner facts and observed repository facts without
+storing raw conversation transcripts.
 
 | Field | Value |
 |---|---|
@@ -188,11 +127,6 @@ source of truth.
 
 #### Intake foundation
 
-Repository mode describes the checked-out code: `GREENFIELD` or `BROWNFIELD`.
-Owner work context is separate and comes only from the owner:
-`NEW_APPLICATION`, `EXISTING_APPLICATION_CHANGE`, or `REPAIR_OR_MIGRATION`.
-An empty repository never proves that the owner is creating a new product.
-
 | Intake ID | Field | Value | Basis | Status | Owner response |
 |---|---|---|---|---|---|
 | INTAKE-0001 | OWNER_WORK_CONTEXT | TODO | OPEN_QUESTION | OPEN | NONE |
@@ -206,50 +140,21 @@ An empty repository never proves that the owner is creating a new product.
 | INTAKE-0009 | RELEASE_AUDIENCE | TODO | OPEN_QUESTION | OPEN | NONE |
 | INTAKE-0010 | OPERATING_GEOGRAPHY | TODO | OPEN_QUESTION | OPEN | NONE |
 
-`CONFIRMED` rows require a concrete value, `OWNER_FACT` provenance, and an
-`Owner response` value that matches a normalized record below. Every fact
-derived from one card question cites that same normalized owner-response
-record. Repository facts, recommendations, assumptions, and open questions
-remain separate and cannot become owner confirmation.
-
 #### Normalized owner response register
 
 | Owner response ID | Card ID | Revision | Presented card digest | Reply key | Question ID | Selection | Selection detail | Basis IDs |
 |---|---|---|---|---|---|---|---|---|
 
-Persist only the normalized selection and necessary detail needed to ground the
-foundation rows. Never store a raw chat transcript in this register. The card
-identity, revision, digest, reply key, and question ID prove deterministic
-interpretation of the recorded reply against the presented card; they do not
-cryptographically authenticate the human's identity. Each presented question
-has at most one normalized answer, and every `RESPONSE` requires concrete
-detail. Unapproved legacy values remain unconfirmed context; never synthesize
-historical `OWNER-MSG-*` provenance.
-
 #### Current intake decision card
-
-Keep exactly one current `INTAKE-CARD-*` here with exactly one question.
-Decision choices use uppercase A/B/C; A is the recommendation only
-when the card explicitly records it. When no recommendation exists, the Engine
-presents a neutral choice and never preselects A. A choice remains unresolved
-until its required detail is supplied.
 
 | Card ID | Revision | Reply key | Question ID | Kind | Basis IDs | Prompt | Option A | Option B | Option C | Recommended | Required detail for | Detail prompt | Selection | Selection detail | Owner response |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | INTAKE-CARD-0001 | 1 | 1 | INTAKE-Q-0001 | DECISION | INTAKE-0001 | What are you starting with? | A new application; no existing product behavior is assumed. | A change to an existing application; preserve its users, data, and behavior unless you approve otherwise. | A repair, replacement, or migration; assess continuity and migration risk first. | NONE | B, C | Name the existing application or system. | PENDING | NONE | NONE |
 
-Persist only normalized selections and necessary details. A resolved row uses
-`OWNER_RESPONSE: OWNER-MSG-nnnn; CARD: INTAKE-CARD-nnnn; REVISION: n; SHA256: sha256:<64-lowercase-hex>; QUESTION: INTAKE-Q-nnnn; ANSWER: <A-or-B-or-C-or-RESPONSE>`.
-Assistant-authored examples, recommendations, prior messages, ambiguous prose,
-and absent replies never satisfy that provenance. Replace this card only after
-a new owner message resolves it or the Engine requests the next bounded card.
-Do not paste a second PRD into this section. Summarize the input, preserve links,
-and translate agreed facts into the requirement sections below.
-
 ### 1.2 Brownfield baseline and preservation contract
 
-This section is mandatory when project mode is `brownfield`. For `greenfield`,
-set every field to `NOT_APPLICABLE` rather than silently leaving it blank.
+Complete these records only for brownfield work. Unknown behavior remains a
+Gate A finding, never permission to replace it.
 
 | Field | Brownfield baseline |
 |---|---|
@@ -271,19 +176,7 @@ set every field to `NOT_APPLICABLE` rather than silently leaving it blank.
 |---|---|---|---|---|
 | PRES-001 | TODO | TODO | TODO | TODO |
 
-Unknown brownfield behavior is not permission to replace it. If the baseline
-cannot be observed, record the gap as a Gate A finding and propose the smallest
-safe discovery step.
-
-For brownfield mode, every baseline fact is mandatory and must be observed or
-explicitly bounded before Gate A readiness. Do not use `NONE`, `UNKNOWN`, or an
-unexplained N/A for repository/baseline, deployments, architecture/ownership,
-interfaces/consumers, data/migration, security controls, baseline commands,
-evidence, or protected components. `NOT_APPLICABLE — <reason>` is allowed only
-when observation proves the concern genuinely cannot apply. Only these fields
-are nullable, using these exact forms: known defects and accepted debt
-`NONE_OBSERVED`; repository-to-environment drift `NONE_OBSERVED`; dirty or
-user-owned changes `NONE`; unresolved overlay collisions `NONE`.
+</details>
 
 ## Product requirements
 
@@ -500,12 +393,10 @@ isolation, recovery, logging, or evidence controls.
 | OPS-004 | The project SHALL identify incident ownership and an actionable escalation path. | UBIQUITOUS | AC-OPS-004 | The runbook check identifies one responsible owner and one actionable escalation path for each material incident class. | MEASURABLE |
 | OPS-005 | The project SHALL define testable rollback and teardown behavior. | UBIQUITOUS | AC-OPS-005 | Rehearsal or observed evidence covers rollback, retained resources, and the approved teardown result. | MEASURABLE |
 
-### Quality attribute scenarios
+<details>
+<summary>Exact quality-scenario and requirement-coverage records</summary>
 
-Use `QAS-*` only when performance, availability, reliability, recovery,
-scalability, security-response, or operational-response materially affects Gate
-A or architecture. Otherwise replace the row with
-`NOT_APPLICABLE — <concrete reason>`.
+### Quality attribute scenarios
 
 | QAS ID | Requirement IDs | Source | Stimulus | Environment | Artifact | Response | Response measure |
 |---|---|---|---|---|---|---|---|
@@ -517,18 +408,21 @@ A or architecture. Otherwise replace the row with
 |---|---|---|---|---|---|
 | FR-001 | TODO | TODO | TODO | AC-FR-001 | INTAKE-0006 |
 
-Every authoritative first-release requirement appears exactly once in this
-table and traces to its owner-grounded intake basis and approved success
-measure. Every declared `ACT-*` and `JOURNEY-*` also appears in at least one
-coverage row. For each requirement, `Acceptance/test IDs` is exactly its
-canonical `AC-*` followed only by `TEST-*`, `PROP-*`, or `EV-*` IDs explicitly
-named in that same requirement's acceptance criterion, in occurrence order.
-For a current requirements-schema 1.4 approval, these rows define the exact
-first-release requirement universe that TASK-10 must disposition after Gate B.
-The task-plan projection is derived and does not add a second requirements
-table or owner approval.
+</details>
 
 # Gate A Review
+
+Gate A confirms the complete product agreement: outcome, users, first-release
+scope, success measures, data and access boundaries, risk, recovery, Region,
+and cost posture. It does not approve a technical design, construction,
+publication, deployment, or teardown.
+
+Review the readiness card, request a correction with
+`Change the requirements: <correction>.`, or provide the exact receipt shown
+last in the owner acceptance record. After approval, Codex continues to Design.
+
+<details>
+<summary>Exact Gate A analysis, lineage, assumptions, and open-decision records</summary>
 
 ## 13. Cross-requirement analysis
 
@@ -619,6 +513,8 @@ record is reported as legacy/unrecorded rather than `NOT_MATERIAL`.
 
 The agent recommendation is advisory. It is not Gate A authorization.
 
+</details>
+
 ### Gate A — readiness card
 
 This card is the compact owner decision surface. Every value must be explicit
@@ -665,6 +561,25 @@ a requirements revision.
 | Verbatim owner receipt | `RECORDED_BELOW` / `TODO` |
 | Derived Gate A state | `BLOCKED` / `PENDING_OWNER_APPROVAL` / `APPROVED_FOR_DESIGN` / `STALE` |
 
+Codex may ask for the receipt below and record it verbatim after it is supplied.
+It must not compose, infer, or mark the receipt approved for the owner. For both
+human gates, `Approver` must identify the human decision owner. Values such as
+`Codex`, `agent`, `automation`, `system`, `AI`, or another service or model
+identity are invalid regardless of capitalization.
+
+<details>
+<summary>Exact Gate A validation and invalidation rules</summary>
+
+### Gate A validation and invalidation rules
+
+The Fastlane Engine requires a current requirements revision, complete readiness
+card, resolved blocking findings and decisions, explicit AWS materiality, and a
+matching human owner record and receipt. Only the owner accepts assumptions.
+Any requirements-controlled change increments the revision and stales both
+gates; task state is reconciled before replacement work becomes runnable.
+
+</details>
+
 For approval, the owner receipt must use this human-readable form with actual
 values substituted:
 
@@ -678,61 +593,13 @@ Approver: <name/handle>
 ```
 <!-- bootstrap:gate-a-receipt:end -->
 
-Codex may ask for this receipt and record it verbatim after it is supplied. It
-must not compose, infer, or mark the receipt approved for the owner.
-For both human gates, `Approver` must identify the human decision owner. Values
-such as `Codex`, `agent`, `automation`, `system`, `AI`, or another service or
-model identity are invalid regardless of capitalization.
-
-### Gate A validation and invalidation rules
-
-The requirements revision is a monotonic ID (`REQ-0001`, `REQ-0002`, and so on).
-It covers the workflow, project mode, delivery profile, effective risk, AWS lane,
-workload profile, intake provenance, brownfield contract, Parts I and II findings,
-proposed assumptions, open decisions, and the REQ-10 AWS Core materiality and
-evidence basis.
-
-Gate A is valid only when all of the following are true:
-
-1. The current requirements revision is populated.
-2. The agent analyzed that exact revision.
-3. Every Gate A readiness-card field is explicit under the card grammar.
-4. No finding or decision marked blocking remains open.
-5. The agent recommendation is `READY_WITH_PROPOSED_ASSUMPTIONS` or
-   `READY_FOR_OWNER_APPROVAL`.
-6. AWS Core materiality is explicit. `REQUIRED` has a current linked REQ-10
-   discovery chain, current basis IDs, and no unresolved material AWS fact;
-   `OPTIONAL` or `NOT_MATERIAL` has the explicit no-evidence reason required by
-   its grammar.
-7. The owner decision is `APPROVED` for that exact revision and exact cost
-   posture. The receipt, owner record, readiness card, and `bootstrap.yaml` must
-   all contain the same normalized cost posture.
-8. Every proposed assumption required to proceed is explicitly accepted by ID,
-   or the requirement is revised so that the assumption is no longer needed.
-9. The authorization source and verbatim owner receipt are present and agree
-   with the structured fields.
-
-The accepted-assumption value must exactly equal the ordered assumption list on
-the proposed Gate A card (or `NONE`); a subset, superset, reordered list, or
-unlisted ID is invalid. At receipt ingestion, record the observed ISO 8601 time
-and exact message, issue, or meeting-record source. Those are structured
-provenance, not additional receipt lines, and must not be invented.
-
-Any material change to the covered content increments the requirements revision
-and immediately makes **both Gate A and Gate B stale**.
-Changing a finding, proposed assumption, blocking classification, or decision
-after approval also makes Gate A and Gate B stale until the owner approves a
-new requirements revision that incorporates the resolution. Status, timestamp,
-and receipt-recording edits do not increment the revision.
-
-If a task plan exists, reconcile every IN_PROGRESS task and commit the stopped
-ledger before setting Task-plan state to `STALE`. No old task becomes runnable
-under the new revision. TASK-10 archives the stale graph by commit and replaces
-it only after the new Gate B is current.
 
 # Technical Plan
 
 Complete this part only after Gate A is valid.
+
+<details>
+<summary>Exact design revision, technology, driver, and candidate records</summary>
 
 ### Technical design revision record
 
@@ -745,46 +612,7 @@ Complete this part only after Gate A is valid.
 | Design completed at | TODO (ISO 8601 with timezone) |
 | Remaining design gaps | TODO / `NONE` |
 
-The design revision is monotonic (`DES-0001`, `DES-0002`, and so on), covers
-Parts III and IV, and identifies the exact Gate A-approved requirements revision
-it implements.
-
 ### Technology and toolchain decision register
-
-This is the authoritative register for build-relevant technology, framework,
-toolchain, and version-policy choices. Use stable monotonic IDs (`TECH-0001`,
-`TECH-0002`, and so on); never renumber or reuse an ID. The current `DES-*`
-revision owns the selected rows. A task copies only its applicable IDs into the
-existing `Design` value as `DES-0001; TECH: TECH-0001, TECH-0002` or
-`DES-0001; TECH: NONE — no technology/toolchain impact`; it does not select or
-substitute a technology.
-
-Resolve every in-scope row before Gate B. `Version policy` is exactly one of
-`EXACT: <version>`, `COMPATIBLE_MAJOR: <positive integer>`,
-`MINIMUM: <version>`, `CURRENT_LTS_AS_OF: <YYYY-MM-DD>`,
-`ORG_MANAGED: <constraint>`, or `NOT_APPLICABLE — <reason>`. `Source` is exactly
-`OWNER_CONSTRAINT`, `REPOSITORY_FACT`, or `AGENT_RECOMMENDATION`; `Basis IDs`
-are exact comma-space-separated stable IDs that already exist in the current
-accepted PRD. They may reference requirements, design decisions, properties,
-or constraints, but never prose, duplicate IDs, the row's own `TECH-*` ID, or
-an obsolete revision. `Validation` names the objective check or narrowly scoped
-ADR. AWS Core evidence
-may inform and be bound to a `TECH-*` row and the current `DES-*`, but it remains
-advisory. The official AWS Core policy is
-`OFFICIAL_CURRENT_NO_TEMPLATE_PIN`; its observed version is evidence metadata,
-never a project pin.
-
-`EXACT` may use an opaque ecosystem version such as `nodejs20.x`. `MINIMUM`
-uses a machine-comparable numeric dotted version such as `6.0`; use another
-policy when the ecosystem version cannot be ordered numerically.
-An active `PROPERTY_TESTING` decision must use `EXACT`, `COMPATIBLE_MAJOR`, or
-numeric `MINIMUM` so observed property-test evidence can prove the approved
-version policy. `CURRENT_LTS_AS_OF` and `ORG_MANAGED` remain valid for other
-technology concerns but cannot back a property execution row.
-
-`Selection` names the chosen technology or uses exactly
-`NOT_APPLICABLE — <reason>` when no technology applies. In that case, `Version
-policy` must use the same non-applicable grammar.
 
 | Decision ID | Concern | Selection | Version policy | Source | Basis IDs | Alternatives and rationale | Compatibility/migration | Validation |
 |---|---|---|---|---|---|---|---|---|
@@ -800,28 +628,17 @@ policy` must use the same non-applicable grammar.
 
 ### Architecture drivers
 
-Record only Gate A-approved requirement IDs. `Class` is exactly
-`HARD_CONSTRAINT`, `PREFERENCE`, or `REVISIT_TRIGGER`; a preference never
-overrides a hard constraint.
-
 | Driver ID | Requirement basis | Class | Decision implication | Validation |
 |---|---|---|---|---|
 | DRV-0001 | TODO | TODO | TODO | TODO |
 
 ### Whole-system candidates
 
-For `SELECT`, compare at least two complete, credible, non-straw whole-system
-candidates against the same requirements. For greenfield work, one candidate
-summary begins `MANAGED_SERVERLESS_BASELINE:` unless a Gate A hard constraint
-makes that baseline impossible. Do not use arbitrary numeric scoring.
-`Eligibility` is exactly `ELIGIBLE` or `INELIGIBLE`; an eligible candidate has
-`Failed constraints` `NONE`, while an ineligible candidate names only failed
-`HARD_CONSTRAINT`
-driver IDs.
-
 | Candidate ID | Architecture summary | Requirement coverage | AWS evidence | Eligibility | Failed constraints | Tradeoffs |
 |---|---|---|---|---|---|---|
 | CAND-0001 | TODO | TODO | TODO | TODO | TODO | TODO |
+
+</details>
 
 ### Selected architecture
 
@@ -835,37 +652,16 @@ otherwise enumerate every nonselected `CAND-*` in table order.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | ARCH-0001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
-### Architecture traceability
+<details>
+<summary>Exact architecture traceability, AWS evidence, change, and diagram bindings</summary>
 
-Map each current requirement exactly once to the selected `ARCH-*` and at least
-one other declared design ID. In a current schema 6 design, those IDs must be
-declared by the interface register (`API-*`, `EVENT-*`, `CLI-*`, or `FILE-*`),
-layer-boundary register (`BOUNDARY-*`), or state register (`STATE-*`). The
-modern contract has no authoritative `COMP-*`, `DATA-*`, or `CTRL-*`
-declaration surface, so those prefixes fail closed instead of acting as prose
-labels. Property/test IDs must be current applicable `PROP-*` IDs present in
-the applicability, definition, and execution records, or exact `EX-*` IDs
-declared in Example-based scenarios. Undeclared `TEST-*` IDs fail closed. Use
-`NONE - <concrete reason>` only where the field permits it. Exact approved
-schema 4 designs retain their grandfathered digest and membership path.
+### Architecture traceability
 
 | Requirement ID | ARCH / API / EVENT / CLI / FILE / BOUNDARY / STATE IDs | Property/test IDs | Evidence IDs |
 |---|---|---|---|
 | TODO | TODO | TODO | TODO |
 
 ### Material AWS evidence
-
-This table maps design decisions to current official AWS facts. The detailed,
-attributable `retrieve_skill` and `search_documentation` call evidence remains
-authoritative in `docs/project/VERIFY.md`; this PRD table does not duplicate
-tool transcripts or prove invocation by itself. Every material claim cites the
-current `AWS-DISC-*` chain that informed it.
-
-An unavailable official AWS Core capability is owner setup. When the capability
-is available, missing, stale, or safely repairable generated discovery/evidence
-is Codex work and must be refreshed without asking the owner to reinstall.
-Unexplained structural drift or an unsafe evidence conflict requires human
-review.
 
 | Evidence ID | Discovery ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |
 |---|---|---|---|---|---|---|
@@ -874,31 +670,11 @@ review.
 
 ### Change impact record
 
-Use this record for `AMEND` and `PRESERVE`. It maps the changed basis to
-affected and provably preserved IDs; it does not override revision monotonicity
-or stale-gate rules. Use `FULL_REVALIDATION` whenever impact cannot be proven.
-After required reapproval, prior task or evidence results are reusable only
-when their exact basis IDs and bound digests remain current.
-
 | Change ID | Changed basis IDs | Affected IDs | Preserved IDs | Required revalidation |
 |---|---|---|---|---|
 | CHANGE-0001 | TODO | TODO | TODO | TODO |
 
-
-A material change to an architecture driver, candidate eligibility, selected
-architecture, traceability row, material AWS evidence, technology selection,
-version policy, compatibility constraint, property applicability, property
-definition, or property execution value
-requires a new `DES-*` revision and makes the prior Gate B approval stale. An
-ordinary dependency addition does not invalidate Gate B unless it changes
-architecture, validation, security, cost, or deployment behavior.
-
 ### Project diagram contract
-
-These bindings describe planned project views, never observed deployment. Fresh
-slots remain `NOT_YET_CREATED` until Design has a selected architecture and
-canonical basis. The Engine validates current Mermaid blocks and keeps semantic
-changes separate from presentation-only changes.
 
 | Diagram ID | Kind | Applicability | Status | Anchor | Basis IDs | Referenced IDs |
 |---|---|---|---|---|---|---|
@@ -910,19 +686,11 @@ changes separate from presentation-only changes.
 | DIAGRAM-0006 | JOURNEY | CONDITIONAL | NOT_YET_CREATED | journey-view | NONE | NONE |
 | DIAGRAM-0007 | STATE | CONDITIONAL | NOT_YET_CREATED | state-view | NONE | NONE |
 
-New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`. Canonical data,
-dependency, recovery, asynchronous, brownfield, or migration records may also
-require `DATA_LIFECYCLE`, `FAILURE_RECOVERY`, or `MIGRATION`; unknown
-applicability fails toward requiring the view. `JOURNEY` and `STATE` are
-optional until their source records require them.
+These records bind the selected architecture to current requirements and
+sources. Diagrams describe planned design; only semantic changes affect the
+design digest and stale Gate B.
 
-A `CURRENT` row binds the selected `ARCH-*`, exact basis/referenced IDs, and
-normalized `{from_id, relation, to_id}` relationships. Its semantic SHA-256 is
-canonical JSON over sorted IDs/relationships and enters the design digest. Its
-rendered SHA-256 covers the complete LF-normalized Mermaid block with one final
-LF. Semantic change stales Gate B. Render-only drift blocks the brief until
-Codex regenerates the diagram, without changing architecture. Diagrams are
-planned views and never prove implementation, deployment, or authority.
+</details>
 
 ### Migration view
 
@@ -1116,41 +884,10 @@ or mismatched disposition is Codex-owned replanning, not another owner gate.
 | AWS environment | Deployed configuration and service behavior | TODO |
 | Operations | Deployment, alarms, rollback, restore, teardown | TODO |
 
+<details>
+<summary>Exact Gate B Harness Profile</summary>
+
 ### Gate B Harness Profile
-
-Select the smallest closed-loop checks justified by the current design. Derive
-the profile from the selected `TECH-*` register, delivery profile, effective
-risk, data classification, identity boundary, public exposure, recovery
-target, and AWS lane. A tool is never required merely because it exists, and
-Fastlane does not impose a universal scanner.
-
-Use exactly one status per row:
-
-- `REQUIRED`;
-- `CONDITIONAL — <trigger>`; or
-- `NOT_APPLICABLE — <concrete reason>`.
-
-Choosing applicability, triggers, checks, and tools is procedural coordinator
-design review based on the current requirements, architecture, risk, and
-technology evidence. Deterministic validation begins with the recorded row's
-status; it validates the allowed value and the row fields implied by that
-value, but it does not decide applicability.
-
-A conditional row becomes required when its recorded trigger is present. For
-an inapplicable row, use `NOT_APPLICABLE` for the selected check, command/API,
-and evidence destination while the status records the concrete reason. At Gate
-B, every row is resolved to `REQUIRED` or
-`NOT_APPLICABLE — <concrete reason>`. Every required row has a stable
-`HARNESS-*` ID, current basis IDs, one exact command or API, the exact
-`docs/project/VERIFY.md#harness-execution-evidence` destination, and its ID in
-the Gate B scope.
-
-The extended concern-to-layer routes are fixed: `HARNESS-011` accessibility ->
-`End-to-end`; `HARNESS-012` visual regression -> `End-to-end`; `HARNESS-013`
-mutation testing -> `Unit`; `HARNESS-014` SAST -> `Static`; `HARNESS-015` DAST
--> `Security and privacy`; and `HARNESS-016` formal/model checking ->
-`Property`. Duplicate layers are intentional because these rows represent
-different applicability decisions and evidence obligations.
 
 | Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | Exact command or API | Evidence destination | Required or conditional status |
 |---|---|---|---|---|---|---|---|
@@ -1171,11 +908,13 @@ different applicability decisions and evidence obligations.
 | HARNESS-015 | Security and privacy | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
 | HARNESS-016 | Property | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
 
-TASK-10 copies every required or triggered conditional row into the existing
-task Validation sections without adding task metadata. BUILD records observed
-results in the named evidence destination. A failed check stays visible until
-a later run passes; a requirement or design change returns to its existing
-gate instead of weakening the check.
+The selected checks, triggers, commands, basis IDs, and evidence destinations
+must be complete before Gate B. Fastlane does not impose a universal tool set.
+
+</details>
+
+<details>
+<summary>Exact infrastructure and delivery validation contract</summary>
 
 ### IaC and delivery validation contract
 
@@ -1197,6 +936,8 @@ Record both operations separately when both are allowed. An authenticated IAM
 Access Analyzer `ValidatePolicy` call belongs only to AWS-10 after Gate B under
 the named read-only scope. Local checks and unauthenticated documentation do not
 substitute for either observation.
+
+</details>
 
 ## 23. Example-based scenarios
 
@@ -1240,56 +981,20 @@ sentinels are not definitions.
 | PROP-004 | REL-001 | Retry attempts never exceed the configured bound. | Failure sequences and transient/permanent classifications | Dependency fails | Attempts <= configured maximum | Zero, one, maximum, permanent transition | Unit |
 | PROP-005 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
+<details>
+<summary>Exact property-execution records</summary>
+
 ### Property execution contract
-
-Before Gate B, add one row for every applicable `PROP-*`. This register plans
-execution; it never records an observed pass or failure. The framework must
-reference the selected `PROPERTY_TESTING` decision (`TECH-0007` in this
-template). `Run target/time bound` is exactly `MIN_CASES: <positive integer>`,
-`MAX_SECONDS: <positive integer>`, or `MIN_CASES: <positive integer>;
-MAX_SECONDS: <positive integer>` in that order. The exact command, target,
-seed/reproduction format, and evidence destination are copied unchanged into
-tasks. Observed versions, commands, run amounts, replay data, counterexamples,
-and results belong only in `docs/project/VERIFY.md`.
-
-Every execution cell must be concrete. The exact command is one runnable local
-command, not prose, a shell-control chain, `NONE`, `PENDING`, or another
-placeholder.
-
-The replay format must explicitly declare either a seed (for example,
-`integer seed; reproduce with the recorded --seed value`) or the exact command
-as the replay method. Evidence then records a concrete seed such as
-`seed: 12345`, or repeats the exact approved command. Vague values such as
-`seed unavailable` cannot satisfy DONE.
 
 | Property ID | Framework TECH ID | Exact command | Run target/time bound | Seed or reproduction format | Evidence destination |
 |---|---|---|---|---|---|
 | PROP-001 | TODO | TODO | TODO | TODO | TODO |
 
-Add workload-specific properties for:
+Each applicable property binds one approved framework decision, exact command,
+run bound, replay format, and evidence destination. Observed results belong in
+`docs/project/VERIFY.md`.
 
-- round-trip serialization;
-- parser acceptance and rejection;
-- state-machine transitions;
-- ordering and concurrency;
-- financial calculations;
-- resource-name generation;
-- retention and expiry;
-- access-control matrices;
-- redaction;
-- pagination;
-- migrations.
-
-When a property test finds a counterexample, preserve its seed, reproduction
-command, and minimized case when the framework supplies one. Classify the
-failure as one of:
-
-- `IMPLEMENTATION_DEFECT`;
-- `SPECIFICATION_AMBIGUITY_OR_DEFECT`;
-- `GENERATOR_OR_ORACLE_DEFECT`; or
-- `ENVIRONMENT_DEFECT`.
-
-Never change an approved property merely to make a valid counterexample pass.
+</details>
 
 ## 25. Test data and environments
 
@@ -1343,15 +1048,28 @@ construction authorization for fast-dev, plus a new Attempt ID.
 
 # Gate B Review
 
-Gate B approves the complete PRD and a bounded construction run. It does not
-grant authority outside the envelope below. Codex may recommend approval, but
-only the decision owner may approve this gate.
+Gate B approves the complete technical plan and a bounded local construction
+run. It does not authorize GitHub publication or any AWS account operation.
 
-Gate B readiness requires a local Git repository and a resolvable baseline
-commit. For greenfield work, create the reviewed bootstrap baseline only under
-explicit local-Git setup authorization. For brownfield work, preserve the
-observed repository baseline and separately list every protected dirty path.
-Remote creation, push, and GitHub writes remain separately bounded.
+## Executive decision
+
+Review the recommendation, tradeoffs, evidence limits, construction boundary,
+and what remains unauthorized. Request a correction with
+`Change the design: <correction>.` or provide the exact receipt shown last in
+the owner authorization record. After approval, Codex creates tasks and builds
+locally inside the approved envelope.
+
+## Technical decision index
+
+| Concern | Owner-facing source |
+|---|---|
+| Application and runtime | [Selected architecture](#selected-architecture) and [component design](#15-component-design) |
+| Identity and data | [Interfaces](#16-interfaces-and-contracts), [data lifecycle](#17-data-model-and-lifecycle), and [AWS approach](#20-aws-implementation-approach) |
+| Reliability and operations | [Error handling](#19-error-handling-strategy), [release acceptance](#26-release-acceptance), and current project diagrams |
+| Validation and construction | [Validation strategy](#validation-strategy), readiness card, and the exact construction envelope |
+
+<details>
+<summary>Exact Gate B agent review record</summary>
 
 ## 27. Gate B agent review record
 
@@ -1368,6 +1086,8 @@ Remote creation, push, and GitHub writes remain separately bounded.
 | Review completed by and at | TODO (identity and ISO 8601 time) |
 | Agent recommendation | `BLOCKED` / `READY_FOR_CONSTRUCTION_APPROVAL` |
 | Recommendation rationale | TODO |
+
+</details>
 
 ### Gate B — readiness card
 
@@ -1394,6 +1114,16 @@ bound to a current basis ID keeps Gate B blocked.
 | Rollback/recovery/teardown | TODO |
 | Brownfield compatibility/migration | TODO |
 | Outstanding gaps | TODO / `NONE` |
+
+## Construction and authorization boundary
+
+Gate B authorizes only the exact local construction scope recorded below. It
+does not authorize GitHub publication or AWS account work. Any broader path,
+command, task, external target, cost, or operation requires the existing
+correction and authorization process.
+
+<details>
+<summary>Exact construction envelope and validation grammar</summary>
 
 ## 28. Construction envelope
 
@@ -1522,6 +1252,8 @@ AWS, GitHub, security, data, cost, or preservation risk. Record the resulting
 `docs/project/TASKS.md` revision at the first checkpoint. Any task outside those conditions
 requires a revised construction authorization and a new Gate B approval.
 
+</details>
+
 ## 29. Gate B owner authorization record
 
 | Field | Owner-provided value |
@@ -1536,6 +1268,13 @@ requires a revised construction authorization and a new Gate B approval.
 | Authorization source | TODO (message, issue, meeting record, or commit link) |
 | Verbatim owner receipt | `RECORDED_BELOW` / `TODO` |
 | Derived Gate B state | `BLOCKED` / `PENDING_OWNER_APPROVAL` / `APPROVED_FOR_CONSTRUCTION` / `STALE` |
+
+Codex may record a receipt supplied by the owner; it must never create, infer,
+or self-accept one. When the Gate B agent recommendation becomes
+`READY_FOR_CONSTRUCTION_APPROVAL`, synchronize the pending owner state, current
+REQ/DES/AUTH records, task snapshot, and lifecycle. Acceptance updates those
+records together. A DES or AUTH change clears the prior approval and requires a
+fresh envelope digest and receipt.
 
 For approval, the owner receipt must use this human-readable form with actual
 values substituted:
@@ -1552,26 +1291,13 @@ Approver: <name/handle>
 ```
 <!-- bootstrap:gate-b-receipt:end -->
 
-Codex may record a receipt supplied by the owner; it must never create, infer,
-or self-accept one.
-
-When the Gate B agent recommendation becomes
-`READY_FOR_CONSTRUCTION_APPROVAL`, set both the detailed owner state and
-Document status to `PENDING_OWNER_APPROVAL`. In the same coordinator checkpoint,
-mirror the exact REQ/DES/AUTH IDs, Gate B state, maximum workers, baseline, and
-protected dirty paths into docs/project/TASKS.md's Active execution snapshot and mirror the
-lifecycle in `bootstrap.yaml`. On exact receipt acceptance, change all three
-records to `APPROVED_FOR_CONSTRUCTION` together. Record the observed ISO 8601
-time and exact source as structured provenance; neither is an extra receipt
-line. When DES or AUTH changes, reset the owner decision to `PENDING`, clear all
-prior approval identity/provenance/authorized-ID fields, and replace the old
-marked receipt with the current proposed card. The proposed and recorded card
-must contain the freshly computed canonical complete-envelope SHA-256; never
-reuse a digest after any envelope edit.
 
 # Contract Appendices
 
 Exact records below remain machine-validated and auditable. They do not add an owner gate or authority.
+
+<details>
+<summary>Exact Gate B record-maintenance and validation rules</summary>
 
 ## Agent reference — exact record maintenance
 
@@ -1627,3 +1353,5 @@ Correcting task traceability or no-task evidence structure within unchanged
 REQ/DES/AUTH does not invalidate Gate B. If the correction would change an
 approved requirement, design decision, or construction envelope, use the
 existing invalidation rules instead.
+
+</details>

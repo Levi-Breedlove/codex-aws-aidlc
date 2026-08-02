@@ -30,13 +30,18 @@ This folder is the one durable project record Fastlane uses to define, design, b
 - [Bounded defect record](BUGFIX.md#current-state)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
-- [PRD](PRD.md) — current project state, Product Agreement, requirements, Gate A Review, Technical Plan, Gate B Review, and exact contract appendices.
-- [TASKS](TASKS.md) — current progress, roadmap, active work, blockers, next action, and exact task records.
-- [VERIFY](VERIFY.md) — what is proven, source verified, planned, not yet observed, failed, or stale.
-- [RUNBOOK](RUNBOOK.md) — safety boundary, validation, deployment, verification, rollback, recovery, teardown, and authorization appendices.
-- [BUGFIX](BUGFIX.md) — one bounded defect record when BUG-10 is active.
+## Project records
 
-Start with the current Fastlane conversation action. Owner Decision Briefs link to exact sections here; they are derived views, never another editable source of truth.
+| Record | What the owner finds there |
+|---|---|
+| [Product and technical plan](PRD.md) | Product Agreement, architecture recommendation, Gate A, and Gate B |
+| [Construction progress](TASKS.md) | Roadmap, active work, blockers, and validation |
+| [Verification and evidence](VERIFY.md) | What is confirmed, observed, planned, failed, or still unobserved |
+| [Operations runbook](RUNBOOK.md) | Validate, deploy, verify, roll back, recover, and tear down |
+| [Bounded defect](BUGFIX.md) | The current focused repair, when BUG-10 is active |
+
+Start with the current Fastlane conversation action. Owner Decision Briefs link
+back to readable sections in these same canonical records.
 
 ## Agent reference
 

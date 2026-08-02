@@ -37,26 +37,30 @@ human gates.
 
 ## Current progress
 
-Start with the [Active execution snapshot](#active-execution-snapshot). It shows the current plan, run, checkpoint, blocker, and next safe action. This summary is derived from the exact task records below and grants no authority.
+The Engine-derived table above is the current progress view. It grants no new
+authority and stays synchronized with the exact task records.
 
 ## Roadmap
 
-Read [Task definitions](#task-definitions) in dependency order. Only `READY` work in a `CURRENT` plan may run; completed work remains tied to its exact evidence.
+| State | Work |
+|---|---|
+| Current | No tasks generated |
+| Next | Complete Gate B, then derive the approved task graph |
 
 ## Active work, blockers, and next action
 
-The Active execution snapshot and current task card are the only live view. A blocker names one next action; an owner action appears only for a genuine decision, approval, authorization, protected-boundary choice, or human safety review.
+No task is active in the untouched template. When work begins, the current task
+card shows its outcome, acceptance criteria, validation, blocker, and next safe
+action here in the normal reading path.
+
 ## How to read a task card
 
-Start with four visible fields: status, owner, blocker, and GitHub issue. Then
-read the Outcome, Acceptance criteria, and Validation sections to understand
-what will change, what “done” means, and how the result will be proved.
+Read status and outcome first, then acceptance criteria and validation. Expand
+the exact execution records only when auditing a boundary, attempt, dependency,
+checkpoint, or evidence binding.
 
-The collapsed **Agent execution details** section contains exact requirement,
-design, authorization, dependency, write-boundary, attempt, evidence, and
-checkpoint data. Those fields keep a long-running Codex session safe and
-resumable; a human normally needs them only when reviewing a boundary or
-investigating a stop.
+<details>
+<summary>Exact run, task, dependency, attempt, and checkpoint records</summary>
 
 ## Agent reference — exact run and task state
 
@@ -160,31 +164,9 @@ of truth or authorization.
   authority; Gate B remains only the maximum planned AWS ceiling.
 ## Fastlane task methodology
 
-Task cards trace to approved EARS requirement IDs; they are not written in EARS
-and contain no `EARS form`, `INVEST`, `THIN_SLICE`, or `DEFINITION_OF_DONE`
-metadata fields.
-
-Apply the Fastlane INVEST profile when TASK-10 creates the graph:
-
-- **Independent:** only necessary dependencies and one writer.
-- **Negotiable:** implementation details may vary only inside the approved
-  DES/AUTH boundary.
-- **Valuable:** one user- or operator-observable approved outcome.
-- **Estimable:** bounded paths, dependencies, risks, commands, and attempt
-  budget.
-- **Small:** one coherent implementation-and-validation cycle.
-- **Testable:** objective acceptance criteria and exact validation commands.
-
-Prefer a Thin Vertical Slice when the selected architecture permits it. A
-legitimate migration-only, security-only, infrastructure-only, or evidence-only
-task does not need artificial vertical behavior, but it still needs one
-coherent outcome and independent evidence.
-
-For `NEW_BUILD`, the Gate-B-approved first construction wave implements one
-tested end-to-end user journey. It is the only first-wave task unless a
-documented, time-boxed, disposable technical spike blocks that path. The spike
-may record learning, but its code is discarded and it cannot satisfy the
-approved outcome or replace the earliest non-spike end-to-end task.
+TASK-10 derives small, independently verifiable work from the approved
+REQ/DES/AUTH boundary. The Deliver phase reference owns generation procedure;
+the Engine and task tool own readiness and transition validation.
 
 ### Fastlane Definition of Done
 
@@ -198,7 +180,6 @@ The existing DONE transition remains authoritative. A task is DONE only when:
 - execution log and checkpoint state are current;
 - no unresolved blocker or placeholder remains; and
 - required documentation and runbook changes are complete.
-
 
 ## Status and transition contract
 
@@ -480,6 +461,8 @@ a mutation.
 | Plan revision | Plan state | REQ / DES / AUTH | Archive commit | Reason replaced |
 |---|---|---|---|---|
 | `NONE` | `UNINITIALIZED` | `REQ-0001` / `DES-0001` / `AUTH-0001` | `NONE` | No prior plan |
+
+</details>
 
 ## Task definitions
 

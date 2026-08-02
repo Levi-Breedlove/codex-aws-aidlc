@@ -207,7 +207,11 @@ sequenceDiagram
                 prd,
                 rf"\| DIAGRAM-[0-9]{{4}} \| {kind} \| .* \| NOT_YET_CREATED \|",
             )
-        self.assertIn("planned project views, never observed deployment", prd)
+        self.assertIn("Diagrams describe planned design", prd)
+        design = (
+            REPOSITORY_ROOT / ".agents/skills/fastlane/references/design.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Diagrams never prove implementation, deployment, or authority", design)
 
     def test_diagram_patterns_are_on_demand_and_non_authoritative(self) -> None:
         patterns = (
@@ -228,14 +232,18 @@ sequenceDiagram
             encoding="utf-8"
         )
         normalized = " ".join(prd.split())
+        self.assertIn("### Project diagram contract", prd)
+        self.assertIn("Diagrams describe planned design", normalized)
+        design = (
+            REPOSITORY_ROOT / ".agents/skills/fastlane/references/design.md"
+        ).read_text(encoding="utf-8")
         for phrase in (
-            "project-specific diagrams",
-            "semantic SHA-256",
-            "rendered SHA-256",
-            "Diagrams are planned views",
-            "never prove implementation, deployment, or authority",
+            "project-specific Mermaid block",
+            "semantic digest",
+            "rendered digest",
+            "Diagrams never prove implementation, deployment, or authority",
         ):
-            self.assertIn(phrase, normalized)
+            self.assertIn(phrase, design)
 
     def test_each_mermaid_block_is_checked_independently(self) -> None:
         fixture = """
