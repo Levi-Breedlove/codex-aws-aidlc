@@ -2638,6 +2638,16 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(report["schema_version"], 2)
         self.assertEqual(report["bootstrap_version"], "1.1.1")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
+        summaries = report["document_summaries"]
+        self.assertEqual(summaries["schema_version"], 1)
+        self.assertEqual(summaries["status"], "CURRENT")
+        self.assertEqual(
+            {item["path"] for item in summaries["documents"]},
+            {
+                f"docs/project/{name}.md"
+                for name in ("README", "PRD", "TASKS", "VERIFY", "RUNBOOK", "BUGFIX")
+            },
+        )
         self.assertEqual(report["next_prompt"], "INTAKE-10")
         self.assertEqual(
             report["gates"],
@@ -4459,6 +4469,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(report["schema_version"], 2)
         self.assertEqual(report["owner_decision_brief"]["schema_version"], 1)
         self.assertEqual(report["owner_answer_confirmation"]["schema_version"], 1)
+        self.assertEqual(report["document_summaries"]["schema_version"], 1)
+        self.assertEqual(report["document_summaries"]["status"], "BLOCKED")
+        self.assertIn("DOCUMENT_SUMMARY_SOURCE_INVALID", codes(report))
         self.assertFalse(report["resume_safe"])
 
     def test_required_file_symlink_is_rejected(self) -> None:
@@ -9661,6 +9674,31 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(
             report["interaction"]["owner_action_kind"],
             "COMPLETE_PREREQUISITE_CHECKLIST",
+        )
+
+    def test_stale_document_summaries_do_not_change_lifecycle_or_authority(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            refresh_control_hashes(project)
+
+            report = doctor.inspect_project(project)
+
+        self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["classification"], "ACTIVE_GREENFIELD")
+        self.assertEqual(report["next_prompt"], "INTAKE-10")
+        self.assertEqual(
+            report["authorizations"],
+            {"construction": "NONE", "aws": "NONE"},
+        )
+        self.assertEqual(report["document_summaries"]["schema_version"], 1)
+        self.assertEqual(report["document_summaries"]["status"], "STALE")
+        self.assertIn("DOCUMENT_SUMMARY_STALE", codes(report))
+        self.assertNotIn(
+            "DOCUMENT_SUMMARY_STALE",
+            {item["diagnostic_code"] for item in report["remediation"]["items"]},
         )
 
 

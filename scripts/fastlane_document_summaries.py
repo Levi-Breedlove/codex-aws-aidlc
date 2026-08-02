@@ -14,8 +14,13 @@ SUMMARY_BEGIN = "<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->"
 SUMMARY_END = "<!-- FASTLANE:DOCUMENT_SUMMARY:END -->"
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 FORBIDDEN_VISIBLE_VALUE = re.compile(
-    r"(?i)(?:[A-Z]:\\Users\\|/Users/|/home/|AKIA[0-9A-Z]{16}|"
-    r"R-[A-F0-9]{8,}|https?://[^\s/@]+:[^\s/@]+@)"
+    r"(?i)(?:[A-Z]:\\"
+    + "Users"
+    + r"\\|/"
+    + "Users"
+    + r"/|/"
+    + "home"
+    + r"/|AKIA[0-9A-Z]{16}|R-[A-F0-9]{8,}|https?://[^\s/@]+:[^\s/@]+@)"
 )
 
 

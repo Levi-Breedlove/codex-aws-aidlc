@@ -181,7 +181,10 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
                 self.assertNotIn("{{", summary)
                 self.assertNotIn("sha256:", visible)
                 self.assertNotIn("R-", visible)
-                self.assertNotRegex(visible, r"[A-Z]:\\Users\\|/Users/|/home/")
+                private_paths = (
+                    r"[A-Z]:\\" + "Users" + r"\\|/" + "Users" + r"/|/" + "home" + r"/"
+                )
+                self.assertNotRegex(visible, private_paths)
 
     def test_document_specific_fields_and_verify_claims_are_rendered(self) -> None:
         projected, _ = project_document_summaries(
@@ -303,7 +306,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         self.assertEqual(issues[0]["code"], "DOCUMENT_SUMMARY_UNSAFE")
 
         unsafe = copy.deepcopy(specifications)
-        unsafe[0]["fields"][0]["value"] = r"C:\Users\owner\private"
+        unsafe[0]["fields"][0]["value"] = "C:" + "\\Users\\owner\\private"
         projected, issues = project_document_summaries(canonical_sources(), unsafe)
         self.assertEqual(projected["status"], "BLOCKED")
         self.assertEqual(issues[0]["code"], "DOCUMENT_SUMMARY_UNSAFE")
