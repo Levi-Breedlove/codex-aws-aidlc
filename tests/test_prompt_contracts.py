@@ -2540,8 +2540,17 @@ Approver: <name/handle>"""
             "SOURCE: <stable owner-message source>; AUTHORIZED_AT: <ISO 8601 "
             "with timezone>"
         )
+        for field in (
+            "AWS lifecycle intent:",
+            "AWS lifecycle intent source:",
+            "AWS lifecycle intent recorded at:",
+            "aws_residual_disposition",
+            "RETAIN",
+            "INVESTIGATE",
+            "REMOVE",
+        ):
+            self.assertIn(field, self.verify)
         residual_documents = (
-            self.verify,
             self.runbook,
             self.workflow,
             aws40,
