@@ -51,6 +51,17 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
         finalize_owner_decision_brief,
         source_locator as owner_source_locator,
     )
+try:
+    from fastlane_document_summaries import (
+        build_summary_specifications,
+        project_document_summaries,
+    )
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.fastlane_document_summaries import (
+        build_summary_specifications,
+        project_document_summaries,
+    )
+
 
 try:
     from fastlane_process import resolve_trusted_git
@@ -97,11 +108,20 @@ STATE_FILE = "bootstrap.yaml"
 MANIFEST_FILE = "bootstrap.manifest.json"
 PROJECT_DOCUMENT_DIRECTORY = "docs/project"
 BUGFIX_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/BUGFIX.md"
+PROJECT_README_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/README.md"
 PRD_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/PRD.md"
 RUNBOOK_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/RUNBOOK.md"
 TASKS_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/TASKS.md"
 VERIFY_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/VERIFY.md"
 PROMPT_FILE = "prompts/CODEX-PROMPTS.md"
+DOCUMENT_SUMMARY_FILES = (
+    PROJECT_README_FILE,
+    PRD_FILE,
+    TASKS_FILE,
+    VERIFY_FILE,
+    RUNBOOK_FILE,
+    BUGFIX_FILE,
+)
 REQ_ID = re.compile(r"REQ-\d{4,}")
 DES_ID = re.compile(r"DES-\d{4,}")
 AUTH_ID = re.compile(r"AUTH-\d{4,}")
@@ -875,6 +895,7 @@ MANDATORY_REQUIRED_FILES = {
     "docs/SETUP.md",
     "docs/TROUBLESHOOTING.md",
     "docs/WORKFLOW.md",
+    "scripts/fastlane_document_summaries.py",
     "infrastructure/AGENTS.md",
     "prompts/CODEX-PROMPTS.md",
     "scripts/bootstrap_doctor.py",
@@ -15038,6 +15059,9 @@ def _agent_correction_is_safe(
     relative = validate_relative_path(diagnostic.path)
     if relative is None:
         return False
+    if diagnostic.code == "DOCUMENT_SUMMARY_STALE":
+        return relative in DOCUMENT_SUMMARY_FILES
+
     if owner_stage == "DEFINE":
         if diagnostic.code not in DEFINE_AGENT_DIAGNOSTICS:
             return False
@@ -20764,6 +20788,186 @@ def derive_aws_mode_boundary(
     }
 
 
+def _summary_table(ctx: Context, path: str, heading: str) -> dict[str, str]:
+    text = ctx.texts.get(path, "")
+    if not text:
+        return {}
+    try:
+        return table_after_heading(text, heading)
+    except ValueError:
+        return {}
+
+
+def _summary_value(value: object, fallback: str) -> str:
+    cleaned = clean_cell(value)
+    return cleaned if explicit_value(cleaned, allow_none=False) else fallback
+
+
+def _summary_bullet(text: str, label: str) -> str:
+    match = re.search(rf"(?m)^- {re.escape(label)}:[ \t]*(?P<value>.+?)[ \t]*$", text)
+    return clean_cell(match.group("value")) if match else ""
+
+
+# fmt: off
+def derive_document_summary_specifications(ctx: Context, *, classification: str, lifecycle_state: str, next_prompt: str, project: Mapping[str, Any], prd_fields: Mapping[str, str], gate_a: str, gate_b: str, tasks: TaskSummary, release_decision: str, release_evidence_cutoff: str, aws_authorization: str, external_authority: Mapping[str, Any], interaction: Mapping[str, Any], active_artifact: str, deployment_sequence: Mapping[str, Any]) -> list[dict[str, Any]]:
+# fmt: on
+    """Normalize existing canonical values for the presentation-only summaries."""
+
+    template_like = classification in {"TEMPLATE_SOURCE", "UNCONFIGURED_TEMPLATE"}
+    prd_card = _summary_table(ctx, PRD_FILE, "### Gate A — readiness card")
+    task_snapshot = _summary_table(ctx, TASKS_FILE, "## Active execution snapshot")
+    verify_scope = _summary_table(ctx, VERIFY_FILE, "## Active evidence scope")
+    runbook_boundary = _summary_table(ctx, RUNBOOK_FILE, "## Active operational boundary")
+    verify_text = ctx.texts.get(VERIFY_FILE, "")
+    bugfix_text = ctx.texts.get(BUGFIX_FILE, "")
+
+    requirements_id = prd_fields.get("requirements_revision")
+    design_id = prd_fields.get("design_revision")
+    authorization_id = prd_fields.get("construction_authorization")
+    checkpoint = _summary_value(task_snapshot.get("Last checkpoint"), "None")
+    cutoff = _summary_value(release_evidence_cutoff, "Not yet recorded")
+    updated = next(
+        (
+            value
+            for value in (
+                cutoff if cutoff != "Not yet recorded" else "",
+                checkpoint if checkpoint != "None" else "",
+                design_id,
+                requirements_id,
+            )
+            if value
+        ),
+        "Current canonical records",
+    )
+
+    observed_ids: set[str] = set()
+    failed_ids: set[str] = set()
+    for line in verify_text.splitlines():
+        evidence_ids = re.findall(r"\b(?:AWS-)?EV-\d{4,}\b", line)
+        if not evidence_ids:
+            continue
+        upper = line.upper()
+        if any(status in upper for status in ("VERIFIED", "PASSED", "OBSERVED")):
+            observed_ids.update(evidence_ids)
+        if any(status in upper for status in ("FAILED", "STALE", "BLOCKED")):
+            failed_ids.update(evidence_ids)
+
+    local_observed = release_decision in {"READY_TO_DEPLOY", "RELEASE_VERIFIED"}
+    deployment_status = clean_cell(deployment_sequence.get("status", "NOT_ACTIVE"))
+    deployment_observed = deployment_status == "RECONCILED"
+    requirements_approved = gate_a == "APPROVED_FOR_DESIGN"
+    design_approved = gate_b == "APPROVED_FOR_CONSTRUCTION"
+    guidance_ready = not any(
+        item.code.startswith("AWS_CORE_") and item.severity == "ERROR"
+        for item in ctx.diagnostics
+    )
+    # fmt: off
+    claim_rows = (
+        ("Requirements are approved", requirements_approved, ("Owner confirmed", requirements_id, "Does not approve construction"), ("Not yet observed", "None", "Gate A is not approved")),
+        ("Technical design is approved", design_approved, ("Owner confirmed", design_id, "Does not authorize AWS account work"), ("Not yet observed", "None", "Gate B is not approved")),
+        ("Current AWS guidance informed the plan", guidance_ready and not template_like, ("Source verified", "Current AWS Core evidence", "Source guidance is not deployment evidence"), ("Not yet observed", "None", "Source guidance is not deployment evidence")),
+        ("Local release checks passed", local_observed, ("Locally observed", release_decision, "Local evidence does not prove AWS behavior"), ("Not yet observed", "None", "Local evidence does not prove AWS behavior")),
+        ("Application is deployed", deployment_observed, ("Deployed observed", "Deployment reconciliation", "Bound to the observed environment"), ("Not authorized", "None", "No deployment evidence or authority")),
+    )
+    # fmt: on
+    claims = []
+    for claim, ready, current, pending in claim_rows:
+        maturity, evidence, limitation = current if ready else pending
+        claims.append(
+            {
+                "claim": claim,
+                "maturity": maturity,
+                "evidence": evidence,
+                "limitation": limitation,
+            }
+        )
+
+    task_progress = (
+        f"{len(tasks.done)} of {tasks.total} tasks complete"
+        if tasks.total
+        else "No tasks generated"
+    )
+    bug_title = _summary_bullet(bugfix_text, "Title")
+    bug_active = active_artifact == BUGFIX_FILE or explicit_value(bug_title)
+    bugfix = {
+        "status": "Active bounded defect" if bug_active else "No active bounded defect",
+        "defect": _summary_value(bug_title, "None") if bug_active else "None",
+        "impact": "Recorded in the defect contract" if bug_active else "None",
+        "reproduction": "Pending evidence" if bug_active else "Not active",
+        "root_cause": "Pending evidence" if bug_active else "Not active",
+        "repair": "Not started" if bug_active else "Not active",
+        "regression": "Pending evidence" if bug_active else "Not active",
+        "architecture": "Not yet assessed" if bug_active else "None",
+        "environment": (
+            _summary_value(_summary_bullet(bugfix_text, "Environment"), "Not recorded")
+            if bug_active
+            else "Not active"
+        ),
+        "requirements": (
+            _summary_value(_summary_bullet(bugfix_text, "Related PRD requirements"), "None")
+            if bug_active
+            else "None"
+        ),
+        "updated": updated,
+    }
+    account_access = (
+        external_authority.get("validity") == "CURRENT"
+        and external_authority.get("kind")
+        in {"AWS_READ_ONLY", "AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}
+    )
+    environment = _summary_value(
+        runbook_boundary.get("Region and environment"),
+        (
+            f"Development in {project.get('region')}"
+            if project.get("region")
+            else "Development"
+        ),
+    )
+    # fmt: off
+    return build_summary_specifications({
+        "template_like": template_like, "lifecycle_state": lifecycle_state, "next_prompt": next_prompt,
+        "owner_stage": interaction.get("owner_stage"), "action_kind": interaction.get("action_kind"),
+        "automatic_continuation_allowed": interaction.get("automatic_continuation_allowed"),
+        "gate_a": gate_a, "gate_b": gate_b, "requirements_revision": requirements_id,
+        "design_revision": design_id, "construction_authorization": authorization_id,
+        "aws_authorization": aws_authorization, "aws_account_access_authorized": account_access,
+        "updated": updated, "product_outcome": _summary_value(prd_card.get("Outcome"), "Not yet confirmed"),
+        "release_boundary": _summary_value(prd_card.get("Scope"), "Not yet confirmed"),
+        "region_and_cost": "Not yet recorded" if template_like else f"{project.get('region') or 'Region not recorded'}; {project.get('cost_posture') or 'Cost posture not recorded'}",
+        "record_identities": "Not yet initialized" if template_like else " / ".join(item for item in (requirements_id, design_id, authorization_id) if item),
+        "tasks": {
+            "progress": task_progress, "plan_revision": tasks.plan_revision,
+            "wave": _summary_value(task_snapshot.get("Current wave"), "None"),
+            "active": ", ".join(tasks.active) if tasks.active else "None",
+            "readiness": tasks.plan_state.replace("_", " ").title(),
+            "blocker": ", ".join(tasks.blocked) if tasks.blocked else "None",
+            "checkpoint": checkpoint, "known_green": _summary_value(task_snapshot.get("Last known-green commit"), "None"),
+            "updated": checkpoint if checkpoint != "None" else updated,
+        },
+        "verify": {
+            "release_result": release_decision.replace("_", " ").title(),
+            "observed_count": str(len(observed_ids)), "failed_count": str(len(failed_ids)),
+            "unobserved": "Recovery and teardown" if deployment_observed else "AWS deployment, recovery, and teardown" if local_observed else "Local build, AWS deployment, recovery, and teardown",
+            "cutoff": _summary_value(verify_scope.get("Evidence cutoff"), cutoff),
+            "updated": cutoff if cutoff != "Not yet recorded" else updated, "claims": claims,
+        },
+        "operations": {
+            "environment": environment,
+            "deployment_state": "Deployment observed" if deployment_observed else "Not deployed" if deployment_status in {"", "NOT_ACTIVE", "NONE"} else deployment_status.replace("_", " ").title(),
+            "authority": str(external_authority.get("kind", "None")).replace("_", " ").title() if account_access else "None",
+            "safe_action": "Only the exact authorized AWS operation" if account_access else "Local validation only",
+            "deployment_approval": "Authorized only for the current deployment" if account_access and external_authority.get("kind") in {"AWS_DEPLOYMENT", "FAST_DEV_GATE_B"} else "Not authorized",
+            "teardown_approval": "Authorized only for the current teardown" if account_access and external_authority.get("kind") == "AWS_TEARDOWN" else "Not authorized",
+            "recovery_state": "Not yet observed",
+            "emergency_state": "Follow the current runbook and authority" if deployment_observed else "No deployed environment exists",
+            "updated": updated,
+        },
+        "bugfix": bugfix,
+    })
+    # fmt: on
+
+
+
 def build_report(
     ctx: Context,
     lifecycle_state: str,
@@ -21228,6 +21432,76 @@ def build_report(
             source_texts=ctx.texts,
         )
         context_plan.pop("_resolution_issues", None)
+    summary_sources: dict[str, str] = {}
+    for summary_path in DOCUMENT_SUMMARY_FILES:
+        summary_text = ctx.texts.get(summary_path)
+        if summary_text is None:
+            summary_text = safe_read_text(ctx, summary_path)
+        if summary_text is not None:
+            summary_sources[summary_path] = summary_text
+    # fmt: off
+    summary_specifications = derive_document_summary_specifications(ctx, classification=classification, lifecycle_state=lifecycle_state, next_prompt=next_prompt, project=project, prd_fields=prd_fields, gate_a=gate_a, gate_b=gate_b, tasks=tasks, release_decision=release_decision, release_evidence_cutoff=release_evidence_cutoff, aws_authorization=aws_authorization, external_authority=external_authority, interaction=interaction, active_artifact=active_artifact, deployment_sequence=deployment_sequence_projection)
+    # fmt: on
+    document_summaries, summary_issues = project_document_summaries(
+        summary_sources, summary_specifications
+    )
+    for issue in summary_issues:
+        reporter = ctx.warning if issue["code"] == "DOCUMENT_SUMMARY_STALE" else ctx.error
+        reporter(
+            str(issue["code"]),
+            str(issue["message"]),
+            str(issue["path"]),
+        )
+    if any(issue["code"] != "DOCUMENT_SUMMARY_STALE" for issue in summary_issues):
+        status = "BLOCKED"
+        diagnostic_codes = [item.code for item in ctx.diagnostics]
+        remediation = derive_remediation(
+            ctx,
+            classification=classification,
+            gate_a=gate_a,
+            gate_b=gate_b,
+            envelope=envelope,
+            tasks=tasks,
+            requirements_revision=prd_fields.get("requirements_revision"),
+            design_revision=prd_fields.get("design_revision"),
+            owner_stage_hint=resolved_owner_stage,
+        )
+        interaction = derive_interaction(
+            lifecycle_state,
+            next_prompt,
+            has_errors=True,
+            diagnostic_codes=diagnostic_codes,
+            design_aws_core_ready=design_aws_core_ready,
+            aws_execution_planning_ready=aws_execution_planning_ready,
+            remediation=remediation,
+            owner_stage_hint=resolved_owner_stage,
+            aws_progress_state=aws_progress_state,
+            aws_mutation_authority_ready=aws_mutation_authority_ready,
+            aws_lane=lane,
+            aws_read_authority_required=(
+                external_authority.get("kind")
+                == "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
+            ),
+            req_aws_core_materiality=req_aws_core_materiality,
+            req_aws_core_ready=req_aws_core_ready,
+        )
+        if (
+            classification == "UNCONFIGURED_TEMPLATE"
+            and remediation["next_action"]["action_kind"]
+            == "COMPLETE_PREREQUISITE_CHECKLIST"
+        ):
+            interaction = derive_unconfigured_template_interaction(diagnostic_codes)
+        context_plan = derive_context_plan(
+            interaction,
+            tasks,
+            coverage_contract,
+            next_prompt=next_prompt,
+            restricted_deployment_closure=deployment_authority_restricted,
+            restricted_teardown_closure=teardown_authority_restricted,
+            source_texts=ctx.texts,
+        )
+        context_plan.pop("_resolution_issues", None)
+
     aws_mode_boundary = derive_aws_mode_boundary(
         lane,
         envelope,
@@ -21302,6 +21576,7 @@ def build_report(
                 else "NONE"
             ),
         },
+        "document_summaries": document_summaries,
         "owner_decision_brief": owner_decision_brief,
         "owner_answer_confirmation": owner_answer_confirmation,
         "intake_foundation": intake_contract.to_dict(),

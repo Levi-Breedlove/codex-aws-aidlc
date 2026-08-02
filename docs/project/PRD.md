@@ -1,6 +1,34 @@
 # {{PROJECT_NAME}} — Product Requirements and Technical Design
 
 Canonical path: `docs/project/PRD.md`.
+<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
+## Current state
+
+| Field | Current value |
+|---|---|
+| Product outcome | Not yet confirmed |
+| First-release boundary | Not yet confirmed |
+| Requirements | Not yet initialized |
+| Technical design | Not yet initialized |
+| Gate A | Not yet initialized |
+| Gate B | Not yet initialized |
+| Last completed milestone | None |
+| Region and cost | Not yet recorded |
+| Construction authorization | None |
+| AWS account work | Not authorized |
+| Current records | Not yet initialized |
+| Updated | Not yet initialized |
+| Need from you | Run `init template`. |
+| Next | Codex will verify prerequisites and initialize the project. |
+
+## Go directly to
+
+- [Product Agreement](#product-agreement)
+- [Gate A Review](#gate-a-review)
+- [Technical Plan](#technical-plan)
+- [Gate B Review](#gate-b-review)
+- [Exact contract records](#contract-appendices)
+<!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
 ## Current project state
 

@@ -3,6 +3,39 @@
 `docs/project/VERIFY.md` records observed proof, not plans or authorization. Gate A and Gate B
 remain the only routine human gates. The checks below determine construction and
 release readiness inside the current approved envelope; they are not additional
+<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
+## Current state
+
+| Field | Current value |
+|---|---|
+| Release result | Not yet initialized |
+| Locally observed evidence | 0 |
+| Failed or stale evidence | 0 |
+| Still unobserved | Local build, AWS deployment, recovery, and teardown |
+| Evidence cutoff | Not yet recorded |
+| AWS account work | Not authorized |
+| Updated | Not yet initialized |
+| Need from you | Run `init template`. |
+| Next | Codex will verify prerequisites and initialize the project. |
+
+### Important claims
+
+| Claim | Current maturity | Evidence | Limitation |
+|---|---|---|---|
+| Requirements are approved | Not yet observed | None | Gate A is not approved |
+| Technical design is approved | Not yet observed | None | Gate B is not approved |
+| Current AWS guidance informed the plan | Not yet observed | None | Source guidance is not deployment evidence |
+| Local release checks passed | Not yet observed | None | Local evidence does not prove AWS behavior |
+| Application is deployed | Not authorized | None | No deployment evidence or authority |
+
+## Go directly to
+
+- [Current result](#current-result)
+- [Passing evidence](#verification-matrix)
+- [Failed or stale evidence](#failed-or-stale)
+- [AWS evidence](#aws-core-evidence)
+- [Release decision](#current-release-decision)
+<!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 human gates.
 
 ## Current result
