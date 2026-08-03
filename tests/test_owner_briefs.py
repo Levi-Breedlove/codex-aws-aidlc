@@ -132,9 +132,21 @@ class OwnerBriefProjectionTests(unittest.TestCase):
                     {
                         "decision_id": "ARCH-0001",
                         "decision": "Application architecture",
+                        "owner_effect": "The application uses managed building blocks.",
                         "selection": "Managed service design",
+                        "requirement_basis": "REQ-0001 requires the first release.",
                         "why": "It satisfies the approved requirements.",
+                        "alternatives": (
+                            "A self-managed design adds unsupported operations."
+                        ),
                         "tradeoff": "It depends on managed service behavior.",
+                        "risk_and_mitigation": (
+                            "Service limits are tested and monitored."
+                        ),
+                        "evidence_status": "Planned from the current design record.",
+                        "reconsider_when": (
+                            "Revisit if a measured hard constraint is missed."
+                        ),
                         "basis_ids": ["REQ-0001"],
                         "evidence_ids": [],
                         "source_locator_keys": ["missing-architecture"],
@@ -149,6 +161,71 @@ class OwnerBriefProjectionTests(unittest.TestCase):
             "technical decisions reference missing source locations: missing-architecture",
             issues,
         )
+
+    def test_gate_b_renders_every_human_decision_field_and_source(self) -> None:
+        projection = self.ready_gate_a()
+        projection.pop("canonical_sha256", None)
+        projection["kind"] = "GATE_B"
+        projection["source_locators"] = [
+            briefs.source_locator(
+                key="selected-architecture",
+                label="Selected architecture",
+                path="docs/project/PRD.md",
+                heading="Selected architecture",
+                start_line=20,
+                end_line=30,
+                section_text="## Selected architecture\n\nARCH-0001\n",
+            )
+        ]
+        projection["technical_decision_groups"] = [
+            {
+                "domain": "application/runtime",
+                "decisions": [
+                    {
+                        "decision_id": "ARCH-0001",
+                        "decision": "Application architecture",
+                        "owner_effect": "The owner receives a managed application.",
+                        "selection": "Managed service design",
+                        "requirement_basis": "REQ-0001 and FR-001",
+                        "why": "It satisfies the approved first release.",
+                        "alternatives": (
+                            "Self-managed hosting was rejected for operations."
+                        ),
+                        "tradeoff": "Lower operations with provider dependency.",
+                        "risk_and_mitigation": "Limits are measured and monitored.",
+                        "evidence_status": (
+                            "Source verified; implementation unobserved."
+                        ),
+                        "reconsider_when": (
+                            "Revisit if latency exceeds its approved target."
+                        ),
+                        "basis_ids": ["REQ-0001", "FR-001"],
+                        "evidence_ids": ["AWS-EV-0001"],
+                        "source_locator_keys": ["selected-architecture"],
+                    }
+                ],
+            }
+        ]
+        finalized, issues = briefs.finalize_owner_decision_brief(projection)
+        self.assertEqual(issues, [])
+        rendered = presenter.render_owner_decision_brief(
+            {"owner_decision_brief": finalized}, "GATE_B"
+        )
+        for label in (
+            "What this means for you:",
+            "Selected:",
+            "Requirement basis:",
+            "Why selected:",
+            "Alternatives and rejection reasons:",
+            "Tradeoffs:",
+            "Risks and safeguards:",
+            "Evidence status:",
+            "Reconsider when:",
+            "Exact source:",
+        ):
+            self.assertIn(label, rendered)
+        self.assertIn("Change the design: <correction>.", rendered)
+        self.assertIn("docs/project/PRD.md#selected-architecture", rendered)
 
     def test_output_budget_blocks_instead_of_truncating_owner_content(self) -> None:
         projection = self.ready_gate_a()

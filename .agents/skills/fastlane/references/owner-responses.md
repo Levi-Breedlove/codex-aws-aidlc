@@ -116,11 +116,17 @@ a second editable brief.
 
 - Gate A explains the outcome, users, first-release journey and boundary,
   success, data and access, resilience, Region and cost, assumptions, risks,
-  change lineage, approval effect, and what remains unauthorized.
+  change lineage, every owner decision and source, approval effect, correction
+  syntax, what remains unauthorized, and what happens after approval.
 - Gate B starts with a one-minute executive decision, then groups every
   consequential technical decision by application/runtime, identity, data,
   messaging, edge/networking, observability, deployment/recovery, and
-  validation/construction. It ends with repository-relative source locations.
+  validation/construction. Every decision states its owner effect, selection,
+  requirement basis, rationale, rejected alternatives, tradeoffs, risks and
+  safeguards, evidence maturity, reconsideration trigger, and exact source.
+- Put repository-relative Markdown links before the formal receipt. Receipt-only
+  approval remains receipt-only; the next automatic post-approval status links
+  back to the approved Gate and forward to the next canonical work section.
 - Render each claim with its exact maturity in plain language. Planned work and
   unobserved deployment never appear as proven.
 - A missing, duplicate, orphaned, conflicting, stale, unsafe, or unresolved

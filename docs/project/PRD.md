@@ -101,6 +101,11 @@ Read the current state above, then go directly to the section named by Fastlane.
 | Expected traffic | TODO |
 | Applicable AWS lenses | TODO |
 
+### Owner decisions and sources
+
+Owner-confirmed selections stay in the exact intake record below. Expand it to
+see each question, answer, and requirement basis without duplicated state.
+
 <details>
 <summary>Exact intake provenance and brownfield preservation records</summary>
 
@@ -431,34 +436,13 @@ last in the owner acceptance record. After approval, Codex continues to Design.
 
 ## 13. Cross-requirement analysis
 
-Codex must analyze the requirements as one system before completing Part III.
-It may identify and propose assumptions, but it may never accept an assumption,
-approve Gate A, or write an owner's authorization receipt on the owner's behalf.
-
 ### Findings
 
 | ID | Type | Requirements involved | Finding | Resolution or decision | Blocking? | Status |
 |---|---|---|---|---|---|---|
 | RA-001 | Ambiguity | TODO | TODO | TODO | Yes | Open |
 
-Valid types:
-
-- Logical inconsistency
-- Ambiguity
-- Conflicting constraint
-- Unstated assumption
-- Missing edge case
-- Missing failure behavior
-- Missing concurrency behavior
-- Unverifiable requirement
-- Security or privacy gap
-- Cost or operational gap
-
 ### Requirements change lineage
-
-This row explains why the current requirements revision exists and what must be
-revalidated. Use `FULL_REVALIDATION` when impact cannot be proven; preserve an
-unchanged ID only while its existing basis and digest remain current.
 
 | Current revision | Prior revision | Trigger | Added IDs | Changed IDs | Removed IDs | Preserved IDs | Stale reason | Required revalidation |
 |---|---|---|---|---|---|---|---|---|
@@ -469,10 +453,6 @@ unchanged ID only while its existing basis and digest remain current.
 | Assumption ID | Assumption | Status | Basis IDs | Validation or successor |
 |---|---|---|---|---|
 | ASM-001 | TODO | PROPOSED | TODO | PENDING_OWNER_DECISION |
-
-Only the owner may accept an assumption. Accepted assumptions remain visible
-until validated, invalidated, or superseded; silence and recommendations never
-change their status.
 
 ### Open decisions
 
@@ -498,34 +478,9 @@ change their status.
 | Agent recommendation | `BLOCKED` / `READY_WITH_PROPOSED_ASSUMPTIONS` / `READY_FOR_OWNER_APPROVAL` |
 | Recommendation rationale | TODO |
 
-Classify REQ-10 AWS Core materiality as `REQUIRED` when Gate A depends on a
-current AWS fact involving service or Region feasibility, identity or
-authorization, sensitive data or uploads, public exposure, encryption,
-deletion or recovery, quotas, availability, or material cost. `OPTIONAL` means
-current AWS guidance could improve confidence but does not decide readiness.
-`NOT_MATERIAL` requires an explicit reason. Never infer `NOT_MATERIAL` merely
-because evidence has not been collected.
-
-When materiality is `REQUIRED`, the coordinator records fresh linked REQ-10
-`search_documentation` then exact matching `retrieve_skill` evidence in
-`docs/project/VERIFY.md`. Basis IDs include the current REQ revision and every
-affected requirement. The evidence is documentation-only: credentials are not
-inspected, no AWS account is accessed, and no architecture is selected before
-Gate A. Any unresolved material AWS fact remains a blocking finding or
-decision. An unchanged already-approved legacy Gate A may retain its exact
-approval until a requirements-controlled change, but its absent materiality
-record is reported as legacy/unrecorded rather than `NOT_MATERIAL`.
-
-The agent recommendation is advisory. It is not Gate A authorization.
-
 </details>
 
 ### Gate A — readiness card
-
-This card is the compact owner decision surface. Every value must be explicit
-and trace to the current requirements revision. `NOT_APPLICABLE — <reason>` is
-allowed only when the concern genuinely cannot apply; blank values, `TODO`,
-`TBD`, `UNKNOWN`, and bare `NONE` are not ready.
 
 | Field | Current requirements decision basis |
 |---|---|
@@ -539,17 +494,6 @@ allowed only when the concern genuinely cannot apply; blank values, `TODO`,
 | Failure/recovery | TODO |
 | Cost posture | TODO (exactly `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED` or the owner's `MINIMIZE_TOTAL_COST; HARD_CAP: <ISO_CURRENCY> <OWNER_AMOUNT>`; `USD 20.00` is only an example) |
 | Intake provenance | TODO |
-
-When the recommendation becomes `READY_WITH_PROPOSED_ASSUMPTIONS` or
-`READY_FOR_OWNER_APPROVAL`, set the detailed owner state and Document status to
-`PENDING_OWNER_APPROVAL` in the same checkpoint. Mirror the exact lifecycle
-state in `bootstrap.yaml` and the identity/Gate B state in docs/project/TASKS.md's Active
-execution snapshot. Gate B remains `BLOCKED` on a new project or becomes
-`STALE` when an earlier design was invalidated. Do not leave a ready Gate A in
-`BLOCKED` state. Reset the owner decision to `PENDING`, clear prior approval
-identity/provenance/authorized-revision fields, and replace the old marked
-receipt with the current proposed card; an earlier receipt never carries across
-a requirements revision.
 
 ### Gate A — owner acceptance record
 
@@ -566,22 +510,13 @@ a requirements revision.
 | Verbatim owner receipt | `RECORDED_BELOW` / `TODO` |
 | Derived Gate A state | `BLOCKED` / `PENDING_OWNER_APPROVAL` / `APPROVED_FOR_DESIGN` / `STALE` |
 
-Codex may ask for the receipt below and record it verbatim after it is supplied.
-It must not compose, infer, or mark the receipt approved for the owner. For both
-human gates, `Approver` must identify the human decision owner. Values such as
-`Codex`, `agent`, `automation`, `system`, `AI`, or another service or model
-identity are invalid regardless of capitalization.
-
 <details>
 <summary>Exact Gate A validation and invalidation rules</summary>
 
 ### Gate A validation and invalidation rules
 
-The Fastlane Engine requires a current requirements revision, complete readiness
-card, resolved blocking findings and decisions, explicit AWS materiality, and a
-matching human owner record and receipt. Only the owner accepts assumptions.
-Any requirements-controlled change increments the revision and stales both
-gates; task state is reconciled before replacement work becomes runnable.
+The Engine requires a complete current product agreement, resolved blockers,
+explicit AWS materiality, and the owner's exact matching receipt.
 
 </details>
 
@@ -602,6 +537,11 @@ Approver: <name/handle>
 # Technical Plan
 
 Complete this part only after Gate A is valid.
+
+### Technology decisions
+
+The Gate B brief explains these selections in plain language. Expand the exact
+records below when you want the complete source tables and candidate analysis.
 
 <details>
 <summary>Exact design revision, technology, driver, and candidate records</summary>
@@ -646,12 +586,6 @@ Complete this part only after Gate A is valid.
 </details>
 
 ### Selected architecture
-
-Select exactly one eligible candidate. The selection is an
-`AGENT_RECOMMENDATION` until Gate B. If only one candidate is eligible,
-`Rejected alternatives` may be `NO_VIABLE_ALTERNATIVE` only when the table
-still contains at least two total candidates and exactly one is eligible;
-otherwise enumerate every nonselected `CAND-*` in table order.
 
 | Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Security impact | Reliability impact | Operational burden | Cost effect | Breakpoints | Migration path | Revisit triggers | Validation |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -859,8 +793,6 @@ below is explicitly approved.
 |---|---|---|---|---|---|
 | SPIKE-0001 | TODO | TODO | TODO | TODO | DISCARD_AND_BUILD_WALKING_SKELETON |
 
-A spike uses `MAX_ATTEMPTS: <positive integer>` and one executable local exit command; shell control and prose are invalid.
-
 Replace this table with `NOT_APPLICABLE — no prerequisite discovery is needed before the walking skeleton`
 when no spike is needed. A spike records learning only and cannot satisfy the
 approved product outcome.
@@ -869,12 +801,7 @@ approved product outcome.
 <details>
 <summary>Exact task-projection rule</summary>
 
-`docs/project/TASKS.md` will translate this design into discrete executable
-tasks. For every modern approved first-release requirement, the Engine derives
-exactly one construction disposition: covered by a non-skipped task with its
-canonical acceptance trace, already satisfied by current scoped no-task
-evidence, or not applicable under the optional-feature evidence rule. A missing
-or mismatched disposition is Codex-owned replanning, not another owner gate.
+The Engine derives tasks and requirement coverage from the approved design.
 
 </details>
 
@@ -1113,15 +1040,7 @@ locally inside the approved envelope.
 <details>
 <summary>Exact Gate B readiness rules</summary>
 
-Every field summarizes the current design and complete construction envelope.
-Use explicit values and stable IDs. `NOT_APPLICABLE — <reason>` is allowed only
-when genuinely inapplicable; blank values, `TODO`, `TBD`, and `UNKNOWN` are not
-ready. `Outstanding gaps` must be `NONE` or a comma-separated list of stable
-gap IDs; any listed gap keeps the recommendation `BLOCKED`.
-
-`Validation/evidence` cites every current required or triggered conditional
-`HARNESS-*` ID. A Harness Profile row that is incomplete, unjustified, or not
-bound to a current basis ID keeps Gate B blocked.
+The Engine blocks Gate B until every field and applicable Harness check is complete.
 
 </details>
 
@@ -1150,10 +1069,6 @@ correction and authorization process.
 <summary>Exact construction envelope and validation grammar</summary>
 
 ## 28. Construction envelope
-
-Use explicit values; `reasonable`, `as needed`, and blank cells grant no
-authority. `NONE` means prohibited or empty only where the row grammar allows
-it, never undecided.
 
 | Boundary | Authorized value |
 |---|---|
@@ -1199,82 +1114,8 @@ it, never undecided.
 | Mandatory stop conditions | TODO |
 | Authorization expiry or completion condition | `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>` |
 
-Select one value from each slash-delimited grammar; do not preserve the option
-list in an approval-ready envelope. In `<profile> / <risk>`, profile is exactly
-`quick-mvp`, `standard`, or `high-risk`, and risk is exactly `low`, `moderate`,
-`high`, or `critical`. In GitHub constraints, choose exactly `MERGE: ALLOWED` or
-`MERGE: PROHIBITED`. `Authorized requirement and design IDs`
-must name the current REQ and DES plus every scoped requirement, design
-decision, property, or defect ID. It must include every current `TECH-*` row and
-every applicable `PROP-*` execution row plus the selected `ARCH-*`; omission
-makes Gate B non-runnable. `Architecture/components` on the readiness card is
-exactly that selected `ARCH-*`.
-`Design contract SHA-256` must exactly equal the Engine's current derived hash
-of the Architecture driver, Candidate, Selection, Traceability, Material AWS
-evidence, Harness, Change impact, Project design contract, Technology decision,
-Example-based scenarios, Property applicability, Property definition, and
-Property execution records in that order. The baseline
-must resolve in the current local Git repository. Prefix lists are literal argv
-prefixes separated by semicolons, not shell fragments, command substitutions,
-or wildcards. Gate B therefore binds the full design-contract digest. An unchanged,
-already approved schema 4 or schema 5 Gate B remains grandfathered until the next design-controlled change
-and remains runnable; schema 6 support does not itself
-stale or rewrite that approval. A new or unapproved design, or any
-design-controlled change, requires every schema 6 design record, a new design
-hash and envelope digest, and fresh Gate B approval. Codex owns the generated
-migration. It asks the owner only when migration exposes a missing owner fact or
-a true requirements decision. Grandfathering never authorizes invented schema
-6 values, an expanded construction envelope, or bypass of task validation.
-Paths
-and external targets must be repository-relative or exact named targets and
-remain inside the approved scope.
-
-The AWS rows are conditional, keeping documentation-only projects lean. For
-`NONE` or `DOCS_ONLY`, fill each authenticated-action row with
-`NOT_APPLICABLE — AWS boundary <mode> authorizes no authenticated action`. For
-`READ_ONLY`, account, role/profile, Region, environment, resource allowlist,
-allowed read operations, prohibited operations, and validity are explicit;
-mutation-only artifact, cost, and rollback rows may use a precise
-`NOT_APPLICABLE — <reason>`. For `MUTATE_LISTED_RESOURCES`, every AWS row is
-explicit and `NOT_APPLICABLE` is invalid. Its `AWS allowed operations` row is
-the deduplicated maximum union of exact operations needed across applicable
-AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 phases. Each phase may use only the
-intersection of that maximum, the phase mode, current evidence, and current
-phase-specific authority. Never combine identities, targets,
-operations, spend, artifact provenance, rollback, or validity into one cell.
-The environment uses the exact `ENVIRONMENT: ...; CLASS: ...` grammar. A
-`fast-dev` mutation requires `CLASS: NON_PRODUCTION`; production requires
-`explicit-gate`. Artifact authority is immutable `EXACT_DIGEST` or a
-deterministic `DERIVED_FROM_AUTHORIZED_SOURCE` rule that cannot select a broader
-artifact at execution time. A derived rule must literally name SHA-256 and the
-full `Authorized baseline commit`; a branch name, moving tag, or source tree
-without that commit binding is invalid. AWS validity uses the exact finite
-expiry grammar, and the expiry must still be in the future at preflight and
-mutation time.
-
-The canonical construction-envelope bytes are the complete Markdown table
-above: its header, separator, and every boundary row in their stored order,
-excluding the heading and surrounding prose. Strip trailing whitespace from
-each line, join lines with LF, append one final LF, then UTF-8 encode and SHA-256
-hash. Record the result as `sha256:` plus 64 lowercase hex characters. Any row,
-value, order, or byte change changes the digest, increments AUTH, and makes Gate
-B stale. Because the envelope stores the current Design contract SHA-256, an
-architecture driver, candidate, eligibility, selection, traceability, material
-AWS evidence, technology, property-applicability, property-definition, or
-property-execution change first makes the stored design hash invalid; updating
-it changes the envelope digest and requires new Gate B approval. A project with
-a grandfathered schema 4 Gate B may keep that exact approval only while its
-design and envelope remain unchanged. Before any replacement Gate B, Codex
-migrates the generated design records to schema 6, computes the new design and
-envelope digests, and presents the fresh approval. Gate A reopens only when the
-requirements themselves change or a required owner fact is missing.
-
-The task boundary may authorize later task generation without another human
-gate only when every generated task traces exclusively to the approved IDs,
-stays inside the allowed write and execution boundaries, and introduces no new
-AWS, GitHub, security, data, cost, or preservation risk. Record the resulting
-`docs/project/TASKS.md` revision at the first checkpoint. Any task outside those conditions
-requires a revised construction authorization and a new Gate B approval.
+The Engine owns the envelope grammar, digest, compatibility, and staleness rules.
+This table is the complete bounded local-construction authority presented at Gate B.
 
 </details>
 
@@ -1292,13 +1133,6 @@ requires a revised construction authorization and a new Gate B approval.
 | Authorization source | TODO (message, issue, meeting record, or commit link) |
 | Verbatim owner receipt | `RECORDED_BELOW` / `TODO` |
 | Derived Gate B state | `BLOCKED` / `PENDING_OWNER_APPROVAL` / `APPROVED_FOR_CONSTRUCTION` / `STALE` |
-
-Codex may record a receipt supplied by the owner; it must never create, infer,
-or self-accept one. When the Gate B agent recommendation becomes
-`READY_FOR_CONSTRUCTION_APPROVAL`, synchronize the pending owner state, current
-REQ/DES/AUTH records, task snapshot, and lifecycle. Acceptance updates those
-records together. A DES or AUTH change clears the prior approval and requires a
-fresh envelope digest and receipt.
 
 For approval, the owner receipt must use this human-readable form with actual
 values substituted:
@@ -1328,54 +1162,10 @@ Exact records below remain machine-validated and auditable. They do not add an o
 Project facts and owner decisions remain in this PRD. Phase procedures, receipt syntax, and Engine schemas remain in their designated Fastlane authorities; `docs/project/AGENTS.md` narrows safe edits here.
 ## 30. Gate B validation and invalidation rules
 
-The design and construction authorization use monotonic IDs (`DES-0001` and
-`AUTH-0001`, then incrementing). Gate B is valid only when:
-
-1. Gate A remains valid for the same requirements revision.
-2. Parts III and IV contain no unresolved item required for the authorized
-   scope, and the design revision identifies their current approved content.
-3. The agent reviewed those exact requirements, design, and construction
-   authorization IDs and the canonical complete-envelope SHA-256, found no
-   blocking gap, and recommended
-   `READY_FOR_CONSTRUCTION_APPROVAL`.
-4. Every Gate B readiness-card field is explicit, and Outstanding gaps is
-   `NONE`.
-5. The Gate B Harness Profile is complete: every row is resolved to `REQUIRED`
-   or `NOT_APPLICABLE — <concrete reason>`, every required row has current basis
-   IDs, an exact command or API, and an existing VERIFY evidence destination,
-   and every required `HARNESS-*` ID is in the authorized scope.
-6. The envelope's design-contract hash equals the current derived hash, and its
-   authorized IDs include every current `TECH-*`, applicable `PROP-*`, and
-   required or triggered conditional `HARNESS-*`.
-7. Scope, write set, baseline, protected paths, external targets, command
-   prefixes, task boundary, parallelism, attempt budget, checkpoints,
-   GitHub authority, AWS authority, stop conditions, and expiry are explicit.
-8. The owner decision is `APPROVED` for those exact revisions and canonical
-   complete-envelope digest, and its source and verbatim receipt agree with the
-   structured fields.
-
-An exact owner, authorization time, and authorization source are required. The
-receipt's IDs, digest, and approver must equal the structured owner record
-exactly.
-
-Any requirements change makes Gate A and Gate B `STALE`. Any design-controlled
-change increments `DES`; any construction-envelope change increments `AUTH`.
-Changing a Harness Profile trigger, basis, selection, command/API, destination,
-or status is design-controlled and makes Gate B stale.
-Either change makes Gate B `STALE` while leaving Gate A unchanged. A revision
-mismatch is stale even if a status still says `APPROVED`. Checkpoint updates,
-evidence, and task status changes within the approved envelope do not invalidate
-Gate B. Stop when a boundary would be exceeded, an attempt budget is exhausted,
-a mandatory stop condition occurs, the authorization expires, or a gate becomes
-stale; report the smallest decision needed to continue.
-
-When REQ, DES, or AUTH changes, apply the same task-plan lifecycle:
-`CURRENT` -> reconcile active work and commit -> `STALE` -> new Gate B ->
-TASK-10 replacement and `CURRENT`. `UNINITIALIZED` and `STALE` are never
-runnable.
-Correcting task traceability or no-task evidence structure within unchanged
-REQ/DES/AUTH does not invalidate Gate B. If the correction would change an
-approved requirement, design decision, or construction envelope, use the
-existing invalidation rules instead.
+The Engine validates current Gate A, complete design and Harness coverage,
+matching REQ/DES/AUTH identities and digests, the exact owner receipt, bounded
+construction, and deterministic staleness. Changes follow the existing Gate A
+or Gate B invalidation boundary; evidence-only progress inside the envelope does
+not create new authority.
 
 </details>

@@ -1784,9 +1784,15 @@ def _validated_owner_decision_brief(
                 for field in (
                     "decision_id",
                     "decision",
+                    "owner_effect",
                     "selection",
+                    "requirement_basis",
                     "why",
+                    "alternatives",
                     "tradeoff",
+                    "risk_and_mitigation",
+                    "evidence_status",
+                    "reconsider_when",
                 )
             ):
                 raise PresentationError(
@@ -1876,6 +1882,9 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
         lines.extend(("", f"## {section['title']}"))
         lines.extend(f"- {item}" for item in section["items"])
 
+    locator_by_key = {
+        str(locator["key"]): locator for locator in brief["source_locators"]
+    }
     groups = brief["technical_decision_groups"]
     if groups:
         lines.extend(("", "## Technical decision index"))
@@ -1883,11 +1892,27 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
             domain = str(group["domain"]).replace("/", " and ").title()
             lines.extend(("", f"### {domain}"))
             for decision in group["decisions"]:
+                sources: list[str] = []
+                for key in decision["source_locator_keys"]:
+                    locator = locator_by_key[str(key)]
+                    anchor = _markdown_anchor(str(locator["heading"]))
+                    sources.append(f"[{locator['label']}]({locator['path']}#{anchor})")
                 lines.extend(
                     (
-                        f"- **{decision['decision']}** — {decision['selection']}",
-                        f"  Why: {decision['why']}",
-                        f"  Tradeoff: {decision['tradeoff']}",
+                        f"#### {decision['decision']} ({decision['decision_id']})",
+                        f"- What this means for you: {decision['owner_effect']}",
+                        f"- Selected: {decision['selection']}",
+                        f"- Requirement basis: {decision['requirement_basis']}",
+                        f"- Why selected: {decision['why']}",
+                        (
+                            "- Alternatives and rejection reasons: "
+                            f"{decision['alternatives']}"
+                        ),
+                        f"- Tradeoffs: {decision['tradeoff']}",
+                        f"- Risks and safeguards: {decision['risk_and_mitigation']}",
+                        f"- Evidence status: {decision['evidence_status']}",
+                        f"- Reconsider when: {decision['reconsider_when']}",
+                        f"- Exact source: {', '.join(sources)}",
                     )
                 )
 
@@ -1902,6 +1927,28 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
     lines.extend(
         f"- {item}" for item in brief["authorization_effect"]["does_not_approve"]
     )
+
+    lines.extend(("", "## Correct or approve"))
+    if expected_kind == "GATE_A":
+        lines.extend(
+            (
+                "- To correct anything, reply `Change the requirements: <correction>.`",
+                (
+                    "- After approval, Codex continues automatically into "
+                    "AWS Core-informed technical design."
+                ),
+            )
+        )
+    else:
+        lines.extend(
+            (
+                "- To correct anything, reply `Change the design: <correction>.`",
+                (
+                    "- After approval, Codex generates the task plan and begins "
+                    "bounded local construction automatically."
+                ),
+            )
+        )
 
     lines.extend(("", "## Review the exact sources"))
     for locator in brief["source_locators"]:

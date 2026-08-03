@@ -88,98 +88,24 @@ authoritative values in `docs/project/PRD.md`. A mismatch or stale Gate B stops 
 | Last known-green commit | `TODO` |
 | Next safe action | Complete Gate B; when current, run `TASK-10` |
 
-Run state is one of `NOT_STARTED`, `RUNNING`, `PAUSED`, `BLOCKED`, or
-`COMPLETE`. Task-plan state is exactly `UNINITIALIZED`, `CURRENT`, or `STALE`.
-Use monotonic IDs such as `PLAN-0001`, `RUN-0001`, and `CP-0001`. Update this
-snapshot only at a coordinator checkpoint.
-
-Lifecycle prompts update this snapshot before task generation. REQ-10 copies a
-new requirements identity and makes construction non-runnable; an agent-ready
-Gate A is `PENDING_OWNER_APPROVAL`. DESIGN-10 copies the current REQ/DES/AUTH,
-authorized single-writer limit, baseline, and protected dirty paths and sets an
-agent-ready Gate B to `PENDING_OWNER_APPROVAL`. DESIGN-20 acceptance changes the
-snapshot to `APPROVED_FOR_CONSTRUCTION` in the same checkpoint as docs/project/PRD.md and
-bootstrap.yaml. A stale gate or identity mismatch sets the run to `BLOCKED` and
-never silently retargets existing tasks. Before marking a plan `STALE`,
-reconcile every `IN_PROGRESS` task to `DONE` with evidence or `BLOCKED` with the
-observed revision blocker, checkpoint and commit the stale ledger, then stop all
-claims. After a new Gate B, TASK-10 archives the stale plan by commit, replaces
-its graph with tasks for the current IDs, and sets the new plan `CURRENT`.
-
 ## Derived requirement disposition contract
 
-This ledger does not store a second manually maintained coverage table. For a
-`CURRENT` plan based on a modern, non-grandfathered requirements schema, the
-Engine projects the approved first-release requirements, task `Requirements`
-traces, and current `docs/project/VERIFY.md` no-task evidence into exactly one
-derived disposition per requirement:
-
-- `TASK_COVERED` — one or more non-`SKIPPED` `BACKLOG`, `READY`,
-  `IN_PROGRESS`, `BLOCKED`, or `DONE` task cards contain the current `REQ-*`
-  identity and the exact requirement ID plus its canonical `AC-*` ID.
-- `ALREADY_SATISFIED` — no task is needed because a current-scoped concrete
-  Verification matrix row has `Task IDs` equal to `NONE`, binds exactly that
-  requirement and canonical acceptance ID, and has status `LOCAL_PASS` or
-  `VERIFIED`.
-- `NOT_APPLICABLE` — no task is needed only when the approved EARS form is
-  `OPTIONAL_FEATURE` and a current-scoped concrete Verification matrix row
-  binds the exact requirement and canonical acceptance ID with status
-  `NOT_APPLICABLE`.
-
-Multiple task IDs or evidence IDs may support one derived disposition. A
-`SKIPPED` task never supplies requirement coverage, and task coverage conflicts
-with `NOT_APPLICABLE` evidence. Missing pairs, unknown or duplicate traces,
-conflicting evidence, stale scope, and uncovered requirement IDs are Codex-owned
-task replanning, not an owner decision or approval gate. Only a genuine change
-to the approved requirement, design, envelope, or authority uses the existing
-gate invalidation rules.
-
-The additive Engine JSON under `tasks` reports
-`requirement_coverage_complete`, `requirement_coverage`, and
-`missing_requirement_ids`. Each `requirement_coverage` item contains
-`requirement_id`, `acceptance_id`, `disposition`, `task_ids`, and
-`evidence_ids`. These fields are a deterministic projection, never a new source
-of truth or authorization.
+The Engine derives requirement coverage from the approved PRD, task cards, and
+current verification evidence. This ledger never stores a second coverage source.
 
 ## Coordinator contract
 
-- One coordinator owns task selection, claims, implementation, checkpoints, and
-  every write to application, infrastructure, project ledgers, manifests,
-  lockfiles, schemas, generated output, and GitHub metadata.
-- `Maximum workers` remains `1` for task claims and mutable execution. A
-  conditional challenger may return one synchronous read-only critique at its
-  defined checkpoint; it is not a worker, claims no task, and changes no state.
-  No subagent or worker edits files or mutable external state.
-- Each path and mutable target has exactly one writer. Treat ambiguous globs,
-  generated output, the same branch, stack, state backend, or database as
-  overlapping.
-- The coordinator records task ID, checkpoint, REQ/DES/AUTH IDs, changed paths,
-  commands/results, evidence IDs, external actions, and deviations before DONE.
-- GitHub writes occur only when the current AUTH names the repository and
-  operation. Otherwise retain `PENDING_SYNC`.
-- Local tasks use only AWS mode `NONE` or `DOCS_ONLY`. If a task reaches
-  authenticated AWS work, checkpoint its local state and route account reads
-  through AWS-10, deployment mutations through AWS-20, and teardown mutations
-  through AWS-50. Task metadata never carries authenticated read or mutation
-  authority; Gate B remains only the maximum planned AWS ceiling.
+Codex is the sole writer. The Deliver reference and Engine enforce task claims,
+attempts, checkpoints, path ownership, GitHub limits, and AWS boundaries.
+
 ## Fastlane task methodology
 
-TASK-10 derives small, independently verifiable work from the approved
-REQ/DES/AUTH boundary. The Deliver phase reference owns generation procedure;
-the Engine and task tool own readiness and transition validation.
+TASK-10 derives small, independently verifiable work from the approved boundary.
 
 ### Fastlane Definition of Done
 
-The existing DONE transition remains authoritative. A task is DONE only when:
-
-- all acceptance criteria pass;
-- exact validation ran and passed;
-- applicable property tests pass;
-- observed evidence is recorded;
-- the task remained inside REQ/DES/AUTH and write boundaries;
-- execution log and checkpoint state are current;
-- no unresolved blocker or placeholder remains; and
-- required documentation and runbook changes are complete.
+The Deliver reference owns the complete rule. `DONE` always requires passing
+acceptance, validation, evidence, boundaries, and a current checkpoint.
 
 ## Status and transition contract
 
@@ -192,57 +118,7 @@ The existing DONE transition remains authoritative. A task is DONE only when:
 | `DONE` | Acceptance criteria and required local evidence passed | Terminal |
 | `SKIPPED` | Intentionally omitted under an explicit skip record | Terminal |
 
-- `BACKLOG` is never runnable. Only an explicitly `READY` task may be claimed.
-- Only a `CURRENT` task plan may be validated for execution or claimed;
-  `UNINITIALIZED` and `STALE` route to TASK-10.
-- An interrupted task remains `IN_PROGRESS` until the coordinator reconciles
-  its paths and external state. Do not hide partial work by returning it to
-  `READY`.
-- `DONE` and `SKIPPED` are audit-terminal. Represent later work with a new task.
-- `READY` requires current matching REQ/DES/AUTH IDs, resolved inputs, a concrete
-  write set and external-state set, available attempt budget, objective
-  validation, and satisfied dependencies.
-- `IN_PROGRESS` requires an assigned owner, incremented attempt count, and base
-  checkpoint; its `Run ID` must equal the snapshot's active run. `DONE` requires
-  recorded evidence. `BLOCKED` requires a blocker and smallest useful next
-  action. `SKIPPED` requires an explicit skip record.
-
-Use the coordinator-owned tool for validation and atomic task updates:
-
-```bash
-python scripts/task_waves.py docs/project/TASKS.md
-python scripts/task_waves.py docs/project/TASKS.md --ready --json
-```
-
-The ready result is a candidate list; the coordinator claims one task at a time.
-
-Use the next unused monotonic IDs and these command shapes; do not hand-edit
-claim or run fields:
-
-```bash
-# Start exactly one task or an autonomous run.
-python scripts/task_waves.py docs/project/TASKS.md --start-run RUN-0001 --coordinator codex-coordinator --run-mode SINGLE_TASK
-python scripts/task_waves.py docs/project/TASKS.md --start-run RUN-0001 --coordinator codex-coordinator --run-mode AUTONOMOUS
-
-# Claim one serialized task only after the run is RUNNING.
-python scripts/task_waves.py docs/project/TASKS.md --claim TASK-0001 --owner codex-coordinator --run-id RUN-0001 --coordinator codex-coordinator --checkpoint CP-0000
-
-# Reconcile every IN_PROGRESS task, then pause or complete.
-python scripts/task_waves.py docs/project/TASKS.md --set-status TASK-0001 DONE --evidence EV-0001 --run-id RUN-0001 --coordinator codex-coordinator --checkpoint CP-0001
-python scripts/task_waves.py docs/project/TASKS.md --pause-run RUN-0001 --coordinator codex-coordinator --checkpoint CP-0002
-
-# Resume only the same safely checkpointed run and coordinator.
-python scripts/task_waves.py docs/project/TASKS.md --resume-run RUN-0001 --coordinator codex-coordinator
-```
-
-Use `--complete-run RUN-0001 --coordinator codex-coordinator --checkpoint
-CP-0002` only when all tasks are terminal. Every mutation names the exact active
-coordinator. Each claim cites the current base checkpoint and each
-`IN_PROGRESS` reconciliation advances to the next unique
-checkpoint. Pause or completion then consumes a later unique checkpoint and
-requires its newest complete row and docs/project/VERIFY.md reference; do not reuse CP-0001.
-Run start and issue synchronization do not create fictional checkpoints. A
-persisted `RUNNING` state is recovery-required, not automatically resumable.
+The Engine and `task_waves.py` enforce these transitions; do not hand-edit run or claim state.
 
 ## Required task record schema
 
@@ -273,32 +149,8 @@ routes to `TASK-10`, not construction.
 | `Last checkpoint` | Coordinator checkpoint ID or `NONE` |
 | `Last updated` | ISO 8601 timestamp or `TODO` before initialization |
 
-For every modern approved requirement cited by a task, `Requirements` contains
-the exact requirement ID and its canonical acceptance ID together; neither may
-appear without the other. The current `REQ-*` identity remains mandatory on
-every task card. A task may cover several approved pairs, and an approved pair
-may be implemented by several non-skipped tasks.
-
-When a task implements or verifies an approved property, include its `PROP-*`
-IDs in `Requirements` and copy its complete PRD Property execution row into one
-exact projection table under `Validation`. The framework `TECH-*`, command, run
-bound, seed/reproduction format, and evidence destination must match the PRD
-byte-for-byte after Markdown cell normalization, and the exact command must also
-appear once in the fenced command list. Omit the projection table only when no
-approved property applies. A DONE task must cite the matching property
-`EV-nnnn` row in `docs/project/VERIFY.md`. That row must bind the same task,
-REQ/DES/AUTH trace, property, framework decision and selection, command,
-observed time, commit/worktree/artifact, and durable source; the latest row for
-that task and property must pass the approved run target.
-
-`TASK-10` emits every real record in this exact structural shape. The four
-human-status fields remain visible and every other singleton metadata field is
-kept in the collapsed agent section. Replace every angle-bracket value. In a
-`CURRENT` plan, `BACKLOG` is a fully specified dependency-gated task, so do not
-leave unresolved values on a `BACKLOG`, `READY`, `IN_PROGRESS`, `BLOCKED`, or
-`DONE` task. The stock `UNINITIALIZED` placeholder is exempt.
-Keep the exact metadata key set above: technology traceability stays inside
-`Design`; do not add a separate `Technologies` metadata key.
+The Deliver reference owns task generation. The Engine validates exact
+requirement, acceptance, design, property, Harness, and evidence bindings.
 
 ~~~text
 ### <TASK-ID> — <short title>
@@ -361,45 +213,10 @@ Keep the exact metadata key set above: technology traceability stays inside
 </details>
 ~~~
 
-A READY task cannot contain `TODO` in its outcome, acceptance, validation,
-boundaries, or traceability. A DONE task has every acceptance checkbox checked,
-non-`NONE` Evidence using `EV-nnnn` IDs (for example `EV-0001`), and an observed
-execution-log entry. Each cited local ID must have exactly one explicit,
-passing row under docs/project/VERIFY.md `Task completion evidence`; the task tool rejects
-placeholder, duplicate, wrong-task, unfenced URL-only, and non-passing rows.
-Every `BACKLOG`, `READY`, `IN_PROGRESS`, `BLOCKED`, or `DONE` task in a
-`CURRENT` plan uses one of the exact `Design` forms above and preserves every
-applicable property projection; TECH references are comma-separated, unique,
-and contain no placeholders. `BACKLOG` contributes to plan coverage but never
-appears in `--ready` and cannot be claimed until it explicitly transitions to
-`READY` after its dependencies are satisfied. `SKIPPED` does not contribute to
-property coverage.
-
 ## Dependencies, waivers, and waves
 
-- `Depends on: NONE` places a task in structural Wave 1. Other wave numbers are
-  derived from the dependency graph and are not manually stored.
-- Missing dependencies, duplicate IDs, self-dependencies, and cycles are
-  invalid.
-- A `DONE` dependency is satisfied. A `SKIPPED` dependency is not satisfied by
-  status alone.
-- To proceed past a skipped dependency, the downstream task must declare
-  `TASK-nnn=WAIVER-nnn` under `Dependency waivers`, and the waiver registry must
-  name the downstream task, skipped task, rationale, evidence, and current AUTH
-  clause or separate owner decision that permits the omission.
-- A waiver cannot broaden scope, weaken an acceptance criterion, or conceal a
-  missing security, data, migration, recovery, or release obligation. If it
-  would, stop and revise Gate A or Gate B as applicable.
-- Structural waves express dependency order; they do not authorize concurrent
-  mutable work. The coordinator claims and executes one mutable task at a time.
-  Read-only analysis may run outside task claims, but it cannot write files or
-  mutable external state.
-- No local task uses authenticated `READ_ONLY` or `MUTATION` mode. BUILD-10 and
-  BUILD-20 checkpoint and stop at an authenticated AWS boundary: preflight
-  through AWS-10, deploy only through AWS-20, reconcile deployment evidence
-  through AWS-30, review residuals through AWS-40, and tear down only through
-  AWS-50. Later AWS mutations remain serialized even when local paths are
-  disjoint.
+Dependencies determine structural waves, never parallel mutable work. Any
+waiver must preserve the approved acceptance and authority boundary.
 
 ### Dependency waiver registry
 
@@ -409,52 +226,19 @@ property coverage.
 
 ## Attempt budget and stop conditions
 
-An attempt is one coherent implementation-and-validation cycle for a task.
-Claiming a task atomically increments `Attempts used`. A materially new
-hypothesis may use the next available attempt; repeating the same failed action
-does not reset the budget.
-
-Stop affected work and checkpoint when any of the following occurs:
-
-- Gate A or Gate B is stale, expired, revoked, or inconsistent with the active
-  REQ/DES/AUTH IDs;
-- the requested outcome, task, path, command, GitHub operation, AWS target, or
-  external-state mutation is outside AUTH;
-- an attempt budget is exhausted without a materially new authorized approach;
-- the coordinator discovers overlapping ownership, protected dirty work,
-  unexpected generated changes, or an unattributable failing baseline;
-- a new requirement, design decision, migration, destructive action, public
-  exposure, IAM broadening, production/shared-resource impact, sensitive-data
-  concern, or material cost change is required;
-- caller identity, account, Region, environment, artifact, change set, or live
-  state does not match the authorized AWS boundary;
-- an external operation is partial or its result is unknown; or
-- the next action cannot be validated objectively.
-
-Record the smallest decision or boundary change needed. Do not ask routine
-questions while safe tasks remain inside the current envelope.
+The Engine enforces the authorized attempt budget and stops on stale gates,
+boundary drift, failed evidence, exhausted attempts, or uncertain external state.
 
 ## Checkpoints and resume
 
-The coordinator checkpoints after every task or safe wave, before and after an
-external mutation, before handing work to another session, and whenever work
-pauses or stops. Gate B requires a local Git repository and resolvable baseline
-commit. After each validated wave, the coordinator inspects the integrated
-diff, records EV evidence, commits only authorized wave changes, updates Last
-known-green commit and the checkpoint row to that commit, and then runs the Fastlane Engine.
-Only after those steps may the run pause or start another wave. Never absorb a
-protected dirty path into the checkpoint commit.
+The coordinator records one durable checkpoint after each validated task or
+wave and before or after any separately authorized external action.
 
 | Checkpoint | Run | Time | REQ / DES / AUTH | Commit and protected dirty paths | Task outcomes and attempts | Evidence and external actions | Blockers and next safe action |
 |---|---|---|---|---|---|---|---|
 | `NONE` | `NONE` | TODO | `REQ-0001` / `DES-0001` / `AUTH-0001` | TODO | No work started | `NONE` | Complete Gate B; when current, run `TASK-10` |
 
-To resume, reconcile the active revisions and authorization expiry, baseline and
-current worktree, protected paths, task states and owners, remaining attempt
-budgets, last-known GitHub state, and last-known AWS state. Inspect an interrupted
-external operation read-only and classify it as succeeded, failed, partial, or
-unknown before deciding what is safe. Stop on any mismatch; never blindly rerun
-a mutation.
+Resume only from a current Engine-validated checkpoint; never blindly repeat an external action.
 
 ### Archived task-plan registry
 

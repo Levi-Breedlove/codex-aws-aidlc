@@ -983,8 +983,9 @@ class FastlaneHookTests(unittest.TestCase):
                 self.assertIn("STRUCTURED_API", content)
                 self.assertIn("REVIEWED_SCRIPT", content)
         self.assertIn(
-            "AWS Core selects a currently supported account-operation tool",
-            (REPOSITORY_ROOT / "docs" / "project" / "RUNBOOK.md").read_text(
+            "Codex follows current AWS Core guidance to select a supported "
+            "account-operation",
+            (REPOSITORY_ROOT / "prompts" / "CODEX-PROMPTS.md").read_text(
                 encoding="utf-8"
             ),
         )

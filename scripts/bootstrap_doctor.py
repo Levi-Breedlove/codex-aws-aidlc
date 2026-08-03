@@ -10334,8 +10334,38 @@ def derive_owner_decision_brief(
             ),
         ]
         locator_specs = (
+            (
+                "owner-decisions",
+                "Owner decisions and sources",
+                "Owner decisions and sources",
+            ),
             ("product-statement", "Product statement", "2. Product statement"),
-            ("requirements", "Product requirements", "6. Feature specifications"),
+            (
+                "requirements",
+                "Features and measurable acceptance",
+                "6. Feature specifications",
+            ),
+            (
+                "journeys",
+                "First-release journeys",
+                "7. Primary, alternate, and failure flows",
+            ),
+            ("data-boundary", "Data requirements", "8. Data requirements"),
+            (
+                "security-boundary",
+                "Security and privacy requirements",
+                "9. Security and privacy requirements",
+            ),
+            (
+                "reliability",
+                "Reliability requirements",
+                "10. Reliability requirements",
+            ),
+            (
+                "cost",
+                "Performance and cost",
+                "11. Performance, cost, and sustainability requirements",
+            ),
             ("gate-a-readiness", "Gate A readiness", "Gate A — readiness card"),
             (
                 "gate-a-acceptance",
@@ -10424,15 +10454,44 @@ def derive_owner_decision_brief(
                 {
                     "decision_id": selection.architecture_id,
                     "decision": "Whole-system architecture",
+                    "owner_effect": (
+                        "This is the complete system shape Codex will implement "
+                        "inside the approved construction boundary."
+                    ),
                     "selection": selection.selected_candidate,
+                    "requirement_basis": selection.requirement_and_driver_basis,
                     "why": selection.rationale,
-                    "tradeoff": selection.risks,
+                    "alternatives": selection.rejected_alternatives,
+                    "tradeoff": (
+                        f"Operational burden: {selection.operational_burden} "
+                        f"Cost effect: {selection.cost_effect}"
+                    ),
+                    "risk_and_mitigation": (
+                        f"Risks: {selection.risks} "
+                        f"Mitigations: {selection.mitigations} "
+                        f"Security impact: {selection.security_impact} "
+                        f"Reliability impact: {selection.reliability_impact}"
+                    ),
+                    "evidence_status": (
+                        "SOURCE_VERIFIED — "
+                        + ", ".join(
+                            item.evidence_id
+                            for item in design_contract.architecture.aws_evidence
+                        )
+                        if design_contract.architecture.aws_evidence
+                        else "NOT_YET_OBSERVED — no material AWS evidence is recorded"
+                    ),
+                    "reconsider_when": (
+                        f"Triggers: {selection.revisit_triggers} "
+                        f"Breakpoints: {selection.breakpoints} "
+                        f"Migration path: {selection.migration_path}"
+                    ),
                     "basis_ids": architecture_basis,
                     "evidence_ids": [
                         item.evidence_id
                         for item in design_contract.architecture.aws_evidence
                     ],
-                    "source_locator_keys": ["technical-plan"],
+                    "source_locator_keys": ["selected-architecture"],
                 }
             )
         for decision in design_contract.technology_decisions:
@@ -10445,37 +10504,88 @@ def derive_owner_decision_brief(
                     )
                 )
             )
+            evidence_maturity = {
+                "OWNER_CONSTRAINT": "CONFIRMED_BY_OWNER",
+                "REPOSITORY_FACT": "OBSERVED_IN_REPOSITORY",
+                "AGENT_RECOMMENDATION": "PLANNED_AFTER_APPROVAL",
+            }.get(decision.source, "NOT_YET_OBSERVED")
             grouped[_owner_technical_domain(decision.concern)].append(
                 {
                     "decision_id": decision.decision_id,
                     "decision": decision.concern,
+                    "owner_effect": (
+                        "This choice defines the "
+                        + decision.concern.lower().replace("_", " ")
+                        + " used by approved construction."
+                    ),
                     "selection": decision.selection,
+                    "requirement_basis": decision.basis_ids,
                     "why": decision.alternatives_and_rationale,
+                    "alternatives": decision.alternatives_and_rationale,
                     "tradeoff": decision.compatibility_migration,
+                    "risk_and_mitigation": (
+                        "Compatibility or migration risk: "
+                        f"{decision.compatibility_migration} "
+                        f"Mitigation and validation: {decision.validation}"
+                    ),
+                    "evidence_status": (
+                        f"{evidence_maturity} — source {decision.source}; "
+                        f"validation {decision.validation}"
+                    ),
+                    "reconsider_when": (
+                        "Revisit when the basis IDs, version policy "
+                        f"({decision.version_policy}), compatibility assumptions, "
+                        "or validation result changes."
+                    ),
                     "basis_ids": decision_basis,
                     "evidence_ids": [],
-                    "source_locator_keys": ["technical-plan"],
+                    "source_locator_keys": ["technology-register"],
                 }
             )
         if design_contract.harness.rows:
+            harness_basis = list(design_contract.harness.required_ids) or [
+                requirements_revision,
+                design_revision,
+            ]
             expected_decision_ids.append("HARNESS-PROFILE")
             grouped["validation/construction"].append(
                 {
                     "decision_id": "HARNESS-PROFILE",
                     "decision": "Validation and construction checks",
+                    "owner_effect": (
+                        "These checks decide whether Fastlane may call the approved "
+                        "construction complete."
+                    ),
                     "selection": (
                         f"{len(design_contract.harness.rows)} applicable checks "
                         "are recorded."
                     ),
+                    "requirement_basis": ", ".join(harness_basis),
                     "why": (
                         "The checks are bound to the approved design and requirements."
+                    ),
+                    "alternatives": (
+                        "A check may be omitted only as NOT_APPLICABLE with a concrete "
+                        "reason in the canonical Harness Profile."
                     ),
                     "tradeoff": (
                         "More validation takes time but reduces undetected defects."
                     ),
-                    "basis_ids": list(design_contract.harness.required_ids),
+                    "risk_and_mitigation": (
+                        "Risk: incomplete checks could overstate readiness. "
+                        "Mitigation: exact commands and durable evidence are required."
+                    ),
+                    "evidence_status": (
+                        "PLANNED_AFTER_APPROVAL — checks become observed "
+                        "only when their recorded commands pass."
+                    ),
+                    "reconsider_when": (
+                        "Revisit when requirements, architecture, tooling, "
+                        "or applicable quality risks change."
+                    ),
+                    "basis_ids": harness_basis,
                     "evidence_ids": [],
-                    "source_locator_keys": ["validation-strategy"],
+                    "source_locator_keys": ["harness-profile"],
                 }
             )
         technical_groups = [
@@ -10527,7 +10637,32 @@ def derive_owner_decision_brief(
         )
         locator_specs = (
             ("technical-plan", "Technical plan", "14. Architecture overview"),
+            (
+                "technology-register",
+                "Technology decisions",
+                "Technology decisions",
+            ),
+            (
+                "selected-architecture",
+                "Selected architecture",
+                "Selected architecture",
+            ),
+            ("components", "Component design", "15. Component design"),
+            ("interfaces", "Interfaces and contracts", "16. Interfaces and contracts"),
+            (
+                "data-lifecycle",
+                "Data model and lifecycle",
+                "17. Data model and lifecycle",
+            ),
+            (
+                "aws-implementation",
+                "AWS implementation approach",
+                "20. AWS implementation approach",
+            ),
             ("validation-strategy", "Validation strategy", "Validation strategy"),
+            ("harness-profile", "Harness checks", "Validation strategy"),
+            ("release-acceptance", "Release acceptance", "26. Release acceptance"),
+            ("first-wave", "First construction wave", "First construction wave"),
             (
                 "gate-b-readiness",
                 "Gate B readiness",
