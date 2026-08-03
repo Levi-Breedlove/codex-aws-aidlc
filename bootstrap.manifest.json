@@ -81,7 +81,7 @@
     "scripts/fastlane_context.py": "f2fe0ce148b010080386954db0e5667fd0ef855aa6ec62dab72f5f9719b17cbd",
     "scripts/fastlane_document_summaries.py": "34fb13bc755ba7de459206049a39e9343ed5e74853da236f80492705f91fa3bf",
     "scripts/fastlane_owner_briefs.py": "8aa12a39bd951ebe50dfd5c4213c97fd32b6a165e92c690f7aa48df613574630",
-    "scripts/fastlane_presenter.py": "dec08972a6aed869e802a6c9eb3b131f3098735d619eb15b5c05d8428e590635",
+    "scripts/fastlane_presenter.py": "4c04394cfe943cf4c03c7da0409bd06b343f1a666fbd6a4422bf22e036263bf2",
     "scripts/fastlane_process.py": "21d97beecfefdade67a0ed7ee69ef3818926a4291c21987b53c25601548ac115",
     "scripts/fastlane_project_identity.py": "b4829cb524fe5171b65ddd6c1d970f67d1d8a771a63c9236a8ab473719c46af5",
     "scripts/fastlane_stdio.py": "06ab89a37c32842db40936b4d364dd54ef8cd626f69e20549c506fe852f594d1",

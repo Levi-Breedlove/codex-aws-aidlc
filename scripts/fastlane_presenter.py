@@ -1896,9 +1896,7 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
                 for key in decision["source_locator_keys"]:
                     locator = locator_by_key[str(key)]
                     anchor = _markdown_anchor(str(locator["heading"]))
-                    sources.append(
-                        f"[{locator['label']}]({locator['path']}#{anchor})"
-                    )
+                    sources.append(f"[{locator['label']}]({locator['path']}#{anchor})")
                 lines.extend(
                     (
                         f"#### {decision['decision']} ({decision['decision_id']})",
