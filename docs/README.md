@@ -9,6 +9,8 @@ implementation instructions.
   fresh template.
 - [Understand the workflow](WORKFLOW.md) — see the complete owner journey from
   idea through local construction and optional AWS operations.
+- [Review the 1.2 qualification and walkthrough](QUALIFICATION.md) - see the
+  complete owner journey, tested scenarios, and bounded release claims.
 - [Troubleshoot](TROUBLESHOOTING.md) — resolve setup, resume, AWS Core, and
   Engine blockers without regenerating an active project.
 - [Security policy](../SECURITY.md) — understand trust, data, credentials, and

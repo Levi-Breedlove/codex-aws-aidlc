@@ -282,7 +282,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.1.5")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.0")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -908,12 +908,13 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 2)
 
     def test_current_release_text_rejects_stale_versions_except_fixtures(self) -> None:
-        stale_product_version = "1" + ".2.0"
+        aws_plugin_fixture_version = "1" + ".2.0"
         stale_versions = (
             "1" + ".0.0",
             PREVIOUS_PACKAGE_VERSION,
+            "1" + ".1.3",
+            "1" + ".1.5",
             "2" + ".0.0",
-            stale_product_version,
         )
         negative_fixture_marker = f'"bootstrap_version": "{stale_versions[0]}"'
         text_suffixes = {".md", ".json", ".yaml", ".yml", ".py", ".txt"}
@@ -928,6 +929,12 @@ class PackageReleaseTests(unittest.TestCase):
             content = path.read_text(encoding="utf-8")
             relative = path.relative_to(REPOSITORY_ROOT).as_posix()
             for line_number, line in enumerate(content.splitlines(), start=1):
+                if (
+                    relative == "tests/test_bootstrap_doctor.py"
+                    and aws_plugin_fixture_version in line
+                    and "plugin_version: str =" in line
+                ):
+                    allowed_aws_version_observations += 1
                 for version in stale_versions:
                     if version not in line:
                         continue
@@ -937,13 +944,6 @@ class PackageReleaseTests(unittest.TestCase):
                         and negative_fixture_marker in line
                     ):
                         allowed_negative_fixtures += 1
-                        continue
-                    if (
-                        relative == "tests/test_bootstrap_doctor.py"
-                        and version == stale_product_version
-                        and "plugin_version: str =" in line
-                    ):
-                        allowed_aws_version_observations += 1
                         continue
                     violations.append(f"{relative}:{line_number}:{version}")
         self.assertEqual(allowed_negative_fixtures, 2)
