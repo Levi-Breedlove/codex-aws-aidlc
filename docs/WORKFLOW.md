@@ -52,10 +52,8 @@ directly and then Fastlane restores the pending project action.
 | Release review | Reconciles what is verified, failed, planned, or still unobserved | Resolve only a genuine release decision |
 | Optional AWS operations | Performs separately bounded preflight, deployment, reconciliation, or teardown | Supply the exact action-specific authorization |
 
-Gate A — approve requirements → Gate B — approve design and construction →
-Codex builds locally inside that boundary. Gate A continues into Design in the
-same run. Gate B continues into task generation and permitted local construction
-in the same run. Build never deploys.
+Gate A continues into Design in the same run. Gate B continues into task generation
+and local construction. Build never deploys.
 
 ## Gate A — Product Owner Brief
 
@@ -86,6 +84,9 @@ access patterns, storage and uploads, messaging and retries, encryption and
 secrets, monitoring and incident response, deletion and restoration,
 reliability, performance, cost, deployment, rollback, trust boundaries, state
 transitions, tests, and the first construction wave.
+Gate B also records application source: greenfield uses `app/**`, never `apps/**`
+or `src/**`; infrastructure-only records none; brownfield keeps only Gate
+A-preserved roots. It adds no gate or routine question.
 
 Each decision states what it means, what was selected, why it fits, alternatives
 and rejection reasons, tradeoffs, risks and mitigations, current evidence, claim

@@ -4,13 +4,17 @@ Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10. BUG-10 and SYNC-10 are requ
 
 ## Application source layout
 
-- New greenfield application source lives under singular `app/`. Do not create
-  a parallel `apps/` or another application source tree. Keep tests under
-  `tests/` and infrastructure under `infrastructure/`; root toolchain files may
-  remain at the repository root when the selected stack requires them.
-- Brownfield work preserves the existing source root recorded in the approved
-  baseline and write boundary. Never introduce `app/` or `apps/` as a parallel
-  tree unless a design-controlled change explicitly approves the migration.
+- Follow the approved `Application source disposition`. Greenfield application
+  work uses singular `app/`; its walking-skeleton task must write there. Never
+  create parallel `apps/` or `src/` trees. Keep tests under `tests/` and
+  infrastructure under `infrastructure/`; root toolchain files may remain at
+  the repository root when the selected stack requires them.
+- Infrastructure-only work may omit `app/` only when Gate B records exactly
+  `NOT_APPLICABLE — INFRASTRUCTURE_ONLY`.
+- Brownfield work preserves only the source roots recorded in the approved
+  baseline, preservation contract, disposition, and write boundary. Never
+  introduce `app/`, `apps/`, or `src/` as a parallel tree unless a
+  design-controlled change explicitly approves the migration.
 - Follow the selected framework and module boundaries. Separate business logic
   from transport, persistence, and provider integration; validate bounded input
   at the boundary; enforce authorization server-side; keep logging structured

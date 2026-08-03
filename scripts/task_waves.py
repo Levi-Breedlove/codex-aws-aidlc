@@ -365,6 +365,8 @@ class ApprovedSpikeContract:
 @dataclass(frozen=True)
 class ApprovedDeliveryContract:
     grandfathered: bool
+    application_source_kind: str | None = None
+    application_source_paths: tuple[str, ...] = ()
     wave_contract_id: str | None = None
     journey_id: str | None = None
     requirement_ids: tuple[str, ...] = ()
@@ -1199,6 +1201,25 @@ def validate_new_build_delivery_order(
             f"{walking_task.task_id}: walking-skeleton Requirements are missing "
             + ", ".join(missing_ids),
         )
+        if delivery.application_source_kind == "GREENFIELD_APP_ROOT":
+            try:
+                walking_writes = validate_write_boundary(
+                    walking_task.metadata.get("Write set", ""),
+                    walking_task.task_id,
+                )
+                writes_application_source = any(
+                    path_boundary_contains(source, path)
+                    or path_boundary_contains(path, source)
+                    for source in delivery.application_source_paths
+                    for path in walking_writes
+                )
+                reject(
+                    not writes_application_source,
+                    f"{walking_task.task_id}: walking-skeleton Write set must include approved application source under app/**",
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+
         projected_harness: dict[str, HarnessExecutionRow] = {}
         validation = task_subsection(walking_task, "#### Validation")
         if validation is not None:
@@ -2989,10 +3010,21 @@ def approved_contract_for_tasks(
             if row.harness_id in design_contract.harness.required_ids
         }
         project_contract = design_contract.project_contract
+        source_disposition = project_contract.application_source_disposition
+        source_kind = (
+            source_disposition.kind if source_disposition is not None else None
+        )
+        source_paths = (
+            source_disposition.paths if source_disposition is not None else ()
+        )
         if project_contract.grandfathered_v4:
             approved_delivery = ApprovedDeliveryContract(grandfathered=True)
         elif project_contract.first_wave is None:
-            approved_delivery = ApprovedDeliveryContract(grandfathered=False)
+            approved_delivery = ApprovedDeliveryContract(
+                grandfathered=False,
+                application_source_kind=source_kind,
+                application_source_paths=source_paths,
+            )
         else:
             first_wave = project_contract.first_wave
             approved_spike: ApprovedSpikeContract | None = None
@@ -3026,6 +3058,8 @@ def approved_contract_for_tasks(
                 requirement_ids=first_wave.requirement_ids,
                 acceptance_test_ids=first_wave.acceptance_test_ids,
                 harness_id=first_wave.harness_id,
+                application_source_kind=source_kind,
+                application_source_paths=source_paths,
                 spike=approved_spike,
             )
         try:

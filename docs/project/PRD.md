@@ -49,7 +49,7 @@ Read the current state above, then go directly to the section named by Fastlane.
 | Bootstrap release | TODO (release version and source commit/tag) |
 | Workflow mode | `codex-native` |
 | Project contract schema | `1.4` |
-| Project design contract schema | `6` |
+| Project design contract schema | `7` |
 | Project mode | `greenfield` / `brownfield` |
 | Delivery profile | `quick-mvp` / `standard` / `high-risk` |
 | Effective risk | `low` / `moderate` / `high` / `critical` |
@@ -159,7 +159,10 @@ storing raw conversation transcripts.
 ### 1.2 Brownfield baseline and preservation contract
 
 Complete these records only for brownfield work. Unknown behavior remains a
-Gate A finding, never permission to replace it.
+Gate A finding, never permission to replace it. List every existing application
+source root exactly (for example, `service/**`) in both **Protected files and
+components** and the matching `PRES-*` row so the technical plan can preserve
+it without creating a parallel application folder.
 
 | Field | Brownfield baseline |
 |---|---|
@@ -1063,7 +1066,10 @@ The Engine blocks Gate B until every field and applicable Harness check is compl
 Gate B authorizes only the exact local construction scope recorded below. It
 does not authorize GitHub publication or AWS account work. Any broader path,
 command, task, external target, cost, or operation requires the existing
-correction and authorization process.
+correction and authorization process. The **Application source disposition**
+names the one application-code home: `app/**` for greenfield work, the recorded
+preserved roots for brownfield work, or an explicit infrastructure-only
+exception. Fastlane rejects parallel greenfield `apps/**` and `src/**` roots.
 
 <details>
 <summary>Exact construction envelope and validation grammar</summary>
@@ -1084,6 +1090,7 @@ correction and authorization process.
 | In-scope components and environments | TODO |
 | Allowed repository write set | `PATHS: exact/path; narrow/**` |
 | Excluded or owner-only write set | `NONE` / `PATHS: exact/path; narrow/**` |
+| Application source disposition | `GREENFIELD_APP_ROOT: app/**` / `BROWNFIELD_PRESERVE: path/**; another/path/**` / `NOT_APPLICABLE — INFRASTRUCTURE_ONLY` |
 | Allowed external-state targets | `NONE` / `TARGETS: exact-target; exact-target` |
 | Task boundary | `DERIVED_FROM_AUTHORIZED_IDS_AND_WRITE_SET` / `TASK_IDS: TASK-0001, TASK-0002` |
 | Maximum generated tasks | TODO (positive integer) |
