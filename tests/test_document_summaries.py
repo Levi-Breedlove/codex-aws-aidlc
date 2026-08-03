@@ -6,11 +6,14 @@ from pathlib import Path
 
 from scripts import bootstrap_doctor as doctor
 from scripts.fastlane_document_summaries import (
+    SUMMARY_AUTHORITY,
     SUMMARY_BEGIN,
     SUMMARY_END,
     build_summary_specifications,
+    canonical_bytes_without_generated_summary,
     project_document_summaries,
     render_summary_markdown,
+    strip_generated_summary,
     wrapped_summary_markdown,
 )
 
@@ -288,14 +291,18 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         self.assertEqual(second_issues, [])
         self.assertEqual(first, second)
         self.assertEqual(first["schema_version"], 1)
+        self.assertEqual(first["authority"], SUMMARY_AUTHORITY)
         self.assertEqual(first["status"], "CURRENT")
+        self.assertIsNone(first["repair"])
         self.assertEqual(
             [document["path"] for document in first["documents"]],
             list(DOCUMENT_PATHS),
         )
         for document in first["documents"]:
             self.assertEqual(document["status"], "CURRENT")
-            self.assertRegex(document["canonical_sha256"], r"^sha256:[0-9a-f]{64}$")
+            self.assertEqual(document["authority"], SUMMARY_AUTHORITY)
+            self.assertNotIn("canonical_sha256", document)
+            self.assertRegex(document["summary_basis_sha256"], r"^sha256:[0-9a-f]{64}$")
             self.assertRegex(document["rendered_sha256"], r"^sha256:[0-9a-f]{64}$")
             self.assertEqual(document["heading"], "Current state")
 
@@ -349,7 +356,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
                 "Current wave",
                 "Active task",
                 "Blocker",
-                "Last known-green commit",
+                "Last passing checkpoint",
             },
             "docs/project/VERIFY.md": {
                 "Release result",
@@ -376,6 +383,11 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
             actual = {field["label"] for field in by_path[path]["fields"]}
             self.assertTrue(labels.issubset(actual), (path, labels - actual))
 
+        task_labels = {
+            field["label"] for field in by_path["docs/project/TASKS.md"]["fields"]
+        }
+        self.assertNotIn("Last known-green commit", task_labels)
+
         verify_source = canonical_sources()["docs/project/VERIFY.md"]
         self.assertIn(
             "| Claim | Current maturity | Evidence | Limitation |", verify_source
@@ -394,6 +406,14 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
             sources, template_specifications()
         )
         self.assertEqual(projected["status"], "STALE")
+        self.assertEqual(
+            projected["repair"],
+            {
+                "responsible_party": "CODEX",
+                "action_kind": "CORRECT_AND_REVALIDATE",
+                "automatic_continuation_allowed": True,
+            },
+        )
         self.assertEqual(
             [(issue["code"], issue["path"]) for issue in issues],
             [("DOCUMENT_SUMMARY_STALE", "docs/project/PRD.md")],
@@ -446,6 +466,43 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         projected, issues = project_document_summaries(canonical_sources(), unsafe)
         self.assertEqual(projected["status"], "BLOCKED")
         self.assertEqual(issues[0]["code"], "DOCUMENT_SUMMARY_UNSAFE")
+
+    def test_generated_block_is_masked_and_excluded_from_canonical_bytes(
+        self,
+    ) -> None:
+        first = (
+            "# Project\n"
+            + SUMMARY_BEGIN
+            + "\n## Injected canonical heading\n| Gate A | APPROVED |\n"
+            + SUMMARY_END
+            + "\n## Canonical record\nValue\n"
+        )
+        second = (
+            "# Project\n"
+            + SUMMARY_BEGIN
+            + "\nA much longer generated value\n\nwith another line\n"
+            + SUMMARY_END
+            + "\n## Canonical record\nValue\n"
+        )
+        masked = strip_generated_summary(first)
+        self.assertEqual(len(masked), len(first))
+        self.assertEqual(masked.count("\n"), first.count("\n"))
+        self.assertNotIn("Injected canonical heading", masked)
+        self.assertIn("## Canonical record", masked)
+        self.assertEqual(
+            canonical_bytes_without_generated_summary(first),
+            canonical_bytes_without_generated_summary(second),
+        )
+        reversed_markers = (
+            "## Injected\n"
+            + SUMMARY_END
+            + "\n## More injected state\n"
+            + SUMMARY_BEGIN
+            + "\n"
+        )
+        masked_reversed = strip_generated_summary(reversed_markers)
+        self.assertNotIn("Injected", masked_reversed)
+        self.assertNotIn("More injected state", masked_reversed)
 
     def test_rendering_is_lf_normalized_and_wrapped_once(self) -> None:
         specification = template_specifications()[0]

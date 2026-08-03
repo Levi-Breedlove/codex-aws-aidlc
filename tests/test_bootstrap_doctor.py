@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Mapping
 
+from scripts import fastlane_document_summaries as document_summaries
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = REPOSITORY_ROOT
@@ -1835,6 +1836,25 @@ def refresh_control_hashes(project: Path) -> None:
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
 
+def refresh_document_summaries(project: Path) -> None:
+    """Apply the Engine-derived presentation blocks at a lifecycle checkpoint."""
+
+    refresh_control_hashes(project)
+    report = doctor.inspect_project(project)
+    for summary in report["document_summaries"]["documents"]:
+        path = project / str(summary["path"])
+        source_text = path.read_text(encoding="utf-8")
+        begin = source_text.index(document_summaries.SUMMARY_BEGIN)
+        begin += len(document_summaries.SUMMARY_BEGIN)
+        end = source_text.index(document_summaries.SUMMARY_END, begin)
+        rendered = document_summaries.render_summary_markdown(summary)
+        path.write_text(
+            source_text[:begin] + "\n" + rendered + source_text[end:],
+            encoding="utf-8",
+        )
+    refresh_control_hashes(project)
+
+
 def aws_authority_envelope(
     *,
     role: str,
@@ -2416,9 +2436,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         state = json.loads(state_path.read_text(encoding="utf-8"))
         state["lifecycle"]["gate_a"] = "PENDING_OWNER_APPROVAL"
         state_path.write_text(json.dumps(state), encoding="utf-8")
-        refresh_control_hashes(project)
+        refresh_document_summaries(project)
         report = doctor.inspect_project(project)
         self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["document_summaries"]["status"], "CURRENT")
         self.assertEqual(report["lifecycle_state"], "WAITING_GATE_A")
         self.assertEqual(report["next_prompt"], "INTAKE-20")
         return proposal.replace("<name/handle>", "alice")
@@ -2487,9 +2508,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             "Complete Gate B; when current, run `TASK-10`.",
         )
         tasks_path.write_text(tasks, encoding="utf-8")
-        refresh_control_hashes(project)
+        refresh_document_summaries(project)
         report = doctor.inspect_project(project)
         self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["document_summaries"]["status"], "CURRENT")
         self.assertEqual(report["lifecycle_state"], "WAITING_GATE_B")
         self.assertEqual(report["next_prompt"], "DESIGN-20")
         return proposal.replace("<name/handle>", "alice")
@@ -9118,6 +9140,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             baseline = doctor.inspect_project(project)
             self.assertTrue(baseline["ok"], baseline["diagnostics"])
             self.assertEqual(baseline["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
+            baseline_records = {
+                item["kind"]: item
+                for item in baseline["design_contract"]["diagram_contract"]["records"]
+            }
 
             prd_path = project / "docs/project/PRD.md"
             source = prd_path.read_text(encoding="utf-8")
@@ -9165,6 +9191,27 @@ class BootstrapDoctorTests(unittest.TestCase):
             relocated["design_contract"]["diagram_contract"],
             baseline["design_contract"]["diagram_contract"],
         )
+        relocated_records = {
+            item["kind"]: item
+            for item in relocated["design_contract"]["diagram_contract"]["records"]
+        }
+        for kind in ("SYSTEM_CONTEXT", "PRIMARY_OUTCOME"):
+            self.assertEqual(
+                relocated_records[kind]["semantic_sha256"],
+                baseline_records[kind]["semantic_sha256"],
+            )
+            self.assertEqual(
+                relocated_records[kind]["rendered_sha256"],
+                baseline_records[kind]["rendered_sha256"],
+            )
+        selected = "\n".join(
+            moved.splitlines()[
+                moved_locator["start_line"] - 1 : moved_locator["end_line"]
+            ]
+        )
+        self.assertTrue(selected.startswith("### Proposed system at a glance"))
+        self.assertNotIn("<details>", selected)
+        self.assertEqual(moved_locator["heading"], "Proposed system at a glance")
 
     def test_required_project_diagrams_fail_closed_when_stale_or_generic(
         self,
@@ -9753,9 +9800,62 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(report["document_summaries"]["schema_version"], 1)
         self.assertEqual(report["document_summaries"]["status"], "STALE")
         self.assertIn("DOCUMENT_SUMMARY_STALE", codes(report))
+        self.assertEqual(
+            report["document_summaries"]["repair"],
+            {
+                "responsible_party": "CODEX",
+                "action_kind": "CORRECT_AND_REVALIDATE",
+                "automatic_continuation_allowed": True,
+            },
+        )
         self.assertNotIn(
             "DOCUMENT_SUMMARY_STALE",
             {item["diagnostic_code"] for item in report["remediation"]["items"]},
+        )
+
+    def test_stale_summary_blocks_only_a_pending_owner_brief(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.pending_gate_a(project)
+            baseline = doctor.inspect_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            source_text = prd_path.read_text(encoding="utf-8")
+            prd_summary = next(
+                item
+                for item in baseline["document_summaries"]["documents"]
+                if item["path"] == doctor.PRD_FILE
+            )
+            product_outcome = next(
+                item["value"]
+                for item in prd_summary["fields"]
+                if item["label"] == "Product outcome"
+            )
+            changed = source_text.replace(
+                f"| Product outcome | {product_outcome} |",
+                "| Product outcome | Stale generated value |",
+                1,
+            )
+            self.assertNotEqual(source_text, changed)
+            prd_path.write_text(changed, encoding="utf-8")
+            refresh_control_hashes(project)
+            observed = doctor.inspect_project(project)
+
+        self.assertTrue(baseline["ok"], baseline["diagnostics"])
+        self.assertFalse(observed["ok"])
+        self.assertEqual(observed["lifecycle_state"], "WAITING_GATE_A")
+        self.assertEqual(observed["gates"], baseline["gates"])
+        self.assertEqual(
+            observed["requirements_contract"], baseline["requirements_contract"]
+        )
+        self.assertEqual(
+            observed["basis"]["prd_snapshot_sha256"],
+            baseline["basis"]["prd_snapshot_sha256"],
+        )
+        self.assertEqual(observed["owner_decision_brief"]["status"], "BLOCKED")
+        self.assertFalse(observed["owner_decision_brief"]["formal_receipt_required"])
+        self.assertEqual(
+            observed["remediation"]["next_action"]["action_kind"],
+            "CORRECT_AND_REVALIDATE",
         )
 
     def test_summary_hand_edit_changes_only_the_presentation_snapshot(self) -> None:
@@ -9768,8 +9868,24 @@ class BootstrapDoctorTests(unittest.TestCase):
             prd_path = project / "docs/project/PRD.md"
             source = prd_path.read_text(encoding="utf-8")
             changed = source.replace(
-                "| Product outcome | Not yet confirmed |",
-                "| Product outcome | Hand-edited presentation only |",
+                "\n".join(
+                    [
+                        "| Product outcome | Not yet confirmed |",
+                        "| First-release boundary | Not yet confirmed |",
+                        "| Requirements | Not yet initialized |",
+                        "| Technical design | Not yet initialized |",
+                        "| Gate A | Not yet initialized |",
+                    ]
+                ),
+                "\n".join(
+                    [
+                        "## Document status",
+                        "| Field | Value |",
+                        "|---|---|",
+                        "| Requirements revision | REQ-9999 |",
+                        "| Gate A derived status | APPROVED_FOR_DESIGN |",
+                    ]
+                ),
                 1,
             )
             self.assertNotEqual(source, changed)
@@ -9796,17 +9912,12 @@ class BootstrapDoctorTests(unittest.TestCase):
             "tasks",
         ):
             self.assertEqual(observed[key], baseline[key], key)
-        for key in (
-            "requirements_revision",
-            "design_revision",
-            "construction_authorization",
-        ):
-            self.assertEqual(observed["basis"][key], baseline["basis"][key])
-        self.assertNotEqual(
-            observed["basis"]["prd_snapshot_sha256"],
-            baseline["basis"]["prd_snapshot_sha256"],
-        )
+        self.assertEqual(observed["basis"], baseline["basis"])
         self.assertEqual(observed["document_summaries"]["status"], "STALE")
+        self.assertEqual(
+            observed["document_summaries"]["repair"]["action_kind"],
+            "CORRECT_AND_REVALIDATE",
+        )
 
 
 class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):

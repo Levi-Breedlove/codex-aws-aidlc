@@ -290,20 +290,48 @@ class FastlanePresenterTests(unittest.TestCase):
         )
 
     def test_automatic_update_says_nothing_and_continues(self) -> None:
+        current = report(
+            owner_stage="DESIGN",
+            state="WORKING",
+            route_reason_code="DESIGN_REQUIRED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+        )
+        current["gates"] = {
+            "gate_a": "APPROVED_FOR_DESIGN",
+            "gate_b": "BLOCKED",
+        }
+        current["next_prompt"] = "DESIGN-10"
         rendered = presenter.render_owner_update(
-            report(
-                owner_stage="DESIGN",
-                state="WORKING",
-                route_reason_code="DESIGN_REQUIRED",
-                owner_action_required=False,
-                owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
-                automatic_continuation_allowed=True,
-            ),
+            current,
             updated="Gate A was approved.",
         )
         self.assertIn("FASTLANE \u00b7 DESIGN", rendered)
         self.assertIn("Need from you: Nothing.", rendered)
         self.assertIn("compare complete architecture candidates", rendered)
+        self.assertIn("(docs/project/PRD.md#gate-a-review)", rendered)
+        self.assertIn("(docs/project/PRD.md#technical-plan)", rendered)
+
+    def test_first_automatic_gate_b_update_links_to_decision_and_tasks(self) -> None:
+        current = report(
+            owner_stage="DELIVER",
+            state="WORKING",
+            route_reason_code="TASK_PLAN_REQUIRED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+        )
+        current["gates"] = {
+            "gate_a": "APPROVED_FOR_DESIGN",
+            "gate_b": "APPROVED_FOR_CONSTRUCTION",
+        }
+        current["next_prompt"] = "TASK-10"
+        rendered = presenter.render_owner_update(
+            current, updated="Gate B was approved."
+        )
+        self.assertIn("(docs/project/PRD.md#gate-b-review)", rendered)
+        self.assertIn("(docs/project/TASKS.md#current-progress)", rendered)
 
     def test_aws_guidance_is_automatic_and_credential_free(self) -> None:
         rendered = presenter.render_owner_update(

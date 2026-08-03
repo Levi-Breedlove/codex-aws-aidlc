@@ -117,6 +117,7 @@ class ProductJourneyTests(unittest.TestCase):
         state["lifecycle"]["gate_a"] = "PENDING_OWNER_APPROVAL"
         state["lifecycle"]["gate_b"] = "BLOCKED"
         state_path.write_text(json.dumps(state), encoding="utf-8")
+        doctor_fixtures.refresh_document_summaries(project)
 
     def authorize_issue_sync(self, project: Path) -> dict[str, str]:
         """Allow issue synchronization while keeping merge prohibited."""
@@ -385,6 +386,9 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_a = presenter.render_owner_decision_brief(gate_a, "GATE_A")
             self.assertIn("Gate A Owner Decision Brief", rendered_gate_a)
             self.assertIn("Not authorized", rendered_gate_a)
+            for locator in gate_a_brief["source_locators"]:
+                anchor = presenter._markdown_anchor(str(locator["heading"]))
+                self.assertIn(f"({locator['path']}#{anchor})", rendered_gate_a)
 
             confirmation = gate_a["owner_answer_confirmation"]
             self.assertEqual(confirmation["status"], "READY")
@@ -410,8 +414,28 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
+            for locator in gate_b_brief["source_locators"]:
+                anchor = presenter._markdown_anchor(str(locator["heading"]))
+                self.assertIn(f"({locator['path']}#{anchor})", rendered_gate_b)
+            design_contract = gate_b["design_contract"]
+            expected_decisions = {
+                design_contract["architecture"]["selection"]["architecture_id"],
+                *(
+                    item["decision_id"]
+                    for item in design_contract["technology_decisions"]
+                ),
+            }
+            if design_contract["harness"]["rows"]:
+                expected_decisions.add("HARNESS-PROFILE")
+            actual_decisions = [
+                decision["decision_id"]
+                for group in gate_b_brief["technical_decision_groups"]
+                for decision in group["decisions"]
+            ]
+            self.assertEqual(len(actual_decisions), len(set(actual_decisions)))
+            self.assertEqual(set(actual_decisions), expected_decisions)
 
-            diagram_contract = gate_b["design_contract"]["diagram_contract"]
+            diagram_contract = design_contract["diagram_contract"]
             self.assertEqual(diagram_contract["schema_version"], 1)
             self.assertEqual(diagram_contract["status"], "CURRENT")
             records = {item["kind"]: item for item in diagram_contract["records"]}
@@ -443,6 +467,11 @@ class ProductJourneyTests(unittest.TestCase):
                 after_gate_a["interaction"]["automatic_continuation_allowed"]
             )
             self.assertFalse(after_gate_a["interaction"]["formal_receipt_required"])
+            after_gate_a_update = presenter.render_owner_update(
+                after_gate_a, updated="Gate A was approved."
+            )
+            self.assertIn("(docs/project/PRD.md#gate-a-review)", after_gate_a_update)
+            self.assertIn("(docs/project/PRD.md#technical-plan)", after_gate_a_update)
 
             current_design = doctor.derive_interaction(
                 "DESIGN_REQUIRED",
@@ -462,6 +491,13 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertTrue(current["ok"], current["diagnostics"])
             self.assertEqual(current["next_prompt"], "TASK-10")
             self.assertTrue(current["interaction"]["automatic_continuation_allowed"])
+            after_gate_b_update = presenter.render_owner_update(
+                current, updated="Gate B was approved."
+            )
+            self.assertIn("(docs/project/PRD.md#gate-b-review)", after_gate_b_update)
+            self.assertIn(
+                "(docs/project/TASKS.md#current-progress)", after_gate_b_update
+            )
 
             verify_path = deliver_project / "docs/project/VERIFY.md"
             current_evidence = verify_path.read_text(encoding="utf-8")
@@ -1097,6 +1133,7 @@ class ProductJourneyTests(unittest.TestCase):
                 1,
             )
             bugfix_path.write_text(bugfix_text, encoding="utf-8")
+            doctor_fixtures.refresh_document_summaries(project)
 
             after = doctor.inspect_project(project)
             self.assertTrue(after["ok"], after["diagnostics"])

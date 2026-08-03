@@ -1406,6 +1406,34 @@ def _render_intake_card(
     return "\n".join(lines)
 
 
+def _post_gate_navigation(
+    report: Mapping[str, Any], interaction: Mapping[str, Any]
+) -> tuple[str, ...]:
+    """Return links only for the first automatic continuation after a gate."""
+
+    if interaction.get("automatic_continuation_allowed") is not True:
+        return ()
+    gates = report.get("gates")
+    if not isinstance(gates, Mapping):
+        return ()
+    next_prompt = str(report.get("next_prompt", ""))
+    if (
+        next_prompt == "DESIGN-10"
+        and gates.get("gate_a") == "APPROVED_FOR_DESIGN"
+        and gates.get("gate_b") != "APPROVED_FOR_CONSTRUCTION"
+    ):
+        return (
+            "- [Gate A decision](docs/project/PRD.md#gate-a-review)",
+            "- [Technical Plan](docs/project/PRD.md#technical-plan)",
+        )
+    if next_prompt == "TASK-10" and gates.get("gate_b") == "APPROVED_FOR_CONSTRUCTION":
+        return (
+            "- [Gate B decision](docs/project/PRD.md#gate-b-review)",
+            "- [Current construction progress](docs/project/TASKS.md#current-progress)",
+        )
+    return ()
+
+
 def render_owner_update(
     report: Mapping[str, Any],
     *,
@@ -1504,6 +1532,9 @@ def render_owner_update(
     ]
     if audit_parts:
         lines.append("Audit: " + " ".join(audit_parts))
+    navigation = _post_gate_navigation(report, interaction)
+    if navigation:
+        lines.extend(("", "Continue in:", *navigation))
     reply = COPYABLE_REPLIES.get(action_kind)
     if required and reply:
         lines.extend(("", "Copyable reply:", reply))
