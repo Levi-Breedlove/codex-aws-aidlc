@@ -6041,6 +6041,46 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertIn("GATE_B_ENVELOPE", codes(report))
 
+    def test_greenfield_gate_b_binds_application_source_to_singular_app(self) -> None:
+        doctor.validate_application_source_root(
+            ["app/**", "tests/**", "infrastructure/**"],
+            "greenfield",
+        )
+        for invalid, message in (
+            (["apps/**", "tests/**"], "singular app/"),
+            (["src/**", "tests/**"], "must include application source under app/"),
+        ):
+            with self.subTest(paths=invalid):
+                with self.assertRaisesRegex(ValueError, message):
+                    doctor.validate_application_source_root(invalid, "greenfield")
+
+        # An approved brownfield layout is preserved rather than silently migrated.
+        doctor.validate_application_source_root(
+            ["apps/existing-service/**", "tests/**"],
+            "brownfield",
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            text = set_table_value(
+                prd_path.read_text(encoding="utf-8"),
+                "## 28. Construction envelope",
+                "## 29. Gate B owner authorization record",
+                "Allowed repository write set",
+                "`PATHS: apps/**; tests/**`",
+            )
+            prd_path.write_text(rebind_gate_b_envelope(text), encoding="utf-8")
+
+            report = doctor.inspect_project(project)
+
+        self.assertIn("GATE_B_ENVELOPE", codes(report))
+        self.assertTrue(
+            any("singular app/**" in item["message"] for item in report["diagnostics"]),
+            report["diagnostics"],
+        )
+
     def test_gate_b_rejects_generated_invalid_design_aws_core_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))

@@ -1342,18 +1342,18 @@ class BootstrapSafetyTests(unittest.TestCase):
             root = Path(temporary_directory)
             source = root / "source"
             target = root / "target"
-            (source / "app").mkdir(parents=True)
-            (target / "app").mkdir(parents=True)
-            (source / "app" / "AGENTS.md").write_text(
+            (source / "infrastructure").mkdir(parents=True)
+            (target / "infrastructure").mkdir(parents=True)
+            (source / "infrastructure" / "AGENTS.md").write_text(
                 "fastlane contract",
                 encoding="utf-8",
             )
-            (target / "app" / "AGENTS.md").write_text(
+            (target / "infrastructure" / "AGENTS.md").write_text(
                 "user contract",
                 encoding="utf-8",
             )
             decision = adoption_decision(
-                "app/AGENTS.md",
+                "infrastructure/AGENTS.md",
                 "PRESERVE",
                 b"user contract",
                 b"fastlane contract",

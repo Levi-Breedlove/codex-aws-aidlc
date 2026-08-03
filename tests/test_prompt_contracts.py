@@ -1103,9 +1103,6 @@ Approver: <name/handle>"""
             "PRD": self.prd,
             "TASKS": self.tasks,
             "prompt pack": self.prompts,
-            "app AGENTS": (PROJECT_ROOT / "app" / "AGENTS.md").read_text(
-                encoding="utf-8"
-            ),
             "infrastructure AGENTS": (
                 PROJECT_ROOT / "infrastructure" / "AGENTS.md"
             ).read_text(encoding="utf-8"),
@@ -1118,6 +1115,26 @@ Approver: <name/handle>"""
         self.assertLessEqual(len(self.root_readme.splitlines()), 80)
         self.assertIn("## Start", self.root_readme)
         self.assertIn("## What to expect", self.root_readme)
+
+    def test_greenfield_application_source_uses_singular_engine_bound_root(
+        self,
+    ) -> None:
+        app_root = PROJECT_ROOT / "app"
+        self.assertTrue((app_root / ".gitkeep").is_file())
+        self.assertEqual((app_root / ".gitkeep").read_bytes(), b"")
+        self.assertFalse((app_root / "AGENTS.md").exists())
+        engine = (PROJECT_ROOT / "scripts/bootstrap_doctor.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("singular `app/`", self.agents)
+        self.assertIn("singular `app/`", self.fastlane_deliver)
+        self.assertIn("Greenfield application source must use singular app/**", engine)
+        self.assertIn('project_mode != "greenfield"', engine)
+        self.assertIn(
+            "Brownfield work preserves the existing source root", self.fastlane_deliver
+        )
+        self.assertIn("Harness Profile", self.fastlane_deliver)
+        self.assertNotIn("app/AGENTS.md", self.agents)
 
     def test_readme_uses_one_line_gate_flow(self) -> None:
         gate_line = (

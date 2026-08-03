@@ -2,6 +2,25 @@
 
 Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10. BUG-10 and SYNC-10 are request-scoped adjuncts; rerun the Engine afterward and resume its route.
 
+## Application source layout
+
+- New greenfield application source lives under singular `app/`. Do not create
+  a parallel `apps/` or another application source tree. Keep tests under
+  `tests/` and infrastructure under `infrastructure/`; root toolchain files may
+  remain at the repository root when the selected stack requires them.
+- Brownfield work preserves the existing source root recorded in the approved
+  baseline and write boundary. Never introduce `app/` or `apps/` as a parallel
+  tree unless a design-controlled change explicitly approves the migration.
+- Follow the selected framework and module boundaries. Separate business logic
+  from transport, persistence, and provider integration; validate bounded input
+  at the boundary; enforce authorization server-side; keep logging structured
+  and safe; and make timeouts and retries explicit.
+- Preserve approved interfaces unless a current requirement changes them. Test
+  success, invalid input, authorization, boundaries, concurrency, and dependency
+  failure. Never put AWS credentials or privileged AWS logic in client code.
+- Before completion, run every required formatter, linter, type checker, test,
+  build, and applicable security check from the current Harness Profile.
+
 ## Tasks and local construction
 
 - Require current Gate B and exact REQ/DES/AUTH basis. Generate dependency-aware tasks with `scripts/task_waves.py`; only dependency-ready `READY` tasks run.

@@ -890,7 +890,7 @@ MANDATORY_REQUIRED_FILES = {
     "SECURITY.md",
     TASKS_FILE,
     VERIFY_FILE,
-    "app/AGENTS.md",
+    "app/.gitkeep",
     "bootstrap.manifest.json",
     "bootstrap.py",
     "bootstrap.yaml",
@@ -9720,6 +9720,24 @@ def parse_envelope_paths(value: str, label: str, *, allow_none: bool) -> list[st
     return parse_task_write_set(",".join(items), label)
 
 
+def validate_application_source_root(
+    paths: list[str], project_mode: str | None
+) -> None:
+    """Bind new application code to app/ without rewriting brownfield layouts."""
+
+    if project_mode != "greenfield":
+        return
+    top_level = {path.split("/", 1)[0].casefold() for path in paths}
+    if "apps" in top_level:
+        raise ValueError(
+            "Greenfield application source must use singular app/**; apps/** is not allowed"
+        )
+    if "app" not in top_level:
+        raise ValueError(
+            "Greenfield Allowed repository write set must include application source under app/**"
+        )
+
+
 def parse_envelope_targets(value: str) -> list[str]:
     cleaned = clean_cell(value)
     if cleaned == "NONE":
@@ -11641,10 +11659,14 @@ def validate_construction_envelope(
     if envelope.get("AWS boundary") not in AWS_BOUNDARIES:
         ctx.error("GATE_B_ENVELOPE", "AWS boundary is not canonical", PRD_FILE)
     try:
-        parse_envelope_paths(
+        allowed_repository_paths = parse_envelope_paths(
             envelope.get("Allowed repository write set", ""),
             "Allowed repository write set",
             allow_none=False,
+        )
+        validate_application_source_root(
+            allowed_repository_paths,
+            selections.get("mode"),
         )
         parse_envelope_paths(
             envelope.get("Excluded or owner-only write set", ""),
