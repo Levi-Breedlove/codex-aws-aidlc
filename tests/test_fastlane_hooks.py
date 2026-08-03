@@ -699,8 +699,8 @@ class FastlaneHookTests(unittest.TestCase):
         hooks_guide = (self.root / "docs" / "HOOKS.md").read_text(encoding="utf-8")
         self.assertIn("Enable this pack only after a current Gate B", hooks_guide)
         self.assertIn("`BOOT-00`, `INTAKE-10`, `REQ-10`, or `DESIGN-10`", hooks_guide)
-        self.assertIn("If Gate B later becomes stale or invalid", hooks_guide)
-        self.assertIn("then regenerate the pack", hooks_guide)
+        self.assertIn("If Gate B becomes stale", hooks_guide)
+        self.assertIn("regenerate the pack", " ".join(hooks_guide.split()))
 
     def test_valid_and_malformed_event_payloads(self) -> None:
         parsed = fastlane_hook.read_event(
@@ -963,8 +963,14 @@ class FastlaneHookTests(unittest.TestCase):
                 )
 
     def test_product_execution_guidance_is_tool_name_independent(self) -> None:
+        human_guide = (REPOSITORY_ROOT / "docs" / "HOOKS.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("call_aws", human_guide)
+        self.assertNotIn("run_script", human_guide)
+        self.assertNotIn("STRUCTURED_API", human_guide)
         documents = (
-            REPOSITORY_ROOT / "docs" / "HOOKS.md",
+            REPOSITORY_ROOT / ".codex" / "hooks" / "AGENTS.md",
             REPOSITORY_ROOT / "docs" / "project" / "RUNBOOK.md",
             REPOSITORY_ROOT / "docs" / "project" / "VERIFY.md",
             REPOSITORY_ROOT / "prompts" / "CODEX-PROMPTS.md",
@@ -3090,10 +3096,13 @@ class FastlaneHookTests(unittest.TestCase):
             self.assertNotIn(forbidden, source)
         security = (self.root / "SECURITY.md").read_text(encoding="utf-8")
         hooks = (self.root / "docs" / "HOOKS.md").read_text(encoding="utf-8")
+        hook_contract = (self.root / ".codex" / "hooks" / "AGENTS.md").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("Hooks are defense in depth", hooks)
-        self.assertIn("internal schema 2", hooks)
-        self.assertIn("expires after 15 minutes", hooks)
-        self.assertIn("without assuming a `tool_use_id`", hooks)
+        self.assertIn("schema 2 stores hashes only", hook_contract)
+        self.assertIn("expires after 15 minutes", hook_contract)
+        self.assertIn("without assuming a `tool_use_id`", hook_contract)
         self.assertIn("never auto-allows", security)
         self.assertIn("private schema-2 transition record", security)
 

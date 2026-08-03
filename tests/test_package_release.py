@@ -282,7 +282,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.1.2")
+        self.assertEqual(manifest["bootstrap_version"], "1.1.3")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -311,10 +311,14 @@ class PackageReleaseTests(unittest.TestCase):
         _version, files = package_release.load_release_files(REPOSITORY_ROOT)
         inventory = {path for path, _content in files}
         for required in (
+            "docs/AGENTS.md",
+            "docs/README.md",
             "docs/SETUP.md",
             "docs/TROUBLESHOOTING.md",
             "docs/DEPENDENCY-POLICY.md",
             "docs/WORKFLOW.md",
+            ".codex/hooks/AGENTS.md",
+            ".agents/skills/maintain-fastlane/references/documentation-governance.md",
             "scripts/setup_assistant.py",
             "tests/test_setup_assistant.py",
             ".github/dependabot.yml",
