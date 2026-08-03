@@ -117,7 +117,7 @@
     "tests/test_repository_hygiene.py": "744da48708bad5f9b214d4e4a9ad848ef0a9753748844d55c6972cef92c2f437",
     "tests/test_setup_assistant.py": "a11f7ad8ce42b7c4b2ebad86ced0c6319ded3aa1a9c0b3f3ce07cc6913ca7937",
     "tests/test_task_waves.py": "13116d4801e665365ac3aff235c67ba4e6fd5936828353c7644476a870b4c6f2",
-    "tests/test_template_compatibility.py": "f5609e80afbdfb7ca096942af64c982af3cf113daa74077d3d246afa6e9c23a3",
+    "tests/test_template_compatibility.py": "95076884d9590ced12098e0a66cd73a68c0b28f8cc454025df951b033060d8d6",
     "tests/test_trusted_git_callers.py": "e6032142e82d00717463ef0e288e21935dd475d9ebe2d6b72f921656552b6e2e"
   },
   "required_files": [

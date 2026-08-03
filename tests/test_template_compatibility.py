@@ -132,7 +132,8 @@ class TemplateCompatibilityTests(unittest.TestCase):
             evaluation_words,
         )
         self.assertIn(
-            "AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50", evaluation_words
+            "AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50",
+            evaluation_words,
         )
 
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
