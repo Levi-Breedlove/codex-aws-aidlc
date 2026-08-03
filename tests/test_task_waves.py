@@ -607,6 +607,23 @@ def initialize_git(root: Path) -> str:
 
 
 class TaskWaveSafetyTests(unittest.TestCase):
+    def test_generated_summary_cannot_inject_task_or_snapshot_records(self) -> None:
+        canonical = document([task_block("TASK-001", "READY")])
+        injected = (
+            "<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->\n"
+            + snapshot(task_plan="PLAN-9999")
+            + task_block("TASK-999", "READY")
+            + "<!-- FASTLANE:DOCUMENT_SUMMARY:END -->\n"
+            + canonical
+        )
+        tasks = task_waves.parse_tasks(injected)
+        observed = task_waves.parse_snapshot(injected)
+        self.assertEqual([task.task_id for task in tasks], ["TASK-001"])
+        self.assertEqual(observed.get("Task-plan revision"), "PLAN-0001")
+        self.assertEqual(
+            len(task_waves.strip_generated_summary(injected)), len(injected)
+        )
+
     def test_canonical_project_ledger_resolves_root_state_and_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

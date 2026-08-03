@@ -337,6 +337,57 @@ sequenceDiagram
                     )
         self.assertEqual(failures, [])
 
+    def test_required_project_diagrams_are_visible_unindented_and_stably_anchored(
+        self,
+    ) -> None:
+        source_text = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(
+            encoding="utf-8"
+        )
+        lines = source_text.splitlines()
+        annotated = disclosure_lines(source_text)
+        depth_by_line = {number: depth for number, _line, depth in annotated}
+        required = {
+            "### Proposed system at a glance": "proposed-system-at-a-glance",
+            "### Sequence — primary outcome": "sequence-primary-outcome",
+        }
+        mermaid_fence = chr(96) * 3 + "mermaid"
+        for heading, expected_anchor in required.items():
+            self.assertEqual(lines.count(heading), 1, heading)
+            heading_index = lines.index(heading)
+            next_heading = next(
+                (
+                    index
+                    for index in range(heading_index + 1, len(lines))
+                    if lines[index].startswith("#")
+                ),
+                len(lines),
+            )
+            mermaid_index = next(
+                (
+                    index
+                    for index in range(heading_index + 1, next_heading)
+                    if lines[index] == mermaid_fence
+                ),
+                None,
+            )
+            self.assertEqual(depth_by_line[heading_index + 1], 0)
+            if mermaid_index is None:
+                slot = lines[heading_index + 1 : next_heading]
+                self.assertTrue(
+                    any(line.startswith("NOT_YET_CREATED") for line in slot),
+                    heading,
+                )
+            else:
+                self.assertEqual(lines[mermaid_index], lines[mermaid_index].lstrip())
+                self.assertFalse(lines[mermaid_index].startswith("|"))
+                self.assertEqual(depth_by_line[mermaid_index + 1], 0)
+            anchor = re.sub(
+                r"[\s-]+",
+                "-",
+                re.sub(r"[^\w -]", "", heading[4:].lower()),
+            ).strip("-")
+            self.assertEqual(anchor, expected_anchor)
+
     def test_owner_reading_path_keeps_actions_boundaries_and_receipts_visible(
         self,
     ) -> None:

@@ -27,6 +27,11 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - package-style test import
     from scripts.fastlane_stdio import configure_utf8_standard_streams
 
+try:
+    from fastlane_document_summaries import strip_generated_summary
+except ModuleNotFoundError:  # pragma: no cover - package-style test import
+    from scripts.fastlane_document_summaries import strip_generated_summary
+
 from pathlib import Path, PurePosixPath
 from typing import Iterator
 
@@ -435,6 +440,7 @@ def without_fenced_code(text: str) -> str:
 
 
 def section(text: str, heading: str) -> str:
+    text = strip_generated_summary(text)
     match = re.search(rf"^## {re.escape(heading)}\s*$", text, re.MULTILINE)
     if not match:
         return ""
@@ -461,6 +467,7 @@ def parse_snapshot(text: str) -> Snapshot:
 
 
 def parse_tasks(text: str) -> list[Task]:
+    text = strip_generated_summary(text)
     structural = without_fenced_code(text)
     matches = list(TASK_HEADER.finditer(structural))
     tasks: list[Task] = []
@@ -1500,6 +1507,7 @@ def validate_done_harness_evidence(
 
 
 def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]:
+    text = strip_generated_summary(text)
     masked = without_fenced_code(text)
     headings = list(
         re.finditer(r"^## Task completion evidence[ \t]*$", masked, re.MULTILINE)
@@ -1713,7 +1721,7 @@ def validate_done_evidence_file(
         )
     if not verify_path.is_file() or verify_path.is_symlink():
         raise ValueError(f"{task.task_id}: local Evidence requires a regular VERIFY.md")
-    verify_text = verify_path.read_text(encoding="utf-8")
+    verify_text = strip_generated_summary(verify_path.read_text(encoding="utf-8"))
     rows = parse_task_completion_evidence(verify_text)
     for evidence_id in task_evidence_ids:
         matching = [row for row in rows if row.evidence_id == evidence_id]
@@ -2416,7 +2424,9 @@ def validate_checkpoint_receipt(
     verify_path = tasks_path.with_name("VERIFY.md")
     if not verify_path.is_file() or verify_path.is_symlink():
         raise ValueError(f"{checkpoint_id}: checkpoint requires a regular VERIFY.md")
-    verify_text = without_fenced_code(verify_path.read_text(encoding="utf-8"))
+    verify_text = without_fenced_code(
+        strip_generated_summary(verify_path.read_text(encoding="utf-8"))
+    )
     if (
         re.search(
             rf"(?<![A-Za-z0-9-]){re.escape(checkpoint_id)}(?![A-Za-z0-9-])",
@@ -2883,7 +2893,7 @@ def approved_contract_for_tasks(
         return None
     if not prd_path.is_file() or prd_path.is_symlink():
         raise ValueError("docs/project/PRD.md must be a regular file")
-    prd_text = prd_path.read_text(encoding="utf-8")
+    prd_text = strip_generated_summary(prd_path.read_text(encoding="utf-8"))
     if tasks_text is None:
         if not tasks_path.is_file() or tasks_path.is_symlink():
             raise ValueError("TASKS.md must be a regular file")
@@ -3063,7 +3073,9 @@ def approved_contract_for_tasks(
         if verify_path.exists():
             if not verify_path.is_file() or verify_path.is_symlink():
                 raise ValueError("docs/project/VERIFY.md must be a regular file")
-            verify_text = verify_path.read_text(encoding="utf-8")
+            verify_text = strip_generated_summary(
+                verify_path.read_text(encoding="utf-8")
+            )
         requirement_evidence, evidence_issues = (
             doctor.task_requirement_evidence_dispositions(
                 verify_text,

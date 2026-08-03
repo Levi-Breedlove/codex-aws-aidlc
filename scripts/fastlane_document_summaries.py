@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 SCHEMA_VERSION = 1
 SUMMARY_BEGIN = "<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->"
 SUMMARY_END = "<!-- FASTLANE:DOCUMENT_SUMMARY:END -->"
+SUMMARY_AUTHORITY = "DERIVED_NON_AUTHORITATIVE"
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 FORBIDDEN_VISIBLE_VALUE = re.compile(
     r"(?i)(?:[A-Z]:\\"
@@ -31,6 +32,44 @@ def _sha256(payload: bytes) -> str:
 def canonical_markdown(value: str) -> str:
     normalized = value.replace("\r\n", "\n").replace("\r", "\n").strip("\n")
     return normalized + "\n"
+
+
+def _generated_summary_span(source: str) -> tuple[int, int] | None:
+    """Return the fail-closed generated-summary span, if markers are present."""
+
+    begin = source.find(SUMMARY_BEGIN)
+    end = source.rfind(SUMMARY_END)
+    if begin < 0 and end < 0:
+        return None
+    if begin < 0:
+        return 0, end + len(SUMMARY_END)
+    if end < begin:
+        return 0, len(source)
+    return begin, end + len(SUMMARY_END)
+
+
+def strip_generated_summary(source: str) -> str:
+    """Mask generated presentation bytes while preserving parser coordinates."""
+
+    span = _generated_summary_span(source)
+    if span is None:
+        return source
+    start, end = span
+    masked = "".join(
+        character if character in "\r\n" else " " for character in source[start:end]
+    )
+    return source[:start] + masked + source[end:]
+
+
+def canonical_bytes_without_generated_summary(source: str) -> bytes:
+    """Return LF-normalized canonical bytes with the generated view removed."""
+
+    normalized = source.replace("\r\n", "\n").replace("\r", "\n")
+    span = _generated_summary_span(normalized)
+    if span is not None:
+        start, end = span
+        normalized = normalized[:start] + normalized[end:]
+    return normalized.encode("utf-8")
 
 
 def _plain(value: object, fallback: str = "Not yet recorded") -> str:
@@ -186,7 +225,7 @@ def wrapped_summary_markdown(specification: Mapping[str, Any]) -> str:
     )
 
 
-def _source_digest(document: Mapping[str, Any]) -> str:
+def _summary_basis_digest(document: Mapping[str, Any]) -> str:
     payload = {
         "fields": document["fields"],
         "need_from_owner": document["need_from_owner"],
@@ -276,12 +315,13 @@ def project_document_summaries(
                 "path": path,
                 "heading": document["heading"],
                 "status": status,
+                "authority": SUMMARY_AUTHORITY,
                 "fields": document["fields"],
                 "need_from_owner": document["need_from_owner"],
                 "next_action": document["next_action"],
                 "claims": document["claims"],
                 "navigation": document["navigation"],
-                "canonical_sha256": _source_digest(document),
+                "summary_basis_sha256": _summary_basis_digest(document),
                 "rendered_sha256": _sha256(expected.encode("utf-8")),
             }
         )
@@ -297,7 +337,17 @@ def project_document_summaries(
     return (
         {
             "schema_version": SCHEMA_VERSION,
+            "authority": SUMMARY_AUTHORITY,
             "status": overall,
+            "repair": (
+                {
+                    "responsible_party": "CODEX",
+                    "action_kind": "CORRECT_AND_REVALIDATE",
+                    "automatic_continuation_allowed": True,
+                }
+                if overall == "STALE"
+                else None
+            ),
             "documents": documents,
         },
         issues,
@@ -494,7 +544,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
             ("Current wave", tasks.get("wave", "None"), plan_id), ("Active task", tasks.get("active", "None")),
             ("Readiness", tasks.get("readiness", "Not started"), plan_id), ("Blocker", tasks.get("blocker", "None")),
             ("Last passing checkpoint", tasks.get("checkpoint", "None")), ("Construction approval", gate_b_status, auth),
-            ("Last known-green commit", tasks.get("known_green", "None")), ("AWS account work", aws_boundary, aws_id),
+            ("AWS account work", aws_boundary, aws_id),
             ("Updated", tasks.get("updated", updated), plan_id),
         ),
         "docs/project/VERIFY.md": (
@@ -529,7 +579,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
     navigation = {
         "docs/project/README.md": (("Product and technical plan", "PRD.md#product-agreement"), ("Construction progress", "TASKS.md#current-progress"), ("Verification and evidence", "VERIFY.md#current-result"), ("Operations runbook", "RUNBOOK.md#safety-boundary"), ("Bounded defect record", "BUGFIX.md#current-state")),
         "docs/project/PRD.md": (("Product Agreement", "#product-agreement"), ("Gate A Review", "#gate-a-review"), ("Technical Plan", "#technical-plan"), ("Gate B Review", "#gate-b-review"), ("Exact contract records", "#contract-appendices")),
-        "docs/project/TASKS.md": (("Current progress", "#current-progress"), ("Roadmap", "#roadmap"), ("Active work and blockers", "#active-work-blockers-and-next-action"), ("Task definitions", "#task-definitions"), ("Exact execution state", "#agent-reference-exact-run-and-task-state")),
+        "docs/project/TASKS.md": (("Current progress", "#current-progress"), ("Roadmap", "#roadmap"), ("Active work and blockers", "#active-work-blockers-and-next-action"), ("Task definitions", "#task-definitions"), ("Checkpoint history", "#checkpoints-and-resume"), ("Exact execution state", "#agent-reference-exact-run-and-task-state")),
         "docs/project/VERIFY.md": (("Current result", "#current-result"), ("Passing evidence", "#verification-matrix"), ("Failed or stale evidence", "#failed-or-stale"), ("AWS evidence", "#aws-core-evidence"), ("Release decision", "#current-release-decision")),
         "docs/project/RUNBOOK.md": (("Before deploying", "#2-prerequisites"), ("Deploy", "#6-deployment"), ("Verify", "#7-smoke-tests"), ("Roll back", "#10-rollback"), ("Recover", "#11-backup-and-recovery"), ("Tear down", "#13-teardown-and-decommissioning")),
         "docs/project/BUGFIX.md": (("Summary", "#1-summary"), ("Current behavior", "#2-current-behavior"), ("Root-cause analysis", "#7-root-cause-analysis"), ("Fix constraints", "#8-fix-constraints"), ("Regression evidence", "#9-regression-and-property-specification")),

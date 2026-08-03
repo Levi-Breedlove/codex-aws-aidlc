@@ -54,12 +54,16 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
 try:
     from fastlane_document_summaries import (
         build_summary_specifications,
+        canonical_bytes_without_generated_summary,
         project_document_summaries,
+        strip_generated_summary,
     )
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     from scripts.fastlane_document_summaries import (
         build_summary_specifications,
+        canonical_bytes_without_generated_summary,
         project_document_summaries,
+        strip_generated_summary,
     )
 
 
@@ -933,6 +937,7 @@ class Context:
     template_source: bool = False
     diagnostics: list[Diagnostic] = field(default_factory=list)
     texts: dict[str, str] = field(default_factory=dict)
+    presentation_texts: dict[str, str] = field(default_factory=dict)
     source_bytes_read: int = 0
     prior_remediation_fingerprint: str | None = None
 
@@ -9971,8 +9976,12 @@ def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str
         return None
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     ctx.source_bytes_read += len(raw)
-    ctx.texts[relative] = text
-    return text
+    ctx.presentation_texts[relative] = text
+    canonical_text = (
+        strip_generated_summary(text) if relative in DOCUMENT_SUMMARY_FILES else text
+    )
+    ctx.texts[relative] = canonical_text
+    return canonical_text
 
 
 def bounded_prd_snapshot(
@@ -9984,7 +9993,13 @@ def bounded_prd_snapshot(
     text = safe_read_text(snapshot_context, PRD_FILE)
     if text is None or snapshot_context.has_errors:
         raise ValueError("Unable to read a bounded PRD snapshot")
-    digest = "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+    raw_text = snapshot_context.presentation_texts.get(PRD_FILE, text)
+    digest = (
+        "sha256:"
+        + hashlib.sha256(
+            canonical_bytes_without_generated_summary(raw_text)
+        ).hexdigest()
+    )
     if expected_sha256 is not None and (
         re.fullmatch(r"sha256:[0-9a-f]{64}", expected_sha256) is None
         or digest != expected_sha256
@@ -10203,6 +10218,7 @@ def derive_owner_decision_brief(
     claims: list[dict[str, Any]] = []
     locators: list[dict[str, Any]] = []
     technical_groups: list[dict[str, Any]] = []
+    expected_decision_ids: list[str] = []
 
     if kind == "GATE_A":
         try:
@@ -10377,6 +10393,7 @@ def derive_owner_decision_brief(
             )
         }
         if selection is not None:
+            expected_decision_ids.append(selection.architecture_id)
             architecture_basis = sorted(
                 set(
                     re.findall(
@@ -10401,6 +10418,7 @@ def derive_owner_decision_brief(
                 }
             )
         for decision in design_contract.technology_decisions:
+            expected_decision_ids.append(decision.decision_id)
             decision_basis = sorted(
                 set(
                     re.findall(
@@ -10422,6 +10440,7 @@ def derive_owner_decision_brief(
                 }
             )
         if design_contract.harness.rows:
+            expected_decision_ids.append("HARNESS-PROFILE")
             grouped["validation/construction"].append(
                 {
                     "decision_id": "HARNESS-PROFILE",
@@ -10521,6 +10540,37 @@ def derive_owner_decision_brief(
                 )
             ],
         }
+
+    if kind == "GATE_A":
+        expected_sections = [
+            "GATE-A-OUTCOME",
+            "GATE-A-BOUNDARY",
+            "GATE-A-SUCCESS",
+            "GATE-A-RISK",
+        ]
+        actual_sections = [str(item.get("section_id", "")) for item in sections]
+        if actual_sections != expected_sections:
+            issues.append(
+                (
+                    "OWNER_BRIEF_COVERAGE_INCOMPLETE",
+                    "Gate A decision sections do not cover the complete "
+                    "canonical decision surface exactly once",
+                )
+            )
+    else:
+        actual_decision_ids = [
+            str(decision.get("decision_id", ""))
+            for group in technical_groups
+            for decision in group.get("decisions", [])
+        ]
+        if sorted(actual_decision_ids) != sorted(expected_decision_ids):
+            issues.append(
+                (
+                    "OWNER_BRIEF_COVERAGE_INCOMPLETE",
+                    "Gate B technical decisions do not cover every "
+                    "Engine-marked decision exactly once",
+                )
+            )
 
     for key, label, heading in locator_specs:
         try:
@@ -10972,7 +11022,9 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
                 )
                 continue
             if ctx.template_source and not has_symlink_component(ctx.root, relative):
-                source_text = ctx.texts.get(relative)
+                source_text = ctx.presentation_texts.get(relative) or ctx.texts.get(
+                    relative
+                )
                 if source_text is None:
                     continue
                 actual = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
@@ -21424,9 +21476,10 @@ def build_report(
         context_plan.pop("_resolution_issues", None)
     summary_sources: dict[str, str] = {}
     for summary_path in DOCUMENT_SUMMARY_FILES:
-        summary_text = ctx.texts.get(summary_path)
+        summary_text = ctx.presentation_texts.get(summary_path)
         if summary_text is None:
-            summary_text = safe_read_text(ctx, summary_path)
+            safe_read_text(ctx, summary_path)
+            summary_text = ctx.presentation_texts.get(summary_path)
         if summary_text is not None:
             summary_sources[summary_path] = summary_text
     # fmt: off
@@ -21435,14 +21488,27 @@ def build_report(
     document_summaries, summary_issues = project_document_summaries(
         summary_sources, summary_specifications
     )
+    brief_was_ready = owner_decision_brief.get("status") == "READY"
     for issue in summary_issues:
-        reporter = ctx.warning if issue["code"] == "DOCUMENT_SUMMARY_STALE" else ctx.error
+        reporter = (
+            ctx.warning
+            if issue["code"] == "DOCUMENT_SUMMARY_STALE" and not brief_was_ready
+            else ctx.error
+        )
         reporter(
             str(issue["code"]),
             str(issue["message"]),
             str(issue["path"]),
         )
-    if any(issue["code"] != "DOCUMENT_SUMMARY_STALE" for issue in summary_issues):
+    if summary_issues and brief_was_ready:
+        blocked_brief = dict(owner_decision_brief)
+        blocked_brief["status"] = "BLOCKED"
+        blocked_brief["formal_receipt_required"] = False
+        owner_decision_brief, _ = finalize_owner_decision_brief(blocked_brief)
+    if any(
+        issue["code"] != "DOCUMENT_SUMMARY_STALE" or brief_was_ready
+        for issue in summary_issues
+    ):
         status = "BLOCKED"
         diagnostic_codes = [item.code for item in ctx.diagnostics]
         remediation = derive_remediation(
@@ -21561,8 +21627,12 @@ def build_report(
             "construction_authorization": prd_fields.get("construction_authorization"),
             "prd_snapshot_sha256": (
                 "sha256:"
-                + hashlib.sha256(ctx.texts[PRD_FILE].encode("utf-8")).hexdigest()
-                if PRD_FILE in ctx.texts
+                + hashlib.sha256(
+                    canonical_bytes_without_generated_summary(
+                        ctx.presentation_texts[PRD_FILE]
+                    )
+                ).hexdigest()
+                if PRD_FILE in ctx.presentation_texts
                 else "NONE"
             ),
         },

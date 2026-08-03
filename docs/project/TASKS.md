@@ -15,7 +15,6 @@ current construction authorization (`AUTH`) permits the named GitHub writes.
 | Blocker | None |
 | Last passing checkpoint | None |
 | Construction approval | Not yet initialized |
-| Last known-green commit | None |
 | AWS account work | Not authorized |
 | Updated | Not yet initialized |
 | Need from you | Run `init template`. |
@@ -27,6 +26,7 @@ current construction authorization (`AUTH`) permits the named GitHub writes.
 - [Roadmap](#roadmap)
 - [Active work and blockers](#active-work-blockers-and-next-action)
 - [Task definitions](#task-definitions)
+- [Checkpoint history](#checkpoints-and-resume)
 - [Exact execution state](#agent-reference-exact-run-and-task-state)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
