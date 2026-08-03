@@ -1,5 +1,5 @@
-name: Fastlane controlled-preview feedback
-description: Share onboarding, gate, architecture, continuation, and resume feedback without private data.
+name: Fastlane 1.2 feedback
+description: Share setup, Owner Brief, architecture, continuation, and resume feedback without private data.
 title: "[Fastlane Feedback] "
 body:
   - type: markdown
@@ -14,7 +14,7 @@ body:
     attributes:
       label: Public Fastlane baseline
       description: Enter the public version, commit SHA, or release checksum only. Do not paste a local path.
-      placeholder: "Example: 1.1.2 or a public commit SHA"
+      placeholder: "Example: 1.2.0 or a public commit SHA"
     validations:
       required: true
 
@@ -36,10 +36,13 @@ body:
     attributes:
       label: Scenario tested
       options:
+        - First-run setup and AWS Core walkthrough
         - Complete MVP brief
         - Vague greenfield idea
+        - Owner Brief and document navigation
         - Bounded bug fix
         - Architecture-affecting feature
+        - Application source layout
         - Resume and side question
         - Validation recovery
         - Other
@@ -105,6 +108,19 @@ body:
         - Clear
         - Mostly clear
         - Unclear
+        - Not reached
+    validations:
+      required: true
+
+  - type: dropdown
+    id: owner_brief_navigation
+    attributes:
+      label: Owner Brief and document navigation
+      options:
+        - The decision, reasons, limits, and linked records were clear
+        - The decision was clear but the linked records were difficult to use
+        - Important decision reasons or limits were missing
+        - The exact approval action was unclear
         - Not reached
     validations:
       required: true

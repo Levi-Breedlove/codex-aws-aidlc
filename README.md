@@ -1,7 +1,6 @@
-# AWS Codex Fastlane 1.1
+# AWS Codex Fastlane 1.2
 
-Current customer build: **1.1.3**.
-
+Current customer build: **1.2.0**.
 Fastlane Engine gives Codex a disciplined way to turn an AWS idea into clear
 requirements, one recommended design, and a tested local build. You explain
 the outcome in plain language; Codex plans while you control consequential choices.
@@ -74,6 +73,7 @@ teardown require their own exact receipts. Tool availability never grants author
 ## Learn more
 
 - [Understand the workflow](docs/WORKFLOW.md)
+- [Fastlane 1.2 qualification and walkthrough](docs/QUALIFICATION.md)
 - [Optional hooks](docs/HOOKS.md)
 - [Dependency policy](docs/DEPENDENCY-POLICY.md)
 - [Security](SECURITY.md)
