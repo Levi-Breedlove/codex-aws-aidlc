@@ -2441,7 +2441,6 @@ Approver: <name/handle>"""
         )
 
     def test_prd_and_prompt_bind_semantic_design_contracts(self) -> None:
-        prd_words = " ".join(self.prd.split())
         prompt_words = " ".join(self.prompts.split())
         define_words = " ".join(self.fastlane_define.split())
         design_words = " ".join(self.fastlane_design.split())
