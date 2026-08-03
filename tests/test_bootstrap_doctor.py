@@ -6182,7 +6182,6 @@ class BootstrapDoctorTests(unittest.TestCase):
             lookalike_conflict,
         )
 
-
         complete = complete_design_contract(source)
         design, issues = doctor.derive_design_contract(
             complete,
