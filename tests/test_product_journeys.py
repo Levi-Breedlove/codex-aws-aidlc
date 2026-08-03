@@ -341,7 +341,6 @@ class ProductJourneyTests(unittest.TestCase):
             locator_keys = {locator["key"] for locator in locators}
             hidden_machine_headings = {
                 "Technology and toolchain decision register",
-                "Selected architecture",
                 "Gate B Harness Profile",
                 "28. Construction envelope",
             }
@@ -418,6 +417,24 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
+            for label in (
+                "What this means for you:",
+                "Selected:",
+                "Requirement basis:",
+                "Why selected:",
+                "Alternatives and rejection reasons:",
+                "Tradeoffs:",
+                "Risks and safeguards:",
+                "Evidence status:",
+                "Reconsider when:",
+                "Exact source:",
+            ):
+                self.assertIn(label, rendered_gate_b)
+            self.assertIn("Change the design: <correction>.", rendered_gate_b)
+            self.assertIn(
+                "begins bounded local construction automatically",
+                rendered_gate_b,
+            )
             for locator in gate_b_brief["source_locators"]:
                 anchor = presenter._markdown_anchor(str(locator["heading"]))
                 self.assertIn(f"({locator['path']}#{anchor})", rendered_gate_b)

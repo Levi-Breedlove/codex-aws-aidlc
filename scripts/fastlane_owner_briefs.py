@@ -226,7 +226,18 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
                 issues.append("technical decision IDs must be present and unique")
             else:
                 seen_decisions.add(decision_id)
-            for field in ("decision", "selection", "why", "tradeoff"):
+            for field in (
+                "decision",
+                "owner_effect",
+                "selection",
+                "requirement_basis",
+                "why",
+                "alternatives",
+                "tradeoff",
+                "risk_and_mitigation",
+                "evidence_status",
+                "reconsider_when",
+            ):
                 if not isinstance(decision.get(field), str) or not decision.get(field):
                     issues.append(f"{decision_id or 'decision'} is missing {field}")
             for field in ("basis_ids", "evidence_ids", "source_locator_keys"):

@@ -27,6 +27,8 @@ BASELINE_VISIBLE_LINES = {
     "docs/project/RUNBOOK.md": 612,
 }
 BASELINE_COMBINED_CHARACTERS = 198_572
+PRE_PR2_COMBINED_BYTES = 170_342
+PR2_REQUIRED_REDUCTION_BYTES = 25_000
 HUMAN_FIRST_RECORDS = tuple(BASELINE_VISIBLE_LINES)
 
 
@@ -203,6 +205,24 @@ class HumanFirstDocumentQualificationTests(unittest.TestCase):
             sum(len(source) for source in current_sources.values()),
             BASELINE_COMBINED_CHARACTERS - 20_000,
         )
+        current_bytes = sum(
+            len(source.encode("utf-8")) for source in current_sources.values()
+        )
+        self.assertLessEqual(
+            current_bytes,
+            PRE_PR2_COMBINED_BYTES - PR2_REQUIRED_REDUCTION_BYTES,
+        )
+
+    def test_runbook_active_boundary_is_a_compact_operational_table(self) -> None:
+        runbook = (REPOSITORY_ROOT / "docs/project/RUNBOOK.md").read_text(
+            encoding="utf-8"
+        )
+        section = runbook.split("## Active operational boundary", 1)[1].split(
+            "\n## ", 1
+        )[0]
+        data_rows = [line for line in section.splitlines() if line.startswith("| ")][1:]
+        self.assertGreaterEqual(len(data_rows), 6)
+        self.assertLessEqual(len(data_rows), 8)
 
     def test_owner_surfaces_arrive_within_their_visible_line_budgets(self) -> None:
         sources = {

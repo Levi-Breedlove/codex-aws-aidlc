@@ -263,8 +263,8 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("Only the owner", self.prompts)
         self.assertIn("Only the owner", self.agents)
         for reserved in ("`Codex`", "`agent`", "`automation`", "`system`", "`AI`"):
-            self.assertIn(reserved, self.prd)
             self.assertIn(reserved, self.prompts)
+            self.assertIn(reserved, self.agents)
 
     def test_gate_and_revision_vocabulary_does_not_drift(self) -> None:
         required = {
@@ -360,8 +360,7 @@ class PromptPackContractTests(unittest.TestCase):
         coordinator = (PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_text(
             encoding="utf-8"
         )
-        ledger = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
-        for surface in (self.agents, coordinator, tasks, ledger):
+        for surface in (self.agents, coordinator, tasks):
             compact = " ".join(surface.split())
             self.assertIn("Maximum workers", compact)
             self.assertIn("task claim", compact)
@@ -579,7 +578,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("challenger prose cannot replace those calls", design_reference)
         self.assertIn("Select one eligible `ARCH-*` recommendation", design_reference)
         self.assertIn("include the selected `ARCH-*`", design)
-        self.assertIn("full design-contract digest", self.prd)
+        self.assertIn("canonical design/envelope digests", design_reference)
         self.assertIn("Adaptive Coverage Plan", design)
         self.assertIn("Adaptive Coverage Plan", design_reference)
         self.assertIn("Change impact record", design)
@@ -591,7 +590,10 @@ class PromptPackContractTests(unittest.TestCase):
             "Migration path",
         ):
             self.assertIn(field, self.prd)
-        self.assertIn("grandfathered until the next design-controlled change", self.prd)
+        self.assertIn(
+            "grandfathered for its exact design and envelope",
+            design_reference,
+        )
         for finding in (
             "unsupported AWS claim",
             "unmet requirement",
@@ -733,10 +735,8 @@ class PromptPackContractTests(unittest.TestCase):
         )
         self.assertIn("`FAILED` preserves\na property-test failure", self.verify)
         self.assertIn("matching Task completion evidence row", self.verify)
-        self.assertIn(
-            "`BACKLOG` is a fully specified dependency-gated task", self.tasks
-        )
-        self.assertIn("`BACKLOG` contributes to plan coverage", self.tasks)
+        self.assertIn("Property execution projection", tasks)
+        self.assertIn("| `BACKLOG` | Defined but not executable |", self.tasks)
         self.assertIn("BACKLOG means dependency-gated, not", tasks)
         self.assertIn("SKIPPED tasks do not satisfy property", tasks)
         self.assertIn("Only the passing status may be cited", build)
@@ -897,7 +897,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("No subagent may edit implementation files", autonomous)
         self.assertNotIn("codex-worker", self.tasks)
         self.assertNotIn("--isolated-worktrees", self.tasks)
-        self.assertIn("No subagent or worker edits files", self.tasks)
+        self.assertIn("Codex is the sole writer", self.tasks)
         self.assertIn("Maximum parallel workers | `1`", self.prd)
         self.assertIn("parallel writing is excluded", self.prd)
         self.assertNotIn("bounded parallelism", self.prd)
@@ -935,7 +935,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("AUTHORIZE AWS READ-ONLY PREFLIGHT", self.runbook)
         self.assertIn("AUTHORIZE AWS DEPLOYMENT", self.runbook)
         self.assertIn("AUTHORIZE AWS TEARDOWN", self.runbook)
-        self.assertIn("action-authorization evidence", self.runbook)
+        self.assertIn("Record observed results in `VERIFY.md`", self.runbook)
         self.assertIn("## Action authorization provenance", self.verify)
         self.assertIn("| Role or profile |", self.verify)
         self.assertIn(
@@ -981,7 +981,7 @@ Approver: <name/handle>"""
         residual_review = self.prompt_section("AWS-40")
         teardown = self.prompt_section("AWS-50")
 
-        for document in (self.prd, self.runbook, self.verify, self.prompts):
+        for document in (self.prd, self.verify, self.prompts):
             self.assertIn("CreateChangeSet", document)
             self.assertRegex(document, r"(?is)CreateChangeSet.{0,180}mutation")
             self.assertRegex(document, r"(?i)access(?:analyzer| analyzer)")
@@ -1022,11 +1022,13 @@ Approver: <name/handle>"""
         self.assertLessEqual(len(self.root_readme.splitlines()), 80)
 
     def test_aws_execution_lanes_are_derived_and_do_not_create_authority(self) -> None:
-        for document in (self.verify, self.runbook, self.prompts):
+        for document in (self.verify, self.prompts):
             self.assertIn("STRUCTURED_API", document)
             self.assertIn("REVIEWED_SCRIPT", document)
             self.assertIn("AWS-EXEC-*", document)
-        self.assertIn("request_match", self.runbook)
+        self.assertIn("STRUCTURED_API", self.runbook)
+        self.assertIn("REVIEWED_SCRIPT", self.runbook)
+        self.assertIn("request_match", self.engine_source)
         self.assertIn("does not grant authority", self.verify)
         self.assertIn("grants nothing", self.prompts)
         self.assertIn("Natural-language descriptions do\nnot prove", self.verify)
@@ -1506,7 +1508,7 @@ Approver: <name/handle>"""
             self.assertIn(heading, task_prompt)
             self.assertIn(heading, self.tasks)
         self.assertIn("every remaining singleton metadata line", task_prompt)
-        self.assertIn("A READY task cannot contain `TODO`", self.tasks)
+        self.assertIn("READY has no TODO", task_prompt)
         self.assertIn("- Dependency waivers: NONE", self.tasks)
         projection_header = (
             "| Property ID | Framework TECH ID | Exact command | "
@@ -1644,23 +1646,25 @@ Approver: <name/handle>"""
         self.assertIn("| Construction envelope SHA-256 reviewed |", self.prd)
         self.assertIn(receipt_line, self.prd)
         self.assertEqual(self.prompts.count(receipt_line), 2)
-        self.assertIn("header, separator, and every boundary row", self.prd)
-        self.assertIn("append one final LF", self.prd)
+        self.assertIn("header, separator, and every boundary row", self.prompts)
+        self.assertIn("one final LF", self.prompts)
         self.assertIn("| Design contract SHA-256 |", self.prd)
         self.assertIn("Engine-derived current value", self.prompts)
         for table_name in (
             "Architecture driver",
             "Candidate",
             "Selection",
-            "Traceability",
             "Material AWS evidence",
             "Technology decision",
             "Property applicability",
-            "Property definition",
             "Property execution",
         ):
             self.assertIn(table_name, self.prd)
             self.assertRegex(self.prompts, table_name.replace(" ", r"\s+"))
+        self.assertIn("Property definitions are not referenced", self.engine_source)
+        self.assertRegex(self.prompts, r"Property\s+definition")
+        self.assertIn("complete traceability", self.fastlane_design)
+        self.assertRegex(self.prompts, r"Traceability")
 
     def test_construction_envelope_uses_bindable_grammars(self) -> None:
         required_rows = (
@@ -1732,8 +1736,9 @@ Approver: <name/handle>"""
     def test_git_checkpoint_plan_and_release_lifecycles_are_explicit(self) -> None:
         self.assertIn("| Task-plan state | `UNINITIALIZED` |", self.tasks)
         for state in ("UNINITIALIZED", "CURRENT", "STALE"):
-            self.assertIn(state, self.tasks)
-        self.assertRegex(self.tasks, r"commits? only authorized wave changes")
+            self.assertIn(state, self.prompts)
+            self.assertIn(state, self.engine_source)
+        self.assertIn("only the authorized validated task changes", self.prompts)
         self.assertIn("Last known-green commit", self.tasks)
         for state in ("NOT_READY", "READY_TO_DEPLOY", "RELEASE_VERIFIED"):
             self.assertIn(state, self.verify)
@@ -1754,8 +1759,8 @@ Approver: <name/handle>"""
         )
         self.assertIn("## Task completion evidence", self.verify)
         self.assertIn(header, self.verify)
-        for document in (self.tasks, self.prompts):
-            self.assertIn("Task completion evidence", document)
+        self.assertIn("Task completion evidence", self.prompts)
+        self.assertIn("Task completion evidence", self.engine_source)
         self.assertIn("passing evidence", self.agents)
         for field in (
             "command/result",
@@ -1810,11 +1815,8 @@ Approver: <name/handle>"""
             "`aws_mode_boundary`",
         ):
             self.assertIn(phrase, self.prompts)
-        for document in (
-            self.runbook,
-            self.prompts,
-            self.fastlane_design,
-        ):
+        self.assertRegex(self.prd, r"AWS allowed\s+operations")
+        for document in (self.prompts, self.fastlane_design):
             self.assertRegex(document, r"AWS allowed\s+operations")
             self.assertIn("union", document.lower())
             for phase in ("AWS-10", "AWS-20", "AWS-30", "AWS-40", "AWS-50"):
@@ -1861,9 +1863,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.1.3")
+        self.assertEqual(manifest["bootstrap_version"], "1.1.4")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.1.3", self.prompts)
+        self.assertIn("**Pack version:** 1.1.4", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -1989,7 +1991,7 @@ Approver: <name/handle>"""
             self.assertIn("Fastlane INVEST profile", surface)
             self.assertIn("Thin Vertical Slice", surface)
             self.assertIn("Fastlane Definition of Done", surface)
-        self.assertIn("Deliver phase reference owns generation procedure", self.tasks)
+        self.assertIn("The Deliver reference owns task generation", self.tasks)
         for attribute in (
             "Independent",
             "Negotiable",
@@ -2000,16 +2002,15 @@ Approver: <name/handle>"""
         ):
             self.assertIn(attribute, deliver_reference)
         for done_condition in (
-            "all acceptance criteria pass",
-            "exact validation ran and passed",
-            "applicable property tests pass",
+            "all acceptance criteria and applicable properties pass",
+            "exact validation passed",
             "observed evidence is recorded",
-            "inside REQ/DES/AUTH and write boundaries",
-            "execution log and checkpoint state are current",
-            "no unresolved blocker or placeholder remains",
-            "required documentation and runbook changes are complete",
+            "work stayed inside REQ/DES/AUTH",
+            "checkpoint state is current",
+            "no blocker/placeholder remains",
+            "required documentation/runbook updates are complete",
         ):
-            self.assertIn(done_condition, self.tasks)
+            self.assertIn(done_condition, deliver_reference)
         for horizontal in (
             "migration-",
             "security-",
@@ -2382,7 +2383,7 @@ Approver: <name/handle>"""
             "OTHER_MEANINGFUL_TRANSITION",
         ):
             self.assertIn(trigger, self.prd)
-        self.assertIn("MAX_ATTEMPTS: <positive integer>", self.prd)
+        self.assertIn("MAX_ATTEMPTS: <positive integer>", self.engine_source)
         self.assertIn("RETRY_OR_RESUME", self.prd)
 
     def test_request_scoped_adjuncts_never_become_engine_routes(self) -> None:
@@ -2569,7 +2570,6 @@ Approver: <name/handle>"""
         )
         for document in (
             self.verify,
-            self.runbook,
             aws30,
             self.fastlane_deliver,
             self.operate_fastlane_aws,
@@ -2595,7 +2595,6 @@ Approver: <name/handle>"""
         ):
             self.assertIn(field, self.verify)
         residual_documents = (
-            self.runbook,
             aws40,
             self.fastlane_deliver,
             self.operate_fastlane_aws,
@@ -2625,7 +2624,7 @@ Approver: <name/handle>"""
                 )
                 self.assertNotIn("For each listed residual", document)
 
-        for document in (self.verify, self.runbook, aws40):
+        for document in (self.verify, aws40, self.fastlane_deliver):
             normalized = " ".join(document.split())
             self.assertIn("exact-scope", normalized)
             self.assertRegex(normalized, r"(?i)STALE.{0,100}fresh reads")

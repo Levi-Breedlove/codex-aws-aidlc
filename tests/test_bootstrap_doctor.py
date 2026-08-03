@@ -202,7 +202,7 @@ def exact_legacy_schema_four_projection(text: str) -> str:
     text = remove_region(
         text,
         doctor.FIRST_WAVE_HEADING,
-        "`docs/project/TASKS.md` will translate this design",
+        "## Validation strategy",
     )
     return text.replace(
         "DES-0001, FR-001, JOURNEY-001, WAVE-001",
@@ -2609,7 +2609,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             "TASK-001 READY attempts=0/3 | Evidence: NONE; External: NONE | "
             "Blockers: NONE; Next: resume TASK-001 |\n"
         )
-        text = text.replace("\n\nTo resume,", "\n" + checkpoint + "\nTo resume,", 1)
+        text = text.replace("\n\nResume only", "\n" + checkpoint + "\nResume only", 1)
         tasks_path.write_text(text, encoding="utf-8")
 
         verify_path = project / "docs/project/VERIFY.md"
@@ -2658,7 +2658,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.1.3")
+        self.assertEqual(report["bootstrap_version"], "1.1.4")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
