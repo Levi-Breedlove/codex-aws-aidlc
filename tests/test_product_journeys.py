@@ -162,6 +162,10 @@ class ProductJourneyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
             project = self.extract_template(temporary, "fresh")
+            self.assertTrue((project / "app").is_dir())
+            self.assertEqual((project / "app/.gitkeep").read_bytes(), b"")
+            self.assertFalse((project / "app/AGENTS.md").exists())
+            self.assertFalse((project / "apps").exists())
 
             exit_code, untouched = self.run_doctor_cli(project)
             self.assertEqual(exit_code, 1)

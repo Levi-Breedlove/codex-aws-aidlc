@@ -454,7 +454,7 @@ sequenceDiagram
         root_agents = REPOSITORY_ROOT / "AGENTS.md"
         chains = {
             "root": [root_agents],
-            "app": [root_agents, REPOSITORY_ROOT / "app" / "AGENTS.md"],
+            "app": [root_agents],
             "infrastructure": [
                 root_agents,
                 REPOSITORY_ROOT / "infrastructure" / "AGENTS.md",

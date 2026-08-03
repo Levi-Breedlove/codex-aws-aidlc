@@ -94,7 +94,8 @@ checks pass, VERIFY/RUNBOOK hold observed evidence, and external tracking is
 reconciled or explicitly pending.
 ## Agent reference
 
-This file owns invariants/routing. Nested guides narrow app, AWS, Engine, or test
-rules; phase references own procedures; `operate-fastlane-aws` owns AWS
+This file owns invariants/routing. Deliver owns the singular `app/` source and
+application procedure. Nested guides narrow AWS,
+Engine, or test rules; phase references own procedures; `operate-fastlane-aws` owns AWS
 operations; the prompt registry owns syntax/receipts; the Engine validates and
 projects authority; `docs/WORKFLOW.md` explains the product.

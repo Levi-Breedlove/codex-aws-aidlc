@@ -265,6 +265,19 @@ class PackageReleaseTests(unittest.TestCase):
             self.assertIn(canonical, manifest["required_files"])
             self.assertFalse((REPOSITORY_ROOT / name).exists(), name)
 
+    def test_template_reserves_singular_app_root_without_nested_agent_authority(
+        self,
+    ) -> None:
+        manifest = json.loads(
+            (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
+        )
+        self.assertIn("app/.gitkeep", manifest["required_files"])
+        self.assertIn("app/.gitkeep", manifest["source_sha256"])
+        self.assertNotIn("app/AGENTS.md", manifest["required_files"])
+        self.assertNotIn("app/AGENTS.md", manifest["source_sha256"])
+        self.assertEqual((REPOSITORY_ROOT / "app/.gitkeep").read_bytes(), b"")
+        self.assertFalse((REPOSITORY_ROOT / "app/AGENTS.md").exists())
+
     def test_manifest_is_the_only_internal_version_source(self) -> None:
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
