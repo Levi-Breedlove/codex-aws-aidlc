@@ -429,7 +429,22 @@ LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
 PROJECT_CONTRACT_SCHEMA = "1.4"
-PROJECT_DESIGN_CONTRACT_SCHEMA = "6"
+PROJECT_DESIGN_CONTRACT_SCHEMA = "7"
+APPLICATION_SOURCE_DISPOSITION_FIELD = "Application source disposition"
+APPLICATION_SOURCE_GREENFIELD = "GREENFIELD_APP_ROOT"
+APPLICATION_SOURCE_BROWNFIELD = "BROWNFIELD_PRESERVE"
+APPLICATION_SOURCE_NOT_APPLICABLE = "NOT_APPLICABLE"
+APPLICATION_SOURCE_INFRASTRUCTURE_ONLY = (
+    "NOT_APPLICABLE — INFRASTRUCTURE_ONLY"
+)
+APPLICATION_SOURCE_DIAGNOSTIC_CODES = frozenset(
+    {
+        "APPLICATION_SOURCE_DISPOSITION_MISSING",
+        "APPLICATION_SOURCE_DISPOSITION_INVALID",
+        "APPLICATION_SOURCE_DISPOSITION_CONFLICT",
+        "APPLICATION_SOURCE_PARALLEL_ROOT",
+    }
+)
 REQUIREMENTS_CHANGE_LINEAGE_HEADING = "### Requirements change lineage"
 REQUIREMENTS_CHANGE_LINEAGE_HEADERS = (
     "Current revision",
@@ -1648,9 +1663,25 @@ class DiagramContract:
 
 
 @dataclass(frozen=True)
+class ApplicationSourceDisposition:
+    kind: str
+    paths: tuple[str, ...] = ()
+
+    @property
+    def canonical_value(self) -> str:
+        if self.kind == APPLICATION_SOURCE_NOT_APPLICABLE:
+            return APPLICATION_SOURCE_INFRASTRUCTURE_ONLY
+        return f"{self.kind}: {'; '.join(self.paths)}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"kind": self.kind, "paths": list(self.paths)}
+
+
+@dataclass(frozen=True)
 class ProjectDesignContract:
-    schema_version: int = 6
+    schema_version: int = 7
     status: str = "UNINITIALIZED"
+    application_source_disposition: ApplicationSourceDisposition | None = None
     interface_ids: tuple[str, ...] = ()
     boundary_ids: tuple[str, ...] = ()
     state_ids: tuple[str, ...] = ()
@@ -1660,12 +1691,18 @@ class ProjectDesignContract:
     canonical_sha256: str | None = None
     grandfathered_v4: bool = False
     grandfathered_v5: bool = False
+    grandfathered_v6: bool = False
     canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "status": self.status,
+            "application_source_disposition": (
+                self.application_source_disposition.to_dict()
+                if self.application_source_disposition is not None
+                else None
+            ),
             "interface_ids": list(self.interface_ids),
             "boundary_ids": list(self.boundary_ids),
             "state_ids": list(self.state_ids),
@@ -1675,6 +1712,7 @@ class ProjectDesignContract:
             "canonical_sha256": self.canonical_sha256,
             "grandfathered_v4": self.grandfathered_v4,
             "grandfathered_v5": self.grandfathered_v5,
+            "grandfathered_v6": self.grandfathered_v6,
         }
 
 
@@ -1709,6 +1747,11 @@ class DesignContract:
             "diagram_contract": self.diagram_contract.to_dict(),
             "canonical_sha256": self.canonical_sha256,
             "project_contract": self.project_contract.to_dict(),
+            "application_source_disposition": (
+                self.project_contract.application_source_disposition.to_dict()
+                if self.project_contract.application_source_disposition is not None
+                else None
+            ),
         }
 
 
@@ -8222,6 +8265,154 @@ def _design_reference_issues(
     return issues
 
 
+def parse_application_source_disposition(
+    value: str,
+) -> ApplicationSourceDisposition:
+    """Parse the exact schema-7 application-source decision grammar."""
+
+    normalized = clean_cell(value)
+    if normalized == APPLICATION_SOURCE_INFRASTRUCTURE_ONLY:
+        return ApplicationSourceDisposition(APPLICATION_SOURCE_NOT_APPLICABLE)
+    for kind in (APPLICATION_SOURCE_GREENFIELD, APPLICATION_SOURCE_BROWNFIELD):
+        prefix = f"{kind}: "
+        if not normalized.startswith(prefix):
+            continue
+        raw_paths = [item.strip() for item in normalized[len(prefix) :].split(";")]
+        try:
+            paths = tuple(
+                parse_task_write_set(
+                    ",".join(raw_paths), APPLICATION_SOURCE_DISPOSITION_FIELD
+                )
+            )
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        if not paths:
+            raise ValueError("Application source disposition has no source paths")
+        if kind == APPLICATION_SOURCE_GREENFIELD and paths != ("app/**",):
+            raise ValueError(
+                "GREENFIELD_APP_ROOT must be exactly GREENFIELD_APP_ROOT: app/**"
+            )
+        return ApplicationSourceDisposition(kind, paths)
+    raise ValueError(
+        "Application source disposition must use GREENFIELD_APP_ROOT: app/**, "
+        "BROWNFIELD_PRESERVE: path/**; another/path/**, or "
+        "NOT_APPLICABLE — INFRASTRUCTURE_ONLY"
+    )
+
+
+def _brownfield_source_contract_section(text: str) -> str:
+    heading = "### 1.2 Brownfield baseline and preservation contract"
+    structural = without_fenced_code(text)
+    matches = list(re.finditer(rf"^{re.escape(heading)}\s*$", structural, re.MULTILINE))
+    if len(matches) != 1:
+        return ""
+    following = structural[matches[0].end() :]
+    next_heading = re.search(r"^##\s+2\.", following, re.MULTILINE)
+    end = matches[0].end() + (next_heading.start() if next_heading else len(following))
+    return text[matches[0].end() : end]
+def _contains_exact_source_path(value: str, path: str) -> bool:
+    """Match one recorded source path without accepting a longer lookalike."""
+
+    return re.search(
+        rf"(?<![A-Za-z0-9._/*-]){re.escape(path)}(?![A-Za-z0-9._/*-])",
+        value,
+        re.IGNORECASE,
+    ) is not None
+
+
+
+def validate_application_source_disposition(
+    disposition: ApplicationSourceDisposition,
+    *,
+    project_mode: str | None,
+    work_kind: str | None,
+    prd_text: str,
+) -> list[str]:
+    """Return stable schema-7 source-disposition diagnostics."""
+
+    issues: list[str] = []
+    if disposition.kind == APPLICATION_SOURCE_NOT_APPLICABLE:
+        if work_kind != "INFRASTRUCTURE":
+            issues.append(
+                "APPLICATION_SOURCE_DISPOSITION_INVALID: "
+                "NOT_APPLICABLE — INFRASTRUCTURE_ONLY requires Work kind INFRASTRUCTURE"
+            )
+        return issues
+    if disposition.kind == APPLICATION_SOURCE_GREENFIELD:
+        if project_mode != "greenfield":
+            issues.append(
+                "APPLICATION_SOURCE_DISPOSITION_INVALID: GREENFIELD_APP_ROOT "
+                "requires greenfield project mode"
+            )
+        if work_kind == "INFRASTRUCTURE":
+            issues.append(
+                "APPLICATION_SOURCE_DISPOSITION_INVALID: infrastructure-only work "
+                "must use NOT_APPLICABLE — INFRASTRUCTURE_ONLY"
+            )
+        return issues
+    if disposition.kind != APPLICATION_SOURCE_BROWNFIELD:
+        issues.append(
+            "APPLICATION_SOURCE_DISPOSITION_INVALID: unknown application source disposition kind"
+        )
+        return issues
+    if project_mode != "brownfield":
+        issues.append(
+            "APPLICATION_SOURCE_DISPOSITION_INVALID: BROWNFIELD_PRESERVE requires brownfield project mode"
+        )
+        return issues
+    preserved_section = _brownfield_source_contract_section(prd_text)
+    tables = markdown_tables(preserved_section)
+    protected_paths = ""
+    preservation_rows: list[list[str]] = []
+    for table in tables:
+        headers = table[0]
+        if headers == ["Field", "Brownfield baseline"]:
+            protected_paths = next(
+                (
+                    row[1]
+                    for row in table[2:]
+                    if len(row) == 2 and row[0] == "Protected files and components"
+                ),
+                "",
+            )
+        elif headers == [
+            "Preservation ID",
+            "Behavior, asset, or constraint to preserve",
+            "How it is verified before change",
+            "Allowed change",
+            "Explicitly prohibited or approval-required change",
+        ]:
+            preservation_rows = table[2:]
+
+    missing_baseline = [
+        path
+        for path in disposition.paths
+        if not _contains_exact_source_path(protected_paths, path)
+    ]
+    missing_preservation = [
+        path
+        for path in disposition.paths
+        if not any(
+            _contains_exact_source_path(" | ".join(row[1:]), path)
+            for row in preservation_rows
+        )
+    ]
+    if missing_baseline or missing_preservation:
+        details: list[str] = []
+        if missing_baseline:
+            details.append(
+                "Protected files and components: " + ", ".join(missing_baseline)
+            )
+        if missing_preservation:
+            details.append("matching PRES record: " + ", ".join(missing_preservation))
+        issues.append(
+            "APPLICATION_SOURCE_DISPOSITION_CONFLICT: brownfield source roots must "
+            "appear unchanged in both Gate A brownfield records; missing from "
+            + "; ".join(details)
+        )
+    return issues
+
+
 def derive_project_design_contract(
     text: str,
     requirements_contract: RequirementsContract,
@@ -8233,7 +8424,7 @@ def derive_project_design_contract(
     required: bool,
     grandfather_approved_v4: bool,
 ) -> tuple[ProjectDesignContract, list[str]]:
-    """Validate the schema-6 interface, boundary, state, and delivery contract."""
+    """Validate the current interface, source, boundary, state, and delivery contract."""
 
     issues: list[str] = []
     add = issues.append
@@ -8245,12 +8436,19 @@ def derive_project_design_contract(
         if required:
             issues.append(str(exc))
     design_schema = clean_cell(document.get("Project design contract schema", ""))
+    grandfather_schema_6 = bool(
+        design_schema == "6" and grandfather_approved_v4
+    )
     grandfather_schema_5 = bool(
         design_schema == "5"
         and grandfather_approved_v4
         and DIAGRAM_CONTRACT_HEADING not in without_fenced_code(text)
     )
-    if design_schema != PROJECT_DESIGN_CONTRACT_SCHEMA and not grandfather_schema_5:
+    if (
+        design_schema != PROJECT_DESIGN_CONTRACT_SCHEMA
+        and not grandfather_schema_6
+        and not grandfather_schema_5
+    ):
         observed_tables = [table for table in markdown_tables(text) if table]
         observed_headers = {tuple(table[0]) for table in observed_tables}
         current_headers = {
@@ -8313,7 +8511,8 @@ def derive_project_design_contract(
             ProjectDesignContract(
                 status="MIGRATION_REQUIRED",
                 missing_records=(
-                    "Project design contract schema 6",
+                    "Project design contract schema 7",
+                    APPLICATION_SOURCE_DISPOSITION_FIELD,
                     INTERFACE_HEADING,
                     LAYER_BOUNDARY_HEADING,
                     STATE_APPLICABILITY_HEADING,
@@ -8324,10 +8523,50 @@ def derive_project_design_contract(
                 ),
             ),
             [
-                "Project design contract schema 6 requires current interface, "
-                "layer-boundary, state-applicability, first-wave, spike, and diagram records"
+                "Project design contract schema 7 requires an application source "
+                "disposition plus current interface, layer-boundary, state-applicability, "
+                "first-wave, spike, and diagram records"
             ],
         )
+
+    source_disposition: ApplicationSourceDisposition | None = None
+    if not (grandfather_schema_5 or grandfather_schema_6):
+        try:
+            envelope = table_after_heading(text, "## 28. Construction envelope")
+        except ValueError as exc:
+            envelope = {}
+            if required:
+                add(
+                    "APPLICATION_SOURCE_DISPOSITION_MISSING: unable to read the "
+                    f"construction envelope: {exc}"
+                )
+        raw_disposition = clean_cell(
+            envelope.get(APPLICATION_SOURCE_DISPOSITION_FIELD, "")
+        )
+        if not raw_disposition or unresolved(raw_disposition):
+            if required:
+                add(
+                    "APPLICATION_SOURCE_DISPOSITION_MISSING: schema 7 requires "
+                    "Application source disposition before Gate B"
+                )
+                missing_records.append(APPLICATION_SOURCE_DISPOSITION_FIELD)
+        else:
+            try:
+                source_disposition = parse_application_source_disposition(
+                    raw_disposition
+                )
+            except ValueError as exc:
+                add(f"APPLICATION_SOURCE_DISPOSITION_INVALID: {exc}")
+            if source_disposition is not None:
+                issues.extend(
+                    validate_application_source_disposition(
+                        source_disposition,
+                        project_mode=clean_cell(document.get("Project mode", "")).lower()
+                        or None,
+                        work_kind=coverage_contract.work_kind,
+                        prd_text=text,
+                    )
+                )
 
     interfaces, boundaries, state_applicability, states = (
         _contract_table_or_issue(text, heading, headers, issues, missing_records)
@@ -8781,10 +9020,19 @@ def derive_project_design_contract(
         )
 
     canonical_parts: list[bytes] = [
-        f"PROJECT_DESIGN_CONTRACT_SCHEMA: {'5' if grandfather_schema_5 else PROJECT_DESIGN_CONTRACT_SCHEMA}\n".encode(
+        f"PROJECT_DESIGN_CONTRACT_SCHEMA: "
+        f"{'5' if grandfather_schema_5 else '6' if grandfather_schema_6 else PROJECT_DESIGN_CONTRACT_SCHEMA}\n".encode(
             "utf-8"
         )
     ]
+    if source_disposition is not None:
+        canonical_parts.append(
+            (
+                "APPLICATION_SOURCE_DISPOSITION: "
+                + source_disposition.canonical_value
+                + "\n"
+            ).encode("utf-8")
+        )
     if (
         requirements_contract.grandfathered_approved_gate_a
         and requirements_contract.canonical_sha256 is None
@@ -8821,14 +9069,21 @@ def derive_project_design_contract(
         return ProjectDesignContract(status="UNINITIALIZED"), []
     return (
         ProjectDesignContract(
-            schema_version=5 if grandfather_schema_5 else 6,
+            schema_version=(
+                5
+                if grandfather_schema_5
+                else 6
+                if grandfather_schema_6
+                else 7
+            ),
             status=(
                 "GRANDFATHERED"
-                if grandfather_schema_5 and not issues
+                if (grandfather_schema_5 or grandfather_schema_6) and not issues
                 else "READY"
                 if not issues
                 else "BLOCKED"
             ),
+            application_source_disposition=source_disposition,
             interface_ids=tuple(interface_ids),
             boundary_ids=tuple(boundary_ids),
             state_ids=tuple(state_ids),
@@ -8837,6 +9092,7 @@ def derive_project_design_contract(
             missing_records=tuple(dict.fromkeys(missing_records)),
             canonical_sha256=canonical_sha256,
             grandfathered_v5=grandfather_schema_5,
+            grandfathered_v6=grandfather_schema_6,
             canonical_bytes=canonical_bytes,
         ),
         issues,
@@ -9642,6 +9898,8 @@ def derive_design_contract(
                 else 5
                 if project_contract.grandfathered_v5
                 else 6
+                if project_contract.grandfathered_v6
+                else 7
             ),
             status=status,
             design_revision=design_revision,
@@ -9723,19 +9981,75 @@ def parse_envelope_paths(value: str, label: str, *, allow_none: bool) -> list[st
 def validate_application_source_root(
     paths: list[str], project_mode: str | None
 ) -> None:
-    """Bind new application code to app/ without rewriting brownfield layouts."""
+    """Compatibility validator for the legacy inferred greenfield source root."""
 
     if project_mode != "greenfield":
         return
     top_level = {path.split("/", 1)[0].casefold() for path in paths}
-    if "apps" in top_level:
+    if top_level & {"apps", "src"}:
         raise ValueError(
-            "Greenfield application source must use singular app/**; apps/** is not allowed"
+            "Greenfield application source must use singular app/**; "
+            "apps/** and src/** are not allowed"
         )
     if "app" not in top_level:
         raise ValueError(
             "Greenfield Allowed repository write set must include application source under app/**"
         )
+
+
+def validate_application_source_write_set(
+    disposition: ApplicationSourceDisposition,
+    paths: list[str],
+) -> None:
+    """Bind the Gate B source decision to the construction write set."""
+
+    top_level = {path.split("/", 1)[0].casefold() for path in paths}
+    if disposition.kind == APPLICATION_SOURCE_NOT_APPLICABLE:
+        if top_level & {"app", "apps", "src"}:
+            raise ValueError(
+                "APPLICATION_SOURCE_PARALLEL_ROOT: infrastructure-only work "
+                "cannot authorize app/**, apps/**, or src/**"
+            )
+        return
+    if disposition.kind == APPLICATION_SOURCE_GREENFIELD:
+        if top_level & {"apps", "src"}:
+            raise ValueError(
+                "APPLICATION_SOURCE_PARALLEL_ROOT: greenfield work cannot "
+                "authorize apps/** or src/** alongside app/**"
+            )
+        if not any(
+            path_boundary_contains("app/**", path)
+            or path_boundary_contains(path, "app/**")
+            for path in paths
+        ):
+            raise ValueError(
+                "APPLICATION_SOURCE_DISPOSITION_INVALID: greenfield Allowed "
+                "repository write set must include application source under app/**"
+            )
+        return
+    missing = [
+        source
+        for source in disposition.paths
+        if not any(path_boundaries_overlap(source, path) for path in paths)
+    ]
+    if missing:
+        raise ValueError(
+            "APPLICATION_SOURCE_DISPOSITION_INVALID: Allowed repository write "
+            "set does not cover approved brownfield source roots: "
+            + ", ".join(missing)
+        )
+    for path in paths:
+        if path.split("/", 1)[0].casefold() not in {"app", "apps", "src"}:
+            continue
+        if not any(
+            path_boundaries_overlap(source, path)
+            for source in disposition.paths
+        ):
+            raise ValueError(
+                "APPLICATION_SOURCE_PARALLEL_ROOT: brownfield write set adds "
+                "an unapproved parallel application root: "
+                + path
+            )
 
 
 def parse_envelope_targets(value: str) -> list[str]:
@@ -10492,6 +10806,93 @@ def derive_owner_decision_brief(
                         for item in design_contract.architecture.aws_evidence
                     ],
                     "source_locator_keys": ["selected-architecture"],
+                }
+            )
+        source_disposition = (
+            design_contract.project_contract.application_source_disposition
+        )
+        if source_disposition is not None:
+            expected_decision_ids.append("SOURCE-0001")
+            source_basis = [design_revision, authorization_id]
+            if source_disposition.kind == APPLICATION_SOURCE_GREENFIELD:
+                owner_effect = (
+                    "New application code has one predictable home under app/, "
+                    "with tests and infrastructure kept in their own roots."
+                )
+                rationale = (
+                    "A singular application root prevents Codex and contributors "
+                    "from creating competing app, apps, or src trees."
+                )
+                alternatives = (
+                    "apps/** and src/** were rejected because parallel greenfield "
+                    "roots make ownership, imports, tests, and release packaging ambiguous."
+                )
+                tradeoff = (
+                    "The selected framework must fit under app/; root toolchain files "
+                    "remain allowed when the approved stack requires them."
+                )
+                reconsider = (
+                    "Reopen this decision only if an approved product or framework "
+                    "constraint cannot be satisfied under app/**."
+                )
+            elif source_disposition.kind == APPLICATION_SOURCE_BROWNFIELD:
+                owner_effect = (
+                    "Existing application source stays in the recorded preserved roots."
+                )
+                rationale = (
+                    "Preserving the observed brownfield layout avoids an unapproved "
+                    "migration and protects existing users, interfaces, and tests."
+                )
+                alternatives = (
+                    "A new parallel app/** root was rejected unless the owner-approved "
+                    "baseline and preservation contract explicitly authorize that migration."
+                )
+                tradeoff = (
+                    "The existing layout may be less uniform, but continuity takes "
+                    "priority over cosmetic restructuring."
+                )
+                reconsider = (
+                    "Reopen this decision when the owner approves a source migration "
+                    "or the recorded brownfield baseline changes."
+                )
+            else:
+                owner_effect = (
+                    "This work changes infrastructure only and creates no application source tree."
+                )
+                rationale = (
+                    "The approved work kind has no application runtime, so app/** would "
+                    "be misleading and unnecessary."
+                )
+                alternatives = (
+                    "Creating app/**, apps/**, or src/** was rejected because no "
+                    "application behavior is in the approved scope."
+                )
+                tradeoff = "Application code requires a later design-controlled change."
+                reconsider = (
+                    "Reopen this decision when application behavior enters the approved scope."
+                )
+            grouped["application/runtime"].append(
+                {
+                    "decision_id": "SOURCE-0001",
+                    "decision": "Application source layout",
+                    "owner_effect": owner_effect,
+                    "selection": source_disposition.canonical_value,
+                    "requirement_basis": ", ".join(source_basis),
+                    "why": rationale,
+                    "alternatives": alternatives,
+                    "tradeoff": tradeoff,
+                    "risk_and_mitigation": (
+                        "Risk: code could drift into an unapproved parallel root. "
+                        "Safeguard: the Engine validates Gate B, task write sets, and the walking skeleton."
+                    ),
+                    "evidence_status": (
+                        "PLANNED_AFTER_APPROVAL — the source boundary is design-verified "
+                        "but implementation remains unobserved."
+                    ),
+                    "reconsider_when": reconsider,
+                    "basis_ids": source_basis,
+                    "evidence_ids": [],
+                    "source_locator_keys": ["construction-boundary"],
                 }
             )
         for decision in design_contract.technology_decisions:
@@ -11651,7 +12052,18 @@ def validate_construction_envelope(
     cost_posture: str,
     design_contract: DesignContract,
 ) -> None:
-    missing = sorted(ENVELOPE_EXPLICIT_FIELDS - set(envelope))
+    required_fields = set(ENVELOPE_EXPLICIT_FIELDS)
+    if any(
+        (
+            design_contract.project_contract.grandfathered_v4,
+            design_contract.project_contract.grandfathered_v5,
+            design_contract.project_contract.grandfathered_v6,
+        )
+    ):
+        required_fields.discard(APPLICATION_SOURCE_DISPOSITION_FIELD)
+    else:
+        required_fields.add(APPLICATION_SOURCE_DISPOSITION_FIELD)
+    missing = sorted(required_fields - set(envelope))
     if missing:
         ctx.error(
             "GATE_B_ENVELOPE",
@@ -11660,7 +12072,7 @@ def validate_construction_envelope(
         )
     unresolved_fields = sorted(
         field
-        for field in ENVELOPE_EXPLICIT_FIELDS
+        for field in required_fields
         if not explicit_value(
             envelope.get(field, ""),
             allow_none=field
@@ -11799,10 +12211,17 @@ def validate_construction_envelope(
             "Allowed repository write set",
             allow_none=False,
         )
-        validate_application_source_root(
-            allowed_repository_paths,
-            selections.get("mode"),
+        source_disposition = (
+            design_contract.project_contract.application_source_disposition
         )
+        if source_disposition is None:
+            validate_application_source_root(
+                allowed_repository_paths, selections.get("mode")
+            )
+        else:
+            validate_application_source_write_set(
+                source_disposition, allowed_repository_paths
+            )
         parse_envelope_paths(
             envelope.get("Excluded or owner-only write set", ""),
             "Excluded or owner-only write set",
@@ -11827,14 +12246,21 @@ def validate_construction_envelope(
         code = (
             "GATE_B_AUTHORITY_EXPIRED"
             if str(exc) == "Construction authorization is expired"
+            else "APPLICATION_SOURCE_PARALLEL_ROOT"
+            if str(exc).startswith("APPLICATION_SOURCE_PARALLEL_ROOT: ")
+            else "APPLICATION_SOURCE_DISPOSITION_INVALID"
+            if str(exc).startswith("APPLICATION_SOURCE_DISPOSITION_INVALID: ")
             else "GATE_B_ENVELOPE"
         )
-        message = (
-            "Gate B authority expired; the owner must reapprove the current "
-            "design boundary before any new local or AWS operation"
-            if code == "GATE_B_AUTHORITY_EXPIRED"
-            else str(exc)
-        )
+        if code in APPLICATION_SOURCE_DIAGNOSTIC_CODES:
+            message = str(exc).split(": ", 1)[1]
+        else:
+            message = (
+                "Gate B authority expired; the owner must reapprove the current "
+                "design boundary before any new local or AWS operation"
+                if code == "GATE_B_AUTHORITY_EXPIRED"
+                else str(exc)
+            )
         ctx.error(code, message, PRD_FILE)
     if numeric.get("Maximum parallel workers") != 1:
         ctx.error(
@@ -12400,7 +12826,11 @@ def validate_prd(
     )
     if design_contract_required:
         for issue in design_contract_issues:
-            ctx.error("DESIGN_CONTRACT_INVALID", issue, PRD_FILE)
+            code, separator, message = issue.partition(": ")
+            if separator and code in APPLICATION_SOURCE_DIAGNOSTIC_CODES:
+                ctx.error(code, message, PRD_FILE)
+            else:
+                ctx.error("DESIGN_CONTRACT_INVALID", issue, PRD_FILE)
     card_cost_posture = clean_cell(gate_a_card.get("Cost posture", ""))
     if gate_a_agent_ready or gate_a_ready_or_current:
         validate_gate_a_method_contract(
@@ -15026,6 +15456,11 @@ def inspect_project(
         blocking_aws_core_phases,
         _owner_stage_from_gates(gate_a, gate_b),
     )
+    if any(
+        item.code == "APPLICATION_SOURCE_DISPOSITION_CONFLICT"
+        for item in ctx.diagnostics
+    ):
+        owner_stage_hint = "DEFINE"
     return build_report(
         ctx,
         lifecycle_state,
@@ -15113,6 +15548,9 @@ DEFINE_AGENT_DIAGNOSTICS = frozenset(
 )
 DESIGN_AGENT_DIAGNOSTICS = frozenset(
     {
+        "APPLICATION_SOURCE_DISPOSITION_INVALID",
+        "APPLICATION_SOURCE_DISPOSITION_MISSING",
+        "APPLICATION_SOURCE_PARALLEL_ROOT",
         "AWS_LANE_BOUNDARY",
         "DESIGN_CONTRACT_INVALID",
         "GATE_B_DESIGN_CONTRACT_HASH",
@@ -15171,6 +15609,7 @@ TASK_REPLAN_DIAGNOSTICS = frozenset(
 )
 OWNER_DECISION_DIAGNOSTICS = frozenset(
     {
+        "APPLICATION_SOURCE_DISPOSITION_CONFLICT",
         "BROWNFIELD_PRD_BASELINE",
         "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
         "BROWNFIELD_PRD_PRESERVATION",

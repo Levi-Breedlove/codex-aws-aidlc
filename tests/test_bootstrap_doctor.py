@@ -168,7 +168,7 @@ def exact_legacy_requirements_projection(text: str) -> str:
 
 def exact_legacy_schema_four_projection(text: str) -> str:
     text = re.sub(
-        r"(?m)^\| Project design contract schema \| `6` \|\r?\n",
+        r"(?m)^\| Project design contract schema \| `7` \|\r?\n",
         "",
         text,
         count=1,
@@ -761,6 +761,7 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
         "Protected dirty paths": "`NONE`",
         "In-scope components and environments": "`app and tests in development`",
         "Allowed repository write set": "`PATHS: app/**; tests/**`",
+        "Application source disposition": "`GREENFIELD_APP_ROOT: app/**`",
         "Excluded or owner-only write set": "`PATHS: docs/project/PRD.md; bootstrap.yaml`",
         "Allowed external-state targets": "`NONE`",
         "Task boundary": "`DERIVED_FROM_AUTHORIZED_IDS_AND_WRITE_SET`",
@@ -1176,8 +1177,15 @@ def complete_project_design_contract(text: str) -> str:
         text,
         "## Document status",
         "## 1. Workload profile",
+        "Project mode",
+        "`greenfield`",
+    )
+    text = set_table_value(
+        text,
+        "## Document status",
+        "## 1. Workload profile",
         "Project design contract schema",
-        "`6`",
+        "`7`",
     )
     text = replace_contract_table(
         text,
@@ -1255,10 +1263,17 @@ def complete_project_design_contract(text: str) -> str:
             )
         ],
     )
-    return replace_contract_table_with_sentinel(
+    text = replace_contract_table_with_sentinel(
         text,
         doctor.SPIKE_HEADING,
         "no prerequisite discovery is needed before the walking skeleton",
+    )
+    return set_table_value(
+        text,
+        "## 28. Construction envelope",
+        "## 29. Gate B owner authorization record",
+        "Application source disposition",
+        "`GREENFIELD_APP_ROOT: app/**`",
     )
 
 
@@ -2658,7 +2673,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.1.4")
+        self.assertEqual(report["bootstrap_version"], "1.1.5")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -2680,7 +2695,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["authorizations"],
             {"construction": "NONE", "aws": "NONE"},
         )
-        self.assertEqual(report["design_contract"]["schema_version"], 6)
+        self.assertEqual(report["design_contract"]["schema_version"], 7)
         self.assertIn(
             report["design_contract"]["status"],
             {"UNINITIALIZED", "BLOCKED"},
@@ -3699,7 +3714,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 6)
+        self.assertEqual(ready.schema_version, 7)
         self.assertEqual(ready.architecture.schema_version, 4)
         self.assertEqual(ready.change_impact.status, "READY")
         self.assertEqual(ready.architecture.status, "READY")
@@ -3851,7 +3866,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(invalidated.status, "BLOCKED")
         self.assertTrue(
             any(
-                "Project design contract schema 6" in issue
+                "Project design contract schema 7" in issue
                 for issue in invalidated_issues
             ),
             invalidated_issues,
@@ -4061,7 +4076,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertTrue(ready_report["ok"], ready_report["diagnostics"])
             self.assertEqual(ready_report["status"], "RESUME")
             self.assertEqual(ready_report["next_prompt"], "TASK-10")
-            self.assertEqual(contract["schema_version"], 6)
+            self.assertEqual(contract["schema_version"], 7)
             self.assertEqual(
                 ready_report["requirements_contract"]["schema_version"], "1.4"
             )
@@ -6042,22 +6057,161 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertIn("GATE_B_ENVELOPE", codes(report))
 
     def test_greenfield_gate_b_binds_application_source_to_singular_app(self) -> None:
-        doctor.validate_application_source_root(
-            ["app/**", "tests/**", "infrastructure/**"],
-            "greenfield",
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        greenfield = doctor.ApplicationSourceDisposition(
+            doctor.APPLICATION_SOURCE_GREENFIELD,
+            ("app/**",),
         )
-        for invalid, message in (
-            (["apps/**", "tests/**"], "singular app/"),
-            (["src/**", "tests/**"], "must include application source under app/"),
+        self.assertEqual(
+            doctor.validate_application_source_disposition(
+                greenfield,
+                project_mode="greenfield",
+                work_kind="NEW_BUILD",
+                prd_text=source,
+            ),
+            [],
+        )
+        doctor.validate_application_source_write_set(
+            greenfield,
+            ["app/**", "tests/**"],
+        )
+        for invalid in (
+            ["app/**", "src/**", "tests/**"],
+            ["apps/**", "tests/**"],
+            ["src/**", "tests/**"],
         ):
             with self.subTest(paths=invalid):
-                with self.assertRaisesRegex(ValueError, message):
-                    doctor.validate_application_source_root(invalid, "greenfield")
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "APPLICATION_SOURCE_PARALLEL_ROOT",
+                ):
+                    doctor.validate_application_source_write_set(greenfield, invalid)
 
-        # An approved brownfield layout is preserved rather than silently migrated.
-        doctor.validate_application_source_root(
-            ["apps/existing-service/**", "tests/**"],
-            "brownfield",
+        infrastructure = doctor.ApplicationSourceDisposition(
+            doctor.APPLICATION_SOURCE_NOT_APPLICABLE
+        )
+        self.assertEqual(
+            doctor.validate_application_source_disposition(
+                infrastructure,
+                project_mode="greenfield",
+                work_kind="INFRASTRUCTURE",
+                prd_text=source,
+            ),
+            [],
+        )
+        doctor.validate_application_source_write_set(
+            infrastructure,
+            ["infrastructure/**", "tests/**"],
+        )
+
+        brownfield_text = set_table_value(
+            source,
+            "### 1.2 Brownfield baseline and preservation contract",
+            "## Product requirements",
+            "Protected files and components",
+            "`service/**`",
+        ).replace(
+            "| PRES-001 | TODO | TODO | TODO | TODO |",
+            "| PRES-001 | Preserve service/** | Baseline tests | Narrow changes only | Parallel application roots |",
+            1,
+        )
+        brownfield = doctor.ApplicationSourceDisposition(
+            doctor.APPLICATION_SOURCE_BROWNFIELD,
+            ("service/**",),
+        )
+        self.assertEqual(
+            doctor.validate_application_source_disposition(
+                brownfield,
+                project_mode="brownfield",
+                work_kind="FEATURE",
+                prd_text=brownfield_text,
+            ),
+            [],
+        )
+        doctor.validate_application_source_write_set(
+            brownfield,
+            ["service/**", "tests/**"],
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "APPLICATION_SOURCE_PARALLEL_ROOT",
+        ):
+            doctor.validate_application_source_write_set(
+                brownfield,
+                ["service/**", "app/**", "tests/**"],
+            )
+        conflict = doctor.validate_application_source_disposition(
+            brownfield,
+            project_mode="brownfield",
+            work_kind="FEATURE",
+            prd_text=set_table_value(
+                source,
+                "### 1.2 Brownfield baseline and preservation contract",
+                "## Product requirements",
+                "Protected files and components",
+                "`service/**`",
+            ),
+        )
+        self.assertTrue(
+            any("matching PRES record" in issue for issue in conflict),
+            conflict,
+        )
+        lookalike_text = set_table_value(
+            source,
+            "### 1.2 Brownfield baseline and preservation contract",
+            "## Product requirements",
+            "Protected files and components",
+            "`myservice/**`",
+        ).replace(
+            "| PRES-001 | TODO | TODO | TODO | TODO |",
+            "| PRES-001 | Preserve myservice/** | Baseline tests | Narrow changes only | Parallel application roots |",
+            1,
+        )
+        lookalike_conflict = doctor.validate_application_source_disposition(
+            brownfield,
+            project_mode="brownfield",
+            work_kind="FEATURE",
+            prd_text=lookalike_text,
+        )
+        self.assertTrue(
+            any(
+                "Protected files and components" in issue
+                and "matching PRES record" in issue
+                for issue in lookalike_conflict
+            ),
+            lookalike_conflict,
+        )
+
+
+        complete = complete_design_contract(source)
+        design, issues = doctor.derive_design_contract(
+            complete,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(
+            design.to_dict()["application_source_disposition"],
+            {"kind": "GREENFIELD_APP_ROOT", "paths": ["app/**"]},
+        )
+        missing = re.sub(
+            r"(?m)^\| Application source disposition \|.*\r?\n",
+            "",
+            complete,
+            count=1,
+        )
+        missing_contract, missing_issues = doctor.derive_design_contract(
+            missing,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(missing_contract.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                "APPLICATION_SOURCE_DISPOSITION_MISSING" in issue
+                for issue in missing_issues
+            ),
+            missing_issues,
         )
 
         with tempfile.TemporaryDirectory() as directory:
@@ -6075,9 +6229,9 @@ class BootstrapDoctorTests(unittest.TestCase):
 
             report = doctor.inspect_project(project)
 
-        self.assertIn("GATE_B_ENVELOPE", codes(report))
+        self.assertIn("APPLICATION_SOURCE_PARALLEL_ROOT", codes(report))
         self.assertTrue(
-            any("singular app/**" in item["message"] for item in report["diagnostics"]),
+            any("apps/** or src/**" in item["message"] for item in report["diagnostics"]),
             report["diagnostics"],
         )
 
@@ -9088,7 +9242,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
         legacy = source.replace(
-            "| Project design contract schema | `6` |",
+            "| Project design contract schema | `7` |",
             "| Project design contract schema | `5` |",
             1,
         )
@@ -9107,6 +9261,49 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(grandfathered.schema_version, 5)
         self.assertTrue(grandfathered.project_contract.grandfathered_v5)
         self.assertTrue(grandfathered.diagram_contract.grandfathered_schema5)
+
+        migration, migration_issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=False,
+        )
+        self.assertEqual(migration.status, "BLOCKED")
+        self.assertEqual(migration.project_contract.status, "MIGRATION_REQUIRED")
+        self.assertTrue(migration_issues)
+
+    def test_approved_schema_six_design_is_grandfathered_without_source_disposition(
+        self,
+    ) -> None:
+        source = complete_design_contract(
+            approve_gate_a(
+                (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+            )
+        )
+        legacy = source.replace(
+            "| Project design contract schema | `7` |",
+            "| Project design contract schema | `6` |",
+            1,
+        )
+        legacy = re.sub(
+            r"(?m)^\| Application source disposition \|.*\r?\n",
+            "",
+            legacy,
+            count=1,
+        )
+        grandfathered, issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "READY")
+        self.assertEqual(grandfathered.schema_version, 6)
+        self.assertTrue(grandfathered.project_contract.grandfathered_v6)
+        self.assertIsNone(
+            grandfathered.project_contract.application_source_disposition
+        )
 
         migration, migration_issues = doctor.derive_design_contract(
             legacy,
@@ -9293,7 +9490,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 6)
+        self.assertEqual(ready.schema_version, 7)
         self.assertEqual(ready.project_contract.status, "READY")
         self.assertEqual(ready.project_contract.interface_ids, ("API-001",))
         self.assertEqual(ready.project_contract.boundary_ids, ("BOUNDARY-001",))
@@ -9405,7 +9602,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertTrue(any(expected in issue for issue in issues), issues)
 
         mislabeled_current = complete.replace(
-            "| Project design contract schema | `6` |\n", "", 1
+            "| Project design contract schema | `7` |\n", "", 1
         )
         migration, migration_issues = doctor.derive_design_contract(
             mislabeled_current,
@@ -9417,7 +9614,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertFalse(migration.project_contract.grandfathered_v4)
         self.assertTrue(
             any(
-                "Project design contract schema 6" in issue
+                "Project design contract schema 7" in issue
                 for issue in migration_issues
             ),
             migration_issues,

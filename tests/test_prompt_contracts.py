@@ -532,7 +532,7 @@ class PromptPackContractTests(unittest.TestCase):
             PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
         ).read_text(encoding="utf-8")
         for phrase in (
-            "schema-6 Project diagram contract",
+            "schema-7 Project design contract",
             "required `NOT_YET_CREATED` slots",
             "canonical IDs as nodes",
             "separate semantic/rendered digests",
@@ -591,7 +591,7 @@ class PromptPackContractTests(unittest.TestCase):
         ):
             self.assertIn(field, self.prd)
         self.assertIn(
-            "grandfathered for its exact design and envelope",
+            "grandfathered for their exact design and envelope",
             design_reference,
         )
         for finding in (
@@ -1131,9 +1131,15 @@ Approver: <name/handle>"""
         self.assertIn("singular `app/`", self.agents)
         self.assertIn("singular `app/`", self.fastlane_deliver)
         self.assertIn("Greenfield application source must use singular app/**", engine)
+        self.assertIn("Application source disposition", self.prompts)
+        self.assertIn("GREENFIELD_APP_ROOT: app/**", self.prompts)
+        self.assertIn("BROWNFIELD_PRESERVE: path/**; another/path/**", self.prompts)
+        self.assertIn("NOT_APPLICABLE", self.prompts)
+        self.assertIn("INFRASTRUCTURE_ONLY", self.prompts)
+        self.assertIn("schema-7 Project design contract", self.prompts)
         self.assertIn('project_mode != "greenfield"', engine)
         self.assertIn(
-            "Brownfield work preserves the existing source root", self.fastlane_deliver
+            "Brownfield work preserves only the source roots", self.fastlane_deliver
         )
         self.assertIn("Harness Profile", self.fastlane_deliver)
         self.assertNotIn("app/AGENTS.md", self.agents)
@@ -1863,9 +1869,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.1.4")
+        self.assertEqual(manifest["bootstrap_version"], "1.1.5")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.1.4", self.prompts)
+        self.assertIn("**Pack version:** 1.1.5", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]

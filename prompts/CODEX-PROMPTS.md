@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.1.4
+**Pack version:** 1.1.5
 
 This pack turns a rough idea or an existing repository into a reviewed,
 executable AWS delivery plan, then lets Codex run the approved work for long
@@ -1178,17 +1178,18 @@ search precedes retrieve and IDs match. Bind each `AWS-EV-*` as
 Persist no raw skill content/transcripts; install/cache/connectors/memory do not count. Codex, the only writer, selects the design.
 Unavailable AWS Core is owner setup; Codex repairs evidence; unsafe/unexplained conflicts need human review.
 
-After design, run `fastlane-architecture-challenger` once per revision only when triggered: 10 minutes Quick MVP/Standard; 45 high-risk/deep. Poll every 60 seconds; finish early. It is read-only and cannot select, write, approve, authorize, or replace evidence.
+Run `fastlane-architecture-challenger` once per revision only when triggered:
+10 minutes Quick MVP/Standard; 45 high-risk/deep. It cannot replace evidence or authority.
 
-Load the Design reference and Adaptive Coverage Plan. `SELECT` compares complete
-candidates; `AMEND` revalidates affected drivers and alternatives; `PRESERVE`
-proves architecture, technology, trust, data, recovery, Region, and Harness
-unchanged. The reference owns legacy bridges; new, unapproved, or changed designs need schema 6, new digests, and fresh Gate B. Never invent owner facts or widen authority.
+Load the Design reference and Adaptive Coverage Plan: `SELECT` compares complete
+candidates; `AMEND` revalidates affected decisions; `PRESERVE` proves them
+unchanged. Approved schemas 4–6 remain grandfathered; current changes require schema 7 and fresh Gate B. Never invent owner facts or authority.
 
 - For `SELECT`, compare at least two complete, credible, non-straw whole-system
   candidates, including the secure managed-serverless baseline unless Gate A
   forbids it. Complete `DRV-*`/`CAND-*`/`ARCH-*`/`AWS-EV-*` and traceability;
-  apply hard constraints before preferences and select only an eligible candidate.
+  apply hard constraints before preferences and select only an eligible candidate;
+  include the selected `ARCH-*` in the authorized scope.
   `NO_VIABLE_ALTERNATIVE` requires at least two total candidates and exactly one is eligible.
 
 - Record alternatives, risks/mitigations, security/reliability/operations,
@@ -1205,7 +1206,10 @@ unchanged. The reference owns legacy bridges; new, unapproved, or changed design
   `FULL_REVALIDATION` for uncertain impact. Duplicate layers are intentional.
 
 
-Complete the schema-6 Project diagram contract. Replace required `NOT_YET_CREATED` slots at their bound anchors with project-specific Mermaid blocks. Use canonical IDs as nodes, plain labels, the selected `ARCH-*` basis, exact relationship tuples, and separate semantic/rendered digests. Require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`; derive conditional data, recovery, and migration views from canonical records. A semantic change stales Gate B; render-only drift blocks the brief until regenerated. Route material requirements-flow changes through REQ-10. Diagrams never prove implementation, deployment, or authority.
+Complete the schema-7 Project design contract and exact Application source disposition.
+Replace required `NOT_YET_CREATED` slots with project-specific Mermaid using
+canonical IDs as nodes, selected `ARCH-*` basis, and separate semantic/rendered digests. Require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`.
+Disposition or semantic changes stale Gate B. Diagrams never prove implementation, deployment, or authority.
 
 Fill the Gate B readiness card with these exact fields: Design basis IDs;
 Architecture/components; Technology/toolchains/version policy; Interfaces/data
@@ -1214,16 +1218,19 @@ Validation/evidence; Rollback/recovery/teardown; Brownfield compatibility/migrat
 Outstanding gaps. Use stable IDs; only genuine `NOT_APPLICABLE — <reason>`;
 gaps are `NONE` or stable IDs and keep Gate B `BLOCKED`.
 
-Use exact envelope grammar; merge/deletion stay unauthorized unless listed and
-AWS defaults DOCS_ONLY. `AWS allowed operations` is the deduplicated AWS-10..50
-maximum; execution intersects it with current phase, evidence, and authority.
-For `explicit-gate`, `MUTATE_LISTED_RESOURCES` must satisfy scope, cost,
-provenance, expiry, rollback, and teardown and needs a separate AWS-20 action
-receipt; AWS-50 needs its own receipt. Fast-dev remains non-production.
+Use exact envelope grammar: `GREENFIELD_APP_ROOT: app/**`,
+`BROWNFIELD_PRESERVE: path/**; another/path/**`, or
+`NOT_APPLICABLE — INFRASTRUCTURE_ONLY`. Reject parallel greenfield `apps/**`
+and `src/**`; this is a Gate B recommendation, not a routine question.
+Merge/deletion remain unauthorized unless listed. AWS operations remain a
+phase-bounded maximum. For `explicit-gate`, `MUTATE_LISTED_RESOURCES` needs a
+separate AWS-20 action receipt; AWS-50 needs its own receipt.
 
-Require a local Git baseline. Hash Architecture driver, Candidate, Selection, Traceability, Material AWS evidence, Harness, Change impact, Project design, Diagram semantic contract, Technology decision, Example-based scenarios, Property applicability, Property definition, and Property execution in canonical order into the Design contract SHA-256; include the selected `ARCH-*`, current
-`TECH-*`, and applicable `PROP-*` in `SCOPE_IDS`, copy it to the envelope, then
-hash the envelope into Gate B review/proposed receipt.
+Require a local Git baseline. Hash Architecture driver, Candidate, Selection,
+Traceability, Material AWS evidence, Technology decision, Property
+applicability, Property definition, Property execution, and source disposition
+in canonical order. Include selected `ARCH-*`, current `TECH-*`, and applicable
+`PROP-*` in `SCOPE_IDS`, then hash the Gate B envelope.
 
 Incomplete design/envelope keeps Gate B `BLOCKED`. At `READY_FOR_CONSTRUCTION_APPROVAL`, atomically set Document status DES/AUTH/design/Gate B fields and Gate B state to
 `PENDING_OWNER_APPROVAL`; mirror REQ/DES/AUTH, Gate B, maximum

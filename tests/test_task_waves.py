@@ -421,6 +421,8 @@ def new_build_delivery_contract(
         acceptance_test_ids=() if grandfathered else ("AC-FR-001",),
         harness_id=None if grandfathered else "HARNESS-900",
         spike=approved_spike,
+        application_source_kind=None if grandfathered else "GREENFIELD_APP_ROOT",
+        application_source_paths=() if grandfathered else ("app/**",),
     )
 
 
@@ -429,6 +431,7 @@ def walking_task_block(
     task_id: str = "TASK-001",
     status: str = "READY",
     dependencies: str = "NONE",
+    write_set: str = "app/task-001.py",
 ) -> str:
     row, harness = walking_harness_values()
     return task_block(
@@ -438,6 +441,7 @@ def walking_task_block(
         requirements=("REQ-0001, FR-001, AC-FR-001, JOURNEY-001, WAVE-001"),
         validation_command=harness.exact_command,
         harness_projection_rows=(row,),
+        write_set=write_set,
     )
 
 
@@ -757,6 +761,25 @@ Not started.
         self.assertEqual(set(tasks[0].metadata), set(task_waves.REQUIRED_METADATA))
         self.assertNotIn("Wave contract", task_waves.REQUIRED_METADATA)
         self.assertIn(row, tasks[0].block)
+
+    def test_walking_skeleton_must_write_the_approved_application_source(self) -> None:
+        _row, harness = walking_harness_values()
+        text = document(
+            [
+                walking_task_block(write_set="src/main.py"),
+                task_block("TASK-002", "BACKLOG", "TASK-001"),
+            ]
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "walking-skeleton Write set must include approved application source under app/",
+        ):
+            task_waves.validate(
+                task_waves.parse_tasks(text),
+                task_waves.parse_snapshot(text),
+                approved_harness={harness.harness_id: harness},
+                approved_delivery=new_build_delivery_contract(),
+            )
 
     def test_legacy_gate_a_schema_five_wave_needs_no_invented_journey(self) -> None:
         row, harness = walking_harness_values()

@@ -448,6 +448,9 @@ class ProductJourneyTests(unittest.TestCase):
             }
             if design_contract["harness"]["rows"]:
                 expected_decisions.add("HARNESS-PROFILE")
+            if design_contract["application_source_disposition"] is not None:
+                expected_decisions.add("SOURCE-0001")
+                self.assertIn("Application source layout", rendered_gate_b)
             actual_decisions = [
                 decision["decision_id"]
                 for group in gate_b_brief["technical_decision_groups"]
