@@ -1869,9 +1869,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.2.0")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.1")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.2.0", self.prompts)
+        self.assertIn("**Pack version:** 1.2.1", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]

@@ -1,6 +1,6 @@
 # AWS Codex Fastlane 1.2
 
-Current customer build: **1.2.0**.
+Current customer build: **1.2.1**.
 Fastlane Engine gives Codex a disciplined way to turn an AWS idea into clear
 requirements, one recommended design, and a tested local build. You explain
 the outcome in plain language; Codex plans while you control consequential choices.

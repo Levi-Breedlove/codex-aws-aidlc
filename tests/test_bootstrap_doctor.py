@@ -2338,6 +2338,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         if gate_b:
             subprocess.run(["git", "init", "-q", str(project)], check=True)
             subprocess.run(
+                ["git", "-C", str(project), "config", "maintenance.auto", "false"],
+                check=True,
+            )
+            subprocess.run(
                 ["git", "-C", str(project), "config", "user.name", "Doctor Test"],
                 check=True,
             )
@@ -2673,7 +2677,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.0")
+        self.assertEqual(report["bootstrap_version"], "1.2.1")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -7483,6 +7487,13 @@ class BootstrapDoctorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             project = self.copy_project(Path(directory))
             self.approve_project(project)
+            maintenance_auto = subprocess.run(
+                ["git", "-C", str(project), "config", "--get", "maintenance.auto"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(maintenance_auto, "false")
             self.pause_project_at_real_checkpoint(project)
 
             paused_report = doctor.inspect_project(project)

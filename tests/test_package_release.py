@@ -282,7 +282,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.0")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.1")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -914,6 +914,7 @@ class PackageReleaseTests(unittest.TestCase):
             PREVIOUS_PACKAGE_VERSION,
             "1" + ".1.3",
             "1" + ".1.5",
+            "1" + ".2.0",
             "2" + ".0.0",
         )
         negative_fixture_marker = f'"bootstrap_version": "{stale_versions[0]}"'
@@ -935,6 +936,7 @@ class PackageReleaseTests(unittest.TestCase):
                     and "plugin_version: str =" in line
                 ):
                     allowed_aws_version_observations += 1
+                    continue
                 for version in stale_versions:
                     if version not in line:
                         continue
