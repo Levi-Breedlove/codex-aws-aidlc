@@ -1146,12 +1146,13 @@ Approver: <name/handle>"""
 
     def test_customer_readme_links_and_explicit_aws_handoff(self) -> None:
         links = {
-            "Get started": "docs/SETUP.md",
+            "setup walkthrough": "docs/SETUP.md",
             "Understand the workflow": "docs/WORKFLOW.md",
-            "Troubleshoot": "docs/TROUBLESHOOTING.md",
+            "troubleshooting guide": "docs/TROUBLESHOOTING.md",
             "Security": "SECURITY.md",
             "Optional hooks": "docs/HOOKS.md",
             "Maintainer evaluation": "docs/EVALUATION.md",
+            "documentation index": "docs/README.md",
         }
         for label, target in links.items():
             with self.subTest(label=label):
@@ -1163,14 +1164,13 @@ Approver: <name/handle>"""
             "`$operate-fastlane-aws`."
         )
         self.assertIn(handoff, " ".join(self.root_readme.split()))
-        self.assertIn(handoff, " ".join(self.workflow.split()))
-        self.assertIn("explicitly invoke `$operate-fastlane-aws`", self.prompts)
         workflow_words = " ".join(self.workflow.split())
-        self.assertIn(
-            "exact current card ID, revision, and canonical digest", workflow_words
-        )
-        self.assertIn("requires no visible reply token", workflow_words)
-        self.assertNotIn("safe only after the current reply token", workflow_words)
+        self.assertIn("ask Codex to use `$operate-fastlane-aws`", workflow_words)
+        self.assertIn("Build never deploys", workflow_words)
+        self.assertIn("explicitly invoke `$operate-fastlane-aws`", self.prompts)
+        self.assertIn("The exact Gate A receipt appears last", workflow_words)
+        self.assertIn("Its exact Gate B receipt appears last", workflow_words)
+        self.assertIn("Only the owner can provide it", workflow_words)
 
     def test_aws_lifecycle_map_and_lane_authority_are_plain_and_ordered(self) -> None:
         phase_positions = [
@@ -1183,13 +1183,14 @@ Approver: <name/handle>"""
             "Choose a residual disposition when required",
             self.workflow,
         )
+        readme_words = " ".join(self.root_readme.split())
         self.assertIn(
             "Fast Dev stays inside a current non-production Gate B envelope",
-            self.root_readme,
+            readme_words,
         )
         self.assertIn(
             "explicit-gate deployment and teardown require their own exact receipts",
-            self.root_readme,
+            readme_words,
         )
 
     def test_template_first_readme_sets_complete_user_expectations(self) -> None:
@@ -1204,21 +1205,21 @@ Approver: <name/handle>"""
             "does not inspect AWS credentials or access an AWS account",
             "signed-in interactive Codex CLI",
             "uvx",
-            "short, plain-language questions",
-            "organized task plan",
+            "one short question at a time",
+            "creates tasks, builds locally",
             "exact authorization",
         ):
             self.assertIn(phrase, self.root_readme)
         for path in (
-            "docs/project/PRD.md",
-            "docs/project/TASKS.md",
-            "docs/project/VERIFY.md",
-            "docs/project/RUNBOOK.md",
+            "app/",
+            "tests/",
+            "infrastructure/",
+            "docs/project/",
         ):
             self.assertIn(path, self.root_readme)
         self.assertNotIn("codex plugin marketplace add", self.root_readme)
         self.assertNotIn("continue setup", self.root_readme)
-        self.assertLessEqual(len(self.root_readme.splitlines()), 80)
+        self.assertLessEqual(len(self.root_readme.splitlines()), 90)
         self.assertFalse((REPOSITORY_ROOT / "my-project" / "README.md").exists())
 
     def test_boot_prompt_has_stable_template_first_contract(self) -> None:
@@ -1617,7 +1618,9 @@ Approver: <name/handle>"""
             architecture_challenger,
         ):
             self.assertIn("serverless", surface.lower())
-        self.assertIn("secure pay-per-use\nserverless options", self.root_readme)
+        self.assertIn(
+            "secure pay-per-use serverless options", " ".join(self.root_readme.split())
+        )
         for surface in (self.agents, self.prd, planning_references):
             self.assertIn("MINIMIZE_TOTAL_COST", surface)
         self.assertRegex(
@@ -1712,7 +1715,6 @@ Approver: <name/handle>"""
             self.assertIn(f"| {row} |", self.prd)
         for document in (
             self.fastlane_design,
-            self.workflow,
             self.prompts,
         ):
             self.assertRegex(document, r"AWS allowed\s+operations")
@@ -1809,7 +1811,6 @@ Approver: <name/handle>"""
         ):
             self.assertIn(phrase, self.prompts)
         for document in (
-            self.workflow,
             self.runbook,
             self.prompts,
             self.fastlane_design,
@@ -1860,9 +1861,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.1.2")
+        self.assertEqual(manifest["bootstrap_version"], "1.1.3")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.1.2", self.prompts)
+        self.assertIn("**Pack version:** 1.1.3", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -1926,7 +1927,10 @@ Approver: <name/handle>"""
             "After that:",
         ):
             self.assertIn(f"`{label}`", owner)
-        self.assertIn("at most one clarification round", workflow)
+        self.assertIn(
+            "exactly one unanswered project question per owner turn",
+            " ".join(workflow.split()),
+        )
         self.assertIn("Gate A continues into Design in the", workflow)
         self.assertIn("Gate B continues into task generation", workflow)
         for level in (
@@ -2082,7 +2086,9 @@ Approver: <name/handle>"""
         ):
             self.assertIn(status, design_reference)
         self.assertIn("does not impose a universal", self.prd)
-        self.assertIn("Gate B records one risk-derived Harness Profile", workflow)
+        self.assertIn(
+            "tests, and the first construction wave", " ".join(workflow.split())
+        )
 
         evidence_header = (
             "| Evidence ID | Harness ID | Layer | Basis IDs | Exact command or API | "
@@ -2334,15 +2340,17 @@ Approver: <name/handle>"""
         workflow = self.workflow
         normalized = " ".join(workflow.split())
         self.assertNotIn("| FSC-", workflow)
-        for phrase in (
-            "internal conditional techniques, not lifecycle stages or approval gates",
+        self.assertIn(
+            "conditional techniques, not lifecycle stages or approval gates",
+            normalized,
+        )
+        for machine_term in (
             "STRIDE, LINDDUN, OWASP Top 10, ATAM, ADR",
             "risk-derived Harness Profile",
             "No universal scanner",
-            "Project diagrams are validated presentation of canonical records",
             "procedural technique selection never claims deterministic proof",
         ):
-            self.assertIn(phrase, normalized)
+            self.assertNotIn(machine_term, normalized)
 
         tasks = (PROJECT_ROOT / "docs/project/TASKS.md").read_text(encoding="utf-8")
         prompts = (PROJECT_ROOT / "prompts/CODEX-PROMPTS.md").read_text(
@@ -2424,8 +2432,23 @@ Approver: <name/handle>"""
 
     def test_crosscutting_concerns_remain_explicit_and_conditional(self) -> None:
         workflow = " ".join(self.workflow.split())
+        technical_contract = " ".join(
+            (
+                self.prd
+                + self.prompts
+                + (
+                    PROJECT_ROOT / ".agents/skills/fastlane/references/define.md"
+                ).read_text(encoding="utf-8")
+                + (
+                    PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
+                ).read_text(encoding="utf-8")
+                + (
+                    PROJECT_ROOT / ".agents/skills/fastlane/references/deliver.md"
+                ).read_text(encoding="utf-8")
+            ).split()
+        )
         for concern in ("security", "testing", "observability", "error handling"):
-            self.assertIn(concern, workflow)
+            self.assertIn(concern, technical_contract.lower())
         for method in (
             "STRIDE",
             "LINDDUN",
@@ -2434,9 +2457,11 @@ Approver: <name/handle>"""
             "ADR",
             "formal inspection",
         ):
-            self.assertIn(method, workflow)
-        self.assertIn("only for material exposure", workflow)
-        self.assertIn("not another lifecycle", workflow)
+            self.assertIn(method, technical_contract)
+            self.assertNotIn(method, workflow)
+        self.assertIn(
+            "conditional techniques, not lifecycle stages or approval gates", workflow
+        )
 
     def test_method_selection_keeps_procedure_and_validation_distinct(self) -> None:
         define_reference = (
@@ -2456,10 +2481,8 @@ Approver: <name/handle>"""
             "deterministic validation begins with the recorded row's status",
             design_words,
         )
-        self.assertIn(
-            "procedural technique selection never claims deterministic proof",
-            workflow_words,
-        )
+        self.assertIn("validated records and evidence", design_words)
+        self.assertNotIn("deterministic proof", workflow_words)
 
     def test_prd_and_prompt_bind_semantic_design_contracts(self) -> None:
         prompt_words = " ".join(self.prompts.split())
@@ -2547,7 +2570,6 @@ Approver: <name/handle>"""
         for document in (
             self.verify,
             self.runbook,
-            self.workflow,
             aws30,
             self.fastlane_deliver,
             self.operate_fastlane_aws,
@@ -2574,7 +2596,6 @@ Approver: <name/handle>"""
             self.assertIn(field, self.verify)
         residual_documents = (
             self.runbook,
-            self.workflow,
             aws40,
             self.fastlane_deliver,
             self.operate_fastlane_aws,
@@ -2604,7 +2625,7 @@ Approver: <name/handle>"""
                 )
                 self.assertNotIn("For each listed residual", document)
 
-        for document in (self.verify, self.runbook, self.workflow, aws40):
+        for document in (self.verify, self.runbook, aws40):
             normalized = " ".join(document.split())
             self.assertIn("exact-scope", normalized)
             self.assertRegex(normalized, r"(?i)STALE.{0,100}fresh reads")
@@ -2626,15 +2647,19 @@ Approver: <name/handle>"""
     def test_project_diagrams_are_conditional_views_not_authority(self) -> None:
         for document in (self.prd, self.prompts):
             self.assertNotIn("### Primary flow", document)
-        workflow = " ".join(self.workflow.split())
+        design_reference = (
+            PROJECT_ROOT / ".agents/skills/fastlane/references/design.md"
+        ).read_text(encoding="utf-8")
+        design_words = " ".join(design_reference.split())
         self.assertIn(
-            "New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`", workflow
+            "New designs require `SYSTEM_CONTEXT` and `PRIMARY_OUTCOME`",
+            design_words,
         )
-        self.assertIn("data, recovery, and migration views are conditional", workflow)
+        self.assertIn("canonical data, dependency, recovery", design_words)
         self.assertIn(
-            "Project diagrams are validated presentation of canonical records", workflow
+            "Diagrams never prove implementation, deployment, or authority",
+            design_words,
         )
-        self.assertIn("do not replace traceability, tests, or evidence", workflow)
         self.assertNotIn("| FSC-", self.workflow)
         doctor_source = (PROJECT_ROOT / "scripts/bootstrap_doctor.py").read_text(
             encoding="utf-8"

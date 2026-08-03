@@ -1,55 +1,67 @@
 # Troubleshooting Fastlane
 
-Run these read-only checks from the repository root:
+Fastlane reports one current action whenever possible. Start with that action;
+do not regenerate an initialized project to clear an error.
+
+## Read-only checks
+
+Run these from the repository root when Codex asks for diagnostic output:
 
 ```text
 python scripts/setup_assistant.py prerequisites --root . --json
 python scripts/bootstrap_dependencies.py --root . --json
 python scripts/bootstrap_doctor.py --root . --json
 ```
+
 The Fastlane Engine is the bundled read-only validator and lifecycle router.
-Its compatibility filename remains `scripts/bootstrap_doctor.py`; it is not
-another service or installation.
+Its compatibility filename is `scripts/bootstrap_doctor.py`; it is not another
+service or installation.
 
+## `init template` repeats setup
 
-## `init template` keeps repeating setup
+For a fresh template, complete the prerequisite checker’s single checklist and
+send `init template` again. An initialized project should resume from the
+Engine-selected stage without repeating prerequisites or project settings.
 
-For a fresh template, complete the prerequisite checker's single checklist,
-then send `init template` again. After configuration, use the Fastlane Engine's
-interaction state; initialized projects do not rerun prerequisites or setup
-questions.
+If it does not, preserve the repository and report the Engine diagnostic. Do
+not delete `bootstrap.yaml` or replace project records.
 
-## AWS Core is missing during prerequisites
+## AWS Core is missing
 
-1. If **Agent Toolkit for AWS** is absent from `/plugins`, run:
+1. Open `/plugins` in Codex.
+2. If **Agent Toolkit for AWS** is absent, run:
 
    ```text
    codex plugin marketplace add aws/agent-toolkit-for-aws
    ```
 
-2. Enable **AWS Core** under **Agent Toolkit for AWS**.
-3. Restart Codex and send `init template`.
-4. Codex will verify both documentation-only capabilities without AWS access.
+3. Enable **AWS Core**, restart Codex, and retry the same step.
 
-Fastlane does not pin the plugin version or commit, inspect private trust
-storage, or persist plugin state.
+See the complete [setup walkthrough](SETUP.md). Fastlane never asks to inspect
+AWS credentials, private trust storage, or an AWS account during setup.
 
-## Codex CLI or local runtime is missing
+## AWS Core research fails later
 
-Use the [official Codex CLI getting-started guide](https://learn.chatgpt.com/docs/codex/cli#getting-started).
-Linux or WSL2 sandbox and `uv` commands are in [SETUP.md](SETUP.md).
-Installation remains owner-run.
+Pause only the affected AWS-specific design or operating step. Confirm the
+official plugin is enabled, restart Codex once, and retry. Do not replace
+missing current evidence with cached prose, memory, or a reviewer’s claim.
 
-## AWS Core research fails
+## A gate becomes stale
 
-On a fresh template, remain at prerequisites. On an initialized project, stop
-only the affected design or AWS operating step. Confirm the capability is from
-`aws-core@agent-toolkit-for-aws`, restart Codex once, and retry the same step.
-Do not regenerate an initialized project, request hook screenshots, compare
-hook hashes, or run synthetic probes.
+A changed requirement stales Gate A and Gate B. A changed technical design or
+construction boundary stales Gate B. Follow the Engine’s correction action,
+review the refreshed brief, and use only the new exact receipt.
 
-## Fastlane Engine reports another blocker
+## Optional hooks deny a valid action
 
-Follow the single diagnostic named by the Engine. Preserve the repository,
-dirty files, approved gates, and project ledgers; do not regenerate an active
-project to clear an error.
+Hooks are optional. Review `/hooks`, remove the local `.codex/hooks.json`, and
+restart Codex to disable them. The Engine and normal Codex approval/sandbox
+controls continue to govern Fastlane. See [Optional Fastlane hooks](HOOKS.md).
+
+## Another blocker appears
+
+Follow the single diagnostic named by the Engine. Preserve dirty files,
+approved gates, and canonical project records. If the same safe Codex-owned
+correction fails repeatedly, Fastlane should stop for review rather than loop.
+
+Return to the [documentation index](README.md).

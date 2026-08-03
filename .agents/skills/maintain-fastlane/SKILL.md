@@ -42,6 +42,12 @@ Do not infer it from an adopter lifecycle, previous conversation, or unrelated
 repository state. Stop before widening the allowlist, outcome, authority, or
 change budget.
 
+Before changing public or project-record documentation, read
+`references/documentation-governance.md` in full. Before evaluation,
+qualification, pilot, or release-claim work, read `references/evaluation.md` in
+full. These references consolidate maintainer procedure; they do not create
+project authority or another lifecycle.
+
 ## Procedure
 
 1. Confirm the request targets the framework and select the maintenance mode.

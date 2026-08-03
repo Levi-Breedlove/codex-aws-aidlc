@@ -483,15 +483,50 @@ sequenceDiagram
                     guide.read_text(encoding="utf-8"),
                 )
 
+    def test_docs_governance_and_index_are_compact_and_linked(self) -> None:
+        guide = REPOSITORY_ROOT / "docs" / "AGENTS.md"
+        index = REPOSITORY_ROOT / "docs" / "README.md"
+        workflow = REPOSITORY_ROOT / "docs" / "WORKFLOW.md"
+        self.assertLessEqual(len(guide.read_text(encoding="utf-8").splitlines()), 60)
+        self.assertLessEqual(len(workflow.read_bytes()), 7_500)
+        index_text = index.read_text(encoding="utf-8")
+        for target in (
+            "SETUP.md",
+            "WORKFLOW.md",
+            "TROUBLESHOOTING.md",
+            "HOOKS.md",
+            "DEPENDENCY-POLICY.md",
+            "EVALUATION.md",
+            "project/PRD.md",
+            "project/TASKS.md",
+            "project/VERIFY.md",
+            "project/RUNBOOK.md",
+            "project/BUGFIX.md",
+        ):
+            self.assertIn(f"]({target})", index_text)
+            self.assertTrue((index.parent / target).is_file(), target)
+
+        owner_workflow = workflow.read_text(encoding="utf-8")
+        for internal_term in (
+            "canonical digest",
+            "schema-migration",
+            "EARS",
+            "QAS",
+            "Harness Profile",
+            "maximum_initial_bytes",
+            "resolved_initial_slices",
+        ):
+            self.assertNotIn(internal_term, owner_workflow)
+
     def test_readme_is_short_human_onboarding(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertLessEqual(len(readme.splitlines()), 90)
         for heading in (
             "## Start",
             "## What to expect",
-            "## Project files",
-            "## Safety",
-            "## Agent reference",
+            "## Repository map",
+            "## AWS Core and AWS changes",
+            "## Learn more",
         ):
             self.assertIn(heading, readme)
         self.assertIn(

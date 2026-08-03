@@ -42,22 +42,20 @@ class TemplateCompatibilityTests(unittest.TestCase):
         skill = (
             REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
         ).read_text(encoding="utf-8")
-        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
+        skill_words = " ".join(skill.split())
         for mode in ("AUDIT", "PLAN", "IMPLEMENT", "PUBLISH"):
             self.assertIn(f"`{mode}`", skill)
-            self.assertIn(f"`{mode}`", workflow)
-        self.assertIn("Missing implementation scope stops", workflow)
-        self.assertIn("publication never", workflow)
+        self.assertIn("If any field is missing", skill_words)
+        self.assertIn("Publication authority never implies", skill_words)
         self.assertNotIn("Delegate to `$fastlane`", skill)
-        self.assertIn("pull requests targeting only that customer branch", workflow)
+        self.assertIn("pull request targeting only `fast-lane`", skill_words)
         self.assertIn(
-            "direct push to `fast-lane` requires explicit emergency", workflow
+            "direct push to `fast-lane` requires explicit emergency", skill_words
         )
-        self.assertIn("Force pushes and deletion", workflow)
-        self.assertIn("live `fast-lane` customer branch", workflow)
-        self.assertIn("legacy `Legacy` is not a customer publication target", workflow)
+        self.assertIn("Never force-push or delete", skill_words)
+        self.assertIn("live `fast-lane` customer branch", skill_words)
         self.assertIn("The protected `Legacy` branch", skill)
-        self.assertIn("separate repository-setting action", workflow)
+        self.assertIn("separate repository-setting action", skill_words)
         for check in (
             "safety-tests (3.11)",
             "safety-tests (3.12)",
@@ -65,7 +63,7 @@ class TemplateCompatibilityTests(unittest.TestCase):
             "windows-smoke",
             "macos-setup-smoke",
         ):
-            self.assertIn(f"`{check}`", workflow)
+            self.assertIn(f"`{check}`", skill)
 
     def test_maintenance_preflight_is_read_only_and_routed_only_to_maintenance(
         self,
@@ -90,9 +88,10 @@ class TemplateCompatibilityTests(unittest.TestCase):
             self.assertNotIn(forbidden, script)
 
     def test_deterministic_workflow_corpus_is_the_mandatory_baseline(self) -> None:
-        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(
-            encoding="utf-8"
-        )
+        evaluation = (
+            REPOSITORY_ROOT
+            / ".agents/skills/maintain-fastlane/references/evaluation.md"
+        ).read_text(encoding="utf-8")
         self.assertIn("Golden Project Corpus", evaluation)
         self.assertIn("tests/test_product_journeys.py", evaluation)
         self.assertRegex(evaluation, r"mandatory deterministic\s+workflow baseline")
@@ -112,25 +111,29 @@ class TemplateCompatibilityTests(unittest.TestCase):
         inventory = json.dumps(manifest, sort_keys=True)
         self.assertNotIn(retired_doc, inventory)
         self.assertNotIn(retired_script, inventory)
-        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(
-            encoding="utf-8"
-        )
-        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
+        evaluation = (
+            REPOSITORY_ROOT
+            / ".agents/skills/maintain-fastlane/references/evaluation.md"
+        ).read_text(encoding="utf-8")
+        evaluation_words = " ".join(evaluation.split())
         self.assertIn("Codex selects the smallest disposable", evaluation)
         self.assertIn("using current AWS Core guidance", evaluation)
         self.assertNotIn("AWS Core selects the smallest disposable", evaluation)
-        self.assertIn("Codex selects the smallest disposable", workflow)
         self.assertIn(
             "AWS Core does not choose the product architecture or grant authority",
-            workflow,
+            evaluation_words,
         )
         self.assertIn(
-            "The owner authorizes; IAM enforces; observed evidence proves", workflow
+            "The owner authorizes; IAM enforces; observed evidence proves",
+            evaluation_words,
         )
         self.assertIn(
-            "introduces no scorer, lifecycle stage, gate, or routine", evaluation
+            "introduces no scorer, lifecycle stage, gate, or routine",
+            evaluation_words,
         )
-        self.assertIn("AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50", evaluation)
+        self.assertIn(
+            "AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50", evaluation_words
+        )
 
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
         plan = model_roleplay_eval.plan_payload()
