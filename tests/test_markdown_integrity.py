@@ -240,7 +240,9 @@ sequenceDiagram
         design = (
             REPOSITORY_ROOT / ".agents/skills/fastlane/references/design.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("Diagrams never prove implementation, deployment, or authority", design)
+        self.assertIn(
+            "Diagrams never prove implementation, deployment, or authority", design
+        )
 
     def test_diagram_patterns_are_on_demand_and_non_authoritative(self) -> None:
         patterns = (

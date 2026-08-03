@@ -9117,9 +9117,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             refresh_control_hashes(project)
             baseline = doctor.inspect_project(project)
             self.assertTrue(baseline["ok"], baseline["diagnostics"])
-            self.assertEqual(
-                baseline["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION"
-            )
+            self.assertEqual(baseline["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
 
             prd_path = project / "docs/project/PRD.md"
             source = prd_path.read_text(encoding="utf-8")
@@ -9809,6 +9807,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             baseline["basis"]["prd_snapshot_sha256"],
         )
         self.assertEqual(observed["document_summaries"]["status"], "STALE")
+
 
 class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
     _DEPLOYMENT_ARTIFACT = "sha256:" + "a" * 64

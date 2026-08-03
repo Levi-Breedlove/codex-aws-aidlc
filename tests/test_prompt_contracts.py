@@ -608,7 +608,9 @@ class PromptPackContractTests(unittest.TestCase):
     def test_technology_register_is_authoritative_and_exact(self) -> None:
         heading = "### Technology and toolchain decision register"
         self.assertIn(heading, self.prd)
-        register = self.prd.split(heading, 1)[1].split("\n### Architecture drivers", 1)[0]
+        register = self.prd.split(heading, 1)[1].split("\n### Architecture drivers", 1)[
+            0
+        ]
         self.assertIn(
             "| Decision ID | Concern | Selection | Version policy | Source | "
             "Basis IDs | Alternatives and rationale | Compatibility/migration | "
@@ -1070,7 +1072,9 @@ Approver: <name/handle>"""
                 document,
                 r"An AWS lane describes planned access; it does not authorize a\s+change",
             )
-        self.assertIn("| Delivery profile | `quick-mvp` / `standard` / `high-risk` |", self.prd)
+        self.assertIn(
+            "| Delivery profile | `quick-mvp` / `standard` / `high-risk` |", self.prd
+        )
         self.assertIn(
             "| Project AWS lane | `documentation-only` / `read-only` / `fast-dev` / `explicit-gate` |",
             self.prd,
@@ -2448,7 +2452,9 @@ Approver: <name/handle>"""
         self.assertIn("| INTAKE-0001 | OWNER_WORK_CONTEXT |", self.prd)
         self.assertIn("### Whole-system candidates", self.prd)
         self.assertIn("### Selected architecture", self.prd)
-        self.assertIn("`NEW_APPLICATION` deterministically requires `NEW_BUILD`", prompt_words)
+        self.assertIn(
+            "`NEW_APPLICATION` deterministically requires `NEW_BUILD`", prompt_words
+        )
         self.assertIn("Confirmed `NEW_APPLICATION` requires `NEW_BUILD`", define_words)
         for document in (define_words, prompt_words):
             with self.subTest(contract="owner-context", document=document[:40]):
