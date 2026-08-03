@@ -8308,15 +8308,19 @@ def _brownfield_source_contract_section(text: str) -> str:
     next_heading = re.search(r"^##\s+2\.", following, re.MULTILINE)
     end = matches[0].end() + (next_heading.start() if next_heading else len(following))
     return text[matches[0].end() : end]
+
+
 def _contains_exact_source_path(value: str, path: str) -> bool:
     """Match one recorded source path without accepting a longer lookalike."""
 
-    return re.search(
-        rf"(?<![A-Za-z0-9._/*-]){re.escape(path)}(?![A-Za-z0-9._/*-])",
-        value,
-        re.IGNORECASE,
-    ) is not None
-
+    return (
+        re.search(
+            rf"(?<![A-Za-z0-9._/*-]){re.escape(path)}(?![A-Za-z0-9._/*-])",
+            value,
+            re.IGNORECASE,
+        )
+        is not None
+    )
 
 
 def validate_application_source_disposition(
@@ -8434,9 +8438,7 @@ def derive_project_design_contract(
         if required:
             issues.append(str(exc))
     design_schema = clean_cell(document.get("Project design contract schema", ""))
-    grandfather_schema_6 = bool(
-        design_schema == "6" and grandfather_approved_v4
-    )
+    grandfather_schema_6 = bool(design_schema == "6" and grandfather_approved_v4)
     grandfather_schema_5 = bool(
         design_schema == "5"
         and grandfather_approved_v4
@@ -8559,7 +8561,9 @@ def derive_project_design_contract(
                 issues.extend(
                     validate_application_source_disposition(
                         source_disposition,
-                        project_mode=clean_cell(document.get("Project mode", "")).lower()
+                        project_mode=clean_cell(
+                            document.get("Project mode", "")
+                        ).lower()
                         or None,
                         work_kind=coverage_contract.work_kind,
                         prd_text=text,
@@ -9068,11 +9072,7 @@ def derive_project_design_contract(
     return (
         ProjectDesignContract(
             schema_version=(
-                5
-                if grandfather_schema_5
-                else 6
-                if grandfather_schema_6
-                else 7
+                5 if grandfather_schema_5 else 6 if grandfather_schema_6 else 7
             ),
             status=(
                 "GRANDFATHERED"
@@ -10033,20 +10033,17 @@ def validate_application_source_write_set(
     if missing:
         raise ValueError(
             "APPLICATION_SOURCE_DISPOSITION_INVALID: Allowed repository write "
-            "set does not cover approved brownfield source roots: "
-            + ", ".join(missing)
+            "set does not cover approved brownfield source roots: " + ", ".join(missing)
         )
     for path in paths:
         if path.split("/", 1)[0].casefold() not in {"app", "apps", "src"}:
             continue
         if not any(
-            path_boundaries_overlap(source, path)
-            for source in disposition.paths
+            path_boundaries_overlap(source, path) for source in disposition.paths
         ):
             raise ValueError(
                 "APPLICATION_SOURCE_PARALLEL_ROOT: brownfield write set adds "
-                "an unapproved parallel application root: "
-                + path
+                "an unapproved parallel application root: " + path
             )
 
 
@@ -10854,9 +10851,7 @@ def derive_owner_decision_brief(
                     "or the recorded brownfield baseline changes."
                 )
             else:
-                owner_effect = (
-                    "This work changes infrastructure only and creates no application source tree."
-                )
+                owner_effect = "This work changes infrastructure only and creates no application source tree."
                 rationale = (
                     "The approved work kind has no application runtime, so app/** would "
                     "be misleading and unnecessary."
@@ -10866,9 +10861,7 @@ def derive_owner_decision_brief(
                     "application behavior is in the approved scope."
                 )
                 tradeoff = "Application code requires a later design-controlled change."
-                reconsider = (
-                    "Reopen this decision when application behavior enters the approved scope."
-                )
+                reconsider = "Reopen this decision when application behavior enters the approved scope."
             grouped["application/runtime"].append(
                 {
                     "decision_id": "SOURCE-0001",

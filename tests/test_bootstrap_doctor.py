@@ -6230,7 +6230,9 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertIn("APPLICATION_SOURCE_PARALLEL_ROOT", codes(report))
         self.assertTrue(
-            any("apps/** or src/**" in item["message"] for item in report["diagnostics"]),
+            any(
+                "apps/** or src/**" in item["message"] for item in report["diagnostics"]
+            ),
             report["diagnostics"],
         )
 
@@ -9300,9 +9302,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(grandfathered.status, "READY")
         self.assertEqual(grandfathered.schema_version, 6)
         self.assertTrue(grandfathered.project_contract.grandfathered_v6)
-        self.assertIsNone(
-            grandfathered.project_contract.application_source_disposition
-        )
+        self.assertIsNone(grandfathered.project_contract.application_source_disposition)
 
         migration, migration_issues = doctor.derive_design_contract(
             legacy,
