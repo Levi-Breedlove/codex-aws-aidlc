@@ -33,14 +33,19 @@ Canonical path: `docs/project/PRD.md`.
 ## Current project state
 
 This document owns the product agreement, technical plan, and both owner gates.
-Read the current state above, then go directly to the section named by Fastlane.
+The current state table above shows what Fastlane needs now and what remains
+unapproved or unauthorized.
 
 - Gate A approves the product requirements.
 - Gate B approves the technical plan and bounded local construction.
-- AWS account work always remains separately authorized.
+- AWS account work always requires separate exact authorization.
 
 <details>
 <summary>Exact document configuration and adaptive-coverage records</summary>
+
+These records show Fastlane's current mode, review depth, contract versions,
+and required coverage. They remain available for audit while the owner-facing
+status above explains the practical project state.
 
 ## Document status
 
@@ -83,7 +88,18 @@ Read the current state above, then go directly to the section named by Fastlane.
 
 # Product Agreement
 
+This agreement defines the first release, its users, boundaries, and Gate A success measures.
+
 ## 1. Workload profile
+
+This profile records the approved audience, environment, data sensitivity,
+reliability, Region, and cost boundaries.
+
+<details>
+<summary>Exact workload profile</summary>
+
+This table preserves the precise workload boundaries behind the plain-language
+project summary.
 
 | Field | Value |
 |---|---|
@@ -101,6 +117,8 @@ Read the current state above, then go directly to the section named by Fastlane.
 | Expected traffic | TODO |
 | Applicable AWS lenses | TODO |
 
+</details>
+
 ### Owner decisions and sources
 
 Owner-confirmed selections stay in the exact intake record below. Expand it to
@@ -108,6 +126,9 @@ see each question, answer, and requirement basis without duplicated state.
 
 <details>
 <summary>Exact intake provenance and brownfield preservation records</summary>
+
+These records show where confirmed project facts came from and, for an existing
+application, what behavior, data, and source locations must remain intact.
 
 ### 1.1 Intake provenance
 
@@ -158,11 +179,9 @@ storing raw conversation transcripts.
 
 ### 1.2 Brownfield baseline and preservation contract
 
-Complete these records only for brownfield work. Unknown behavior remains a
-Gate A finding, never permission to replace it. List every existing application
-source root exactly (for example, `service/**`) in both **Protected files and
-components** and the matching `PRES-*` row so the technical plan can preserve
-it without creating a parallel application folder.
+For an existing application, this baseline records the behavior, data, source
+locations, and safeguards that must be preserved. Unknown behavior remains an
+open finding, never permission to replace the application.
 
 | Field | Brownfield baseline |
 |---|---|
@@ -188,28 +207,30 @@ it without creating a parallel application folder.
 
 ## Product requirements
 
+These sections describe what the product must accomplish and the observable
+results Fastlane will use to determine whether the first release succeeds.
+
 ## 2. Product statement
 
-Describe the product, target user, and core value in one paragraph.
+TODO - one plain-language paragraph naming the product, its users, and its value.
 
 ## 3. Problem and opportunity
 
-Describe:
-
-- the problem or deficiency;
-- who experiences it;
-- current impact or risk;
-- why it is worth solving now.
+TODO - who has the problem today, what fails for them, and why solving it matters.
 
 ## 4. Users and outcomes
+
+This section identifies who uses or supports the product, the result each
+person needs, and the data or permission boundary that protects them.
 
 | Actor ID | Actor or external system | Kind | Desired outcome or responsibility | Permission/data boundary | Intake basis IDs |
 |---|---|---|---|---|---|
 | ACT-001 | TODO | TODO | TODO | TODO | TODO |
 
-`Kind` is exactly `PRIMARY_USER`, `SECONDARY_USER`, `OPERATOR`, or `EXTERNAL_SYSTEM`.
-
 ## 5. Goals and non-goals
+
+Goals define the results the first release is intended to achieve. Non-goals
+make deliberate deferrals visible so they are not mistaken for approved scope.
 
 ### Goals
 
@@ -224,7 +245,13 @@ Describe:
 
 ## 6. Feature specifications
 
+These records connect user needs to the approved product behavior and its
+measurable acceptance checks.
+
 ### User stories
+
+User stories summarize the practical result each person expects from the
+product without choosing the technical implementation.
 
 | ID | User story | Priority | Related requirements |
 |---|---|---|---|
@@ -232,61 +259,64 @@ Describe:
 
 ### Functional requirements
 
+The approved requirement states what the application must do; its matching
+success check explains how Fastlane will prove the result. Fastlane manages the
+internal requirement format and compatibility automatically.
+
+<details>
+<summary>Exact functional requirements and acceptance checks</summary>
+
+This table preserves each requirement and the exact check that demonstrates its
+approved outcome.
+
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
 | FR-001 | TODO | UBIQUITOUS | AC-FR-001 | TODO | MEASURABLE |
 | FR-002 | TODO | UNWANTED_BEHAVIOR | AC-FR-002 | TODO | GHERKIN |
 
-<details>
-<summary>Exact requirement grammar and compatibility</summary>
-
-The six columns above are the **Fastlane EARS Contract** for normative
-requirements; they do not redefine EARS outside this template. The EARS form
-states one observable obligation and the acceptance form states how that
-obligation is verified. A `MEASURABLE` row needs both an observable expected
-result and a bound, policy/configuration check, exact command/API, or stable
-`TEST-*`, `PROP-*`, or `EV-*` binding. Do not apply these fields to goals,
-stories, facts, assumptions, decisions, architecture, tasks, tests, receipts,
-or evidence. Replace undefined terms such as "fast," "secure," "large," or
-"user friendly" with measurable conditions.
-
-Compatibility is revision-bound. An unchanged approved schema 1.3 Gate A is
-grandfathered until a requirements-controlled change. An unchanged approved
-schema 1.2 Gate A remains the basis for a design-only move to schema 6. Codex completes generated design
-records without rewriting Part I or asking the owner to repeat confirmed facts;
-only a missing required owner fact returns to the owner. Unapproved schema 1.2
-migrates before Gate A, while a requirements change requires schema 1.4 and
-invalidates both gates. The design-only bridge derives `AC-<requirement ID>`
-from approved acceptance rows; legacy `NEW_BUILD` uses journey `NONE` and binds
-its end-to-end Harness to the wave plus every selected approved requirement.
-Fastlane identifies migration rows and never invents owner requirements.
-
 </details>
 
 ## 7. Primary, alternate, and failure flows
 
+These flows show the successful user journey, safe alternatives, and what the
+application must do when the expected path cannot finish.
+
 ### Journey register
+
+This record connects each user goal to its successful outcome, expected failure
+behavior, and the requirements that protect it.
+
+<details>
+<summary>Exact journey register</summary>
+
+This table preserves the actors, triggers, outcomes, safeguards, and requirement
+links for each approved journey.
 
 | Journey ID | Actor IDs | Goal | Trigger | Main success outcome | Alternate/failure behavior | Requirement IDs | Rich-use-case triggers |
 |---|---|---|---|---|---|---|---|
 | JOURNEY-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
-Use only `DISTINCT_PERMISSIONED_ACTORS`,
-`CONFIDENTIAL_OR_REGULATED_MUTATION`, `MONEY_OR_ENTITLEMENT`,
-`IRREVERSIBLE_ACTION`, `MIGRATION_OR_CUTOVER`, `ASYNCHRONOUS_WORK`,
-`PARTIAL_FAILURE`, or `NONE` in the final column.
+</details>
 
-Rich-use-case applicability is journey-specific. At low or moderate risk,
-every journey with any trigger other than `NONE` requires a rich use case bound
-to that same journey. At high or critical risk, every declared journey requires
-one. The typed journey rows are authoritative; the applicability summary cannot
-transfer a trigger to a different journey.
+Fastlane expands a journey only when permissions, sensitive changes, money,
+irreversible actions, migrations, background work, or partial failure require it.
 
 ### Journey view
 
-NOT_YET_CREATED - Codex adds a project-specific journey diagram only when the approved flow needs one.
+No project-specific journey diagram has been created yet. After Gate A,
+Fastlane adds one when the approved flow needs a visual explanation.
 
 ### Rich-use-case applicability
+
+Some journeys need extra detail because permissions, sensitive changes, money,
+irreversible actions, migration, background work, or partial failure raise the
+consequence of a mistake.
+
+<details>
+<summary>Exact rich-use-case and business-rule records</summary>
+
+These tables preserve the detailed conditions, guarantees, and business rules
+for every journey that needs that additional depth.
 
 | Applicability | Trigger basis | Use-case IDs |
 |---|---|---|
@@ -301,20 +331,33 @@ NOT_YET_CREATED - Codex adds a project-specific journey diagram only when the ap
 
 | Rule ID | Rule | Basis IDs | Journey/use-case IDs | Validation ID |
 |---|---|---|---|---|
-Optional Mermaid flow diagrams may illustrate a validated `JOURNEY-*` or
-`STATE-*` record when they improve owner understanding. They are presentation
-aids, not Gate A readiness artifacts; the existing journey and state records
-remain authoritative.
+
+</details>
 
 ### Alternate flows
+
+Alternate flows show safe ways a user can still complete or leave the journey
+when the primary path is not available.
 
 - TODO
 
 ### Failure and recovery flows
 
+Failure flows explain what the user sees, what remains protected, and how the
+product returns to a known safe state.
+
 - TODO
 
 ## 8. Data requirements
+
+Fastlane records what data exists, who owns and may access it, how long it is
+kept, how it is deleted, and whether it must be recoverable.
+
+<details>
+<summary>Exact data requirements and acceptance checks</summary>
+
+This table preserves each data obligation and the evidence needed to confirm
+storage, access, deletion, residency, and recovery behavior.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -324,7 +367,18 @@ remain authoritative.
 | DATA-004 | WHERE durable recovery applies, the service SHALL restore data within the approved recovery objectives. | OPTIONAL_FEATURE | AC-DATA-004 | A timed restore rehearsal meets the current RTO and RPO, or the requirement records why durable recovery does not apply. | MEASURABLE |
 | DATA-005 | WHILE data-bearing construction is planned, the design SHALL identify migration, compatibility, and residency constraints. | STATE_DRIVEN | AC-DATA-005 | A traceability check maps every applicable constraint to a validation, migration, or rollback check. | MEASURABLE |
 
+</details>
+
 ## 9. Security and privacy requirements
+
+The application must protect identities, data, secrets, permissions, and audit
+events while rejecting unsafe input without unintended changes.
+
+<details>
+<summary>Exact security and privacy requirements and acceptance checks</summary>
+
+This table preserves the safeguards for identity, access, secrets, input,
+encryption, and audit activity, together with their acceptance checks.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -336,15 +390,18 @@ remain authoritative.
 | SEC-006 | WHERE sensitive data is handled, the service SHALL use approved encryption controls in transit and at rest. | OPTIONAL_FEATURE | AC-SEC-006 | Infrastructure definitions and deployed configuration checks match every approved encryption control. | MEASURABLE |
 | SEC-007 | WHEN an important access or change event occurs, the service SHALL record the actor, action, target, and time without recording secrets. | EVENT_DRIVEN | AC-SEC-007 | Audit-event tests and log review confirm all five required event conditions for every sampled event. | MEASURABLE |
 
-Invalid, malformed, and oversized inputs are rejected without creating an
-unintended change.
-
-Remove rows that genuinely do not apply and add any workload-specific
-safeguards needed for the approved users, data, and integrations. Record an
-actual discovered defect in `docs/project/BUGFIX.md` or an authorized issue rather than in
-generic template prose.
+</details>
 
 ## 10. Reliability requirements
+
+Failures must remain bounded: retries stop, duplicate work has one effective
+result, newer valid data survives conflicts, and approved recovery remains testable.
+
+<details>
+<summary>Exact reliability requirements and acceptance checks</summary>
+
+This table preserves the required timeout, retry, duplicate, concurrency,
+recovery, and rollback outcomes and how each one will be checked.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -354,9 +411,23 @@ generic template prose.
 | REL-004 | WHERE durable recovery applies, the service SHALL restore within the approved RTO and RPO. | OPTIONAL_FEATURE | AC-REL-004 | A timed restore rehearsal meets the approved RTO and RPO. | MEASURABLE |
 | REL-005 | WHEN a release fails approved health checks, the deployment SHALL support rollback to the last known-good artifact. | EVENT_DRIVEN | AC-REL-005 | A rollback rehearsal restores the bound last known-good artifact and all approved smoke tests pass. | MEASURABLE |
 
+</details>
+
 ## 11. Performance, cost, and sustainability requirements
 
+These requirements set expectations for response time, responsible spending,
+and efficient use of resources without weakening safety or reliability.
+
 ### Performance efficiency
+
+Critical user paths receive measurable response-time, load, scaling, and
+resource limits appropriate to the approved audience.
+
+<details>
+<summary>Exact performance requirements and acceptance checks</summary>
+
+This table preserves the measurable response-time, workload, and scaling
+boundaries behind the product's performance expectations.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -365,7 +436,18 @@ generic template prose.
 | PERF-003 | The design SHALL define scaling boundaries and resource limits. | UBIQUITOUS | AC-PERF-003 | Tests or configuration checks show work stays within approved limits and fails safely at each boundary. | MEASURABLE |
 | PERF-004 | WHERE performance evidence is required, the project SHALL document the load-test profile. | OPTIONAL_FEATURE | AC-PERF-004 | The profile records data shape, duration, concurrency, environment, and pass condition, or records why performance evidence does not apply. | MEASURABLE |
 
+</details>
+
 ### Cost optimization
+
+The design minimizes expected total and idle cost inside the approved safety
+and reliability boundaries. Any owner budget is a ceiling, not a spending target.
+
+<details>
+<summary>Exact cost requirements and acceptance checks</summary>
+
+This table preserves the approved cost posture, budget boundaries, cost drivers,
+and evidence needed before expansion.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -375,19 +457,18 @@ generic template prose.
 | COST-004 | WHEN expansion or migration is proposed, the design SHALL require a measurable approved trigger before the change. | EVENT_DRIVEN | AC-COST-004 | Each proposed expansion records a bounded threshold, evidence source, and owner decision path. | MEASURABLE |
 | COST-005 | The project SHALL define tagging, idle-resource handling, and teardown expectations for created resources. | UBIQUITOUS | AC-COST-005 | IaC and runbook checks cover approved tags, idle policy, and teardown or retained-resource behavior. | MEASURABLE |
 
-A hard cap is optional during requirements approval unless it is an owner-stated
-business constraint. Do not manufacture one. Preserve a real cap in the Gate A
-posture as `MINIMIZE_TOTAL_COST; HARD_CAP: <ISO_CURRENCY> <OWNER_AMOUNT>` using
-the owner's exact currency and amount. For example, an owner-provided USD 20.00
-cap becomes `MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00`. A finite positive Gate B
-ceiling such as `USD: 20.00` is required before any AWS mutation or billable
-deployed test, applies across that authorization's validity period, and cannot
-exceed or change the currency of the Gate A cap. It is an authorization limit,
-not a guaranteed provider-side billing stop. Never select a cheaper option by
-weakening required identity, encryption, secrets handling, input validation,
-isolation, recovery, logging, or evidence controls.
+</details>
 
 ### Sustainability
+
+Fastlane avoids idle resources, unnecessary data movement and retention, and
+unmeasured capacity growth.
+
+<details>
+<summary>Exact sustainability requirements and acceptance checks</summary>
+
+This table preserves the approved expectations for idle resources, data
+movement, measured expansion, and architecture learning.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -396,7 +477,18 @@ isolation, recovery, logging, or evidence controls.
 | SUS-003 | WHEN capacity expansion is proposed, the project SHALL measure utilization before approving the expansion. | EVENT_DRIVEN | AC-SUS-003 | Expansion evidence cites the approved utilization trigger and an observed measurement at or above that trigger. | MEASURABLE |
 | SUS-004 | WHEN learning changes an approved architecture decision, the project SHALL record the tradeoff and owner decision path. | EVENT_DRIVEN | AC-SUS-004 | A traceability check links the affected requirement and design IDs, evidence, and owner decision. | MEASURABLE |
 
+</details>
+
 ## 12. Operational requirements
+
+Operations must be reproducible, observable, recoverable, and owned, with safe
+rollback and teardown procedures.
+
+<details>
+<summary>Exact operational requirements and acceptance checks</summary>
+
+This table preserves the deployment, observability, incident, rollback, and
+teardown outcomes required for safe operation.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -406,8 +498,13 @@ isolation, recovery, logging, or evidence controls.
 | OPS-004 | The project SHALL identify incident ownership and an actionable escalation path. | UBIQUITOUS | AC-OPS-004 | The runbook check identifies one responsible owner and one actionable escalation path for each material incident class. | MEASURABLE |
 | OPS-005 | The project SHALL define testable rollback and teardown behavior. | UBIQUITOUS | AC-OPS-005 | Rehearsal or observed evidence covers rollback, retained resources, and the approved teardown result. | MEASURABLE |
 
+</details>
+
 <details>
 <summary>Exact quality-scenario and requirement-coverage records</summary>
+
+These records connect material quality concerns and every approved requirement
+to the scenario or journey that demonstrates its coverage.
 
 ### Quality attribute scenarios
 
@@ -436,6 +533,9 @@ last in the owner acceptance record. After approval, Codex continues to Design.
 
 <details>
 <summary>Exact Gate A analysis, lineage, assumptions, and open-decision records</summary>
+
+These records show the findings, changes, assumptions, and unresolved decisions
+behind the Gate A recommendation and the current AWS-guidance basis.
 
 ## 13. Cross-requirement analysis
 
@@ -495,17 +595,23 @@ last in the owner acceptance record. After approval, Codex continues to Design.
 | Identity/security boundary | TODO |
 | Environment/Region | TODO |
 | Failure/recovery | TODO |
-| Cost posture | TODO (exactly `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED` or the owner's `MINIMIZE_TOTAL_COST; HARD_CAP: <ISO_CURRENCY> <OWNER_AMOUNT>`; `USD 20.00` is only an example) |
+| Cost posture | TODO - explain the approved cost-minimization posture and any owner budget ceiling |
 | Intake provenance | TODO |
 
 ### Gate A — owner acceptance record
+
+<details>
+<summary>Exact Gate A acceptance record</summary>
+
+This table preserves who made the decision, the precise requirements revision,
+the accepted assumptions, and the source of the owner's approval.
 
 | Field | Owner-provided value |
 |---|---|
 | Approver | TODO |
 | Owner decision | `PENDING` / `CHANGES_REQUESTED` / `APPROVED` / `STALE` |
 | Authorized requirements revision | TODO |
-| Authorized cost posture | TODO (must exactly match the approved Gate A readiness card) |
+| Authorized cost posture | TODO (approved Gate A cost posture) |
 | Explicitly accepted assumption IDs | TODO / `NONE` |
 | Explicitly rejected assumption IDs and resolution | TODO / `NONE` |
 | Authorization provided at | TODO (ISO 8601 with timezone) |
@@ -513,15 +619,13 @@ last in the owner acceptance record. After approval, Codex continues to Design.
 | Verbatim owner receipt | `RECORDED_BELOW` / `TODO` |
 | Derived Gate A state | `BLOCKED` / `PENDING_OWNER_APPROVAL` / `APPROVED_FOR_DESIGN` / `STALE` |
 
-<details>
-<summary>Exact Gate A validation and invalidation rules</summary>
+</details>
 
 ### Gate A validation and invalidation rules
 
-The Engine requires a complete current product agreement, resolved blockers,
-explicit AWS materiality, and the owner's exact matching receipt.
-
-</details>
+This record explains whether the product agreement is complete, blockers are
+resolved, material AWS facts are current, and the owner decision matches the
+requirements being reviewed.
 
 For approval, the owner receipt must use this human-readable form with actual
 values substituted:
@@ -539,7 +643,8 @@ Approver: <name/handle>
 
 # Technical Plan
 
-Complete this part only after Gate A is valid.
+Fastlane prepares this section after Gate A. It explains the proposed design,
+why it fits the approved product, and what remains unbuilt or unauthorized.
 
 ### Technology decisions
 
@@ -548,6 +653,9 @@ records below when you want the complete source tables and candidate analysis.
 
 <details>
 <summary>Exact design revision, technology, driver, and candidate records</summary>
+
+These tables preserve the complete technology choices, design drivers, options
+considered, and source basis behind the recommendation.
 
 ### Technical design revision record
 
@@ -596,12 +704,26 @@ records below when you want the complete source tables and candidate analysis.
 
 ### Selected architecture
 
+The recommendation below owns the complete rationale, rejected alternatives,
+risks, mitigations, cost, operating burden, and conditions for reconsideration.
+
+<details>
+<summary>Exact selected architecture record</summary>
+
+This table preserves the selected architecture, alternatives, consequences,
+risks, safeguards, operating burden, and conditions for reconsideration.
+
 | Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Security impact | Reliability impact | Operational burden | Cost effect | Breakpoints | Migration path | Revisit triggers | Validation |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | ARCH-0001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
+</details>
+
 <details>
 <summary>Exact architecture traceability, AWS evidence, change, and diagram bindings</summary>
+
+These records connect the proposed architecture to approved requirements,
+current AWS guidance, affected decisions, and the project diagrams below.
 
 ### Architecture traceability
 
@@ -634,29 +756,39 @@ records below when you want the complete source tables and candidate analysis.
 | DIAGRAM-0006 | JOURNEY | CONDITIONAL | NOT_YET_CREATED | journey-view | NONE | NONE |
 | DIAGRAM-0007 | STATE | CONDITIONAL | NOT_YET_CREATED | state-view | NONE | NONE |
 
-These records bind the selected architecture to current requirements and
-sources. Diagrams describe planned design; only semantic changes affect the
-design digest and stale Gate B.
+The diagram records identify which project facts each view represents. Diagrams
+describe planned design and are not evidence that the application is built or
+deployed.
 
 </details>
 
 ### Migration view
 
-NOT_YET_CREATED - Codex adds a project-specific migration diagram only when brownfield or migration work makes it material.
+No project-specific migration diagram has been created yet. After Gate A,
+Fastlane adds one when existing-system or migration work makes it useful.
 
 ## 14. Architecture overview
 
+This overview shows the planned components, trust boundaries, data movement,
+dependencies, and important failure boundaries in one place.
+
 ### Proposed system at a glance
 
-NOT_YET_CREATED - After Gate A, Codex replaces this slot with the selected
-project architecture. The diagram uses canonical record IDs as Mermaid node
-identifiers and plain-language labels. It expresses intended design only;
-implementation and deployment proof belongs in code, tests, IaC, and VERIFY.
-
-Describe the selected components, trust and identity boundaries, data movement,
-external dependencies, and failure boundaries in the written design below.
+No project architecture diagram has been created yet. After Gate A, Fastlane
+places the selected components, trust boundaries, data movement, dependencies,
+and failure boundaries here. The diagram describes planned design, not proof of
+implementation or deployment.
 
 ## 15. Component design
+
+The selected components each have one clear responsibility, dependency
+boundary, and safe failure behavior.
+
+<details>
+<summary>Exact component and layer-boundary records</summary>
+
+These tables preserve each component's responsibility and the exact boundaries
+that keep external details separate from the product's core behavior.
 
 | Component | Responsibility | Inputs | Outputs | Dependencies | Failure behavior | Owner |
 |---|---|---|---|---|---|---|
@@ -668,22 +800,37 @@ external dependencies, and failure boundaries in the written design below.
 |---|---|---|---|---|---|---|---|---|---|
 | BOUNDARY-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
-Applicable boundaries use explicit DTO/schema mapping, `INWARD` dependencies, and server-side authorization.
+</details>
 
 ## 16. Interfaces and contracts
+
+Every interface names its producer, consumer, access boundary, validation,
+success result, safe failure behavior, compatibility, and measurable limits.
+
+<details>
+<summary>Exact interface and contract records</summary>
+
+This table preserves the complete protocol, access, validation, compatibility,
+failure, concurrency, and performance boundary for each material interface.
 
 | Contract ID | Kind | Requirement basis | Producer | Consumer | Schema or protocol | Authentication | Authorization | Input validation | Success output/status | Error and recovery behavior | Compatibility/versioning | Idempotency/concurrency | Timeout bound | Rate bound | Performance bound |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | API-001 | API | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
-Put schemas in code. Authorization is server-side or `NOT_APPLICABLE - <reason>`; timeout, rate, and performance use a numeric measurable bound or that sentinel.
+</details>
 
 ## 17. Data model and lifecycle
 
-### State-model applicability
+The design records the ownership, lifecycle, retention, deletion, backup,
+recovery, and concurrency rules for every important data category.
 
-Use ordered `CATEGORY: ID, ID; CATEGORY: ID`: `LIFECYCLE_RESOURCE`, `ASYNCHRONOUS_WORK`, `RETRY_OR_RESUME`,
-`APPROVAL_FLOW`, `MIGRATION_OR_CUTOVER`, `OTHER_MEANINGFUL_TRANSITION`. Applicable categories bind `STATE-*`; non-applicable uses a reason and IDs `NONE`.
+<details>
+<summary>Exact state applicability and state records</summary>
+
+These records identify which product subjects have meaningful lifecycles and
+the valid states, transitions, and safeguards for each one.
+
+### State-model applicability
 
 | Subject ID | Applicability | Trigger basis IDs | State model IDs |
 |---|---|---|---|
@@ -695,43 +842,44 @@ Use ordered `CATEGORY: ID, ID; CATEGORY: ID`: `LIFECYCLE_RESOURCE`, `ASYNCHRONOU
 |---|---|---|---|---|---|---|---|---|
 | STATE-001 | RESOURCE-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
+</details>
+
 ### State view
 
-NOT_YET_CREATED - Codex adds a project-specific state diagram only when a meaningful lifecycle contract requires one.
+No project-specific state diagram has been created yet. After Gate A, Fastlane
+adds one when an important product lifecycle benefits from a visual view.
 
 ### Data lifecycle view
 
-NOT_YET_CREATED - Codex adds this project-specific view when approved data,
-retention, deletion, backup, or recovery requirements make it material.
-
-Define:
-
-- entities and ownership;
-- keys and indexes;
-- consistency needs;
-- transaction boundaries;
-- retention;
-- backup and restore;
-- deletion semantics;
-- concurrency controls.
+No project-specific data lifecycle diagram has been created yet. After Gate A,
+Fastlane adds one when approved retention, deletion, backup, or recovery
+requirements make it useful.
 
 ## 18. Detailed sequence diagrams
 
+These diagrams show how the planned components cooperate to deliver the main
+user outcome and respond safely when a material step fails.
+
 ### Sequence — primary outcome
 
-NOT_YET_CREATED - Codex adds the selected application's primary end-to-end
-outcome after its components and interfaces have canonical IDs.
+No primary-outcome sequence has been created yet. After the design selects its
+components and interfaces, Fastlane shows the first useful result end to end.
 
 ### Sequence — failure and recovery
 
-NOT_YET_CREATED - Codex adds the selected application's failure and recovery
-flow when current reliability, asynchronous, or recovery records require it.
-
-Replace required slots with project-specific diagrams. Keep each canonical block
-at its bound anchor. Add an optional view only when it materially improves owner
-understanding and its canonical records justify it.
+No failure-and-recovery sequence has been created yet. Fastlane adds one when
+the approved design includes material retry, background work, or recovery.
 
 ## 19. Error handling strategy
+
+Users receive safe, useful failures while operators receive enough signal to
+diagnose, recover, or roll back without uncontrolled retry.
+
+<details>
+<summary>Exact error-handling records</summary>
+
+This table preserves how each important failure appears to the user, whether a
+retry is safe, what operators can observe, and how the product recovers.
 
 | Error class | Example | Retry? | User-visible behavior | Logging or metric | Recovery |
 |---|---|---|---|---|---|
@@ -741,9 +889,19 @@ understanding and its canonical records justify it.
 | Concurrency conflict | TODO | No or retry with fresh state | Conflict response | Conflict metric | Re-read and retry |
 | Internal defect | TODO | No uncontrolled retry | Generic safe error | Alert and trace | Rollback or fix |
 
-Define error taxonomy, safe messages, correlation IDs, retry ownership, timeout ownership, dead-letter behavior, and operator actions.
+</details>
 
 ## 20. AWS implementation approach
+
+Fastlane explains each selected AWS capability, why it fits, its main tradeoff,
+and the current evidence supporting it. AWS Core informs the recommendation;
+only the owner can approve it or separately authorize account work.
+
+<details>
+<summary>Exact AWS service decision records</summary>
+
+This table preserves each AWS capability selected for the design, the current
+decision records behind it, its rationale, and its principal tradeoff.
 
 | Concern | Decision IDs | AWS service or mechanism | Rationale | Tradeoff |
 |---|---|---|---|---|
@@ -756,27 +914,25 @@ Define error taxonomy, safe messages, correlation IDs, retry ownership, timeout 
 | Deployment | TODO | TODO | TODO | TODO |
 | Secrets and encryption | TODO | TODO | TODO | TODO |
 
-Reference the authoritative `TECH-*` rows in the `Decision IDs` column; do not
-restate or override their selections or version policies here.
-
-Use the installed `aws-core` plugin from Agent Toolkit for AWS and current AWS
-primary documentation when completing this section. Compare the secure
-serverless baseline with any proposed alternative using workload fit, required
-controls, expected low-usage cost, scaling breakpoints, operational ownership,
-and migration or expansion triggers. Cost never overrides a required security
-or recovery control.
+</details>
 
 ### Lightweight Well-Architected decision review
 
-Keep this a short, blame-free design conversation, not a separate audit or
-gate. Record the applicable Operational Excellence, Security, Reliability,
-Performance Efficiency, Cost Optimization, and Sustainability effects in the
-existing design and task records. Reversible low-risk choices need only concise
-rationale. Expand evidence, alternatives, rollback, and owner visibility when
-effective risk is high/critical or a decision is a one-way door that would be
-difficult, costly, or unsafe to reverse.
+The recommendation records the material operating, security, reliability,
+performance, cost, and sustainability consequences. This review does not add
+another gate.
 
 ## 21. Implementation boundaries and order
+
+Fastlane builds only the approved components, compatibility boundary, rollout,
+rollback, and explicit deferrals, beginning with one useful end-to-end outcome.
+
+<details>
+<summary>Exact implementation-order, first-wave, and spike records</summary>
+
+These records preserve what is reused, changed, added, deferred, or protected,
+plus the first tested end-to-end construction outcome. A short disposable
+investigation appears only when a blocking technical unknown must be resolved.
 
 - Existing components to reuse: TODO
 - Components to modify: TODO
@@ -792,9 +948,8 @@ difficult, costly, or unsafe to reverse.
 |---|---|---|---|---|---|---|
 | WAVE-0001 | TODO | TODO | TODO | TODO | TODO | NONE |
 
-For `NEW_BUILD`, this row selects one tested end-to-end first-release outcome.
-Its first structural task is the only first-wave task unless the bounded spike
-below is explicitly approved.
+For a new application, this row identifies the first tested end-to-end outcome
+that construction will prove.
 
 ### Blocking spike
 
@@ -802,21 +957,27 @@ below is explicitly approved.
 |---|---|---|---|---|---|
 | SPIKE-0001 | TODO | TODO | TODO | TODO | DISCARD_AND_BUILD_WALKING_SKELETON |
 
-Replace this table with `NOT_APPLICABLE — no prerequisite discovery is needed before the walking skeleton`
-when no spike is needed. A spike records learning only and cannot satisfy the
-approved product outcome.
-
-
-<details>
-<summary>Exact task-projection rule</summary>
-
-The Engine derives tasks and requirement coverage from the approved design.
-
 </details>
+
+A blocking spike records learning only; it never counts as the approved product
+outcome. When no spike is needed, the exact record states that plainly.
+
+
+Construction tasks come from the approved design and remain inside its
+requirement and authorization boundaries.
 
 ## Validation strategy
 
+Validation proves the approved user outcomes, safety boundaries, failure
+behavior, and construction scope at the most useful layer.
+
 ## 22. Test layers
+
+<details>
+<summary>Exact validation-layer records</summary>
+
+This table preserves which kinds of checks apply to the selected design and the
+coverage expected at each technical layer.
 
 | Layer | Purpose | Required coverage |
 |---|---|---|
@@ -830,8 +991,13 @@ The Engine derives tasks and requirement coverage from the approved design.
 | AWS environment | Deployed configuration and service behavior | TODO |
 | Operations | Deployment, alarms, rollback, restore, teardown | TODO |
 
+</details>
+
 <details>
-<summary>Exact Gate B Harness Profile</summary>
+<summary>Exact Gate B validation profile</summary>
+
+This table preserves the selected checks, their project basis, the exact way
+they run, and where their results will be recorded.
 
 ### Gate B Harness Profile
 
@@ -854,71 +1020,61 @@ The Engine derives tasks and requirement coverage from the approved design.
 | HARNESS-015 | Security and privacy | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
 | HARNESS-016 | Property | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
 
-The selected checks, triggers, commands, basis IDs, and evidence destinations
-must be complete before Gate B. Fastlane does not impose a universal tool set.
+The profile is complete only when each selected check has a project reason, a
+repeatable command or API, and a clear evidence destination. The tool set is
+chosen for this design rather than imposed universally.
 
 </details>
 
 <details>
 <summary>Exact infrastructure and delivery validation contract</summary>
 
+This table preserves the checks that apply to the selected infrastructure and
+delivery path, including the local evidence and separately authorized AWS
+planning evidence required for technical review.
+
 ### IaC and delivery validation contract
 
-Select validation from the approved `INFRASTRUCTURE_AS_CODE`,
-`SECURITY_VALIDATION`, and `DEPLOYMENT_TOOLING` `TECH-*` rows; do not impose a
-universal scanner. Mark unused paths `NOT_APPLICABLE — <reason>`.
 
 | Validation path | Applicability | TECH binding | Required local/static validation | AWS planning validation | Evidence destination |
 |---|---|---|---|---|---|
-| CloudFormation / SAM / CDK | TODO | TODO | Synth or template validation, selected lint, and selected Guard or policy checks | Review an authorized existing change set; creating one is an AWS mutation | `docs/project/VERIFY.md` IaC validation evidence |
-| Terraform | TODO | TODO | Formatting, validation, selected policy checks, and a deterministic plan boundary | Bind the reviewed plan to exact inputs, state/refresh mode, target, and digest | `docs/project/VERIFY.md` IaC validation evidence |
-| Container delivery | TODO | TODO | Dependency/lock validation, SBOM generation, and selected image/configuration checks | Bind the immutable image digest and deployment target | `docs/project/VERIFY.md` IaC validation evidence |
-| Other approved delivery path | TODO | TODO | Exact equivalent checks selected by current TECH decisions | Exact equivalent immutable plan and target binding | `docs/project/VERIFY.md` IaC validation evidence |
-
-CloudFormation `CreateChangeSet` creates account-side state, including a
-`REVIEW_IN_PROGRESS` stack for a new-stack change set, so it requires exact AWS
-mutation authority even though `ExecuteChangeSet` is a separate operation.
-Record both operations separately when both are allowed. An authenticated IAM
-Access Analyzer `ValidatePolicy` call belongs only to AWS-10 after Gate B under
-the named read-only scope. Local checks and unauthenticated documentation do not
-substitute for either observation.
+| CloudFormation / SAM / CDK | TODO | TODO | Synth or template validation, selected lint, and selected Guard or policy checks | Review an authorized existing change set; creating one is an AWS mutation | `docs/project/VERIFY.md#iac-validation-evidence` |
+| Terraform | TODO | TODO | Formatting, validation, selected policy checks, and a deterministic plan boundary | Bind the reviewed plan to exact inputs, state/refresh mode, target, and digest | `docs/project/VERIFY.md#iac-validation-evidence` |
+| Container delivery | TODO | TODO | Dependency/lock validation, SBOM generation, and selected image/configuration checks | Bind the immutable image digest and deployment target | `docs/project/VERIFY.md#iac-validation-evidence` |
+| Other approved delivery path | TODO | TODO | Exact equivalent checks selected by current TECH decisions | Exact equivalent immutable plan and target binding | `docs/project/VERIFY.md#iac-validation-evidence` |
 
 </details>
 
 ## 23. Example-based scenarios
+
+These scenarios show concrete success, boundary, and failure outcomes at the
+most useful validation layer.
+
+<details>
+<summary>Exact example-scenario records</summary>
+
+These records preserve the concrete examples that demonstrate normal, boundary,
+and failure behavior at the selected validation layer.
 
 | Test ID | Scenario | Expected result | Layer |
 |---|---|---|---|
 | EX-001 | Known happy path | TODO | Integration |
 | EX-002 | Known boundary or failure | TODO | Unit |
 
-<details>
-<summary>Exact example-scenario record rules</summary>
-
-Every `EX-*` referenced by architecture traceability or another current design
-record appears exactly once in this table with a concrete scenario, expected
-result, and layer. The complete Example-based scenarios table is
-design-controlled and participates in the modern design digest after the
-Technology decision register and before Property applicability, Property
-definitions, and Property execution. Exact approved schema 4 designs retain
-their grandfathered digest path.
-
 </details>
 
 ## 24. Property-based testing specification
 
-During DESIGN-10, classify every measurable Gate A requirement in the approved
-revision exactly once. Use `APPLICABLE` only when a generated input or state
-space and a stable oracle can test an invariant; otherwise record
-`NOT_APPLICABLE` with a concrete reason.
-Property-based testing is optional until an invariant is classified as
-applicable. Every approved `PROP-*` is then required construction and release
-evidence unless a later owner-approved requirements or design revision removes
-or replaces it.
+Fastlane uses generated tests only where varied inputs or states can prove an
+important rule, such as isolation, duplicate handling, secrecy, or retry limits.
 
-Every applicable property definition must contain concrete inputs, conditions,
-oracle, boundaries, and layer. `NONE`, `PENDING`, `PLACEHOLDER`, and similar
-sentinels are not definitions.
+<details>
+<summary>Exact property applicability, definitions, and execution records</summary>
+
+These tables preserve which important rules benefit from generated cases, the
+stable expected result, the run boundary, and the replayable evidence path.
+
+### Property applicability
 
 | Requirement ID | Applicability | Reason or property IDs |
 |---|---|---|
@@ -931,9 +1087,6 @@ sentinels are not definitions.
 | PROP-003 | SEC-003 | No generated secret appears in emitted telemetry. | Secret-like values and payload positions | Telemetry enabled | Search of logs/events contains no secret | Unicode, long values, encoded forms | Unit / integration |
 | PROP-004 | REL-001 | Retry attempts never exceed the configured bound. | Failure sequences and transient/permanent classifications | Dependency fails | Attempts <= configured maximum | Zero, one, maximum, permanent transition | Unit |
 | PROP-005 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-
-<details>
-<summary>Exact property-execution records</summary>
 
 ### Property execution contract
 
@@ -949,6 +1102,15 @@ run bound, replay format, and evidence destination. Observed results belong in
 
 ## 25. Test data and environments
 
+Fastlane records safe test data, local substitutes, any approved AWS test
+environment, cleanup, and cost boundary.
+
+<details>
+<summary>Exact test-data and environment records</summary>
+
+These records preserve the safe fixture, environment, cleanup, sensitive-data,
+and billable-test boundaries behind the validation plan.
+
 - Synthetic fixture strategy: TODO
 - Generated data constraints: TODO
 - Sensitive-data prohibition: TODO
@@ -956,6 +1118,8 @@ run bound, replay format, and evidence destination. Observed results belong in
 - AWS test environment: TODO
 - Cleanup strategy: TODO
 - Cost limit for billable deployed tests: TODO / `NOT_APPLICABLE — local or documentation-only validation`
+
+</details>
 
 ## 26. Release acceptance
 
@@ -968,38 +1132,6 @@ Release is acceptable when:
 - security and reliability evidence passes;
 - deployment, monitoring, rollback, recovery, and cleanup are verified;
 - `docs/project/VERIFY.md` records the exact release decision and remaining gaps.
-
-<details>
-<summary>Exact release-state and AWS evidence rules</summary>
-
-The release lifecycle is `NOT_READY` -> `READY_TO_DEPLOY` ->
-`RELEASE_VERIFIED`. RELEASE-10 is the only prompt that changes this state.
-AWS-10 starts only from READY_TO_DEPLOY. Before each AWS-20 mutation call,
-`docs/project/VERIFY.md` receives an append-only STARTED row, followed by one
-terminal direct-result row and an AWS-30 read-only reconciliation row for the
-same Attempt ID. Each row preserves immutable deployment authority and
-provenance: explicit-gate derives them from its deployment receipt; fast-dev
-stores the exact current construction `AUTH-*`, derives its expiry timestamp
-from Gate B `AWS authorization validity`, and uses Gate B's authorization source. Non-STARTED operation evidence uses the canonical unique-
-identifiers/direct-result grammar; that structure alone never proves execution.
-STARTED is not proof of a call. A lone STARTED is completed by Codex as UNKNOWN
-before any owner action or AWS-30 read authorization request. Deployment
-authority binds one attempt and never supplies AWS-30 read authority or permits
-replay. FAILED, PARTIAL, and UNKNOWN require reconciliation before retry;
-COMPLETE or BLOCKED
-returns to RELEASE-10 for the final decision. One first STALE remains at AWS-30
-and may be followed by one later COMPLETE or BLOCKED under a different current
-read authorization. A repeated STALE is a safety-review blocker, and no
-reconciliation row follows COMPLETE or BLOCKED. COMPLETE acceptance IDs must
-satisfy VERIFY's exact current `VERIFIED` matrix-row and target-binding contract.
-RELEASE-10 records the terminal
-AWS-30 Evidence ID as VERIFY's Active evidence cutoff while deciding NOT_READY,
-RELEASE_VERIFIED, or a separately authorized correction path. That acknowledgment
-prevents rerouting the same attempt. Retry requires distinct current mutation
-authority: a new exact deployment receipt for explicit-gate or freshly approved
-construction authorization for fast-dev, plus a new Attempt ID.
-
-</details>
 
 # Gate B Review
 
@@ -1024,7 +1156,10 @@ locally inside the approved envelope.
 | Validation and construction | [Validation strategy](#validation-strategy), readiness card, and the exact construction envelope |
 
 <details>
-<summary>Exact Gate B agent review record</summary>
+<summary>Detailed Gate B independent review record</summary>
+
+This record shows what the independent read-only review examined and whether it
+found a gap that should be resolved before the owner decides.
 
 ## 27. Gate B agent review record
 
@@ -1047,11 +1182,10 @@ locally inside the approved envelope.
 ### Gate B — readiness card
 
 <details>
-<summary>Exact Gate B readiness rules</summary>
+<summary>Detailed Gate B readiness basis</summary>
 
-The Engine blocks Gate B until every field and applicable Harness check is complete.
-
-</details>
+This record explains which parts of the technical plan and its validation are
+complete enough to present for an owner decision.
 
 | Field | Current design and construction decision basis |
 |---|---|
@@ -1062,10 +1196,12 @@ The Engine blocks Gate B until every field and applicable Harness check is compl
 | Identity/secrets | TODO |
 | Failure/retry/concurrency | TODO |
 | Deployment/operations | TODO |
-| Validation/evidence | TODO (cite required and triggered conditional `HARNESS-*` IDs) |
+| Validation/evidence | TODO - name the required evidence and any remaining limitation |
 | Rollback/recovery/teardown | TODO |
 | Brownfield compatibility/migration | TODO |
 | Outstanding gaps | TODO / `NONE` |
+
+</details>
 
 ## Construction and authorization boundary
 
@@ -1078,7 +1214,10 @@ preserved roots for brownfield work, or an explicit infrastructure-only
 exception. Fastlane rejects parallel greenfield `apps/**` and `src/**` roots.
 
 <details>
-<summary>Exact construction envelope and validation grammar</summary>
+<summary>Exact construction envelope</summary>
+
+This record defines the bounded local work Codex may perform after Gate B. Any
+repository, GitHub, or AWS action outside it remains unauthorized.
 
 ## 28. Construction envelope
 
@@ -1127,12 +1266,17 @@ exception. Fastlane rejects parallel greenfield `apps/**` and `src/**` roots.
 | Mandatory stop conditions | TODO |
 | Authorization expiry or completion condition | `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>` |
 
-The Engine owns the envelope grammar, digest, compatibility, and staleness rules.
 This table is the complete bounded local-construction authority presented at Gate B.
 
 </details>
 
 ## 29. Gate B owner authorization record
+
+<details>
+<summary>Exact Gate B authorization record</summary>
+
+This record preserves the owner's decision and the exact requirements, design,
+and construction boundary to which that decision applies.
 
 | Field | Owner-provided value |
 |---|---|
@@ -1146,6 +1290,8 @@ This table is the complete bounded local-construction authority presented at Gat
 | Authorization source | TODO (message, issue, meeting record, or commit link) |
 | Verbatim owner receipt | `RECORDED_BELOW` / `TODO` |
 | Derived Gate B state | `BLOCKED` / `PENDING_OWNER_APPROVAL` / `APPROVED_FOR_CONSTRUCTION` / `STALE` |
+
+</details>
 
 For approval, the owner receipt must use this human-readable form with actual
 values substituted:
@@ -1165,20 +1311,13 @@ Approver: <name/handle>
 
 # Contract Appendices
 
-Exact records below remain machine-validated and auditable. They do not add an owner gate or authority.
+Exact records are kept in the labeled disclosures beside the owner-readable
+sections they support. They remain available for audit and do not add another
+owner gate or grant authority.
 
-<details>
-<summary>Exact Gate B record-maintenance and validation rules</summary>
-
-## Exact record maintenance
-
-Project facts and owner decisions remain in this PRD. Phase procedures, receipt syntax, and Engine schemas remain in their designated Fastlane authorities; `docs/project/AGENTS.md` narrows safe edits here.
 ## 30. Gate B validation and invalidation rules
 
-The Engine validates current Gate A, complete design and Harness coverage,
-matching REQ/DES/AUTH identities and digests, the exact owner receipt, bounded
-construction, and deterministic staleness. Changes follow the existing Gate A
-or Gate B invalidation boundary; evidence-only progress inside the envelope does
-not create new authority.
-
-</details>
+Gate B remains current only while its requirements, design, validation plan,
+and construction boundary still match the approved record. A material change
+returns the project to the appropriate owner review; evidence gathered within
+the approved boundary does not create new authority.

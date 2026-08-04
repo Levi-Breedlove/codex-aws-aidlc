@@ -118,6 +118,9 @@ verification, or teardown preparation, ask Codex to use
 `$operate-fastlane-aws`. Read, deployment, and teardown actions retain separate
 exact boundaries. Tool availability and credentials never grant permission.
 
+<details>
+<summary>Optional internal AWS stage labels</summary>
+
 | Optional stage | Purpose | Owner boundary |
 |---|---|---|
 | AWS-10 | Read-only account preflight | Authorize the exact read-only account and scope |
@@ -125,6 +128,8 @@ exact boundaries. Tool availability and credentials never grant permission.
 | AWS-30 | Reconcile observed results | No new mutation authority |
 | AWS-40 | Review residual resources | Choose a residual disposition when required |
 | AWS-50 | Bounded teardown | Provide the separate exact teardown authorization |
+
+</details>
 
 ## Build, resume, and optional hooks
 

@@ -111,6 +111,11 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
    RELEASE-10 acknowledgment. Retry requires distinct current mutation
    authority: a new exact deployment receipt for explicit-gate or freshly
    approved construction authorization for fast-dev, plus a new Attempt ID.
+   CloudFormation `CreateChangeSet` is a mutation that can create account-side
+   state and must be authorized separately from `ExecuteChangeSet`. An
+   authenticated IAM Access Analyzer `ValidatePolicy` call is read-only AWS-10
+   work and requires the current named read scope; local or documentation-only
+   checks do not substitute for either observed operation.
    A structurally valid historical attempt remains closable when its Gate B
    authority later expires or becomes legitimately stale. In that case, the
    fresh read receipt binds the immutable attempted account, Region,

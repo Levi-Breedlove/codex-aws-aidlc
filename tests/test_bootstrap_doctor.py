@@ -1732,6 +1732,155 @@ def complete_design_contract(text: str) -> str:
         harness_table,
         "## 27. Gate B agent review record",
     )
+    text = replace_contract_table(
+        text,
+        doctor.ERROR_HANDLING_HEADING,
+        doctor.ERROR_HANDLING_HEADERS,
+        [
+            (
+                "Validation",
+                "Request exceeds the approved input shape",
+                "No",
+                "Reject the request with a safe explanation",
+                "Validation error counter without request content",
+                "The user corrects the request",
+            ),
+            (
+                "Transient dependency",
+                "A dependency times out temporarily",
+                "Bounded to 3 attempts",
+                "Ask the user to try again later",
+                "Retry count and dependency timeout trace",
+                "Stop at the retry bound and preserve state",
+            ),
+            (
+                "Permanent dependency",
+                "A dependency rejects the approved operation",
+                "No",
+                "Explain that the operation could not complete",
+                "Permanent dependency failure counter",
+                "Correct the dependency configuration before retry",
+            ),
+            (
+                "Concurrency conflict",
+                "A request uses a stale record version",
+                "No or retry with fresh state",
+                "Return a conflict response",
+                "Conflict counter with the record category",
+                "Re-read the current record before retry",
+            ),
+            (
+                "Internal defect",
+                "Unexpected application failure",
+                "No uncontrolled retry",
+                "Return a generic safe error",
+                "Alert and trace without sensitive content",
+                "Roll back or correct the defect",
+            ),
+        ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.AWS_SERVICE_DECISION_HEADING,
+        doctor.AWS_SERVICE_DECISION_HEADERS,
+        [
+            (
+                "Compute",
+                "TECH-0001, TECH-0002",
+                "AWS Lambda behind the approved application interface",
+                "Pay-per-use compute fits the bounded workload",
+                "Managed runtime limits become revisit triggers",
+            ),
+            (
+                "API and edge",
+                "TECH-0002, TECH-0013",
+                "Amazon API Gateway without a separate public edge layer",
+                "One managed entry point keeps the interface bounded",
+                "A public endpoint requires separate deployment authorization",
+            ),
+            (
+                "Identity",
+                "TECH-0010",
+                "Server-side application authorization at the trusted service",
+                "The local release preserves the approved identity boundary",
+                "An AWS identity provider is deferred until deployment design needs it",
+            ),
+            (
+                "Data",
+                "TECH-0011",
+                "Per-owner records behind the trusted data adapter",
+                "The adapter preserves ownership and supports later migration",
+                "A managed AWS store is not locally observed",
+            ),
+            (
+                "Messaging",
+                "TECH-0012",
+                "NOT_APPLICABLE - the approved path completes synchronously",
+                "No background delivery is required by the approved journey",
+                "A queue is reconsidered if asynchronous work becomes material",
+            ),
+            (
+                "Observability",
+                "TECH-0014",
+                "Structured application logs and bounded failure counters",
+                "The local evidence can verify useful signals without secrets",
+                "AWS-native signals remain unobserved before deployment",
+            ),
+            (
+                "Deployment",
+                "TECH-0004, TECH-0009",
+                "AWS SAM template and deployment plan",
+                "The selected tools keep planned infrastructure reproducible",
+                "Account-side planning still requires separate authority",
+            ),
+            (
+                "Secrets and encryption",
+                "TECH-0008, TECH-0010",
+                "No stored secret in the local release and least-privilege planned access",
+                "The design avoids introducing a secret before it is required",
+                "Deployed encryption controls remain unobserved",
+            ),
+        ],
+    )
+    text = replace_contract_table(
+        text,
+        doctor.IAC_VALIDATION_HEADING,
+        doctor.IAC_VALIDATION_HEADERS,
+        [
+            (
+                "CloudFormation / SAM / CDK",
+                "APPLICABLE",
+                "TECH-0004, TECH-0008, TECH-0009",
+                "sam validate, selected lint, and policy checks",
+                "Review a separately authorized change set bound to the template digest",
+                doctor.IAC_VALIDATION_EVIDENCE_DESTINATION,
+            ),
+            (
+                "Terraform",
+                "NOT_APPLICABLE - AWS SAM is the selected infrastructure tool",
+                "NOT_APPLICABLE - no Terraform technology decision is active",
+                "NOT_APPLICABLE - no Terraform configuration is approved",
+                "NOT_APPLICABLE - no Terraform plan is approved",
+                doctor.IAC_VALIDATION_EVIDENCE_DESTINATION,
+            ),
+            (
+                "Container delivery",
+                "NOT_APPLICABLE - no container delivery path is approved",
+                "NOT_APPLICABLE - no container technology decision is active",
+                "NOT_APPLICABLE - no container artifact is approved",
+                "NOT_APPLICABLE - no image deployment is approved",
+                doctor.IAC_VALIDATION_EVIDENCE_DESTINATION,
+            ),
+            (
+                "Other approved delivery path",
+                "NOT_APPLICABLE - no additional delivery path is approved",
+                "NOT_APPLICABLE - no additional delivery technology is active",
+                "NOT_APPLICABLE - no additional local validation is needed",
+                "NOT_APPLICABLE - no additional AWS planning is approved",
+                doctor.IAC_VALIDATION_EVIDENCE_DESTINATION,
+            ),
+        ],
+    )
     return complete_diagram_contract(complete_project_design_contract(text))
 
 
@@ -2778,7 +2927,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.3")
+        self.assertEqual(report["bootstrap_version"], "1.2.4")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -3441,6 +3590,75 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
         self.assertEqual(no_property_contract.property_execution, ())
+
+    def test_design_support_records_are_complete_and_technology_bound(self) -> None:
+        template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(template)
+        ready, ready_issues = doctor.derive_design_contract(
+            complete,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(ready_issues, [])
+        self.assertEqual(ready.status, "READY")
+
+        cases = {
+            "missing required error class": (
+                re.sub(
+                    r"(?m)^\| Validation \|.*\r?\n",
+                    "",
+                    complete,
+                    count=1,
+                ),
+                "Error class Validation must appear exactly once; found 0",
+            ),
+            "unbounded retry": (
+                complete.replace("Bounded to 3 attempts", "Retry forever", 1),
+                "retry posture is unbounded",
+            ),
+            "unknown AWS technology decision": (
+                complete.replace(
+                    "| Identity | TECH-0010 |",
+                    "| Identity | TECH-9999 |",
+                    1,
+                ),
+                "AWS decision IDs are not current technology IDs: TECH-9999",
+            ),
+            "unrelated AWS technology decision": (
+                complete.replace(
+                    "| Identity | TECH-0010 |",
+                    "| Identity | TECH-0011 |",
+                    1,
+                ),
+                "AWS decision IDs do not bind the relevant technology concern",
+            ),
+            "unrelated IaC technology binding": (
+                complete.replace(
+                    "| CloudFormation / SAM / CDK | APPLICABLE | TECH-0004, TECH-0008, TECH-0009 |",
+                    "| CloudFormation / SAM / CDK | APPLICABLE | TECH-0006 |",
+                    1,
+                ),
+                "TECH binding uses unrelated concerns: TEST_TOOLING",
+            ),
+            "wrong IaC evidence destination": (
+                complete.replace(
+                    doctor.IAC_VALIDATION_EVIDENCE_DESTINATION,
+                    "docs/project/VERIFY.md",
+                    1,
+                ),
+                "Evidence destination must be exactly "
+                + doctor.IAC_VALIDATION_EVIDENCE_DESTINATION,
+            ),
+        }
+        for label, (changed, expected) in cases.items():
+            with self.subTest(label=label):
+                blocked, issues = doctor.derive_design_contract(
+                    changed,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(blocked.status, "BLOCKED")
+                self.assertIn(expected, "\n".join(issues))
 
     def test_adaptive_coverage_select_amend_preserve_and_fail_closed(self) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -8962,6 +9180,31 @@ class BootstrapDoctorTests(unittest.TestCase):
                 for code, message in actor_issues
             ),
             actor_issues,
+        )
+
+        invalid_kind = replace_contract_table(
+            text,
+            doctor.ACTOR_HEADING,
+            doctor.ACTOR_HEADERS,
+            [actors.rows[0][:2] + ("CUSTOMER",) + actors.rows[0][3:]],
+        )
+        invalid_kind_contract, invalid_kind_issues = (
+            doctor.derive_requirements_contract(
+                invalid_kind,
+                "low",
+                intake_contract,
+                required=True,
+                grandfather_current_gate_a=False,
+            )
+        )
+        self.assertEqual(invalid_kind_contract.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                code == "ACTOR_CONTRACT_INVALID"
+                and "invalid actor kind 'CUSTOMER'" in message
+                for code, message in invalid_kind_issues
+            ),
+            invalid_kind_issues,
         )
 
         requirement_list = ", ".join(sorted(doctor.authoritative_requirement_ids(text)))
