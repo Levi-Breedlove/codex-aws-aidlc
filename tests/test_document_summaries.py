@@ -84,9 +84,7 @@ Visible again
         rules = (REPOSITORY_ROOT / "docs/project/AGENTS.md").read_text(encoding="utf-8")
         evaluation = (
             REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/references/evaluation.md"
-        ).read_text(
-            encoding="utf-8"
-        )
+        ).read_text(encoding="utf-8")
         for phrase in (
             "within 45 visible PRD lines",
             "within 35 TASKS lines",

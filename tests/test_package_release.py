@@ -341,7 +341,9 @@ class PackageReleaseTests(unittest.TestCase):
             self.assertNotIn(removed, inventory)
         self.assertFalse(any(path.startswith("docs/assets/") for path in inventory))
         self.assertFalse(any(path.startswith("docs/advanced/") for path in inventory))
-        self.assertFalse(any(path.startswith("docs/maintainers/") for path in inventory))
+        self.assertFalse(
+            any(path.startswith("docs/maintainers/") for path in inventory)
+        )
 
     def test_manifest_is_the_exact_template_file_inventory(self) -> None:
         template = REPOSITORY_ROOT
