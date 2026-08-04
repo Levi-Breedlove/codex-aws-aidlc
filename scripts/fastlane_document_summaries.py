@@ -432,9 +432,7 @@ def normalized_view_document(specification: Mapping[str, Any]) -> dict[str, Any]
     ):
         raise ValueError("human-view document path must be canonical and relative")
     raw_sections = specification.get("sections")
-    if not isinstance(raw_sections, Sequence) or isinstance(
-        raw_sections, (str, bytes)
-    ):
+    if not isinstance(raw_sections, Sequence) or isinstance(raw_sections, (str, bytes)):
         raise ValueError("human-view sections must be a sequence")
     sections: list[dict[str, Any]] = []
     keys: set[str] = set()

@@ -1106,9 +1106,7 @@ Approver: <name/handle>"""
         self.assertIn(
             "IF external input violates documented shape or size limits", self.prd
         )
-        bugfix = (PROJECT_ROOT / "docs/project/BUGFIX.md").read_text(
-            encoding="utf-8"
-        )
+        bugfix = (PROJECT_ROOT / "docs/project/BUGFIX.md").read_text(encoding="utf-8")
         self.assertIn("Use this file for the active defect or regression", bugfix)
         self.assertIn("reproduce the defect", bugfix)
         for phrase in (

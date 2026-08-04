@@ -550,9 +550,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         self.assertEqual(len(projected["documents"]), 6)
         for document in projected["documents"]:
             self.assertEqual(document["authority"], VIEW_AUTHORITY)
-            self.assertRegex(
-                document["view_basis_sha256"], r"^sha256:[0-9a-f]{64}$"
-            )
+            self.assertRegex(document["view_basis_sha256"], r"^sha256:[0-9a-f]{64}$")
             self.assertNotIn("canonical_sha256", document)
 
     def test_stale_human_view_is_safe_correction_and_blocks_no_gate(self) -> None:
