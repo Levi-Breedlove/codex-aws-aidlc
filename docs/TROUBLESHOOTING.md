@@ -23,8 +23,8 @@ For a fresh template, complete the prerequisite checker’s single checklist and
 send `init template` again. An initialized project should resume from the
 Engine-selected stage without repeating prerequisites or project settings.
 
-If it does not, preserve the repository and report the Engine diagnostic. Do
-not delete `bootstrap.yaml` or replace project records.
+If it does not, preserve the repository and report the diagnostic code and its
+plain-language message. Do not delete `bootstrap.yaml` or replace project records.
 
 ## AWS Core is missing
 
@@ -50,7 +50,7 @@ missing current evidence with cached prose, memory, or a reviewer’s claim.
 
 A changed requirement stales Gate A and Gate B. A changed technical design or
 construction boundary stales Gate B. Follow the Engine’s correction action,
-review the refreshed brief, and use only the new exact receipt.
+review the refreshed brief, and use only the new copyable approval message.
 
 ## Optional hooks deny a valid action
 

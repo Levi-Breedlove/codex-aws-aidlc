@@ -60,16 +60,20 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
 try:
     from fastlane_document_summaries import (
         build_summary_specifications,
-        canonical_bytes_without_generated_summary,
+        build_view_specifications,
+        canonical_bytes_without_generated_presentation,
         project_document_summaries,
-        strip_generated_summary,
+        project_document_views,
+        strip_generated_presentation,
     )
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     from scripts.fastlane_document_summaries import (
         build_summary_specifications,
-        canonical_bytes_without_generated_summary,
+        build_view_specifications,
+        canonical_bytes_without_generated_presentation,
         project_document_summaries,
-        strip_generated_summary,
+        project_document_views,
+        strip_generated_presentation,
     )
 
 
@@ -10418,7 +10422,9 @@ def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str
     ctx.source_bytes_read += len(raw)
     ctx.presentation_texts[relative] = text
     canonical_text = (
-        strip_generated_summary(text) if relative in DOCUMENT_SUMMARY_FILES else text
+        strip_generated_presentation(text)
+        if relative in DOCUMENT_SUMMARY_FILES
+        else text
     )
     ctx.texts[relative] = canonical_text
     return canonical_text
@@ -10437,7 +10443,7 @@ def bounded_prd_snapshot(
     digest = (
         "sha256:"
         + hashlib.sha256(
-            canonical_bytes_without_generated_summary(raw_text)
+            canonical_bytes_without_generated_presentation(raw_text)
         ).hexdigest()
     )
     if expected_sha256 is not None and (
@@ -11356,7 +11362,11 @@ def derive_owner_decision_brief(
             ("validation-strategy", "Validation strategy", "Validation strategy"),
             ("harness-profile", "Harness checks", "Validation strategy"),
             ("release-acceptance", "Release acceptance", "26. Release acceptance"),
-            ("first-wave", "First construction wave", "First construction wave"),
+            (
+                "first-wave",
+                "First construction wave",
+                "21. Implementation boundaries and order",
+            ),
             ("gate-b-readiness", "Gate B readiness", "Gate B — readiness card"),
             (
                 "construction-boundary",
@@ -15975,7 +15985,7 @@ def _agent_correction_is_safe(
     relative = validate_relative_path(diagnostic.path)
     if relative is None:
         return False
-    if diagnostic.code == "DOCUMENT_SUMMARY_STALE":
+    if diagnostic.code in {"DOCUMENT_SUMMARY_STALE", "DOCUMENT_VIEW_STALE"}:
         return relative in DOCUMENT_SUMMARY_FILES
 
     if owner_stage == "DEFINE":
@@ -22366,11 +22376,16 @@ def build_report(
     document_summaries, summary_issues = project_document_summaries(
         summary_sources, summary_specifications
     )
+    document_views, view_issues = project_document_views(
+        summary_sources, build_view_specifications(summary_specifications)
+    )
+    presentation_issues = [*summary_issues, *view_issues]
+    stale_presentation_codes = {"DOCUMENT_SUMMARY_STALE", "DOCUMENT_VIEW_STALE"}
     brief_was_ready = owner_decision_brief.get("status") == "READY"
-    for issue in summary_issues:
+    for issue in presentation_issues:
         reporter = (
             ctx.warning
-            if issue["code"] == "DOCUMENT_SUMMARY_STALE" and not brief_was_ready
+            if issue["code"] in stale_presentation_codes and not brief_was_ready
             else ctx.error
         )
         reporter(
@@ -22378,14 +22393,14 @@ def build_report(
             str(issue["message"]),
             str(issue["path"]),
         )
-    if summary_issues and brief_was_ready:
+    if presentation_issues and brief_was_ready:
         blocked_brief = dict(owner_decision_brief)
         blocked_brief["status"] = "BLOCKED"
         blocked_brief["formal_receipt_required"] = False
         owner_decision_brief, _ = finalize_owner_decision_brief(blocked_brief)
     if any(
-        issue["code"] != "DOCUMENT_SUMMARY_STALE" or brief_was_ready
-        for issue in summary_issues
+        issue["code"] not in stale_presentation_codes or brief_was_ready
+        for issue in presentation_issues
     ):
         status = "BLOCKED"
         diagnostic_codes = [item.code for item in ctx.diagnostics]
@@ -22506,7 +22521,7 @@ def build_report(
             "prd_snapshot_sha256": (
                 "sha256:"
                 + hashlib.sha256(
-                    canonical_bytes_without_generated_summary(
+                    canonical_bytes_without_generated_presentation(
                         ctx.presentation_texts[PRD_FILE]
                     )
                 ).hexdigest()
@@ -22515,6 +22530,7 @@ def build_report(
             ),
         },
         "document_summaries": document_summaries,
+        "document_views": document_views,
         "owner_decision_brief": owner_decision_brief,
         "owner_decision_inventory": owner_decision_inventory,
         "owner_answer_confirmation": owner_answer_confirmation,

@@ -618,6 +618,10 @@ class TaskWaveSafetyTests(unittest.TestCase):
             + snapshot(task_plan="PLAN-9999")
             + task_block("TASK-999", "READY")
             + "<!-- FASTLANE:DOCUMENT_SUMMARY:END -->\n"
+            + "<!-- FASTLANE:HUMAN_VIEW:BEGIN -->\n"
+            + snapshot(task_plan="PLAN-8888")
+            + task_block("TASK-888", "READY")
+            + "<!-- FASTLANE:HUMAN_VIEW:END -->\n"
             + canonical
         )
         tasks = task_waves.parse_tasks(injected)

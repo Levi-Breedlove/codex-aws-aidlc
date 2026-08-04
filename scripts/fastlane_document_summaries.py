@@ -10,9 +10,13 @@ from typing import Any, Mapping, Sequence
 
 
 SCHEMA_VERSION = 1
+VIEW_SCHEMA_VERSION = 1
 SUMMARY_BEGIN = "<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->"
 SUMMARY_END = "<!-- FASTLANE:DOCUMENT_SUMMARY:END -->"
+VIEW_BEGIN = "<!-- FASTLANE:HUMAN_VIEW:BEGIN -->"
+VIEW_END = "<!-- FASTLANE:HUMAN_VIEW:END -->"
 SUMMARY_AUTHORITY = "DERIVED_NON_AUTHORITATIVE"
+VIEW_AUTHORITY = "DERIVED_NON_AUTHORITATIVE"
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 FORBIDDEN_VISIBLE_VALUE = re.compile(
     r"(?i)(?:[A-Z]:\\"
@@ -49,9 +53,50 @@ def _generated_summary_span(source: str) -> tuple[int, int] | None:
 
 
 def strip_generated_summary(source: str) -> str:
-    """Mask generated presentation bytes while preserving parser coordinates."""
+    """Compatibility entrypoint that masks every generated presentation block."""
 
     span = _generated_summary_span(source)
+    masked_source = source
+    if span is not None:
+        start, end = span
+        masked = "".join(
+            character if character in "\r\n" else " "
+            for character in source[start:end]
+        )
+        masked_source = source[:start] + masked + source[end:]
+    return strip_generated_view(masked_source)
+
+
+def canonical_bytes_without_generated_summary(source: str) -> bytes:
+    """Compatibility entrypoint excluding every generated presentation block."""
+
+    normalized = source.replace("\r\n", "\n").replace("\r", "\n")
+    for span_resolver in (_generated_summary_span, _generated_view_span):
+        span = span_resolver(normalized)
+        if span is not None:
+            start, end = span
+            normalized = normalized[:start] + normalized[end:]
+    return normalized.encode("utf-8")
+
+
+def _generated_view_span(source: str) -> tuple[int, int] | None:
+    """Return the fail-closed generated human-view span, if present."""
+
+    begin = source.find(VIEW_BEGIN)
+    end = source.rfind(VIEW_END)
+    if begin < 0 and end < 0:
+        return None
+    if begin < 0:
+        return 0, end + len(VIEW_END)
+    if end < begin:
+        return 0, len(source)
+    return begin, end + len(VIEW_END)
+
+
+def strip_generated_view(source: str) -> str:
+    """Mask the generated human view while preserving parser coordinates."""
+
+    span = _generated_view_span(source)
     if span is None:
         return source
     start, end = span
@@ -61,14 +106,21 @@ def strip_generated_summary(source: str) -> str:
     return source[:start] + masked + source[end:]
 
 
-def canonical_bytes_without_generated_summary(source: str) -> bytes:
-    """Return LF-normalized canonical bytes with the generated view removed."""
+def strip_generated_presentation(source: str) -> str:
+    """Mask every generated, non-authoritative presentation block."""
+
+    return strip_generated_view(strip_generated_summary(source))
+
+
+def canonical_bytes_without_generated_presentation(source: str) -> bytes:
+    """Return LF-normalized canonical bytes with generated views removed."""
 
     normalized = source.replace("\r\n", "\n").replace("\r", "\n")
-    span = _generated_summary_span(normalized)
-    if span is not None:
-        start, end = span
-        normalized = normalized[:start] + normalized[end:]
+    for span_resolver in (_generated_summary_span, _generated_view_span):
+        span = span_resolver(normalized)
+        if span is not None:
+            start, end = span
+            normalized = normalized[:start] + normalized[end:]
     return normalized.encode("utf-8")
 
 
@@ -354,6 +406,205 @@ def project_document_summaries(
     )
 
 
+def _view_section(
+    key: str,
+    heading: str,
+    summary: str,
+    basis_ids: Sequence[str] = (),
+) -> dict[str, Any]:
+    return {
+        "key": key,
+        "heading": heading,
+        "summary": summary,
+        "basis_ids": list(basis_ids),
+    }
+
+
+def normalized_view_document(specification: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize one non-authoritative human document view."""
+
+    path = str(specification.get("path", "")).strip()
+    pure_path = PurePosixPath(path)
+    if (
+        not path
+        or pure_path.is_absolute()
+        or ".." in pure_path.parts
+        or pure_path.as_posix() != path
+    ):
+        raise ValueError("human-view document path must be canonical and relative")
+    raw_sections = specification.get("sections")
+    if not isinstance(raw_sections, Sequence) or isinstance(
+        raw_sections, (str, bytes)
+    ):
+        raise ValueError("human-view sections must be a sequence")
+    sections: list[dict[str, Any]] = []
+    keys: set[str] = set()
+    headings: set[str] = set()
+    for item in raw_sections:
+        if not isinstance(item, Mapping):
+            raise ValueError("human-view section must be an object")
+        key = str(item.get("key", "")).strip()
+        heading = _plain(item.get("heading"), "")
+        summary = _plain(item.get("summary"), "")
+        if re.fullmatch(r"[a-z][a-z0-9-]{1,63}", key) is None:
+            raise ValueError("human-view section key must be stable kebab-case")
+        if key in keys or heading in headings:
+            raise ValueError("human-view section keys and headings must be unique")
+        if not heading or not summary:
+            raise ValueError("human-view heading and summary cannot be empty")
+        keys.add(key)
+        headings.add(heading)
+        sections.append(
+            {
+                "key": key,
+                "heading": heading,
+                "summary": summary,
+                "basis_ids": _basis_ids(item.get("basis_ids", [])),
+            }
+        )
+    if not sections:
+        raise ValueError("human-view sections cannot be empty")
+    return {"path": path, "heading": "What this record means", "sections": sections}
+
+
+def render_view_markdown(specification: Mapping[str, Any]) -> str:
+    """Render the human explanation below a document's first screen."""
+
+    document = normalized_view_document(specification)
+    lines = [
+        "## What this record means",
+        "",
+        "Fastlane keeps this explanation synchronized with the current project records.",
+    ]
+    for section in document["sections"]:
+        lines.extend(["", f"### {section['heading']}", "", section["summary"]])
+    return canonical_markdown("\n".join(lines))
+
+
+def wrapped_view_markdown(specification: Mapping[str, Any]) -> str:
+    return VIEW_BEGIN + "\n" + render_view_markdown(specification) + VIEW_END + "\n"
+
+
+def _view_basis_digest(document: Mapping[str, Any]) -> str:
+    canonical = json.dumps(
+        {"sections": document["sections"]},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return _sha256(canonical)
+
+
+def _observed_view(source: str) -> tuple[str | None, str | None]:
+    begin_count = source.count(VIEW_BEGIN)
+    end_count = source.count(VIEW_END)
+    if begin_count == 0 and end_count == 0:
+        return None, None
+    if begin_count != 1 or end_count != 1:
+        return None, "human-view delimiters must occur exactly once"
+    begin = source.index(VIEW_BEGIN) + len(VIEW_BEGIN)
+    end = source.index(VIEW_END)
+    if end <= begin:
+        return None, "human-view delimiters are reversed or overlapping"
+    return canonical_markdown(source[begin:end]), None
+
+
+def project_document_views(
+    source_texts: Mapping[str, str],
+    specifications: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Compare deterministic human views with their visible Markdown blocks."""
+
+    documents: list[dict[str, Any]] = []
+    issues: list[dict[str, str]] = []
+    for raw_specification in specifications:
+        try:
+            document = normalized_view_document(raw_specification)
+            expected = render_view_markdown(document)
+        except (TypeError, ValueError) as exc:
+            path = str(raw_specification.get("path", "NONE"))
+            issues.append(
+                {
+                    "code": "DOCUMENT_VIEW_UNSAFE",
+                    "path": path,
+                    "message": str(exc),
+                }
+            )
+            continue
+        path = document["path"]
+        source = source_texts.get(path)
+        status = "CURRENT"
+        if source is None:
+            status = "BLOCKED"
+            issues.append(
+                {
+                    "code": "DOCUMENT_VIEW_SOURCE_INVALID",
+                    "path": path,
+                    "message": "Canonical project document is unavailable",
+                }
+            )
+        else:
+            observed, unsafe_reason = _observed_view(source)
+            if unsafe_reason is not None:
+                status = "BLOCKED"
+                issues.append(
+                    {
+                        "code": "DOCUMENT_VIEW_UNSAFE",
+                        "path": path,
+                        "message": unsafe_reason,
+                    }
+                )
+            elif observed != expected:
+                status = "STALE"
+                issues.append(
+                    {
+                        "code": "DOCUMENT_VIEW_STALE",
+                        "path": path,
+                        "message": (
+                            "Visible project explanation differs from the current "
+                            "canonical Engine projection"
+                        ),
+                    }
+                )
+        documents.append(
+            {
+                "path": path,
+                "heading": document["heading"],
+                "status": status,
+                "authority": VIEW_AUTHORITY,
+                "sections": document["sections"],
+                "view_basis_sha256": _view_basis_digest(document),
+                "rendered_sha256": _sha256(expected.encode("utf-8")),
+            }
+        )
+    overall = "CURRENT"
+    if any(item["status"] == "BLOCKED" for item in documents) or any(
+        issue["code"] in {"DOCUMENT_VIEW_SOURCE_INVALID", "DOCUMENT_VIEW_UNSAFE"}
+        for issue in issues
+    ):
+        overall = "BLOCKED"
+    elif any(item["status"] == "STALE" for item in documents):
+        overall = "STALE"
+    return (
+        {
+            "schema_version": VIEW_SCHEMA_VERSION,
+            "authority": VIEW_AUTHORITY,
+            "status": overall,
+            "repair": (
+                {
+                    "responsible_party": "CODEX",
+                    "action_kind": "CORRECT_AND_REVALIDATE",
+                    "automatic_continuation_allowed": True,
+                }
+                if overall == "STALE"
+                else None
+            ),
+            "documents": documents,
+        },
+        issues,
+    )
+
+
 def _field(label: str, value: object, *basis_ids: object) -> dict[str, Any]:
     return {
         "label": label,
@@ -595,3 +846,173 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
         )
         for path in fields
     ]
+
+
+def build_view_specifications(
+    summary_specifications: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Build the human body views from the normalized first-screen state."""
+
+    result: list[dict[str, Any]] = []
+    for raw_summary in summary_specifications:
+        document = normalized_document(raw_summary)
+        fields = {item["label"]: item for item in document["fields"]}
+
+        def value(label: str, fallback: str = "Not yet recorded") -> str:
+            item = fields.get(label)
+            return str(item["value"]) if item is not None else fallback
+
+        def basis(*labels: str) -> list[str]:
+            return sorted(
+                {
+                    basis_id
+                    for label in labels
+                    for basis_id in fields.get(label, {}).get("basis_ids", [])
+                }
+            )
+
+        owner_and_next = (
+            f"Current owner action: {document['need_from_owner']} "
+            f"Next, {document['next_action']}"
+        )
+        path = document["path"]
+        if path == "docs/project/README.md":
+            sections = [
+                _view_section(
+                    "project-direction",
+                    "Project direction",
+                    (
+                        f"The project is {value('Overall status')}. "
+                        f"Its current phase is {value('Phase')}."
+                    ),
+                    basis("Overall status", "Phase"),
+                ),
+                _view_section(
+                    "project-action",
+                    "Current project action",
+                    owner_and_next,
+                    basis("Gate A", "Gate B", "AWS account access"),
+                ),
+            ]
+        elif path == "docs/project/PRD.md":
+            sections = [
+                _view_section(
+                    "product-direction",
+                    "Product direction",
+                    (
+                        f"The intended outcome is {value('Product outcome')}. "
+                        f"The first-release boundary is {value('First-release boundary')}."
+                    ),
+                    basis("Product outcome", "First-release boundary"),
+                ),
+                _view_section(
+                    "approval-status",
+                    "Approval status",
+                    (
+                        f"Requirements are {value('Requirements')}; the technical "
+                        f"design is {value('Technical design')}. AWS account work "
+                        f"is {value('AWS account work')}."
+                    ),
+                    basis("Requirements", "Technical design", "AWS account work"),
+                ),
+                _view_section(
+                    "project-action",
+                    "Current project action",
+                    owner_and_next,
+                    basis("Current records"),
+                ),
+            ]
+        elif path == "docs/project/TASKS.md":
+            sections = [
+                _view_section(
+                    "construction-progress",
+                    "Construction progress",
+                    (
+                        f"{value('Progress')}. The active task is {value('Active task')}, "
+                        f"and the current blocker is {value('Blocker')}."
+                    ),
+                    basis("Progress", "Active task", "Blocker"),
+                ),
+                _view_section(
+                    "construction-boundary",
+                    "Current construction boundary",
+                    (
+                        f"Construction approval is {value('Construction approval')}; "
+                        f"AWS account work is {value('AWS account work')}. "
+                        + owner_and_next
+                    ),
+                    basis("Construction approval", "AWS account work"),
+                ),
+            ]
+        elif path == "docs/project/VERIFY.md":
+            sections = [
+                _view_section(
+                    "evidence-picture",
+                    "Evidence picture",
+                    (
+                        f"The current release result is {value('Release result')}. "
+                        f"Fastlane has {value('Locally observed evidence')} locally "
+                        f"observed evidence records and {value('Failed or stale evidence')} "
+                        "failed or stale records."
+                    ),
+                    basis("Release result"),
+                ),
+                _view_section(
+                    "evidence-boundary",
+                    "Evidence boundary",
+                    (
+                        f"Still unobserved: {value('Still unobserved')}. AWS account "
+                        f"work is {value('AWS account work')}. {owner_and_next}"
+                    ),
+                    basis("AWS account work"),
+                ),
+            ]
+        elif path == "docs/project/RUNBOOK.md":
+            sections = [
+                _view_section(
+                    "safe-operation",
+                    "Safe operation now",
+                    (
+                        f"The deployment state is {value('Deployment state')}. "
+                        f"The safest available operation is "
+                        f"{value('Safest available operation')}."
+                    ),
+                    basis("Deployment state", "Safest available operation"),
+                ),
+                _view_section(
+                    "operational-boundary",
+                    "Operational boundary",
+                    (
+                        f"Current AWS authority is {value('Current AWS authority')}; "
+                        f"teardown approval is {value('Teardown approval')}. "
+                        + owner_and_next
+                    ),
+                    basis("Current AWS authority", "Teardown approval"),
+                ),
+            ]
+        elif path == "docs/project/BUGFIX.md":
+            sections = [
+                _view_section(
+                    "defect-picture",
+                    "Defect picture",
+                    (
+                        f"Defect status is {value('Status')}. User impact is "
+                        f"{value('User impact')}, and reproduction is "
+                        f"{value('Reproduction')}."
+                    ),
+                    basis("Status", "User impact", "Reproduction"),
+                ),
+                _view_section(
+                    "repair-boundary",
+                    "Repair boundary",
+                    (
+                        f"Root-cause status is {value('Root cause')}; repair status is "
+                        f"{value('Repair')}. {owner_and_next}"
+                    ),
+                    basis("Root cause", "Repair", "Related requirements"),
+                ),
+            ]
+        else:
+            raise ValueError(f"unsupported human-view document {path}")
+        result.append({"path": path, "sections": sections})
+    return result

@@ -30,10 +30,19 @@ current construction authorization (`AUTH`) permits the named GitHub writes.
 - [Exact execution state](#exact-run-and-task-state)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
-Gate A and Gate B are the only routine human gates. Task readiness, wave
-selection, checkpoints, verification, deployment preflight, and release checks
-are execution controls inside an approved envelope; they are not additional
-human gates.
+<!-- FASTLANE:HUMAN_VIEW:BEGIN -->
+## What this record means
+
+Fastlane keeps this explanation synchronized with the current project records.
+
+### Construction progress
+
+No tasks generated. The active task is None, and the current blocker is None.
+
+### Current construction boundary
+
+Construction approval is Not yet initialized; AWS account work is Not authorized. Current owner action: Run `init template`. Next, Codex will verify prerequisites and initialize the project.
+<!-- FASTLANE:HUMAN_VIEW:END -->
 
 ## Current progress
 
@@ -188,10 +197,7 @@ requirement, acceptance, design, property, Harness, and evidence bindings.
 
 - <timestamped coordinator entry or NOT_STARTED>
 
-#### Agent execution details
-
-<details>
-<summary>Exact metadata used by Codex and task_waves.py</summary>
+#### Exact execution metadata
 
 - Requirements: <current REQ ID and requirement IDs>
 - Design: <DES-nnnn; TECH: TECH-nnnn[, TECH-nnnn...] or DES-nnnn; TECH: NONE — no technology/toolchain impact>
@@ -209,8 +215,6 @@ requirement, acceptance, design, property, Harness, and evidence bindings.
 - Skip record: NONE
 - Last checkpoint: NONE
 - Last updated: <ISO 8601 timestamp>
-
-</details>
 ~~~
 
 ## Dependencies, waivers, and waves

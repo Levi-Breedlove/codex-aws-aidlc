@@ -31,7 +31,27 @@ Use this file for the active defect or regression. Archive or reset it after the
 - [Regression evidence](#9-regression-and-property-specification)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
+<!-- FASTLANE:HUMAN_VIEW:BEGIN -->
+## What this record means
+
+Fastlane keeps this explanation synchronized with the current project records.
+
+### Defect picture
+
+Defect status is No active bounded defect. User impact is None, and reproduction is Not active.
+
+### Repair boundary
+
+Root-cause status is Not active; repair status is Not active. Current owner action: Run `init template`. Next, Codex will verify prerequisites and initialize the project.
+<!-- FASTLANE:HUMAN_VIEW:END -->
+
 ## 1. Summary
+
+The first-screen status identifies the active defect, user impact, evidence,
+repair state, and current project action.
+
+<details>
+<summary>Exact defect identity record</summary>
 
 - Bug ID: BUG-001
 - Title: TODO
@@ -41,37 +61,20 @@ Use this file for the active defect or regression. Archive or reset it after the
 - Related GitHub Issue: TODO
 - Related PRD requirements: TODO
 
+</details>
+
 ## 2. Current behavior
 
-Describe exactly what the system does now.
-
-Include:
-
-- observable output;
-- affected users or systems;
-- frequency;
-- environment;
-- logs, metrics, or evidence;
-- known workaround.
+TODO - the observable behavior, affected users, frequency, environment, supporting evidence, and any safe workaround.
 
 ## 3. Expected behavior
 
-Describe the correct behavior objectively.
-
-Reference existing PRD requirements when possible. A bugfix should not silently create a new feature.
+TODO - the correct observable result and its existing requirement basis. A repair does not silently add a feature.
 
 ## 4. Intentionally unchanged behavior
 
-State what must remain unchanged after the fix:
-
-- public contracts;
-- unrelated user flows;
-- data formats;
-- permissions;
-- performance boundaries;
-- deployment behavior.
-
-This section defines the regression boundary.
+TODO - the public contracts, unrelated flows, data, permissions, performance,
+and deployment behavior that the repair must preserve.
 
 ## 5. Reproduction
 
@@ -126,6 +129,12 @@ Do not present a hypothesis as confirmed root cause.
 
 ## 9. Regression and property specification
 
+Fastlane adds repeatable checks that reproduce the defect and prove behavior
+outside the approved repair remains unchanged.
+
+<details>
+<summary>Exact regression examples and generated-property records</summary>
+
 ### Example regression tests
 
 | Test ID | Scenario | Expected result |
@@ -139,6 +148,8 @@ Do not present a hypothesis as confirmed root cause.
 |---|---|---|---|
 | BUG-PROP-001 | The reported failure cannot occur for any valid input in the affected domain. | TODO | TODO |
 | BUG-PROP-002 | Intentionally unchanged behavior remains equivalent before and after the fix. | TODO | TODO |
+
+</details>
 
 ## 10. Acceptance criteria
 

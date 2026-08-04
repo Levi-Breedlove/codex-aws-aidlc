@@ -30,6 +30,20 @@ This folder is the one durable project record Fastlane uses to define, design, b
 - [Bounded defect record](BUGFIX.md#current-state)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
+<!-- FASTLANE:HUMAN_VIEW:BEGIN -->
+## What this record means
+
+Fastlane keeps this explanation synchronized with the current project records.
+
+### Project direction
+
+The project is Not yet initialized. Its current phase is Not yet initialized.
+
+### Current project action
+
+Current owner action: Run `init template`. Next, Codex will verify prerequisites and initialize the project.
+<!-- FASTLANE:HUMAN_VIEW:END -->
+
 ## Project records
 
 | Record | What the owner finds there |

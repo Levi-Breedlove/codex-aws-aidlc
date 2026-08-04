@@ -475,9 +475,15 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertNotIn("| `BOOT-00` |", verify)
         self.assertEqual(verify.count("| `retrieve_skill` |"), 3)
         self.assertEqual(verify.count("| `search_documentation` |"), 3)
-        self.assertIn(
-            "Fresh prerequisite capability\nobservations are ephemeral", verify
+        setup_assistant = (PROJECT_ROOT / "scripts/setup_assistant.py").read_text(
+            encoding="utf-8"
         )
+        fastlane_skill = (
+            PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("allowlisted, ephemeral stdin interface", setup_assistant)
+        self.assertIn("allowlisted, ephemeral", fastlane_skill)
+        self.assertIn("persist prerequisite observations", fastlane_skill)
         operate_skill = (
             PROJECT_ROOT / ".agents/skills/operate-fastlane-aws/SKILL.md"
         ).read_text(encoding="utf-8")
@@ -687,13 +693,15 @@ class PromptPackContractTests(unittest.TestCase):
             "## 24. Property-based testing specification", 1
         )[1].split("\n## 25.", 1)[0]
         for record_contract in (
-            "classify every measurable Gate A requirement",
             "APPLICABLE` / `NOT_APPLICABLE",
             "### Property execution contract",
             "Seed or reproduction format",
-            "Every applicable property definition must contain concrete",
         ):
             self.assertIn(record_contract, property_section)
+        self.assertIn(
+            "Classify every measurable approved requirement", self.fastlane_design
+        )
+        self.assertIn("concrete generated inputs or states", self.fastlane_design)
         self.assertLess(
             property_section.index("| PROP-005 |"),
             property_section.index("### Property execution contract"),
@@ -734,13 +742,12 @@ class PromptPackContractTests(unittest.TestCase):
             "Durable source",
         ):
             self.assertIn(phrase, self.verify)
-        self.assertIn("CASES: <positive integer>; ELAPSED_SECONDS:", self.verify)
-        self.assertIn("latest uniquely timed row", self.verify)
-        self.assertRegex(
-            self.verify, r"preserve the smallest observed\s+counterexample"
-        )
+        self.assertIn("CASES: <n>;\nELAPSED_SECONDS: <seconds>", build)
+        self.assertIn("latest uniquely timed row", build)
+        self.assertIn("preserve and classify the counterexample", build)
+        self.assertIn("FAIL requires a minimized counterexample", self.engine_source)
         self.assertIn("`FAILED` preserves\na property-test failure", self.verify)
-        self.assertIn("matching Task completion evidence row", self.verify)
+        self.assertIn("matching Task completion evidence row", build)
         self.assertIn("Property execution projection", tasks)
         self.assertIn("| `BACKLOG` | Defined but not executable |", self.tasks)
         self.assertIn("BACKLOG means dependency-gated, not", tasks)
@@ -987,7 +994,7 @@ Approver: <name/handle>"""
         residual_review = self.prompt_section("AWS-40")
         teardown = self.prompt_section("AWS-50")
 
-        for document in (self.prd, self.verify, self.prompts):
+        for document in (self.prd, self.prompts):
             self.assertIn("CreateChangeSet", document)
             self.assertRegex(document, r"(?is)CreateChangeSet.{0,180}mutation")
             self.assertRegex(document, r"(?i)access(?:analyzer| analyzer)")
@@ -1024,7 +1031,7 @@ Approver: <name/handle>"""
         self.assertNotIn("Perform post-teardown read-only verification", teardown)
 
         self.assertIn("Lightweight Well-Architected decision review", self.prd)
-        self.assertRegex(self.prd, r"not a separate audit or\s+gate")
+        self.assertRegex(self.prd, r"review does not add\s+another gate")
         self.assertLessEqual(len(self.root_readme.splitlines()), 80)
 
     def test_aws_execution_lanes_are_derived_and_do_not_create_authority(self) -> None:
@@ -1032,8 +1039,6 @@ Approver: <name/handle>"""
             self.assertIn("STRUCTURED_API", document)
             self.assertIn("REVIEWED_SCRIPT", document)
             self.assertIn("AWS-EXEC-*", document)
-        self.assertIn("STRUCTURED_API", self.runbook)
-        self.assertIn("REVIEWED_SCRIPT", self.runbook)
         self.assertIn("request_match", self.engine_source)
         self.assertIn("does not grant authority", self.verify)
         self.assertIn("grants nothing", self.prompts)
@@ -1094,8 +1099,18 @@ Approver: <name/handle>"""
         self.assertIn(
             "approved access succeeds and unapproved access is denied", self.prd
         )
-        self.assertIn("Invalid, malformed, and oversized inputs are rejected", self.prd)
-        self.assertIn("actual discovered defect", self.prd)
+        self.assertIn(
+            "rejecting unsafe input without unintended changes",
+            " ".join(self.prd.split()),
+        )
+        self.assertIn(
+            "IF external input violates documented shape or size limits", self.prd
+        )
+        bugfix = (PROJECT_ROOT / "docs/project/BUGFIX.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Use this file for the active defect or regression", bugfix)
+        self.assertIn("reproduce the defect", bugfix)
         for phrase in (
             "approved access succeeds and unapproved access is denied",
             "secrets stay out of code",
@@ -1472,7 +1487,11 @@ Approver: <name/handle>"""
         self.assertIn("- Blocker: NONE", self.tasks)
         self.assertIn("- GitHub issue: PENDING_SYNC", self.tasks)
         self.assertIn("<details>", self.tasks)
-        self.assertIn("Exact metadata used by Codex and task_waves.py", self.tasks)
+        self.assertIn(
+            "Exact run, task, dependency, attempt, and checkpoint records",
+            self.tasks,
+        )
+        self.assertIn("#### Exact execution metadata", self.tasks)
         required_metadata = (
             "Status",
             "Requirements",
@@ -1523,10 +1542,11 @@ Approver: <name/handle>"""
             "#### Acceptance criteria",
             "#### Validation",
             "#### Execution log",
-            "#### Agent execution details",
         ):
             self.assertIn(heading, task_prompt)
             self.assertIn(heading, self.tasks)
+        self.assertIn("#### Agent execution details", task_prompt)
+        self.assertIn("#### Exact execution metadata", self.tasks)
         self.assertIn("every remaining singleton metadata line", task_prompt)
         self.assertIn("READY has no TODO", task_prompt)
         self.assertIn("- Dependency waivers: NONE", self.tasks)
@@ -1591,13 +1611,12 @@ Approver: <name/handle>"""
 
     def test_aws_core_design_evidence_is_advisory_and_tech_bindable(self) -> None:
         design = self.prompt_section("DESIGN-10")
-        for document in (self.verify, design):
-            self.assertIn("DES-0001; TECH: TECH-0001, TECH-0002", document)
-            self.assertIn(
-                "DES-0001; TECH: NONE — no technology/toolchain impact", document
-            )
+        self.assertIn("DES-0001; TECH: TECH-0001, TECH-0002", design)
+        self.assertIn(
+            "DES-0001; TECH: NONE — no technology/toolchain impact", design
+        )
         self.assertIn("Advisory Design binding", self.verify)
-        self.assertRegex(self.verify, r"never\s+selects a technology")
+        self.assertRegex(self.prompts, r"never\s+selects\s+(?:a\s+)?technology")
         self.assertIn("observed AWS Core version is metadata, never a pin", design)
 
     def test_cost_posture_and_secure_serverless_first_contract(self) -> None:
@@ -1634,7 +1653,6 @@ Approver: <name/handle>"""
 
         for surface in (
             self.agents,
-            self.prd,
             design,
             planning_references,
             architecture_challenger,
@@ -1643,7 +1661,7 @@ Approver: <name/handle>"""
         self.assertIn(
             "secure pay-per-use serverless options", " ".join(self.root_readme.split())
         )
-        for surface in (self.agents, self.prd, planning_references):
+        for surface in (self.agents, planning_references):
             self.assertIn("MINIMIZE_TOTAL_COST", surface)
         self.assertRegex(
             self.root_readme,
@@ -1656,7 +1674,9 @@ Approver: <name/handle>"""
             self.prompts,
         )
         self.assertIn("| AWS cost ceiling |", self.prd)
-        self.assertRegex(self.prd, r"not a guaranteed .*billing stop")
+        self.assertIn(
+            "Any owner budget is a ceiling, not a spending target.", self.prd
+        )
         for surface in (self.root_readme, self.agents, self.prd, self.prompts):
             self.assertNotIn("{{MONTHLY_BUDGET}}", surface)
 
@@ -1760,9 +1780,10 @@ Approver: <name/handle>"""
             self.assertIn(state, self.engine_source)
         self.assertIn("only the authorized validated task changes", self.prompts)
         self.assertIn("Last known-green commit", self.tasks)
+        self.assertIn("- Release state: `NOT_READY`", self.verify)
         for state in ("NOT_READY", "READY_TO_DEPLOY", "RELEASE_VERIFIED"):
-            self.assertIn(state, self.verify)
             self.assertIn(state, self.prompt_section("RELEASE-10"))
+            self.assertIn(state, self.engine_source)
         self.assertIn(
             "AWS-30 | Reconcile one deployment attempt read-only | RELEASE-10, or AWS-30 while stale",
             self.prompts,
@@ -1883,9 +1904,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.2.3")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.4")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.2.3", self.prompts)
+        self.assertIn("**Pack version:** 1.2.4", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -2115,7 +2136,12 @@ Approver: <name/handle>"""
             "Artifact / environment | Observed result | Observed at | Durable source | Status |"
         )
         self.assertIn(evidence_header, self.verify)
-        self.assertIn("Preserve a failed row and append the later rerun", self.verify)
+        self.assertIn("Failed results remain in history.", self.verify)
+        self.assertIn(
+            "Preserve task IDs, protected paths, attempts, checkpoints, failed "
+            "evidence, and last-known-green state",
+            deliver_reference,
+        )
 
         design_prompt = self.prompt_section("DESIGN-10")
         task_prompt = self.prompt_section("TASK-10")
@@ -2395,7 +2421,8 @@ Approver: <name/handle>"""
             self.prd.index(component_table), self.prd.index("### Layer boundaries")
         )
         for kind in ("PRIMARY_USER", "SECONDARY_USER", "OPERATOR", "EXTERNAL_SYSTEM"):
-            self.assertIn(kind, self.prd)
+            self.assertIn(kind, self.fastlane_define)
+            self.assertIn(kind, self.engine_source)
         for trigger in (
             "LIFECYCLE_RESOURCE",
             "ASYNCHRONOUS_WORK",
@@ -2404,9 +2431,9 @@ Approver: <name/handle>"""
             "MIGRATION_OR_CUTOVER",
             "OTHER_MEANINGFUL_TRANSITION",
         ):
-            self.assertIn(trigger, self.prd)
+            self.assertIn(trigger, self.fastlane_design)
+            self.assertIn(trigger, self.engine_source)
         self.assertIn("MAX_ATTEMPTS: <positive integer>", self.engine_source)
-        self.assertIn("RETRY_OR_RESUME", self.prd)
 
     def test_request_scoped_adjuncts_never_become_engine_routes(self) -> None:
         coordinator = (PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_text(
@@ -2590,12 +2617,9 @@ Approver: <name/handle>"""
             "with timezone>; RESOURCES: <exact canonical list>; OPERATIONS: "
             "<exact canonical list>"
         )
-        for document in (
-            self.verify,
-            aws30,
-            self.fastlane_deliver,
-            self.operate_fastlane_aws,
-        ):
+        self.assertIn("Read authority source", self.verify)
+        self.assertIn("## Action authorization provenance", self.verify)
+        for document in (aws30, self.fastlane_deliver, self.operate_fastlane_aws):
             with self.subTest(contract="aws30-source", document=document[:40]):
                 normalized = " ".join(document.split())
                 self.assertIn(four_field_source, normalized)
@@ -2610,10 +2634,6 @@ Approver: <name/handle>"""
             "AWS lifecycle intent:",
             "AWS lifecycle intent source:",
             "AWS lifecycle intent recorded at:",
-            "aws_residual_disposition",
-            "RETAIN",
-            "INVESTIGATE",
-            "REMOVE",
         ):
             self.assertIn(field, self.verify)
         residual_documents = (
@@ -2646,7 +2666,7 @@ Approver: <name/handle>"""
                 )
                 self.assertNotIn("For each listed residual", document)
 
-        for document in (self.verify, aws40, self.fastlane_deliver):
+        for document in (aws40, self.fastlane_deliver, self.operate_fastlane_aws):
             normalized = " ".join(document.split())
             self.assertIn("exact-scope", normalized)
             self.assertRegex(normalized, r"(?i)STALE.{0,100}fresh reads")

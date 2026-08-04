@@ -9,27 +9,43 @@ from scripts.fastlane_document_summaries import (
     SUMMARY_AUTHORITY,
     SUMMARY_BEGIN,
     SUMMARY_END,
+    VIEW_AUTHORITY,
+    VIEW_BEGIN,
+    VIEW_END,
     build_summary_specifications,
+    build_view_specifications,
+    canonical_bytes_without_generated_presentation,
     canonical_bytes_without_generated_summary,
     project_document_summaries,
+    project_document_views,
     render_summary_markdown,
+    render_view_markdown,
+    strip_generated_presentation,
     strip_generated_summary,
     wrapped_summary_markdown,
+    wrapped_view_markdown,
 )
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 BASELINE_VISIBLE_LINES = {
-    "docs/project/PRD.md": 1292,
-    "docs/project/TASKS.md": 361,
-    "docs/project/VERIFY.md": 649,
-    "docs/project/RUNBOOK.md": 612,
+    "docs/project/PRD.md": 500,
+    "docs/project/TASKS.md": 54,
+    "docs/project/VERIFY.md": 127,
+    "docs/project/RUNBOOK.md": 361,
+    "docs/project/BUGFIX.md": 109,
 }
-BASELINE_COMBINED_CHARACTERS = 198_572
-PRE_PR2_COMBINED_BYTES = 170_342
-PR2_REQUIRED_REDUCTION_BYTES = 25_000
+BASELINE_COMBINED_CHARACTERS = 136_153
+PRIMARY_RECORDS = tuple(path for path in BASELINE_VISIBLE_LINES if not path.endswith("BUGFIX.md"))
 HUMAN_FIRST_RECORDS = tuple(BASELINE_VISIBLE_LINES)
+VISIBLE_LINE_CEILINGS = {
+    "docs/project/PRD.md": 330,
+    "docs/project/TASKS.md": 65,
+    "docs/project/VERIFY.md": 90,
+    "docs/project/RUNBOOK.md": 220,
+    "docs/project/BUGFIX.md": 90,
+}
 
 
 def visible_markdown_lines(markdown: str) -> list[str]:
@@ -87,14 +103,12 @@ Visible again
             / ".agents/skills/maintain-fastlane/references/evaluation.md"
         ).read_text(encoding="utf-8")
         for phrase in (
-            "within 45 visible PRD lines",
-            "within 35 TASKS lines",
-            "within 30 VERIFY lines",
-            "within 45 RUNBOOK lines",
-            "at most 80 lines",
-            "at most 140 lines",
-            "at least 35 percent",
-            "at least 20,000 characters",
+            "PRD 330",
+            "TASKS 65",
+            "VERIFY 90",
+            "RUNBOOK 220",
+            "BUGFIX 90",
+            "at least 20,000",
         ):
             self.assertIn(phrase, rules + "\n" + evaluation)
         self.assertIn("balanced, labeled `<details>`", rules)
@@ -202,16 +216,11 @@ class HumanFirstDocumentQualificationTests(unittest.TestCase):
             0.35,
             current_visible,
         )
+        for path, ceiling in VISIBLE_LINE_CEILINGS.items():
+            self.assertLessEqual(current_visible[path], ceiling, current_visible)
         self.assertLessEqual(
-            sum(len(source) for source in current_sources.values()),
+            sum(len(current_sources[path]) for path in PRIMARY_RECORDS),
             BASELINE_COMBINED_CHARACTERS - 20_000,
-        )
-        current_bytes = sum(
-            len(source.encode("utf-8")) for source in current_sources.values()
-        )
-        self.assertLessEqual(
-            current_bytes,
-            PRE_PR2_COMBINED_BYTES - PR2_REQUIRED_REDUCTION_BYTES,
         )
 
     def test_runbook_active_boundary_is_a_compact_operational_table(self) -> None:
@@ -528,6 +537,81 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         masked_reversed = strip_generated_summary(reversed_markers)
         self.assertNotIn("Injected", masked_reversed)
         self.assertNotIn("More injected state", masked_reversed)
+
+    def test_human_views_are_current_derived_and_non_authoritative(self) -> None:
+        specifications = build_view_specifications(template_specifications())
+        projected, issues = project_document_views(canonical_sources(), specifications)
+        self.assertEqual(issues, [])
+        self.assertEqual(projected["schema_version"], 1)
+        self.assertEqual(projected["authority"], VIEW_AUTHORITY)
+        self.assertEqual(projected["status"], "CURRENT")
+        self.assertEqual(len(projected["documents"]), 6)
+        for document in projected["documents"]:
+            self.assertEqual(document["authority"], VIEW_AUTHORITY)
+            self.assertRegex(
+                document["view_basis_sha256"], r"^sha256:[0-9a-f]{64}$"
+            )
+            self.assertNotIn("canonical_sha256", document)
+
+    def test_stale_human_view_is_safe_correction_and_blocks_no_gate(self) -> None:
+        sources = canonical_sources()
+        sources["docs/project/PRD.md"] = sources["docs/project/PRD.md"].replace(
+            "The intended outcome is Not yet confirmed.",
+            "The intended outcome is a hand-edited claim.",
+            1,
+        )
+        projected, issues = project_document_views(
+            sources, build_view_specifications(template_specifications())
+        )
+        self.assertEqual(projected["status"], "STALE")
+        self.assertEqual(issues[0]["code"], "DOCUMENT_VIEW_STALE")
+        context = doctor.Context(REPOSITORY_ROOT)
+        context.error(
+            "DOCUMENT_VIEW_STALE",
+            "Visible project explanation differs from canonical state",
+            "docs/project/PRD.md",
+        )
+        remediation = doctor.derive_remediation(
+            context,
+            classification="UNCONFIGURED_TEMPLATE",
+            gate_a="APPROVED_FOR_DESIGN",
+            gate_b="APPROVED_FOR_CONSTRUCTION",
+            envelope={},
+            tasks=doctor.TaskSummary(),
+            owner_stage_hint="DELIVER",
+        )
+        self.assertEqual(
+            remediation["next_action"]["action_kind"], "CORRECT_AND_REVALIDATE"
+        )
+
+    def test_human_view_bytes_never_enter_canonical_project_bytes(self) -> None:
+        summary = wrapped_summary_markdown(template_specifications()[1])
+        first_view = wrapped_view_markdown(
+            build_view_specifications(template_specifications())[1]
+        )
+        second_view = first_view.replace(
+            "The intended outcome is Not yet confirmed.",
+            "A different presentation-only sentence.",
+        )
+        first = summary + first_view + "## Canonical record\nValue\n"
+        second = summary + second_view + "## Canonical record\nValue\n"
+        masked = strip_generated_presentation(first)
+        self.assertEqual(len(masked), len(first))
+        self.assertNotIn("different", masked)
+        self.assertEqual(
+            canonical_bytes_without_generated_presentation(first),
+            canonical_bytes_without_generated_presentation(second),
+        )
+
+    def test_human_view_rendering_is_lf_normalized_and_wrapped_once(self) -> None:
+        specification = build_view_specifications(template_specifications())[0]
+        rendered = render_view_markdown(specification)
+        wrapped = wrapped_view_markdown(specification)
+        self.assertNotIn("\r", rendered)
+        self.assertTrue(rendered.endswith("\n"))
+        self.assertEqual(wrapped.count(VIEW_BEGIN), 1)
+        self.assertEqual(wrapped.count(VIEW_END), 1)
+        self.assertIn(rendered, wrapped)
 
     def test_rendering_is_lf_normalized_and_wrapped_once(self) -> None:
         specification = template_specifications()[0]

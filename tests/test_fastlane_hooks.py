@@ -758,6 +758,12 @@ class FastlaneHookTests(unittest.TestCase):
             "status": "STALE",
             "documents": [],
         }
+        enriched["document_views"] = {
+            "schema_version": 1,
+            "authority": "DERIVED_NON_AUTHORITATIVE",
+            "status": "STALE",
+            "documents": [],
+        }
         event = payload("SessionStart", self.root)
 
         self.assertEqual(
@@ -979,19 +985,25 @@ class FastlaneHookTests(unittest.TestCase):
         self.assertNotIn("call_aws", human_guide)
         self.assertNotIn("run_script", human_guide)
         self.assertNotIn("STRUCTURED_API", human_guide)
-        documents = (
+        internal_contracts = (
             REPOSITORY_ROOT / ".codex" / "hooks" / "AGENTS.md",
-            REPOSITORY_ROOT / "docs" / "project" / "RUNBOOK.md",
-            REPOSITORY_ROOT / "docs" / "project" / "VERIFY.md",
             REPOSITORY_ROOT / "prompts" / "CODEX-PROMPTS.md",
         )
-        for path in documents:
+        for path in internal_contracts:
             with self.subTest(path=path):
                 content = path.read_text(encoding="utf-8")
                 self.assertNotIn("call_aws", content)
                 self.assertNotIn("run_script", content)
                 self.assertIn("STRUCTURED_API", content)
                 self.assertIn("REVIEWED_SCRIPT", content)
+        for path in (
+            REPOSITORY_ROOT / "docs" / "project" / "RUNBOOK.md",
+            REPOSITORY_ROOT / "docs" / "project" / "VERIFY.md",
+        ):
+            with self.subTest(human_path=path):
+                content = path.read_text(encoding="utf-8")
+                self.assertNotIn("call_aws", content)
+                self.assertNotIn("run_script", content)
         self.assertIn(
             "Codex follows current AWS Core guidance to select a supported "
             "account-operation",

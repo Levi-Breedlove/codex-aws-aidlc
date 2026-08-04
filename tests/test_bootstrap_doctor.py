@@ -1953,7 +1953,7 @@ def refresh_control_hashes(project: Path) -> None:
 
 
 def refresh_document_summaries(project: Path) -> None:
-    """Apply the Engine-derived presentation blocks at a lifecycle checkpoint."""
+    """Apply every Engine-derived presentation block at a lifecycle checkpoint."""
 
     refresh_control_hashes(project)
     report = doctor.inspect_project(project)
@@ -1964,6 +1964,19 @@ def refresh_document_summaries(project: Path) -> None:
         begin += len(document_summaries.SUMMARY_BEGIN)
         end = source_text.index(document_summaries.SUMMARY_END, begin)
         rendered = document_summaries.render_summary_markdown(summary)
+        path.write_text(
+            source_text[:begin] + "\n" + rendered + source_text[end:],
+            encoding="utf-8",
+        )
+    refresh_control_hashes(project)
+    report = doctor.inspect_project(project)
+    for view in report["document_views"]["documents"]:
+        path = project / str(view["path"])
+        source_text = path.read_text(encoding="utf-8")
+        begin = source_text.index(document_summaries.VIEW_BEGIN)
+        begin += len(document_summaries.VIEW_BEGIN)
+        end = source_text.index(document_summaries.VIEW_END, begin)
+        rendered = document_summaries.render_view_markdown(view)
         path.write_text(
             source_text[:begin] + "\n" + rendered + source_text[end:],
             encoding="utf-8",
@@ -2778,7 +2791,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.3")
+        self.assertEqual(report["bootstrap_version"], "1.2.4")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -8964,6 +8977,31 @@ class BootstrapDoctorTests(unittest.TestCase):
             actor_issues,
         )
 
+        invalid_kind = replace_contract_table(
+            text,
+            doctor.ACTOR_HEADING,
+            doctor.ACTOR_HEADERS,
+            [actors.rows[0][:2] + ("CUSTOMER",) + actors.rows[0][3:]],
+        )
+        invalid_kind_contract, invalid_kind_issues = (
+            doctor.derive_requirements_contract(
+                invalid_kind,
+                "low",
+                intake_contract,
+                required=True,
+                grandfather_current_gate_a=False,
+            )
+        )
+        self.assertEqual(invalid_kind_contract.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                code == "ACTOR_CONTRACT_INVALID"
+                and "invalid actor kind 'CUSTOMER'" in message
+                for code, message in invalid_kind_issues
+            ),
+            invalid_kind_issues,
+        )
+
         requirement_list = ", ".join(sorted(doctor.authoritative_requirement_ids(text)))
         journey_candidate = replace_contract_table(
             text,
@@ -10168,6 +10206,11 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(report["owner_decision_inventory"]["decisions"], [])
         self.assertEqual(report["owner_answer_confirmation"]["schema_version"], 1)
         self.assertEqual(report["owner_answer_confirmation"]["status"], "NONE")
+        self.assertEqual(report["document_views"]["schema_version"], 1)
+        self.assertEqual(report["document_views"]["status"], "CURRENT")
+        self.assertEqual(
+            report["document_views"]["authority"], "DERIVED_NON_AUTHORITATIVE"
+        )
         self.assertEqual(
             report["interaction"]["owner_action_kind"],
             "COMPLETE_PREREQUISITE_CHECKLIST",
@@ -10192,7 +10235,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(report["document_summaries"]["schema_version"], 1)
         self.assertEqual(report["document_summaries"]["status"], "STALE")
+        self.assertEqual(report["document_views"]["schema_version"], 1)
+        self.assertEqual(report["document_views"]["status"], "STALE")
         self.assertIn("DOCUMENT_SUMMARY_STALE", codes(report))
+        self.assertIn("DOCUMENT_VIEW_STALE", codes(report))
         self.assertEqual(
             report["document_summaries"]["repair"],
             {
@@ -10205,6 +10251,38 @@ class BootstrapDoctorTests(unittest.TestCase):
             "DOCUMENT_SUMMARY_STALE",
             {item["diagnostic_code"] for item in report["remediation"]["items"]},
         )
+        self.assertNotIn(
+            "DOCUMENT_VIEW_STALE",
+            {item["diagnostic_code"] for item in report["remediation"]["items"]},
+        )
+
+    def test_stale_human_view_does_not_stale_gates_or_canonical_digests(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project)
+            self.set_non_material_req_evidence(project)
+            refresh_document_summaries(project)
+            baseline = doctor.inspect_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            source = prd_path.read_text(encoding="utf-8")
+            changed = source.replace(
+                "### Product direction\n\n",
+                "### Product direction\n\nStale owner-facing text.\n\n",
+                1,
+            )
+            self.assertNotEqual(source, changed)
+            prd_path.write_text(changed, encoding="utf-8")
+            refresh_control_hashes(project)
+            observed = doctor.inspect_project(project)
+
+        self.assertEqual(baseline["document_views"]["status"], "CURRENT")
+        self.assertEqual(observed["document_views"]["status"], "STALE")
+        self.assertIn("DOCUMENT_VIEW_STALE", codes(observed))
+        self.assertEqual(observed["gates"], baseline["gates"])
+        self.assertEqual(observed["requirements_contract"], baseline["requirements_contract"])
+        self.assertEqual(observed["design_contract"], baseline["design_contract"])
+        self.assertEqual(observed["basis"]["prd_snapshot_sha256"], baseline["basis"]["prd_snapshot_sha256"])
+        self.assertEqual(observed["authorizations"], baseline["authorizations"])
 
     def test_stale_summary_blocks_only_a_pending_owner_brief(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

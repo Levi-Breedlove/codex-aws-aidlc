@@ -24,7 +24,10 @@ project-record templates. It is a maintenance procedure, not an adopter phase.
 
 Never duplicate authority to make a document easier to read. Improve the view,
 navigation, labels, disclosure structure, or generated summary while preserving
-the single canonical record.
+the single canonical record. Both generated presentation blocks are explicitly
+non-authoritative: `FASTLANE:DOCUMENT_SUMMARY` owns the first screen and
+`FASTLANE:HUMAN_VIEW` owns the synchronized plain-language explanation below it.
+Exclude both from parsers, context selection, routing, and every canonical digest.
 
 Keep `docs/` for reusable customer guidance and canonical project records. Do
 not place maintainer procedures, qualification reports, showcase journeys,
@@ -39,8 +42,9 @@ stay outside the reusable template unless separately authorized.
    and unapproved or unauthorized work.
 3. Relocate machine procedure to its canonical instructional home. Preserve any
    parser-controlled heading, table, marker, stable ID, receipt, and record order.
-4. Keep active decisions, material risks, commands, diagrams, and formal receipts
-   open. Use balanced labeled disclosures only for exact records or appendices.
+4. Keep active decisions, material risks, project commands, diagrams, and Gate A
+   and Gate B receipts open. Conditional AWS receipt copies may remain in a
+   labeled audit disclosure because the active exact receipt is presented in chat.
 5. Validate all relative links, heading anchors, Mermaid fences, summary markers,
    UTF-8 text, visible-line budgets, package inventory, and version mirrors.
 
@@ -48,6 +52,12 @@ Count a visible line as a nonblank rendered line outside a closed `<details>`
 body; count its `<summary>` once. Machine terminology in an exact collapsed
 record is allowed when the parser requires it, but it must not leak into the
 ordinary owner path.
+
+Raw file length is not capped. Enforce the owner-visible ceilings: PRD 330,
+TASKS 65, VERIFY 90, RUNBOOK 220, and BUGFIX 90 nonblank lines. Compare the four
+primary records with the exact maintenance base and require at least 20,000
+fewer characters. A stale generated view is safe Codex-owned repair and may
+block presentation of a misleading Owner Brief; it never invalidates a gate.
 
 Any Semantic Contract change must update workflow guidance, the applicable
 phase procedure, project schema, Engine validation/projection, owner-visible

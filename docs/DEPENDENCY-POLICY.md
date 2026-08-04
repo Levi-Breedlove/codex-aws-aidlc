@@ -25,7 +25,7 @@ connectors do not replace that evidence.
 
 AWS Core is an advisor. It cannot approve a gate or authorize AWS access.
 
-## Ruff
+## Maintainer-only Ruff check
 
 Ruff `0.16.0` checks Fastlane’s own Python during maintainer validation and CI.
 It is pinned so a changing default cannot silently expand the repository
@@ -35,7 +35,7 @@ Fastlane adopters do **not** install Ruff system-wide to initialize or use the
 template. Maintainers may run the pinned CI action or an ephemeral
 `uvx ruff==0.16.0` command. Ruff does not access AWS or change Fastlane state.
 
-## GitHub Actions
+## Maintainer-only GitHub Actions updates
 
 Dependabot checks GitHub Actions dependencies weekly against `fast-lane`.
 Updates require human review and the full cross-platform validation suite;

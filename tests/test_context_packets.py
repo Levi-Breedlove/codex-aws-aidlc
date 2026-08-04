@@ -48,12 +48,15 @@ class ContextPacketTests(unittest.TestCase):
         self.assertLessEqual(packet["actual_initial_source_bytes"], 12_000)
         self.assertEqual(report["document_summaries"]["schema_version"], 1)
         self.assertEqual(report["document_summaries"]["status"], "CURRENT")
+        self.assertEqual(report["document_views"]["schema_version"], 1)
+        self.assertEqual(report["document_views"]["status"], "CURRENT")
         for item in packet["resolved_initial_slices"]:
             source = (REPOSITORY_ROOT / item["path"]).read_text(encoding="utf-8")
             selected = "\n".join(
                 source.splitlines()[item["start_line"] - 1 : item["end_line"]]
             )
             self.assertNotIn("FASTLANE:DOCUMENT_SUMMARY", selected)
+            self.assertNotIn("FASTLANE:HUMAN_VIEW", selected)
 
     def test_canonical_source_bytes_and_heading_range_are_digest_bound(self) -> None:
         text = "# Target\r\nvalue\r\n\r\n# Later\r\nignored\r\n"

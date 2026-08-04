@@ -31,9 +31,23 @@
 - [Tear down](#13-teardown-and-decommissioning)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
+<!-- FASTLANE:HUMAN_VIEW:BEGIN -->
+## What this record means
+
+Fastlane keeps this explanation synchronized with the current project records.
+
+### Safe operation now
+
+The deployment state is Not deployed. The safest available operation is Local validation only.
+
+### Operational boundary
+
+Current AWS authority is None; teardown approval is Not authorized. Current owner action: Run `init template`. Next, Codex will verify prerequisites and initialize the project.
+<!-- FASTLANE:HUMAN_VIEW:END -->
+
 ## Safety boundary
 
-Use only the safest operation shown above. Stop whenever identity, account, Region, environment, resource scope, cost, rollback, expiry, evidence, or owner authority differs from the current Engine projection.
+Follow the safest operation shown above. Stop whenever identity, account, Region, environment, resource scope, cost, rollback, expiry, evidence, or owner authority differs from the current Engine projection.
 
 <details>
 <summary>Exact AWS authority record</summary>
@@ -61,13 +75,25 @@ authority.
 
 ## 1. Environments
 
+The first-screen status identifies the current environment and Region; expand the complete map only when preparing or auditing an operation.
+
+<details>
+<summary>Exact environment map</summary>
+
 | Environment | Purpose | AWS account | Region | Deployment method | Owner |
 |---|---|---|---|---|---|
 | Local | Development | N/A | N/A | TODO | TODO |
 | Development | Integration and AWS validation | TODO | {{AWS_REGION}} | TODO | TODO |
 | Production | User-facing workload | TODO | {{AWS_REGION}} | TODO | TODO |
 
+</details>
+
 ## 2. Prerequisites
+
+Before operating, confirm the selected tools, temporary identity, permissions, secrets location, dependencies, and expected cost.
+
+<details>
+<summary>Exact operational prerequisites</summary>
 
 - Required tools and versions: TODO
 - Required AWS profile or role: TODO
@@ -81,11 +107,13 @@ authority.
 - Expected recurring cost: TODO
 - Expected one-time deployment cost: TODO
 
+</details>
+
 Never place secret values in this document.
 
 ## 3. Read-only AWS preflight
 
-AWS-10 runs only after local release readiness and the owner's exact current
+The read-only AWS preflight runs only after local release readiness and the owner's exact current
 read-only receipt. It confirms the named identity, account, Region, environment,
 resources, quotas, cost exposure, drift, and reversibility without mutation.
 
@@ -101,10 +129,9 @@ not account evidence; change-set creation and every mutation remain unauthorized
 
 ## 4. Local validation
 
-Use only the applicable validation path selected in the PRD's IaC and delivery
-validation contract. Every observed row in `docs/project/VERIFY.md` uses
-`COMMAND: <single local command>` or `API: <service>.<Operation>` and binds the
-current TECH IDs and immutable artifact/plan.
+Follow the infrastructure and delivery validation path selected in the PRD.
+Record every observed result in `docs/project/VERIFY.md` with its relevant
+technical decisions and immutable artifact or plan.
 
 ```bash
 # Formatting
@@ -127,30 +154,16 @@ Do not continue when required local readiness checks fail.
 
 ## 5. Cost preflight
 
-Confirm:
-
-- planning posture: `{{COST_POSTURE}}`;
-- exact finite positive mutation or billable-test ceiling when applicable;
-- confirmation that the ceiling covers the authorization-validity period and
-  does not exceed or change the currency of an owner-stated Gate A hard cap;
-- expected low-usage cost, scaling breakpoints, budget alerts, and recipients;
-- expensive resources;
-- NAT Gateway, public IPv4, EKS, RDS, ALB, OpenSearch, provisioned capacity, and log-retention implications where applicable;
-- teardown command or procedure;
-- intended retention of data, logs, images, backups, and source repositories.
-
-The objective is to minimize total expected cost and idle spend, not to consume
-an available budget. Do not reduce required identity, encryption, secrets,
-validation, isolation, recovery, logging, or evidence controls for savings.
-Treat the ceiling as an authorization boundary, not a guaranteed AWS billing
-stop. AWS Budgets and billing data are delayed, alerts may arrive after more
-cost has accrued, and a threshold is not an immediate kill switch. Retain
-alerts, teardown, service-side quotas where suitable, and observed billing
-checks. See [AWS Budgets](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html).
+Confirm the planning posture, operation ceiling, low-usage cost, scaling breakpoints, material billing drivers, alerts, teardown, and retained data.
+Minimize expected total and idle cost without weakening safety or reliability. A ceiling limits authorization; it is not an instant billing stop.
 
 ## Brownfield deployment readiness
 
-Before changing an existing environment:
+Unknown ownership, unexplained drift, unapproved replacement, or inability to
+restore the observed baseline stops the operation.
+
+<details>
+<summary>Exact brownfield preflight checks</summary>
 
 1. Record the repository and deployed baselines, including known failing checks.
 2. Reconcile IaC, state backends, tags, live inventory, versions, and drift using
@@ -163,37 +176,27 @@ Before changing an existing environment:
    create, adopt, import, replace, detach, or delete an existing resource merely
    to make IaC converge.
 
-Unknown ownership, unexplained drift, an unapproved import/replacement, or an
-inability to restore the observed baseline stops the affected operation.
+</details>
 
 ## Interrupted or uncertain external action
 
-Never resume by blindly rerunning a deployment, migration, rollback, or cleanup
-command. At the next checkpoint:
-
-1. Reconfirm the exact identity, account, Region, environment, authorization,
-   artifact, and expected resource boundary.
-2. Inspect live state read-only and correlate operation, stack, deployment, or
-   request identifiers.
-3. Classify the prior action as `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`.
-4. Compare observed resources, data, telemetry, billing dimensions, and locks to
-   the last safe checkpoint.
-5. Continue only when the documented next operation is idempotent, inside the
-   current authorization, and safe for the observed state.
-
-`PARTIAL` or `UNKNOWN` state is a mandatory stop unless the current authorization
-explicitly covers the reconciled corrective or rollback action.
+Do not repeat the command. Stop, inspect the live state read-only, classify the
+result, and continue only through the Engine's reconciled safe action. Partial
+or unknown state requires current authority for any correction or rollback.
 
 ## AWS execution lanes
 
-Fastlane uses either one attributable `STRUCTURED_API` operation or a digest-bound
-`REVIEWED_SCRIPT` for legitimate multi-step work. The Engine and AWS Operations
-skill validate the exact request, authority, journal, retry, and reconciliation;
-tool availability grants nothing and deployment never authorizes teardown.
+Fastlane uses only an attributable discrete operation or reviewed digest-bound
+script. The Engine and AWS Operations skill enforce the exact boundary;
+deployment never authorizes teardown.
 
 ## 6. Deployment
 
-Record the exact reviewed artifact:
+The deployment uses one immutable reviewed artifact and the exact current
+account, Region, environment, resource, cost, and rollback boundary.
+
+<details>
+<summary>Exact deployment artifact record</summary>
 
 - commit:
 - image digest:
@@ -205,17 +208,17 @@ Record the exact reviewed artifact:
 - final read-only plan or change-set identifier:
 - exact artifact and plan/change-set digests:
 
+</details>
+
 Deployment commands:
 
 ```bash
 TODO
 ```
 
-Immediately before mutation, recheck identity and prove the immutable artifact,
-plan, operation, resources, cost, and rollback fit the active boundary exactly.
-Stop on drift or a newly destructive, shared, public, sensitive, or higher-cost
-effect. Record the pre-call checkpoint, direct result, and separate read-only
-reconciliation in `VERIFY.md`; a submitted request is not proof of completion.
+Immediately before mutation, recheck the complete boundary. Stop on drift or a
+new destructive, shared, public, sensitive, or higher-cost effect. A submitted
+request is not proof of completion.
 
 ## 7. Smoke tests
 
@@ -249,6 +252,12 @@ Record evidence in `docs/project/VERIFY.md`.
 
 ## 8. Monitoring and alarms
 
+Monitoring must show availability, errors, latency, dependency health, cost,
+and security conditions with one clear response for each alert.
+
+<details>
+<summary>Exact monitoring and alarm records</summary>
+
 | Signal | Source | Expected behavior | Threshold | Response |
 |---|---|---|---|---|
 | Availability | TODO | TODO | TODO | TODO |
@@ -259,6 +268,8 @@ Record evidence in `docs/project/VERIFY.md`.
 | Resource utilization | TODO | TODO | TODO | TODO |
 | Cost | AWS Budgets / Cost Explorer | Remain within approved ceiling | TODO | TODO |
 | Security events | TODO | TODO | TODO | TODO |
+
+</details>
 
 ## 9. Common diagnosis flow
 
@@ -306,6 +317,12 @@ resources and data rather than forcing template state.
 
 ## 11. Backup and recovery
 
+The approved backup, retention, recovery target, restore procedure, and latest
+rehearsal evidence remain recorded together.
+
+<details>
+<summary>Exact backup and recovery record</summary>
+
 | Item | Value |
 |---|---|
 | Backup mechanism | TODO |
@@ -316,6 +333,8 @@ resources and data rather than forcing template state.
 | Restore procedure | TODO |
 | Last restore rehearsal | TODO |
 | Restore evidence | TODO |
+
+</details>
 
 Restore commands or procedure:
 
@@ -338,8 +357,8 @@ TODO
 
 Default to read-only inventory. Deletion requires a separate exact current
 teardown receipt covering the target, retained data, shared dependencies, cost,
-approver, and validity. `RETAIN`, `INVESTIGATE`, and `REMOVE` choose a route but
-never authorize an AWS action.
+approver, and validity. Choosing to retain, investigate, or remove a resource
+selects a route but never authorizes an AWS action.
 
 ```bash
 # Dry run or inventory
@@ -369,7 +388,8 @@ and recompute the safe deletion order before any further mutation.
 
 ## 14. Residual-resource and billing verification
 
-AWS-40 records current read-only residual and billing evidence before a teardown decision and after every teardown attempt.
+The residual-resource review records current read-only inventory and billing evidence before a
+teardown decision and after every teardown attempt.
 
 ```bash
 # Resource inventory checks
@@ -379,7 +399,8 @@ TODO
 TODO
 ```
 
-Record:
+<details>
+<summary>Exact residual-resource and billing evidence fields</summary>
 
 - expected removal/retention manifest and stack/application identifier;
 - stack events or equivalent operation history and terminal status;
@@ -396,22 +417,13 @@ Record:
 Post-AWS-50 rows repeat the exact teardown authorization ID and receipt digest
 so terminal evidence cannot be attributed to a different destructive request.
 
+</details>
+
 ## 15. Evidence capture
 
-For every deployment, rollback, restore, or teardown, record:
-
-- version or commit;
-- environment and Region;
-- start and completion time;
-- operator or workflow;
-- result;
-- relevant test, metric, log, or stack references;
-- linked GitHub issue or pull request;
-- remaining evidence gaps.
-
-Use VERIFY's append-only action and reconciliation tables. Record the exact
-boundary, immutable artifact, result, retained resources, residual cost, and
-remaining evidence gaps; never overwrite history or infer success from a request.
+For every operation, VERIFY records the immutable version, environment, Region,
+operator, timing, result, supporting observations, and remaining gaps. Evidence
+is append-only; a request never proves success.
 
 ## Authorization appendices
 
@@ -436,6 +448,9 @@ or over-budget work uses `explicit-gate`. Teardown always has separate authority
 </details>
 
 ## Conditional AWS action receipts
+
+<details>
+<summary>Exact conditional AWS authorization receipt copies</summary>
 
 These are action-specific safety authorizations, not routine lifecycle gates.
 The first permits named reads only, the second permits one matching deployment,
@@ -498,3 +513,5 @@ The owner's exact message remains the source. Fastlane records it verbatim in
 VERIFY and the protected journal, recomputes its digest, and rejects any target,
 identity, scope, timing, or provenance mismatch. The AWS Operations skill owns
 the exact journal, retry, and reconciliation procedure.
+
+</details>

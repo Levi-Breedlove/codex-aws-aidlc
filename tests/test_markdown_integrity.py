@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import unittest
 from pathlib import Path
@@ -23,6 +24,13 @@ PERSISTENCE_STEP = "Persist approved data"
 QUEUE_ACK_STEP = "Durable enqueue acknowledged"
 ACCEPTED_STEP = "Accepted response with correlation ID"
 WORKER_DELIVERY_STEP = "Deliver work"
+RECEIPT_SHA256 = {
+    "gate-a-receipt": "7b6ad510b449d0095101c0ebdd75f9ac21d826076f5ee215c03dc17579880266",
+    "gate-b-receipt": "455995bf3557aa32ef9cd82513430eb25f26265924929aad4d6d32e1698275c4",
+    "aws-read-preflight-receipt": "72b244b89c1b2affd194ded7484147eef406ecfd09e8be9e4a1c86d318313433",
+    "aws-deployment-receipt": "0d58dd6348d513216cf57936f9b4ccada146389533c077d252145df91ac8d7de",
+    "aws-teardown-receipt": "a6bc0f3dca0104238b0c344af61386af00f167e9f326026b786197cfb1067119",
+}
 WORKER_VALIDATION_STEP = "Validate trusted source, schema, and idempotency"
 WORKER_PERSISTENCE_STEP = "Worker->>Data: Persist approved data"
 
@@ -331,9 +339,16 @@ sequenceDiagram
                     failures.append(
                         f"{path.name}: operator command hidden near line {index + 1}"
                     )
-                if "bootstrap:" in line and "-receipt:" in line and depth:
+                if (
+                    line
+                    in {
+                        "<!-- bootstrap:gate-a-receipt:start -->",
+                        "<!-- bootstrap:gate-b-receipt:start -->",
+                    }
+                    and depth
+                ):
                     failures.append(
-                        f"{path.name}: formal receipt hidden near line {index + 1}"
+                        f"{path.name}: owner gate receipt hidden near line {index + 1}"
                     )
         self.assertEqual(failures, [])
 
@@ -419,9 +434,6 @@ sequenceDiagram
             ),
             "VERIFY.md": (
                 "## Current result",
-                "<!-- bootstrap:aws-read-preflight-receipt:start -->",
-                "<!-- bootstrap:aws-deployment-receipt:start -->",
-                "<!-- bootstrap:aws-teardown-receipt:start -->",
             ),
             "RUNBOOK.md": (
                 "## Safety boundary",
@@ -437,10 +449,17 @@ sequenceDiagram
 
         forbidden_visible_instructions = (
             "Fastlane EARS Contract",
+            "EARS form",
             "Compatibility is revision-bound",
             "modern design digest",
             "The release lifecycle is",
             "A Harness Profile row that",
+            "Harness Profile",
+            "`HARNESS-*`",
+            "Use only",
+            "schema migration",
+            "canonical order",
+            "sentinel",
             "canonical_sha256",
             "context_plan",
             "maximum_initial_source_bytes",
@@ -449,6 +468,40 @@ sequenceDiagram
         owner_path = "\n".join(visible.values())
         for phrase in forbidden_visible_instructions:
             self.assertNotIn(phrase, owner_path)
+
+        for name, source in visible.items():
+            for line in source.splitlines():
+                if not (line.startswith("|") and line.endswith("|")):
+                    continue
+                columns = len(re.findall(r"(?<!\\)\|", line)) - 1
+                self.assertLessEqual(columns, 6, (name, columns, line))
+
+        for marker in (
+            "aws-read-preflight-receipt",
+            "aws-deployment-receipt",
+            "aws-teardown-receipt",
+        ):
+            self.assertIn(f"<!-- bootstrap:{marker}:start -->", verify)
+            self.assertNotIn(f"<!-- bootstrap:{marker}:start -->", visible["VERIFY.md"])
+
+    def test_all_five_receipt_blocks_match_the_1_2_3_base_bytes(self) -> None:
+        locations = {
+            "gate-a-receipt": "docs/project/PRD.md",
+            "gate-b-receipt": "docs/project/PRD.md",
+            "aws-read-preflight-receipt": "docs/project/VERIFY.md",
+            "aws-deployment-receipt": "docs/project/VERIFY.md",
+            "aws-teardown-receipt": "docs/project/VERIFY.md",
+        }
+        for marker, relative_path in locations.items():
+            source = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+            start = f"<!-- bootstrap:{marker}:start -->"
+            end = f"<!-- bootstrap:{marker}:end -->"
+            block = source[source.index(start) : source.index(end) + len(end)] + "\n"
+            self.assertEqual(
+                hashlib.sha256(block.encode("utf-8")).hexdigest(),
+                RECEIPT_SHA256[marker],
+                marker,
+            )
 
     def test_automatic_agents_context_has_explicit_headroom(self) -> None:
         root_agents = REPOSITORY_ROOT / "AGENTS.md"
@@ -500,9 +553,6 @@ sequenceDiagram
             "TROUBLESHOOTING.md",
             "../.codex/hooks/README.md",
             "DEPENDENCY-POLICY.md",
-            "../.agents/skills/maintain-fastlane/SKILL.md",
-            "../.agents/skills/maintain-fastlane/references/evaluation.md",
-            "../.agents/skills/maintain-fastlane/references/qualification.md",
             "project/PRD.md",
             "project/TASKS.md",
             "project/VERIFY.md",
@@ -511,6 +561,7 @@ sequenceDiagram
         ):
             self.assertIn(f"]({target})", index_text)
             self.assertTrue((index.parent / target).is_file(), target)
+        self.assertNotIn("maintain-fastlane", index_text)
         for removed in (
             "docs/AGENTS.md",
             "docs/QUALIFICATION.md",
