@@ -484,19 +484,25 @@ sequenceDiagram
                 )
 
     def test_docs_governance_and_index_are_compact_and_linked(self) -> None:
-        guide = REPOSITORY_ROOT / "docs" / "AGENTS.md"
+        guide = (
+            REPOSITORY_ROOT
+            / ".agents/skills/maintain-fastlane/references/documentation-governance.md"
+        )
         index = REPOSITORY_ROOT / "docs" / "README.md"
         workflow = REPOSITORY_ROOT / "docs" / "WORKFLOW.md"
-        self.assertLessEqual(len(guide.read_text(encoding="utf-8").splitlines()), 60)
+        self.assertFalse((REPOSITORY_ROOT / "docs/AGENTS.md").exists())
+        self.assertLessEqual(len(guide.read_text(encoding="utf-8").splitlines()), 70)
         self.assertLessEqual(len(workflow.read_bytes()), 7_500)
         index_text = index.read_text(encoding="utf-8")
         for target in (
             "SETUP.md",
             "WORKFLOW.md",
             "TROUBLESHOOTING.md",
-            "advanced/HOOKS.md",
+            "../.codex/hooks/README.md",
             "DEPENDENCY-POLICY.md",
-            "maintainers/EVALUATION.md",
+            "../.agents/skills/maintain-fastlane/SKILL.md",
+            "../.agents/skills/maintain-fastlane/references/evaluation.md",
+            "../.agents/skills/maintain-fastlane/references/qualification.md",
             "project/PRD.md",
             "project/TASKS.md",
             "project/VERIFY.md",
@@ -505,6 +511,20 @@ sequenceDiagram
         ):
             self.assertIn(f"]({target})", index_text)
             self.assertTrue((index.parent / target).is_file(), target)
+        for removed in (
+            "docs/AGENTS.md",
+            "docs/QUALIFICATION.md",
+            "docs/SHOWCASE.md",
+            "docs/advanced",
+            "docs/assets",
+            "docs/maintainers",
+        ):
+            self.assertFalse((REPOSITORY_ROOT / removed).exists(), removed)
+
+        setup = (REPOSITORY_ROOT / "docs/SETUP.md").read_text(encoding="utf-8")
+        self.assertIn("pipx install uv", setup)
+        self.assertIn("uvx --version", setup)
+        self.assertIn("docs.astral.sh/uv/getting-started/installation", setup)
 
         owner_workflow = workflow.read_text(encoding="utf-8")
         for internal_term in (

@@ -82,7 +82,9 @@ Visible again
 
     def test_final_readability_thresholds_are_explicit(self) -> None:
         rules = (REPOSITORY_ROOT / "docs/project/AGENTS.md").read_text(encoding="utf-8")
-        evaluation = (REPOSITORY_ROOT / "docs/maintainers/EVALUATION.md").read_text(
+        evaluation = (
+            REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/references/evaluation.md"
+        ).read_text(
             encoding="utf-8"
         )
         for phrase in (
@@ -216,6 +218,10 @@ class HumanFirstDocumentQualificationTests(unittest.TestCase):
     def test_runbook_active_boundary_is_a_compact_operational_table(self) -> None:
         runbook = (REPOSITORY_ROOT / "docs/project/RUNBOOK.md").read_text(
             encoding="utf-8"
+        )
+        self.assertIn(
+            "<summary>Exact AWS authority record</summary>\n\n## Active operational boundary",
+            runbook,
         )
         section = runbook.split("## Active operational boundary", 1)[1].split(
             "\n## ", 1

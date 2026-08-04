@@ -12,8 +12,8 @@ project-record templates. It is a maintenance procedure, not an adopter phase.
 | Setup and owner-run prerequisites | `docs/SETUP.md` |
 | Human lifecycle and gate explanation | `docs/WORKFLOW.md` |
 | Troubleshooting | `docs/TROUBLESHOOTING.md` |
-| Optional hook activation | `docs/advanced/HOOKS.md` |
-| Maintainer evaluation overview | `docs/maintainers/EVALUATION.md` |
+| Optional hook activation | `.codex/hooks/README.md` |
+| Maintainer evaluation procedure | `references/evaluation.md` |
 | Release qualification procedure | `references/qualification.md` |
 | Global agent invariants | root `AGENTS.md` |
 | Phase procedures | Fastlane Define, Design, and Deliver references |
@@ -25,6 +25,12 @@ project-record templates. It is a maintenance procedure, not an adopter phase.
 Never duplicate authority to make a document easier to read. Improve the view,
 navigation, labels, disclosure structure, or generated summary while preserving
 the single canonical record.
+
+Keep `docs/` for reusable customer guidance and canonical project records. Do
+not place maintainer procedures, qualification reports, showcase journeys,
+screenshots, videos, social-preview art, or release evidence there. Maintenance
+procedure belongs in `maintain-fastlane`; run evidence and publication assets
+stay outside the reusable template unless separately authorized.
 
 ## Review method
 

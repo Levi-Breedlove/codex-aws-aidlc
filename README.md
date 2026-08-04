@@ -1,6 +1,6 @@
 # AWS Codex Fastlane 1.2
 
-Current customer build: **1.2.2**.
+Current customer build: **1.2.3**.
 
 Fastlane turns an AWS application idea into an approved product agreement, an AWS-informed
 technical plan, and a tested local build. You describe the outcome in plain language; Codex
@@ -68,13 +68,11 @@ receipts. Every AWS account operation still requires exact authorization for tha
 - `tests/`: application and infrastructure verification.
 - `docs/project/`: requirements, design, tasks, evidence, operations, and defects.
 
-Start with the [documentation index](docs/README.md), [project record guide](docs/project/README.md),
-or [synthetic customer showcase](docs/SHOWCASE.md).
+Start with the [documentation index](docs/README.md) or
+[project record guide](docs/project/README.md).
 
 ## Learn more
 
 - [Understand the workflow](docs/WORKFLOW.md)
-- [Review qualification boundaries](docs/QUALIFICATION.md)
-- [Optional hooks](docs/advanced/HOOKS.md)
+- [Optional hooks](.codex/hooks/README.md)
 - [Security](SECURITY.md)
-- [Maintainer evaluation](docs/maintainers/EVALUATION.md)

@@ -56,7 +56,7 @@ review the refreshed brief, and use only the new exact receipt.
 
 Hooks are optional. Review `/hooks`, remove the local `.codex/hooks.json`, and
 restart Codex to disable them. The Engine and normal Codex approval/sandbox
-controls continue to govern Fastlane. See [Optional Fastlane hooks](advanced/HOOKS.md).
+controls continue to govern Fastlane. See [Optional Fastlane hooks](../.codex/hooks/README.md).
 
 ## Another blocker appears
 

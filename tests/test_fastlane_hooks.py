@@ -696,7 +696,7 @@ class FastlaneHookTests(unittest.TestCase):
             self.assertIn("mcp__.*", matcher)
             self.assertNotIn("call_aws", matcher)
             self.assertNotIn("run_script", matcher)
-        hooks_guide = (self.root / "docs" / "advanced" / "HOOKS.md").read_text(
+        hooks_guide = (self.root / ".codex" / "hooks" / "README.md").read_text(
             encoding="utf-8"
         )
         self.assertIn("Enable this pack only after a current Gate B", hooks_guide)
@@ -973,7 +973,7 @@ class FastlaneHookTests(unittest.TestCase):
                 )
 
     def test_product_execution_guidance_is_tool_name_independent(self) -> None:
-        human_guide = (REPOSITORY_ROOT / "docs" / "advanced" / "HOOKS.md").read_text(
+        human_guide = (REPOSITORY_ROOT / ".codex" / "hooks" / "README.md").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("call_aws", human_guide)
@@ -3106,7 +3106,7 @@ class FastlaneHookTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
         security = (self.root / "SECURITY.md").read_text(encoding="utf-8")
-        hooks = (self.root / "docs" / "advanced" / "HOOKS.md").read_text(
+        hooks = (self.root / ".codex" / "hooks" / "README.md").read_text(
             encoding="utf-8"
         )
         hook_contract = (self.root / ".codex" / "hooks" / "AGENTS.md").read_text(

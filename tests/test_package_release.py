@@ -287,7 +287,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.2")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.3")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -316,7 +316,7 @@ class PackageReleaseTests(unittest.TestCase):
         _version, files = package_release.load_release_files(REPOSITORY_ROOT)
         inventory = {path for path, _content in files}
         for required in (
-            "docs/AGENTS.md",
+            ".codex/hooks/README.md",
             "docs/README.md",
             "docs/SETUP.md",
             "docs/TROUBLESHOOTING.md",
@@ -330,6 +330,18 @@ class PackageReleaseTests(unittest.TestCase):
             "pyproject.toml",
         ):
             self.assertIn(required, inventory)
+        for removed in (
+            "docs/AGENTS.md",
+            "docs/QUALIFICATION.md",
+            "docs/SHOWCASE.md",
+            "docs/advanced/HOOKS.md",
+            "docs/maintainers/EVALUATION.md",
+            "tests/test_release_qualification.py",
+        ):
+            self.assertNotIn(removed, inventory)
+        self.assertFalse(any(path.startswith("docs/assets/") for path in inventory))
+        self.assertFalse(any(path.startswith("docs/advanced/") for path in inventory))
+        self.assertFalse(any(path.startswith("docs/maintainers/") for path in inventory))
 
     def test_manifest_is_the_exact_template_file_inventory(self) -> None:
         template = REPOSITORY_ROOT
@@ -920,6 +932,8 @@ class PackageReleaseTests(unittest.TestCase):
             "1" + ".1.3",
             "1" + ".1.5",
             "1" + ".2.0",
+            "1" + ".2.1",
+            "1" + ".2.2",
             "2" + ".0.0",
         )
         negative_fixture_marker = f'"bootstrap_version": "{stale_versions[0]}"'

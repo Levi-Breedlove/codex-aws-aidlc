@@ -77,10 +77,17 @@ WSL1 is unsupported; convert the distribution to WSL2 first.
 
 ### Astral uv
 
-Fastlane needs the `uvx` command. Follow the
+Fastlane needs the `uvx` command. If `pipx` is already installed, use:
+
+```text
+pipx install uv
+uvx --version
+```
+
+Otherwise follow the
 [official Astral installation guide](https://docs.astral.sh/uv/getting-started/installation/)
-and verify with `uvx --version`. Fastlane does not install a package manager
-for you.
+and then verify with `uvx --version`. Fastlane does not install or bootstrap a
+package manager for you.
 
 Ruff is only a Fastlane maintainer and CI check. Project owners do not install
 Ruff system-wide to use the template.
@@ -93,7 +100,7 @@ Gate A, Gate B, deployment, or teardown.
 Deployment and teardown retain separate exact Fastlane authority.
 
 Repository hooks are optional and disabled by default. If you choose to enable
-them after Gate B, follow [Optional Fastlane hooks](advanced/HOOKS.md). Hook trust stays
+them after Gate B, follow [Optional Fastlane hooks](../.codex/hooks/README.md). Hook trust stays
 in your local Codex profile.
 
 For help, see [Troubleshooting Fastlane](TROUBLESHOOTING.md).
