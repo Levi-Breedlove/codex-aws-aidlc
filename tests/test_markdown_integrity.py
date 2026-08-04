@@ -443,6 +443,42 @@ sequenceDiagram
         ):
             self.assertIn(f"| {field} |", gate_b_body)
 
+    def test_gate_b_numbered_headings_are_visible_and_records_fold_together(
+        self,
+    ) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        depth_by_line = {
+            number: depth for number, _line, depth in disclosure_lines(prd)
+        }
+        disclosures = dict(PRD_DISCLOSURE.findall(prd))
+        cases = (
+            (
+                "## 27. Gate B agent review record",
+                "Detailed Gate B independent review record",
+                "This record shows what the independent read-only review examined",
+                "| Field | Agent-recorded value |",
+                "| Requirements revision reviewed |",
+            ),
+            (
+                "## 28. Construction envelope",
+                "Exact construction envelope",
+                "This record defines the bounded local work Codex may perform after Gate B.",
+                "| Boundary | Authorized value |",
+                "| Construction authorization ID |",
+            ),
+        )
+        for heading, summary, introduction, table_header, required_row in cases:
+            with self.subTest(heading=heading):
+                self.assertEqual(prd.count(heading), 1)
+                heading_line = prd.splitlines().index(heading) + 1
+                self.assertEqual(depth_by_line[heading_line], 0)
+
+                body = disclosures[summary]
+                self.assertNotIn(heading, body)
+                self.assertIn(introduction, " ".join(body.split()))
+                self.assertIn(table_header, body)
+                self.assertIn(required_row, body)
+
     def test_prd_owner_path_stays_within_the_readability_ceiling(self) -> None:
         prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         visible_lines = [
