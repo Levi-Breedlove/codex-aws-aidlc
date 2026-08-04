@@ -43,6 +43,7 @@ This folder is the one durable project record Fastlane uses to define, design, b
 Start with the current Fastlane conversation action. Owner Decision Briefs link
 back to readable sections in these same canonical records.
 
-## Agent reference
+## Record integrity
 
-The root and nested `AGENTS.md` files govern safe edits. Project facts stay in these canonical files; procedures, validation schemas, and prompt syntax stay in their designated Fastlane authorities.
+Project facts stay in these canonical files. Fastlane validates their exact
+records while keeping internal procedures and syntax out of the owner path.

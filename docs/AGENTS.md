@@ -4,9 +4,11 @@ This guide narrows the root rules and never widens approval or authorization.
 
 ## Audience and purpose
 
-- `README.md`, `docs/README.md`, `SETUP.md`, `WORKFLOW.md`,
-  `TROUBLESHOOTING.md`, and `HOOKS.md` are human-facing.
-- `DEPENDENCY-POLICY.md` and `EVALUATION.md` are readable maintainer guides.
+- `README.md`, `docs/README.md`, `SETUP.md`, `WORKFLOW.md`, and
+  `TROUBLESHOOTING.md` are adopter-facing.
+- `advanced/HOOKS.md` is optional operator guidance.
+- `DEPENDENCY-POLICY.md` and `maintainers/EVALUATION.md` are readable
+  maintainer guides.
 - `docs/project/` holds the one canonical set of project records. Follow its
   nested guide before changing those templates.
 

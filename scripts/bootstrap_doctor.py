@@ -37,17 +37,23 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
 
 try:
     from fastlane_owner_briefs import (
+        TECHNICAL_DOMAIN_ORDER,
         answer_confirmation,
         claim as owner_claim,
+        empty_owner_decision_inventory,
         empty_owner_decision_brief,
+        finalize_owner_decision_inventory,
         finalize_owner_decision_brief,
         source_locator as owner_source_locator,
     )
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     from scripts.fastlane_owner_briefs import (
+        TECHNICAL_DOMAIN_ORDER,
         answer_confirmation,
         claim as owner_claim,
+        empty_owner_decision_inventory,
         empty_owner_decision_brief,
+        finalize_owner_decision_inventory,
         finalize_owner_decision_brief,
         source_locator as owner_source_locator,
     )
@@ -299,7 +305,7 @@ TECHNOLOGY_DECISION_HEADERS = (
     "Compatibility/migration",
     "Validation",
 )
-REQUIRED_TECHNOLOGY_CONCERNS = (
+LEGACY_REQUIRED_TECHNOLOGY_CONCERNS = (
     "APPLICATION_RUNTIME",
     "APPLICATION_FRAMEWORK",
     "FRONTEND_FRAMEWORK",
@@ -309,6 +315,15 @@ REQUIRED_TECHNOLOGY_CONCERNS = (
     "PROPERTY_TESTING",
     "SECURITY_VALIDATION",
     "DEPLOYMENT_TOOLING",
+)
+REQUIRED_TECHNOLOGY_CONCERNS = (
+    *LEGACY_REQUIRED_TECHNOLOGY_CONCERNS,
+    "IDENTITY_AUTHORIZATION",
+    "DATA_STORAGE",
+    "MESSAGING_RETRIES",
+    "EDGE_NETWORKING",
+    "OBSERVABILITY_INCIDENT_RESPONSE",
+    "RELIABILITY_RECOVERY",
 )
 TECHNOLOGY_DECISION_ID = re.compile(r"TECH-\d{4}")
 TECHNOLOGY_CONCERN = re.compile(r"[A-Z][A-Z0-9_]*")
@@ -903,7 +918,7 @@ MANDATORY_REQUIRED_FILES = {
     "SECURITY.md",
     TASKS_FILE,
     VERIFY_FILE,
-    "app/.gitkeep",
+    "app/README.md",
     "bootstrap.manifest.json",
     "bootstrap.py",
     "bootstrap.yaml",
@@ -951,6 +966,7 @@ class Context:
     diagnostics: list[Diagnostic] = field(default_factory=list)
     texts: dict[str, str] = field(default_factory=dict)
     presentation_texts: dict[str, str] = field(default_factory=dict)
+    source_file_bytes: dict[str, bytes] = field(default_factory=dict)
     source_bytes_read: int = 0
     prior_remediation_fingerprint: str | None = None
 
@@ -4725,6 +4741,27 @@ def technology_contract_value_is_unresolved(value: str) -> bool:
     return (
         unresolved(cleaned) or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
     )
+
+
+def technology_reasoning_parts(value: str) -> tuple[str, str]:
+    """Split the canonical reasoning cell without duplicating its prose."""
+
+    cleaned = clean_cell(value)
+    prefix = "RATIONALE: "
+    separator = "; REJECTED: "
+    if not cleaned.startswith(prefix) or separator not in cleaned:
+        raise ValueError(
+            "Alternatives and rationale must use "
+            "RATIONALE: <selection reason>; REJECTED: <alternatives and reasons>"
+        )
+    rationale, rejected = cleaned[len(prefix) :].split(separator, 1)
+    if not explicit_value(rationale, allow_none=False) or not explicit_value(
+        rejected, allow_none=False
+    ):
+        raise ValueError(
+            "Technology rationale and rejected alternatives must be concrete"
+        )
+    return rationale, rejected
 
 
 def valid_technology_selection(value: str) -> bool:
@@ -9504,6 +9541,11 @@ def derive_design_contract(
                 issues.append(
                     f"{decision.decision_id}: unresolved technology decision cell"
                 )
+            elif not grandfather_approved_v1:
+                try:
+                    technology_reasoning_parts(decision.alternatives_and_rationale)
+                except ValueError as exc:
+                    issues.append(f"{decision.decision_id}: {exc}")
             if not unresolved(decision.selection) and not valid_technology_selection(
                 decision.selection
             ):
@@ -9557,7 +9599,12 @@ def derive_design_contract(
                             f"{decision.decision_id}: Basis IDs must include current "
                             f"design revision {design_revision}"
                         )
-        for concern in REQUIRED_TECHNOLOGY_CONCERNS:
+        required_concerns = (
+            LEGACY_REQUIRED_TECHNOLOGY_CONCERNS
+            if grandfather_approved_v1
+            else REQUIRED_TECHNOLOGY_CONCERNS
+        )
+        for concern in required_concerns:
             count = concern_counts.get(concern, 0)
             if count != 1:
                 issues.append(
@@ -10235,6 +10282,71 @@ def has_symlink_component(root: Path, relative: str) -> bool:
 MAX_REQUIRED_FILES = 512
 MAX_REQUIRED_FILE_BYTES = 16 * 1024 * 1024
 MAX_PROJECT_SOURCE_BYTES = 64 * 1024 * 1024
+BINARY_REQUIRED_SUFFIXES = frozenset({".png"})
+
+
+def safe_read_required_binary(
+    ctx: Context, relative: str, *, required: bool = True
+) -> bytes | None:
+    """Read one explicitly supported binary package file within integrity bounds."""
+
+    cached = ctx.source_file_bytes.get(relative)
+    if cached is not None:
+        return cached
+    if validate_relative_path(relative) is None:
+        ctx.error("MANIFEST_UNSAFE_PATH", f"Unsafe project-relative path: {relative!r}")
+        return None
+    if has_symlink_component(ctx.root, relative):
+        ctx.error(
+            "REQUIRED_FILE_SYMLINK", "Required path contains a symbolic link", relative
+        )
+        return None
+    path = ctx.root / relative
+    if not path.exists():
+        if required:
+            ctx.error("REQUIRED_FILE_MISSING", "Required file is missing", relative)
+        return None
+    if not path.is_file():
+        ctx.error(
+            "REQUIRED_FILE_NOT_REGULAR", "Required path is not a regular file", relative
+        )
+        return None
+    remaining = MAX_PROJECT_SOURCE_BYTES - ctx.source_bytes_read
+    if remaining <= 0:
+        ctx.error(
+            "PROJECT_SOURCE_LIMIT",
+            f"Required project files exceed the {MAX_PROJECT_SOURCE_BYTES}-byte aggregate limit",
+            relative,
+        )
+        return None
+    read_limit = min(MAX_REQUIRED_FILE_BYTES, remaining)
+    try:
+        with path.open("rb") as stream:
+            raw = stream.read(read_limit + 1)
+    except OSError as exc:
+        ctx.error("REQUIRED_FILE_UNREADABLE", f"Unable to read file: {exc}", relative)
+        return None
+    if len(raw) > read_limit:
+        code = (
+            "REQUIRED_FILE_TOO_LARGE"
+            if read_limit == MAX_REQUIRED_FILE_BYTES
+            else "PROJECT_SOURCE_LIMIT"
+        )
+        limit = (
+            MAX_REQUIRED_FILE_BYTES
+            if code == "REQUIRED_FILE_TOO_LARGE"
+            else MAX_PROJECT_SOURCE_BYTES
+        )
+        scope = "per-file" if code == "REQUIRED_FILE_TOO_LARGE" else "aggregate"
+        ctx.error(
+            code,
+            f"Required project file exceeds the {limit}-byte {scope} limit",
+            relative,
+        )
+        return None
+    ctx.source_bytes_read += len(raw)
+    ctx.source_file_bytes[relative] = raw
+    return raw
 
 
 def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str | None:
@@ -10301,6 +10413,7 @@ def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str
             "REQUIRED_FILE_UNREADABLE", f"Unable to read UTF-8 text: {exc}", relative
         )
         return None
+    ctx.source_file_bytes[relative] = raw
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     ctx.source_bytes_read += len(raw)
     ctx.presentation_texts[relative] = text
@@ -10454,7 +10567,133 @@ def _owner_decision_section(
     }
 
 
+OWNER_INTAKE_DECISION_METADATA = {
+    "OWNER_WORK_CONTEXT": (
+        "product",
+        "Starting point",
+        "This determines whether Fastlane creates a new application or preserves an existing system.",
+    ),
+    "PRIMARY_USERS": (
+        "product",
+        "Primary users",
+        "This keeps the first release focused on the people who must receive value.",
+    ),
+    "OWNER_STATED_PROBLEM": (
+        "product",
+        "Problem to solve",
+        "This is the user problem every first-release capability must address.",
+    ),
+    "OBSERVABLE_OUTCOME": (
+        "product",
+        "First useful outcome",
+        "This defines the end-to-end result the application must make possible.",
+    ),
+    "FIRST_RELEASE_BOUNDARY": (
+        "scope",
+        "First-release boundary",
+        "This separates essential first-release work from explicit deferrals.",
+    ),
+    "SUCCESS_MEASURE": (
+        "success",
+        "Success measure",
+        "This gives the owner an observable way to decide whether the first release is useful.",
+    ),
+    "DATA_TYPES": (
+        "data/access",
+        "Data handled",
+        "This determines the data the application must accept, generate, protect, and delete.",
+    ),
+    "DATA_SENSITIVITY": (
+        "data/access",
+        "Data sensitivity and access",
+        "This sets the practical privacy and access boundary for the first release.",
+    ),
+    "RELEASE_AUDIENCE": (
+        "scope",
+        "Initial audience",
+        "This limits who may use the first release and how broadly it may be shared.",
+    ),
+    "OPERATING_GEOGRAPHY": (
+        "operations",
+        "Operating geography",
+        "This records any material service-area or data-location constraint.",
+    ),
+}
+
+OWNER_TECHNICAL_DOMAIN_METADATA = {
+    "application/runtime": (
+        "OWNER-DES-0001",
+        "Application and runtime",
+        "This defines the application shape, runtime, framework, and one approved source location.",
+        ("technology-register", "selected-architecture", "construction-boundary"),
+    ),
+    "identity": (
+        "OWNER-DES-0002",
+        "Identity and authorization",
+        "This defines who can sign in and which data and actions each identity may access.",
+        ("technology-register", "interfaces", "aws-implementation"),
+    ),
+    "data": (
+        "OWNER-DES-0003",
+        "Data and storage",
+        "This defines where project data lives and how ownership, retention, deletion, and recovery are enforced.",
+        ("technology-register", "data-lifecycle", "aws-implementation"),
+    ),
+    "messaging": (
+        "OWNER-DES-0004",
+        "Messaging and retries",
+        "This defines whether work is synchronous or queued and how duplicate, delayed, and failed work is handled.",
+        ("technology-register", "interfaces", "aws-implementation"),
+    ),
+    "edge/networking": (
+        "OWNER-DES-0005",
+        "Edge and networking",
+        "This defines how users reach the application and which network boundaries remain private or public.",
+        ("technology-register", "components", "aws-implementation"),
+    ),
+    "observability": (
+        "OWNER-DES-0006",
+        "Observability and incident response",
+        "This defines what operators can see when the application is slow, failing, or being misused.",
+        ("technology-register", "validation-strategy", "aws-implementation"),
+    ),
+    "deployment/recovery": (
+        "OWNER-DES-0007",
+        "Deployment and recovery",
+        "This defines how the application is released, rolled back, restored, and eventually removed.",
+        ("technology-register", "release-acceptance", "construction-boundary"),
+    ),
+    "validation/construction": (
+        "OWNER-DES-0008",
+        "Validation and construction",
+        "This defines the checks and boundaries Codex must satisfy before calling local construction complete.",
+        ("technology-register", "harness-profile", "construction-boundary"),
+    ),
+}
+
+TECHNOLOGY_CONCERN_DOMAINS = {
+    "APPLICATION_RUNTIME": "application/runtime",
+    "APPLICATION_FRAMEWORK": "application/runtime",
+    "FRONTEND_FRAMEWORK": "application/runtime",
+    "IDENTITY_AUTHORIZATION": "identity",
+    "DATA_STORAGE": "data",
+    "MESSAGING_RETRIES": "messaging",
+    "EDGE_NETWORKING": "edge/networking",
+    "OBSERVABILITY_INCIDENT_RESPONSE": "observability",
+    "INFRASTRUCTURE_AS_CODE": "deployment/recovery",
+    "DEPLOYMENT_TOOLING": "deployment/recovery",
+    "RELIABILITY_RECOVERY": "deployment/recovery",
+    "PACKAGE_BUILD_TOOLING": "validation/construction",
+    "TEST_TOOLING": "validation/construction",
+    "PROPERTY_TESTING": "validation/construction",
+    "SECURITY_VALIDATION": "validation/construction",
+}
+
+
 def _owner_technical_domain(concern: str) -> str:
+    exact = TECHNOLOGY_CONCERN_DOMAINS.get(concern)
+    if exact is not None:
+        return exact
     lowered = concern.lower()
     groups = (
         ("identity", ("identity", "auth", "access", "secret")),
@@ -10477,6 +10716,318 @@ def _owner_technical_domain(concern: str) -> str:
     return "application/runtime"
 
 
+def _unique_owner_text(values: Iterable[str]) -> list[str]:
+    return list(
+        dict.fromkeys(clean_cell(value) for value in values if clean_cell(value))
+    )
+
+
+def _owner_stable_ids(values: Iterable[str]) -> list[str]:
+    return sorted(
+        {
+            identifier
+            for value in values
+            for identifier in re.findall(r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b", value)
+        }
+    )
+
+
+def _owner_readable_journeys(prd_text: str, journey_ids: Sequence[str]) -> list[str]:
+    try:
+        table = contract_table_after_heading(prd_text, JOURNEY_HEADING, JOURNEY_HEADERS)
+    except ValueError:
+        return list(journey_ids)
+    if table is None:
+        return list(journey_ids)
+    by_id = {row[0]: row for row in table.rows}
+    readable: list[str] = []
+    for journey_id in journey_ids:
+        row = by_id.get(journey_id)
+        if row is None:
+            readable.append(journey_id)
+            continue
+        goal = clean_cell(row[2])
+        outcome = clean_cell(row[4])
+        readable.append(f"{journey_id} — {goal}; success means {outcome}")
+    return readable
+
+
+def _derive_gate_a_decision_inventory(
+    prd_text: str,
+    intake_contract: IntakeFoundationContract,
+    requirements_contract: RequirementsContract,
+    *,
+    status: str,
+) -> tuple[dict[str, Any], list[str]]:
+    issues: list[str] = []
+    decisions: list[dict[str, Any]] = []
+    try:
+        table = contract_table_after_heading(
+            prd_text, INTAKE_FOUNDATION_HEADING, INTAKE_FOUNDATION_HEADERS
+        )
+    except ValueError as exc:
+        table = None
+        issues.append(f"Gate A owner decisions could not be resolved: {exc}")
+    expected_ids = list(intake_contract.basis_ids)
+    if table is not None:
+        for intake_id, field_name, value, basis, row_status, _response in table.rows:
+            if row_status != "CONFIRMED" or intake_id not in intake_contract.basis_ids:
+                continue
+            metadata = OWNER_INTAKE_DECISION_METADATA.get(field_name)
+            if metadata is None:
+                issues.append(f"{intake_id} has no owner-facing decision metadata")
+                continue
+            domain, title, owner_effect = metadata
+            decisions.append(
+                {
+                    "decision_id": intake_id,
+                    "domain": domain,
+                    "title": title,
+                    "selection": value,
+                    "source": "Validated owner intake",
+                    "maturity": "CONFIRMED_BY_OWNER",
+                    "owner_effect": owner_effect,
+                    "why": "This value was confirmed by the owner and bound to the current intake record.",
+                    "alternatives": "Not applicable — this records the owner's answer rather than an agent-selected alternative.",
+                    "tradeoff": owner_effect,
+                    "risk_and_mitigation": "A later change requires requirements revalidation before Gate A can remain current.",
+                    "evidence_status": "CONFIRMED_BY_OWNER — validated owner-response provenance is current.",
+                    "reconsider_when": "Reconsider when the owner changes this answer or its requirement basis.",
+                    "basis_ids": [intake_id],
+                    "evidence_ids": [],
+                    "source_locator_keys": ["owner-decisions"],
+                }
+            )
+    active_assumptions = [
+        item
+        for item in requirements_contract.assumptions
+        if item.status not in {"INVALIDATED", "SUPERSEDED"}
+    ]
+    expected_ids.extend(item.assumption_id for item in active_assumptions)
+    for assumption in active_assumptions:
+        maturity = (
+            "CONFIRMED_BY_OWNER"
+            if assumption.status in {"ACCEPTED", "VALIDATED"}
+            else "PLANNED_AFTER_APPROVAL"
+        )
+        decisions.append(
+            {
+                "decision_id": assumption.assumption_id,
+                "domain": "assumption",
+                "title": "Assumption",
+                "selection": assumption.assumption,
+                "source": "Gate A assumption record",
+                "maturity": maturity,
+                "owner_effect": "Gate A either accepts this assumption explicitly or returns it for correction.",
+                "why": "The requirements analysis identified this assumption as material to the first release.",
+                "alternatives": "The owner may reject or replace the assumption before approving Gate A.",
+                "tradeoff": "Accepting it enables design to proceed; changing it may alter scope or feasibility.",
+                "risk_and_mitigation": f"Validation or successor: {assumption.validation_or_successor}",
+                "evidence_status": f"{maturity} — assumption state {assumption.status}.",
+                "reconsider_when": "Reconsider when its basis, validation result, or owner acceptance changes.",
+                "basis_ids": [assumption.assumption_id, *assumption.basis_ids],
+                "evidence_ids": [],
+                "source_locator_keys": ["requirements"],
+            }
+        )
+    actual_ids = [item["decision_id"] for item in decisions]
+    if actual_ids != expected_ids:
+        issues.append(
+            "Gate A decision inventory must cover every confirmed intake and active assumption exactly once"
+        )
+    projection = {
+        "schema_version": 1,
+        "kind": "GATE_A",
+        "status": status,
+        "required_domains": [],
+        "decisions": decisions,
+    }
+    finalized, validation_issues = finalize_owner_decision_inventory(projection)
+    return finalized, [*issues, *validation_issues]
+
+
+def _source_disposition_owner_parts(
+    source_disposition: ApplicationSourceDisposition,
+) -> tuple[str, str, str, str, str]:
+    if source_disposition.kind == APPLICATION_SOURCE_GREENFIELD:
+        return (
+            "New application code has one predictable home under app/, with tests and infrastructure in their own roots.",
+            "A singular application root prevents competing app, apps, or src trees.",
+            "apps/** and src/** were rejected because parallel roots make ownership, imports, tests, and packaging ambiguous.",
+            "The selected framework must fit under app/; approved root toolchain files remain allowed.",
+            "Reopen only if an approved product or framework constraint cannot be satisfied under app/**.",
+        )
+    if source_disposition.kind == APPLICATION_SOURCE_BROWNFIELD:
+        return (
+            "Existing application source stays in the recorded preserved roots.",
+            "Preserving the observed layout avoids an unapproved migration.",
+            "A parallel app/** root was rejected unless the owner-approved preservation contract authorizes migration.",
+            "The existing layout may be less uniform, but continuity takes priority.",
+            "Reopen when the owner approves a source migration or the brownfield baseline changes.",
+        )
+    return (
+        "This work changes infrastructure only and creates no application source tree.",
+        "The approved work kind has no application runtime, so app/** would be misleading.",
+        "Creating app/**, apps/**, or src/** was rejected because application behavior is outside scope.",
+        "Application code requires a later design-controlled change.",
+        "Reopen when application behavior enters the approved scope.",
+    )
+
+
+def _derive_gate_b_decision_inventory(
+    design_contract: DesignContract,
+    requirements_revision: str,
+    design_revision: str,
+    authorization_id: str,
+    *,
+    status: str,
+) -> tuple[dict[str, Any], list[str]]:
+    issues: list[str] = []
+    grouped: dict[str, list[TechnologyDecision]] = {
+        domain: [] for domain in TECHNICAL_DOMAIN_ORDER
+    }
+    for technology in design_contract.technology_decisions:
+        grouped[_owner_technical_domain(technology.concern)].append(technology)
+
+    selection = design_contract.architecture.selection
+    source_disposition = design_contract.project_contract.application_source_disposition
+    all_evidence = list(design_contract.architecture.aws_evidence)
+    decisions: list[dict[str, Any]] = []
+    for domain in TECHNICAL_DOMAIN_ORDER:
+        technologies = grouped[domain]
+        if not technologies:
+            if status == "READY":
+                issues.append(
+                    f"Gate B decision domain {domain} has no canonical technology decision"
+                )
+            continue
+        decision_id, title, owner_effect, locator_keys = (
+            OWNER_TECHNICAL_DOMAIN_METADATA[domain]
+        )
+        rationales: list[str] = []
+        alternatives: list[str] = []
+        for technology in technologies:
+            try:
+                rationale, rejected = technology_reasoning_parts(
+                    technology.alternatives_and_rationale
+                )
+            except ValueError as exc:
+                if status == "READY":
+                    issues.append(f"{technology.decision_id}: {exc}")
+                continue
+            rationales.append(rationale)
+            alternatives.append(rejected)
+        basis_ids = _owner_stable_ids(
+            [requirements_revision, design_revision, authorization_id]
+            + [technology.basis_ids for technology in technologies]
+        )
+        technology_ids = {technology.decision_id for technology in technologies}
+        evidence = [
+            item
+            for item in all_evidence
+            if technology_ids & set(re.findall(r"\bTECH-\d{4}\b", item.design_ids))
+        ]
+        selections = [
+            f"{technology.concern.replace('_', ' ').title()}: {technology.selection}"
+            for technology in technologies
+        ]
+        tradeoffs = [technology.compatibility_migration for technology in technologies]
+        safeguards = [technology.validation for technology in technologies]
+        reconsider = [
+            f"{technology.concern.replace('_', ' ').title()} policy {technology.version_policy}"
+            for technology in technologies
+        ]
+        source_keys = list(locator_keys)
+        if domain == "application/runtime" and selection is not None:
+            selections.insert(
+                0, f"Whole-system architecture: {selection.selected_candidate}"
+            )
+            rationales.insert(0, selection.rationale)
+            alternatives.insert(0, selection.rejected_alternatives)
+            tradeoffs.extend([selection.operational_burden, selection.cost_effect])
+            safeguards.extend([selection.risks, selection.mitigations])
+            reconsider.extend([selection.revisit_triggers, selection.breakpoints])
+            basis_ids = sorted(set(basis_ids) | {selection.architecture_id})
+        if domain == "application/runtime" and source_disposition is not None:
+            (
+                source_effect,
+                source_why,
+                source_alternatives,
+                source_tradeoff,
+                source_reconsider,
+            ) = _source_disposition_owner_parts(source_disposition)
+            selections.append(
+                f"Application source: {source_disposition.canonical_value}"
+            )
+            rationales.append(source_why)
+            alternatives.append(source_alternatives)
+            tradeoffs.append(source_tradeoff)
+            safeguards.append(source_effect)
+            reconsider.append(source_reconsider)
+        if domain == "deployment/recovery" and selection is not None:
+            safeguards.extend([selection.reliability_impact, selection.migration_path])
+        if domain == "identity" and selection is not None:
+            safeguards.append(selection.security_impact)
+        if domain == "validation/construction" and design_contract.harness.rows:
+            selections.append(
+                f"Harness Profile: {len(design_contract.harness.rows)} recorded checks"
+            )
+            rationales.append(
+                "The approved checks bind construction completion to executable evidence."
+            )
+            alternatives.append(
+                "A check may be omitted only with a concrete NOT_APPLICABLE reason."
+            )
+            tradeoffs.append(
+                "More validation takes time but reduces undetected defects."
+            )
+            safeguards.append(
+                "Exact commands and durable evidence prevent overstated readiness."
+            )
+            reconsider.append(
+                "Revisit when tooling, design, or applicable quality risks change."
+            )
+            basis_ids = sorted(
+                set(basis_ids) | set(design_contract.harness.required_ids)
+            )
+        evidence_ids = [item.evidence_id for item in evidence]
+        maturity = "SOURCE_VERIFIED" if evidence_ids else "PLANNED_AFTER_APPROVAL"
+        evidence_status = (
+            "SOURCE_VERIFIED — " + ", ".join(evidence_ids)
+            if evidence_ids
+            else "PLANNED_AFTER_APPROVAL — this canonical design decision has not been observed in a deployed environment."
+        )
+        decisions.append(
+            {
+                "decision_id": decision_id,
+                "domain": domain,
+                "title": title,
+                "selection": "; ".join(_unique_owner_text(selections)),
+                "source": "Canonical Design-7 architecture and technology records",
+                "maturity": maturity,
+                "owner_effect": owner_effect,
+                "why": " ".join(_unique_owner_text(rationales)),
+                "alternatives": " ".join(_unique_owner_text(alternatives)),
+                "tradeoff": " ".join(_unique_owner_text(tradeoffs)),
+                "risk_and_mitigation": " ".join(_unique_owner_text(safeguards)),
+                "evidence_status": evidence_status,
+                "reconsider_when": " ".join(_unique_owner_text(reconsider)),
+                "basis_ids": basis_ids,
+                "evidence_ids": evidence_ids,
+                "source_locator_keys": source_keys,
+            }
+        )
+    projection = {
+        "schema_version": 1,
+        "kind": "GATE_B",
+        "status": status,
+        "required_domains": list(TECHNICAL_DOMAIN_ORDER),
+        "decisions": decisions,
+    }
+    finalized, validation_issues = finalize_owner_decision_inventory(projection)
+    return finalized, [*issues, *validation_issues]
+
+
 def derive_owner_decision_brief(
     prd_text: str,
     prd_fields: Mapping[str, str],
@@ -10487,11 +11038,11 @@ def derive_owner_decision_brief(
     *,
     has_errors: bool,
     enabled: bool,
-) -> tuple[dict[str, Any], list[tuple[str, str]]]:
-    """Derive one fail-closed gate decision view from canonical project records."""
+) -> tuple[dict[str, Any], dict[str, Any], list[tuple[str, str]]]:
+    """Derive one fail-closed gate view and its complete decision inventory."""
 
     if not enabled:
-        return empty_owner_decision_brief(), []
+        return empty_owner_decision_brief(), empty_owner_decision_inventory(), []
     requirements_revision = clean_cell(prd_fields.get("requirements_revision", ""))
     design_revision = clean_cell(prd_fields.get("design_revision", ""))
     authorization_id = clean_cell(prd_fields.get("construction_authorization", ""))
@@ -10502,25 +11053,21 @@ def derive_owner_decision_brief(
     elif gate_b != "APPROVED_FOR_CONSTRUCTION":
         kind = "GATE_B"
     else:
-        return empty_owner_decision_brief(), []
+        return empty_owner_decision_brief(), empty_owner_decision_inventory(), []
 
     basis = {
-        "requirements_revision": (
-            requirements_revision if REQ_ID.fullmatch(requirements_revision) else None
-        ),
-        "design_revision": (
-            design_revision
-            if kind == "GATE_B" and DES_ID.fullmatch(design_revision)
-            else None
-        ),
-        "construction_authorization": (
-            authorization_id
-            if kind == "GATE_B" and AUTH_ID.fullmatch(authorization_id)
-            else None
-        ),
-        "design_contract_sha256": (
-            design_contract.canonical_sha256 if kind == "GATE_B" else None
-        ),
+        "requirements_revision": requirements_revision
+        if REQ_ID.fullmatch(requirements_revision)
+        else None,
+        "design_revision": design_revision
+        if kind == "GATE_B" and DES_ID.fullmatch(design_revision)
+        else None,
+        "construction_authorization": authorization_id
+        if kind == "GATE_B" and AUTH_ID.fullmatch(authorization_id)
+        else None,
+        "design_contract_sha256": design_contract.canonical_sha256
+        if kind == "GATE_B"
+        else None,
     }
     state_value = gate_a if kind == "GATE_A" else gate_b
     contract_ready = (
@@ -10545,9 +11092,11 @@ def derive_owner_decision_brief(
     claims: list[dict[str, Any]] = []
     locators: list[dict[str, Any]] = []
     technical_groups: list[dict[str, Any]] = []
-    expected_decision_ids: list[str] = []
 
     if kind == "GATE_A":
+        inventory, inventory_issues = _derive_gate_a_decision_inventory(
+            prd_text, intake_contract, requirements_contract, status=status
+        )
         try:
             gate_a_analysis = table_after_heading(
                 prd_text, "### Gate A — agent analysis record"
@@ -10555,6 +11104,9 @@ def derive_owner_decision_brief(
         except ValueError as exc:
             gate_a_analysis = {}
             issues.append(("OWNER_BRIEF_SOURCE_MISMATCH", str(exc)))
+        readable_journeys = _owner_readable_journeys(
+            prd_text, requirements_contract.journey_ids
+        )
         sections = [
             _owner_decision_section(
                 "GATE-A-OUTCOME",
@@ -10564,10 +11116,7 @@ def derive_owner_decision_brief(
                     "Owner and users: "
                     + gate_a_card.get("Owner and users", "Not yet recorded."),
                     "First-release journey: "
-                    + (
-                        ", ".join(requirements_contract.journey_ids)
-                        or "Not yet recorded."
-                    ),
+                    + ("; ".join(readable_journeys) or "Not yet recorded."),
                 ],
                 [requirements_revision, *intake_contract.basis_ids],
             ),
@@ -10577,9 +11126,9 @@ def derive_owner_decision_brief(
                 [
                     "Scope and non-goals: "
                     + gate_a_card.get("Scope and non-goals", "Not yet recorded."),
-                    "Data handled: "
-                    + gate_a_card.get("Data boundary", "Not yet recorded."),
-                    "Who can access it: "
+                    "Data and access: "
+                    + gate_a_card.get("Data boundary", "Not yet recorded.")
+                    + " "
                     + gate_a_card.get(
                         "Identity/security boundary", "Not yet recorded."
                     ),
@@ -10594,11 +11143,11 @@ def derive_owner_decision_brief(
                     + gate_a_card.get(
                         "Measurable requirement/acceptance IDs", "Not yet recorded."
                     ),
-                    "Outage and recovery expectation: "
-                    + gate_a_card.get("Failure/recovery", "Not yet recorded."),
-                    "AWS Region: "
-                    + gate_a_card.get("Environment/Region", "Not yet recorded."),
-                    "Cost posture: "
+                    "Recovery, Region, and cost: "
+                    + gate_a_card.get("Failure/recovery", "Not yet recorded.")
+                    + "; "
+                    + gate_a_card.get("Environment/Region", "Not yet recorded.")
+                    + "; "
                     + gate_a_card.get("Cost posture", "Not yet recorded."),
                 ],
                 [requirements_revision, *requirements_contract.acceptance_ids],
@@ -10607,13 +11156,12 @@ def derive_owner_decision_brief(
                 "GATE-A-RISK",
                 "Assumptions, risks, and change impact",
                 [
-                    "Proposed assumptions: "
-                    + gate_a_card.get("Assumptions", "None recorded."),
-                    "Open decisions: "
+                    "Assumptions: " + gate_a_card.get("Assumptions", "None recorded."),
+                    "Open decisions or findings: "
                     + gate_a_analysis.get(
                         "Open blocking decision IDs", "None recorded."
-                    ),
-                    "Open findings: "
+                    )
+                    + "; "
                     + gate_a_analysis.get(
                         "Open blocking finding IDs", "None recorded."
                     ),
@@ -10665,11 +11213,7 @@ def derive_owner_decision_brief(
                 "Security and privacy requirements",
                 "9. Security and privacy requirements",
             ),
-            (
-                "reliability",
-                "Reliability requirements",
-                "10. Reliability requirements",
-            ),
+            ("reliability", "Reliability requirements", "10. Reliability requirements"),
             (
                 "cost",
                 "Performance and cost",
@@ -10695,35 +11239,36 @@ def derive_owner_decision_brief(
             table_after_heading(prd_text, "### Gate B — readiness card")
         except ValueError as exc:
             issues.append(("OWNER_BRIEF_SOURCE_MISMATCH", str(exc)))
+        inventory, inventory_issues = _derive_gate_b_decision_inventory(
+            design_contract,
+            requirements_revision,
+            design_revision,
+            authorization_id,
+            status=status,
+        )
         selection = design_contract.architecture.selection
         sections = [
             _owner_decision_section(
                 "GATE-B-EXECUTIVE",
                 "Executive decision",
                 [
-                    (
-                        "Recommendation: "
-                        + (
-                            selection.selected_candidate
-                            if selection is not None
-                            else "Not yet selected."
-                        )
+                    "Recommendation: "
+                    + (
+                        selection.selected_candidate
+                        if selection is not None
+                        else "Not yet selected."
                     ),
-                    (
-                        "Why it fits: "
-                        + (
-                            selection.rationale
-                            if selection is not None
-                            else "The architecture analysis is still in progress."
-                        )
+                    "Why it fits: "
+                    + (
+                        selection.rationale
+                        if selection is not None
+                        else "The architecture analysis is still in progress."
                     ),
-                    (
-                        "Main tradeoff: "
-                        + (
-                            selection.risks
-                            if selection is not None
-                            else "Not yet recorded."
-                        )
+                    "Main tradeoff: "
+                    + (
+                        selection.risks
+                        if selection is not None
+                        else "Not yet recorded."
                     ),
                     "Construction boundary: "
                     + envelope.get("Authorized outcome", "Not yet recorded."),
@@ -10736,254 +11281,29 @@ def derive_owner_decision_brief(
                 ],
             )
         ]
-        grouped: dict[str, list[dict[str, Any]]] = {
-            key: []
-            for key in (
-                "application/runtime",
-                "identity",
-                "data",
-                "messaging",
-                "edge/networking",
-                "observability",
-                "deployment/recovery",
-                "validation/construction",
-            )
-        }
-        if selection is not None:
-            expected_decision_ids.append(selection.architecture_id)
-            architecture_basis = sorted(
-                set(
-                    re.findall(
-                        r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b",
-                        selection.requirement_and_driver_basis,
-                    )
-                )
-            )
-            grouped["application/runtime"].append(
-                {
-                    "decision_id": selection.architecture_id,
-                    "decision": "Whole-system architecture",
-                    "owner_effect": (
-                        "This is the complete system shape Codex will implement "
-                        "inside the approved construction boundary."
-                    ),
-                    "selection": selection.selected_candidate,
-                    "requirement_basis": selection.requirement_and_driver_basis,
-                    "why": selection.rationale,
-                    "alternatives": selection.rejected_alternatives,
-                    "tradeoff": (
-                        f"Operational burden: {selection.operational_burden} "
-                        f"Cost effect: {selection.cost_effect}"
-                    ),
-                    "risk_and_mitigation": (
-                        f"Risks: {selection.risks} "
-                        f"Mitigations: {selection.mitigations} "
-                        f"Security impact: {selection.security_impact} "
-                        f"Reliability impact: {selection.reliability_impact}"
-                    ),
-                    "evidence_status": (
-                        "SOURCE_VERIFIED — "
-                        + ", ".join(
-                            item.evidence_id
-                            for item in design_contract.architecture.aws_evidence
-                        )
-                        if design_contract.architecture.aws_evidence
-                        else "NOT_YET_OBSERVED — no material AWS evidence is recorded"
-                    ),
-                    "reconsider_when": (
-                        f"Triggers: {selection.revisit_triggers} "
-                        f"Breakpoints: {selection.breakpoints} "
-                        f"Migration path: {selection.migration_path}"
-                    ),
-                    "basis_ids": architecture_basis,
-                    "evidence_ids": [
-                        item.evidence_id
-                        for item in design_contract.architecture.aws_evidence
-                    ],
-                    "source_locator_keys": ["selected-architecture"],
-                }
-            )
-        source_disposition = (
-            design_contract.project_contract.application_source_disposition
-        )
-        if source_disposition is not None:
-            expected_decision_ids.append("SOURCE-0001")
-            source_basis = [design_revision, authorization_id]
-            if source_disposition.kind == APPLICATION_SOURCE_GREENFIELD:
-                owner_effect = (
-                    "New application code has one predictable home under app/, "
-                    "with tests and infrastructure kept in their own roots."
-                )
-                rationale = (
-                    "A singular application root prevents Codex and contributors "
-                    "from creating competing app, apps, or src trees."
-                )
-                alternatives = (
-                    "apps/** and src/** were rejected because parallel greenfield "
-                    "roots make ownership, imports, tests, and release packaging ambiguous."
-                )
-                tradeoff = (
-                    "The selected framework must fit under app/; root toolchain files "
-                    "remain allowed when the approved stack requires them."
-                )
-                reconsider = (
-                    "Reopen this decision only if an approved product or framework "
-                    "constraint cannot be satisfied under app/**."
-                )
-            elif source_disposition.kind == APPLICATION_SOURCE_BROWNFIELD:
-                owner_effect = (
-                    "Existing application source stays in the recorded preserved roots."
-                )
-                rationale = (
-                    "Preserving the observed brownfield layout avoids an unapproved "
-                    "migration and protects existing users, interfaces, and tests."
-                )
-                alternatives = (
-                    "A new parallel app/** root was rejected unless the owner-approved "
-                    "baseline and preservation contract explicitly authorize that migration."
-                )
-                tradeoff = (
-                    "The existing layout may be less uniform, but continuity takes "
-                    "priority over cosmetic restructuring."
-                )
-                reconsider = (
-                    "Reopen this decision when the owner approves a source migration "
-                    "or the recorded brownfield baseline changes."
-                )
-            else:
-                owner_effect = "This work changes infrastructure only and creates no application source tree."
-                rationale = (
-                    "The approved work kind has no application runtime, so app/** would "
-                    "be misleading and unnecessary."
-                )
-                alternatives = (
-                    "Creating app/**, apps/**, or src/** was rejected because no "
-                    "application behavior is in the approved scope."
-                )
-                tradeoff = "Application code requires a later design-controlled change."
-                reconsider = "Reopen this decision when application behavior enters the approved scope."
-            grouped["application/runtime"].append(
-                {
-                    "decision_id": "SOURCE-0001",
-                    "decision": "Application source layout",
-                    "owner_effect": owner_effect,
-                    "selection": source_disposition.canonical_value,
-                    "requirement_basis": ", ".join(source_basis),
-                    "why": rationale,
-                    "alternatives": alternatives,
-                    "tradeoff": tradeoff,
-                    "risk_and_mitigation": (
-                        "Risk: code could drift into an unapproved parallel root. "
-                        "Safeguard: the Engine validates Gate B, task write sets, and the walking skeleton."
-                    ),
-                    "evidence_status": (
-                        "PLANNED_AFTER_APPROVAL — the source boundary is design-verified "
-                        "but implementation remains unobserved."
-                    ),
-                    "reconsider_when": reconsider,
-                    "basis_ids": source_basis,
-                    "evidence_ids": [],
-                    "source_locator_keys": ["construction-boundary"],
-                }
-            )
-        for decision in design_contract.technology_decisions:
-            expected_decision_ids.append(decision.decision_id)
-            decision_basis = sorted(
-                set(
-                    re.findall(
-                        r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b",
-                        decision.basis_ids,
-                    )
-                )
-            )
-            evidence_maturity = {
-                "OWNER_CONSTRAINT": "CONFIRMED_BY_OWNER",
-                "REPOSITORY_FACT": "OBSERVED_IN_REPOSITORY",
-                "AGENT_RECOMMENDATION": "PLANNED_AFTER_APPROVAL",
-            }.get(decision.source, "NOT_YET_OBSERVED")
-            grouped[_owner_technical_domain(decision.concern)].append(
-                {
-                    "decision_id": decision.decision_id,
-                    "decision": decision.concern,
-                    "owner_effect": (
-                        "This choice defines the "
-                        + decision.concern.lower().replace("_", " ")
-                        + " used by approved construction."
-                    ),
-                    "selection": decision.selection,
-                    "requirement_basis": decision.basis_ids,
-                    "why": decision.alternatives_and_rationale,
-                    "alternatives": decision.alternatives_and_rationale,
-                    "tradeoff": decision.compatibility_migration,
-                    "risk_and_mitigation": (
-                        "Compatibility or migration risk: "
-                        f"{decision.compatibility_migration} "
-                        f"Mitigation and validation: {decision.validation}"
-                    ),
-                    "evidence_status": (
-                        f"{evidence_maturity} — source {decision.source}; "
-                        f"validation {decision.validation}"
-                    ),
-                    "reconsider_when": (
-                        "Revisit when the basis IDs, version policy "
-                        f"({decision.version_policy}), compatibility assumptions, "
-                        "or validation result changes."
-                    ),
-                    "basis_ids": decision_basis,
-                    "evidence_ids": [],
-                    "source_locator_keys": ["technology-register"],
-                }
-            )
-        if design_contract.harness.rows:
-            harness_basis = list(design_contract.harness.required_ids) or [
-                requirements_revision,
-                design_revision,
-            ]
-            expected_decision_ids.append("HARNESS-PROFILE")
-            grouped["validation/construction"].append(
-                {
-                    "decision_id": "HARNESS-PROFILE",
-                    "decision": "Validation and construction checks",
-                    "owner_effect": (
-                        "These checks decide whether Fastlane may call the approved "
-                        "construction complete."
-                    ),
-                    "selection": (
-                        f"{len(design_contract.harness.rows)} applicable checks "
-                        "are recorded."
-                    ),
-                    "requirement_basis": ", ".join(harness_basis),
-                    "why": (
-                        "The checks are bound to the approved design and requirements."
-                    ),
-                    "alternatives": (
-                        "A check may be omitted only as NOT_APPLICABLE with a concrete "
-                        "reason in the canonical Harness Profile."
-                    ),
-                    "tradeoff": (
-                        "More validation takes time but reduces undetected defects."
-                    ),
-                    "risk_and_mitigation": (
-                        "Risk: incomplete checks could overstate readiness. "
-                        "Mitigation: exact commands and durable evidence are required."
-                    ),
-                    "evidence_status": (
-                        "PLANNED_AFTER_APPROVAL — checks become observed "
-                        "only when their recorded commands pass."
-                    ),
-                    "reconsider_when": (
-                        "Revisit when requirements, architecture, tooling, "
-                        "or applicable quality risks change."
-                    ),
-                    "basis_ids": harness_basis,
-                    "evidence_ids": [],
-                    "source_locator_keys": ["harness-profile"],
-                }
-            )
         technical_groups = [
-            {"domain": domain, "decisions": decisions}
-            for domain, decisions in grouped.items()
-            if decisions
+            {
+                "domain": decision["domain"],
+                "decisions": [
+                    {
+                        "decision_id": decision["decision_id"],
+                        "decision": decision["title"],
+                        "owner_effect": decision["owner_effect"],
+                        "selection": decision["selection"],
+                        "requirement_basis": ", ".join(decision["basis_ids"]),
+                        "why": decision["why"],
+                        "alternatives": decision["alternatives"],
+                        "tradeoff": decision["tradeoff"],
+                        "risk_and_mitigation": decision["risk_and_mitigation"],
+                        "evidence_status": decision["evidence_status"],
+                        "reconsider_when": decision["reconsider_when"],
+                        "basis_ids": decision["basis_ids"],
+                        "evidence_ids": decision["evidence_ids"],
+                        "source_locator_keys": decision["source_locator_keys"],
+                    }
+                ],
+            }
+            for decision in inventory.get("decisions", [])
         ]
         evidence_ids = [
             item.evidence_id for item in design_contract.architecture.aws_evidence
@@ -10992,10 +11312,7 @@ def derive_owner_decision_brief(
         if evidence_ids:
             claims.append(
                 owner_claim(
-                    (
-                        "Current official AWS references support the material "
-                        "AWS design claims recorded in the technical plan."
-                    ),
+                    "Current official AWS references support the material AWS design claims recorded in the technical plan.",
                     "SOURCE_VERIFIED",
                     basis_ids=[design_revision],
                     evidence_ids=evidence_ids,
@@ -11004,24 +11321,17 @@ def derive_owner_decision_brief(
         claims.extend(
             (
                 owner_claim(
-                    (
-                        "The recommended architecture, construction work, "
-                        "rollback, and operational procedures are planned after "
-                        "approval."
-                    ),
+                    "The recommended architecture, construction work, rollback, and operational procedures are planned after approval.",
                     "PLANNED_AFTER_APPROVAL",
                     basis_ids=[design_revision, authorization_id],
                 ),
                 owner_claim(
-                    ("Deployment, recovery, and teardown have not yet been observed."),
+                    "Deployment, recovery, and teardown have not yet been observed.",
                     "NOT_YET_OBSERVED",
                     basis_ids=[design_revision],
                 ),
                 owner_claim(
-                    (
-                        "Gate B does not authorize GitHub publication, AWS "
-                        "account access, deployment, or teardown."
-                    ),
+                    "Gate B does not authorize GitHub publication, AWS account access, deployment, or teardown.",
                     "NOT_AUTHORIZED",
                     basis_ids=[authorization_id],
                 ),
@@ -11029,16 +11339,8 @@ def derive_owner_decision_brief(
         )
         locator_specs = (
             ("technical-plan", "Technical plan", "14. Architecture overview"),
-            (
-                "technology-register",
-                "Technology decisions",
-                "Technology decisions",
-            ),
-            (
-                "selected-architecture",
-                "Selected architecture",
-                "Selected architecture",
-            ),
+            ("technology-register", "Technology decisions", "Technology decisions"),
+            ("selected-architecture", "Selected architecture", "Selected architecture"),
             ("components", "Component design", "15. Component design"),
             ("interfaces", "Interfaces and contracts", "16. Interfaces and contracts"),
             (
@@ -11055,11 +11357,7 @@ def derive_owner_decision_brief(
             ("harness-profile", "Harness checks", "Validation strategy"),
             ("release-acceptance", "Release acceptance", "26. Release acceptance"),
             ("first-wave", "First construction wave", "First construction wave"),
-            (
-                "gate-b-readiness",
-                "Gate B readiness",
-                "Gate B — readiness card",
-            ),
+            ("gate-b-readiness", "Gate B readiness", "Gate B — readiness card"),
             (
                 "construction-boundary",
                 "Construction boundary",
@@ -11073,49 +11371,17 @@ def derive_owner_decision_brief(
         )
         authorization = {
             "approves": [
-                (
-                    "The complete technical design and the exact bounded local "
-                    "construction envelope."
-                )
+                "The complete technical design and the exact bounded local construction envelope."
             ],
             "does_not_approve": [
-                (
-                    "GitHub publication, AWS account access, deployment, "
-                    "rollback execution, or teardown."
-                )
+                "GitHub publication, AWS account access, deployment, rollback execution, or teardown."
             ],
         }
 
-    if kind == "GATE_A":
-        expected_sections = [
-            "GATE-A-OUTCOME",
-            "GATE-A-BOUNDARY",
-            "GATE-A-SUCCESS",
-            "GATE-A-RISK",
-        ]
-        actual_sections = [str(item.get("section_id", "")) for item in sections]
-        if actual_sections != expected_sections:
-            issues.append(
-                (
-                    "OWNER_BRIEF_COVERAGE_INCOMPLETE",
-                    "Gate A decision sections do not cover the complete "
-                    "canonical decision surface exactly once",
-                )
-            )
-    else:
-        actual_decision_ids = [
-            str(decision.get("decision_id", ""))
-            for group in technical_groups
-            for decision in group.get("decisions", [])
-        ]
-        if sorted(actual_decision_ids) != sorted(expected_decision_ids):
-            issues.append(
-                (
-                    "OWNER_BRIEF_COVERAGE_INCOMPLETE",
-                    "Gate B technical decisions do not cover every "
-                    "Engine-marked decision exactly once",
-                )
-            )
+    if inventory_issues:
+        status = "BLOCKED"
+        for issue in inventory_issues:
+            issues.append(("OWNER_BRIEF_COVERAGE_INCOMPLETE", issue))
 
     for key, label, heading in locator_specs:
         try:
@@ -11129,6 +11395,21 @@ def derive_owner_decision_brief(
                 (
                     "OWNER_BRIEF_SOURCE_MISMATCH",
                     f"{label} source could not be resolved: {exc}",
+                )
+            )
+
+    inventory_ids = [item.get("decision_id") for item in inventory.get("decisions", [])]
+    if kind == "GATE_B":
+        brief_ids = [
+            decision.get("decision_id")
+            for group in technical_groups
+            for decision in group.get("decisions", [])
+        ]
+        if brief_ids != inventory_ids:
+            issues.append(
+                (
+                    "OWNER_BRIEF_COVERAGE_INCOMPLETE",
+                    "Gate B brief does not cover the complete decision inventory exactly once",
                 )
             )
 
@@ -11160,7 +11441,7 @@ def derive_owner_decision_brief(
                 "the gate basis is stale; regenerate the derived decision brief from current canonical records",
             )
         )
-    return finalized, issues
+    return finalized, inventory, issues
 
 
 def derive_owner_answer_confirmation(
@@ -11520,7 +11801,10 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
             continue
         seen.add(relative)
         folded.add(relative.casefold())
-        safe_read_text(ctx, relative)
+        if PurePosixPath(relative).suffix.lower() in BINARY_REQUIRED_SUFFIXES:
+            safe_read_required_binary(ctx, relative)
+        else:
+            safe_read_text(ctx, relative)
     missing_mandatory = sorted(MANDATORY_REQUIRED_FILES - seen)
     if missing_mandatory:
         ctx.error(
@@ -11567,12 +11851,15 @@ def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
                 )
                 continue
             if ctx.template_source and not has_symlink_component(ctx.root, relative):
-                source_text = ctx.presentation_texts.get(relative) or ctx.texts.get(
-                    relative
-                )
-                if source_text is None:
-                    continue
-                actual = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+                source_bytes = ctx.source_file_bytes.get(relative)
+                if source_bytes is None:
+                    source_text = ctx.presentation_texts.get(relative) or ctx.texts.get(
+                        relative
+                    )
+                    if source_text is None:
+                        continue
+                    source_bytes = source_text.encode("utf-8")
+                actual = hashlib.sha256(source_bytes).hexdigest()
                 if actual != expected:
                     ctx.error(
                         "MANIFEST_SOURCE_HASHES",
@@ -21880,7 +22167,9 @@ def build_report(
         authorization_field=transition_authorization_field,
         receipt_digest_field=transition_receipt_field,
     )
-    owner_decision_brief, owner_brief_issues = derive_owner_decision_brief(
+    (
+        owner_decision_brief, owner_decision_inventory, owner_brief_issues
+    ) = derive_owner_decision_brief(
         ctx.texts.get(PRD_FILE, ""),
         prd_fields,
         intake_contract,
@@ -22007,7 +22296,9 @@ def build_report(
                 lifecycle_intent=lifecycle_intent_projection,
             )
         )
-        owner_decision_brief, _owner_brief_issues = derive_owner_decision_brief(
+        (
+            owner_decision_brief, owner_decision_inventory, _owner_brief_issues
+        ) = derive_owner_decision_brief(
             ctx.texts.get(PRD_FILE, ""),
             prd_fields,
             intake_contract,
@@ -22225,6 +22516,7 @@ def build_report(
         },
         "document_summaries": document_summaries,
         "owner_decision_brief": owner_decision_brief,
+        "owner_decision_inventory": owner_decision_inventory,
         "owner_answer_confirmation": owner_answer_confirmation,
         "intake_foundation": intake_contract.to_dict(),
         "requirements_contract": requirements_contract.to_dict(),

@@ -12,11 +12,17 @@ from datetime import datetime
 from typing import Any, Mapping, Sequence
 
 try:
-    from fastlane_owner_briefs import finalize_owner_decision_brief
+    from fastlane_owner_briefs import (
+        finalize_owner_decision_brief,
+        finalize_owner_decision_inventory,
+    )
     from intake_response import intake_reply_token
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
-    from scripts.fastlane_owner_briefs import finalize_owner_decision_brief
+    from scripts.fastlane_owner_briefs import (
+        finalize_owner_decision_brief,
+        finalize_owner_decision_inventory,
+    )
     from scripts.intake_response import intake_reply_token
     from scripts.fastlane_stdio import configure_utf8_standard_streams
 
@@ -1375,6 +1381,28 @@ def _intake_question_lines(card: Mapping[str, Any]) -> list[str]:
     return lines
 
 
+def _intake_reply_guidance(card: Mapping[str, Any]) -> list[str]:
+    """Return copyable values only when the displayed value is a valid reply."""
+
+    questions = card["questions"]
+    if card["accept_all_allowed"] or all(
+        question["kind"] == "DECISION" and question["recommended"] is not None
+        for question in questions
+    ):
+        return ["Copyable reply:", str(card["owner_reply"])]
+    if len(questions) == 1 and questions[0]["kind"] == "DECISION":
+        question = questions[0]
+        required = set(question["required_detail_for"])
+        lines = ["Reply with one of:"]
+        for choice in ("A", "B", "C"):
+            example = f"{question['reply_key']}{choice}"
+            if choice in required:
+                example += ": <required detail>"
+            lines.append(f"- `{example}`")
+        return lines
+    return ["Reply format:", f"`{card['owner_reply']}`"]
+
+
 def _render_intake_card(
     report: Mapping[str, Any],
     card: Mapping[str, Any],
@@ -1402,7 +1430,7 @@ def _render_intake_card(
     )
     if card["accept_all_allowed"]:
         lines.append("You may also reply `Accept all recommendations.`")
-    lines.extend(("", "Copyable reply:", str(card["owner_reply"])))
+    lines.extend(("", *_intake_reply_guidance(card)))
     return "\n".join(lines)
 
 
@@ -1592,7 +1620,7 @@ def render_side_question_response(
             lines.extend(_intake_question_lines(card))
             if card["accept_all_allowed"]:
                 lines.append("You may also reply `Accept all recommendations.`")
-            lines.extend(("", "Copyable reply:", str(card["owner_reply"])))
+            lines.extend(("", *_intake_reply_guidance(card)))
     if required and action_kind == "CHOOSE_AWS_RESIDUAL_DISPOSITION":
         lines.extend(("", "Copyable reply:", COPYABLE_REPLIES[action_kind]))
     if not required:
@@ -1856,6 +1884,43 @@ def _validated_owner_decision_brief(
     return brief
 
 
+def _validated_owner_decision_inventory(
+    report: Mapping[str, Any], expected_kind: str
+) -> Mapping[str, Any]:
+    inventory = report.get("owner_decision_inventory")
+    if not isinstance(inventory, Mapping):
+        raise PresentationError(
+            "Fastlane Engine report is missing the owner decision inventory"
+        )
+    finalized, issues = finalize_owner_decision_inventory(dict(inventory))
+    if issues or finalized.get("canonical_sha256") != inventory.get("canonical_sha256"):
+        raise PresentationError(
+            "Owner decision inventory does not satisfy its derived contract"
+        )
+    if inventory.get("schema_version") != 1 or inventory.get("kind") != expected_kind:
+        raise PresentationError(
+            "Owner decision inventory kind does not match the requested gate"
+        )
+    if inventory.get("status") not in {"BUILDING", "READY", "STALE", "BLOCKED"}:
+        raise PresentationError("Owner decision inventory has an invalid status")
+    return inventory
+
+
+def _markdown_table_cell(value: Any) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _decision_source_links(
+    decision: Mapping[str, Any], locator_by_key: Mapping[str, Mapping[str, Any]]
+) -> str:
+    sources: list[str] = []
+    for key in decision["source_locator_keys"]:
+        locator = locator_by_key[str(key)]
+        anchor = _markdown_anchor(str(locator["heading"]))
+        sources.append(f"[{locator['label']}]({locator['path']}#{anchor})")
+    return ", ".join(sources)
+
+
 def _markdown_anchor(heading: str) -> str:
     value = re.sub(r"[^\w -]", "", heading.lower(), flags=re.UNICODE)
     return re.sub(r"[\s-]+", "-", value).strip("-")
@@ -1865,6 +1930,7 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
     """Render one deterministic Gate A or Gate B owner decision view."""
 
     brief = _validated_owner_decision_brief(report, expected_kind)
+    inventory = _validated_owner_decision_inventory(report, expected_kind)
     stage = "DEFINE" if expected_kind == "GATE_A" else "DESIGN"
     name = (
         "Gate A Owner Decision Brief"
@@ -1882,39 +1948,108 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
         lines.extend(("", f"## {section['title']}"))
         lines.extend(f"- {item}" for item in section["items"])
 
+    inventory_decisions = inventory["decisions"]
     locator_by_key = {
         str(locator["key"]): locator for locator in brief["source_locators"]
     }
-    groups = brief["technical_decision_groups"]
-    if groups:
-        lines.extend(("", "## Technical decision index"))
-        for group in groups:
-            domain = str(group["domain"]).replace("/", " and ").title()
-            lines.extend(("", f"### {domain}"))
-            for decision in group["decisions"]:
-                sources: list[str] = []
-                for key in decision["source_locator_keys"]:
-                    locator = locator_by_key[str(key)]
-                    anchor = _markdown_anchor(str(locator["heading"]))
-                    sources.append(f"[{locator['label']}]({locator['path']}#{anchor})")
-                lines.extend(
-                    (
-                        f"#### {decision['decision']} ({decision['decision_id']})",
-                        f"- What this means for you: {decision['owner_effect']}",
-                        f"- Selected: {decision['selection']}",
-                        f"- Requirement basis: {decision['requirement_basis']}",
-                        f"- Why selected: {decision['why']}",
+    if expected_kind == "GATE_A":
+        lines.extend(
+            (
+                "",
+                "## Your recorded decisions",
+                "",
+                "| Decision | Recorded answer | Source | Status |",
+                "|---|---|---|---|",
+            )
+        )
+        for decision in inventory_decisions:
+            lines.append(
+                "| "
+                + " | ".join(
+                    _markdown_table_cell(value)
+                    for value in (
+                        decision["title"],
+                        decision["selection"],
                         (
-                            "- Alternatives and rejection reasons: "
-                            f"{decision['alternatives']}"
+                            f"{decision['source']} — "
+                            f"{_decision_source_links(decision, locator_by_key)}"
                         ),
-                        f"- Tradeoffs: {decision['tradeoff']}",
-                        f"- Risks and safeguards: {decision['risk_and_mitigation']}",
-                        f"- Evidence status: {decision['evidence_status']}",
-                        f"- Reconsider when: {decision['reconsider_when']}",
-                        f"- Exact source: {', '.join(sources)}",
+                        OWNER_MATURITY_LABELS[str(decision["maturity"])],
                     )
                 )
+                + " |"
+            )
+
+    groups = brief["technical_decision_groups"]
+    if groups:
+        brief_ids = [
+            decision["decision_id"]
+            for group in groups
+            for decision in group["decisions"]
+        ]
+        inventory_ids = [decision["decision_id"] for decision in inventory_decisions]
+        if brief_ids != inventory_ids:
+            raise PresentationError(
+                "Gate B brief does not match the complete decision inventory"
+            )
+        lines.extend(
+            (
+                "",
+                "## Technical decision index",
+                "",
+                "| Domain | Decision | Selected approach |",
+                "|---|---|---|",
+            )
+        )
+        for group in groups:
+            for decision in group["decisions"]:
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        _markdown_table_cell(value)
+                        for value in (
+                            str(group["domain"]).replace("/", " and ").title(),
+                            decision["decision"],
+                            decision["selection"],
+                        )
+                    )
+                    + " |"
+                )
+        lines.extend(
+            (
+                "",
+                "<details>",
+                "<summary>Decision reasoning, tradeoffs, risks, and sources</summary>",
+                "",
+            )
+        )
+        for group in groups:
+            for decision in group["decisions"]:
+                sources = _decision_source_links(decision, locator_by_key)
+                lines.extend(
+                    (
+                        f"### {decision['decision']} ({decision['decision_id']})",
+                        (
+                            f"- Meaning and selection: {decision['owner_effect']} "
+                            f"Selected: {decision['selection']}"
+                        ),
+                        (
+                            f"- Basis and rationale: {decision['requirement_basis']}. "
+                            f"{decision['why']}"
+                        ),
+                        (
+                            "- Alternatives and tradeoffs: "
+                            f"{decision['alternatives']} Tradeoffs: {decision['tradeoff']}"
+                        ),
+                        (f"- Risks and safeguards: {decision['risk_and_mitigation']}"),
+                        (
+                            f"- Evidence and revisit trigger: {decision['evidence_status']} "
+                            f"Reconsider when: {decision['reconsider_when']}"
+                        ),
+                        f"- Exact source: {sources}",
+                    )
+                )
+        lines.extend(("", "</details>"))
 
     lines.extend(("", "## Evidence and authorization"))
     for claim in brief["claims"]:

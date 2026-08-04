@@ -69,11 +69,12 @@ guidance and recommends one coherent architecture; AWS Core does not approve it.
 
 ### 5. Review Gate B
 
-The Gate B Technical Owner Brief Pack explains every Engine-marked decision:
-architecture, application root, identity, authorization, data, AWS services,
-security, reliability, cost, recovery, deployment, tests, and the construction
-boundary. Each decision includes its requirement basis, alternatives,
-tradeoffs, risks, evidence status, and measurable reconsideration trigger.
+The Gate B Technical Owner Brief explains one complete decision for each
+promised domain: application/runtime, identity, data, messaging,
+edge/networking, observability, deployment/recovery, and
+validation/construction. Each decision includes its requirement basis,
+alternatives, tradeoffs, risks, evidence status, canonical source, and a
+measurable reconsideration trigger.
 
 The brief links to the exact canonical PRD sections and keeps the exact Gate B
 receipt last. After approval, Fastlane repeats the useful links, generates the
@@ -89,7 +90,7 @@ pending action after side questions, and resumes without repeating setup.
 Gate B permits only its local construction boundary. AWS preflight, mutation,
 rollback, recovery, and teardown remain separately controlled and observed.
 
-## Owner and AI qualification matrix
+## Deterministic synthetic journey matrix
 
 `DETERMINISTIC_PASS` means the credential-free repository test named by the
 evidence reference passed for this release candidate. It does not mean an
@@ -136,13 +137,14 @@ independent adopter, external model, or AWS account performed the journey.
 
 ## Release claim boundary
 
-> Repository contracts, deterministic tests, and owner/AI journeys passed.
+> Repository contracts, deterministic tests, and deterministic synthetic
+> owner-facing journeys passed.
 > Independent adopter evidence has not yet been collected.
 > Real AWS deployment, rollback, recovery, and teardown remain unobserved
 > unless separately field-qualified.
 
-In that statement, **owner/AI journeys** means the credential-free synthetic
-journeys exercised by deterministic repository tests. External model role-play:
+In that statement, **deterministic synthetic owner-facing journeys** means the
+credential-free scenarios exercised by repository tests. External model role-play:
 `NOT_RUN`. No live model or independent-rater evidence is claimed.
 
 | Claim class | Fastlane 1.2 status |
@@ -159,6 +161,6 @@ journeys exercised by deterministic repository tests. External model role-play:
 - [Verified and unobserved claims](project/VERIFY.md)
 - [Operations and recovery boundaries](project/RUNBOOK.md)
 - [Complete owner workflow](WORKFLOW.md)
-- [Evaluation boundaries](EVALUATION.md)
+- [Evaluation boundaries](maintainers/EVALUATION.md)
 
 The qualification page summarizes those contracts; it never replaces them.

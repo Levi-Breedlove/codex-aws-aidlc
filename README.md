@@ -1,80 +1,80 @@
 # AWS Codex Fastlane 1.2
 
-Current customer build: **1.2.1**.
-Fastlane Engine gives Codex a disciplined way to turn an AWS idea into clear
-requirements, one recommended design, and a tested local build. You explain
-the outcome in plain language; Codex plans while you control consequential choices.
+Current customer build: **1.2.2**.
+
+Fastlane turns an AWS application idea into an approved product agreement, an AWS-informed
+technical plan, and a tested local build. You describe the outcome in plain language; Codex
+asks focused questions and the Fastlane Engine keeps decisions, evidence, and authority aligned.
 
 - **You set the destination:** outcome, constraints, budget, and approvals.
-- **Codex pilots:** it asks, recommends, writes, tests, and keeps work moving.
+- **Codex pilots:** it asks, recommends, writes, tests, and records evidence.
 - **AWS Core advises:** it supplies current AWS knowledge and procedures.
-- **Fastlane governs:** it records decisions, enforces boundaries, and proves results.
-
-Fastlane favors secure pay-per-use serverless options when they fit and seeks the
-lowest practical total cost without weakening required safeguards. It never jumps directly to production.
+- **Fastlane governs:** it preserves boundaries and honest claims.
 
 ## What to expect
 
-1. Describe what you want to accomplish in your own words.
-2. Codex asks one short question at a time and recommends sensible defaults.
-3. At Gate A, you confirm the complete product agreement.
-4. Codex consults AWS Core, compares credible designs, and recommends one.
-5. At Gate B, you approve the full technical design and construction limits.
-6. Codex creates tasks, builds locally, tests, and records observed evidence.
-7. Any AWS account operation follows a separate, exact authorization.
+```mermaid
+flowchart LR
+    IDEA["Describe the outcome"] --> A["Gate A: approve requirements"]
+    A --> DESIGN["AWS Core-informed design"]
+    DESIGN --> B["Gate B: approve design and build boundary"]
+    B --> BUILD["Codex builds and tests locally"]
+    BUILD --> AWS["Separate approval for any AWS account action"]
+```
 
 Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.
 
-You do not need an architecture. You can always say, “I’m not sure; recommend one.”
+After the three one-time settings, Fastlane asks one short question at a time.
+It creates tasks, builds locally, and continues until needed. Neither gate authorizes AWS deployment, spending, or teardown.
 
 ## Start
 
-1. Select [Use this template](https://github.com/Levi-Breedlove/aws-bootstrap/generate) and clone the new repository.
+1. Select [Use this template](https://github.com/Levi-Breedlove/aws-bootstrap/generate)
+   and clone the new repository.
 2. Open it in a signed-in interactive Codex CLI and send:
 
    ```text
    init template
    ```
 
-3. Fastlane checks Codex, Git, Python 3.11+, sandbox support, `uvx`, and the
-   official AWS Core plugin. If needed, it provides one consolidated checklist.
-4. Answer the three one-time settings: project name, preferred AWS Region, and
-   development budget or “minimize cost; no hard cap.”
+3. Fastlane checks Codex, Git, Python 3.11+, sandbox support, `uvx`, and AWS
+   Core. Missing items appear in one consolidated checklist.
+4. Answer project name, preferred AWS Region, and development budget—or say
+   “minimize cost; no hard cap.”
 
-Setup does not inspect AWS credentials or access an AWS account. See the [setup walkthrough](docs/SETUP.md)
-and [troubleshooting guide](docs/TROUBLESHOOTING.md).
+Setup does not inspect AWS credentials or access an AWS account. See the
+[setup walkthrough](docs/SETUP.md) and [troubleshooting guide](docs/TROUBLESHOOTING.md).
+
+## AWS Core and AWS changes
+
+Fastlane requires the official AWS Core plugin from the current AWS Agent Toolkit source
+`aws-core@agent-toolkit-for-aws` in `aws/agent-toolkit-for-aws`; it does not pin a plugin version or commit. Codex discovers
+only the runtime skills relevant to the current decision and does not copy AWS skills into the
+repository. Ordinary requirements and
+design need no AWS credentials or AWS account.
+
+Codex chooses the architecture. AWS Core supplies current expertise; it cannot approve or authorize.
+Fastlane evaluates secure pay-per-use serverless options and the lowest practical total cost without weakening required safeguards.
+
+After Gate B, Codex builds locally. For AWS preflight, deployment verification, or teardown
+preparation, ask Codex to use `$operate-fastlane-aws`. Fast Dev stays inside a current
+non-production Gate B envelope; explicit-gate deployment and teardown require their own exact
+receipts. Every AWS account operation still requires exact authorization for that action.
 
 ## Repository map
 
 - `app/`: the one reserved greenfield application root.
-- `tests/`: application and infrastructure verification.
 - `infrastructure/`: infrastructure as code and deployment definitions.
-- `docs/project/`: canonical requirements, design, tasks, evidence, operations, and defects.
-- `.agents/` and `prompts/`: scoped instructions used by Codex.
-- `scripts/`: deterministic Fastlane Engine and supporting validators.
+- `tests/`: application and infrastructure verification.
+- `docs/project/`: requirements, design, tasks, evidence, operations, and defects.
 
-Start with the [documentation index](docs/README.md) or [project record guide](docs/project/README.md).
-
-## AWS Core and AWS changes
-
-Fastlane requires the official AWS Core plugin from the
-[AWS Agent Toolkit](https://github.com/aws/agent-toolkit-for-aws). It uses `aws-core@agent-toolkit-for-aws`, discovers current runtime skills, and does not copy AWS skills into the
-repository. Fastlane does not pin a plugin version or commit.
-
-Codex chooses the architecture. AWS Core supplies current expertise; it cannot approve or authorize.
-Ordinary requirements and
-design need no AWS credentials or AWS account.
-
-After Gate B, Codex builds locally. For AWS preflight, deployment verification,
-or teardown preparation, ask Codex to use `$operate-fastlane-aws`. Fast Dev stays
-inside a current non-production Gate B envelope; explicit-gate deployment and
-teardown require their own exact receipts. Tool availability never grants authority.
+Start with the [documentation index](docs/README.md), [project record guide](docs/project/README.md),
+or [synthetic customer showcase](docs/SHOWCASE.md).
 
 ## Learn more
 
 - [Understand the workflow](docs/WORKFLOW.md)
-- [Fastlane 1.2 qualification and walkthrough](docs/QUALIFICATION.md)
-- [Optional hooks](docs/HOOKS.md)
-- [Dependency policy](docs/DEPENDENCY-POLICY.md)
+- [Review qualification boundaries](docs/QUALIFICATION.md)
+- [Optional hooks](docs/advanced/HOOKS.md)
 - [Security](SECURITY.md)
-- [Maintainer evaluation](docs/EVALUATION.md)
+- [Maintainer evaluation](docs/maintainers/EVALUATION.md)

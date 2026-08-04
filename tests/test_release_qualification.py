@@ -11,8 +11,9 @@ QUALIFICATION = REPOSITORY_ROOT / "docs" / "QUALIFICATION.md"
 QUALIFICATION_IDS = [f"QUAL-{number:02d}" for number in range(1, 16)]
 EVIDENCE_IDS = [f"QTEST-{number:02d}" for number in range(1, 16)]
 RELEASE_CLAIM = (
-    "Repository contracts, deterministic tests, and owner/AI journeys passed. "
-    "Independent adopter evidence has not yet been collected. "
+    "Repository contracts, deterministic tests, and deterministic synthetic "
+    "owner-facing journeys passed. Independent adopter evidence has not yet "
+    "been collected. "
     "Real AWS deployment, rollback, recovery, and teardown remain unobserved "
     "unless separately field-qualified."
 )
@@ -113,19 +114,19 @@ class ReleaseQualificationTests(unittest.TestCase):
         docs_index = (REPOSITORY_ROOT / "docs" / "README.md").read_text(
             encoding="utf-8"
         )
-        evaluation = (REPOSITORY_ROOT / "docs" / "EVALUATION.md").read_text(
-            encoding="utf-8"
-        )
+        evaluation = (
+            REPOSITORY_ROOT / "docs" / "maintainers" / "EVALUATION.md"
+        ).read_text(encoding="utf-8")
         self.assertIn("](docs/QUALIFICATION.md)", readme)
         self.assertIn("](QUALIFICATION.md)", docs_index)
-        self.assertIn("](QUALIFICATION.md)", evaluation)
+        self.assertIn("](../QUALIFICATION.md)", evaluation)
         for target in (
             "project/PRD.md",
             "project/TASKS.md",
             "project/VERIFY.md",
             "project/RUNBOOK.md",
             "WORKFLOW.md",
-            "EVALUATION.md",
+            "maintainers/EVALUATION.md",
         ):
             self.assertIn(f"]({target})", self.text)
 

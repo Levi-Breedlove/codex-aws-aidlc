@@ -14,7 +14,7 @@ also extract a customer template and validate its real startup path.
 These results can verify repository contracts and deterministic behavior. They
 do not prove that independent adopters understand the workflow or that an AWS
 deployment, rollback, recovery, or teardown succeeded in a real account.
-The [Fastlane 1.2 qualification matrix](QUALIFICATION.md) maps each promised
+The [Fastlane 1.2 qualification matrix](../QUALIFICATION.md) maps each promised
 owner-visible journey to its executable deterministic evidence.
 
 
@@ -40,15 +40,15 @@ The visible targets are intentionally small:
 Machine-maintenance tables may remain in the canonical record under clearly
 labeled disclosures, but they must not crowd the ordinary owner path.
 
-## Owner-and-AI journeys
+## Deterministic synthetic owner-facing journeys
 
 Maintainers may run synthetic role-play scenarios to review question pacing,
 answer confirmation, gate comprehension, document navigation, resume,
 side-question recovery, and Codex-owned correction. Store full evidence
 outside the reusable template. Tracked results contain only sanitized,
 non-personal summaries and stable references.
-In the 1.2 release statement, **owner/AI journeys** means credential-free
-synthetic journeys exercised by repository tests. Optional external model
+In the 1.2 release statement, **deterministic synthetic owner-facing journeys**
+means credential-free scenarios exercised by repository tests. Optional external model
 role-play remains a separate evidence class and must be reported as not run
 unless its complete current evidence bundle was actually scored.
 

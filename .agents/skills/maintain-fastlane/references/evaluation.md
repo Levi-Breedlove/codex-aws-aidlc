@@ -4,6 +4,9 @@ Use this maintainer-only procedure for optional owner/AI journey evaluation,
 customer-record readability qualification, or real-AWS field qualification.
 It creates no lifecycle gate or publication authority.
 
+For the final deterministic corpus, package comparison, rendered review, CI,
+and release-evidence sequence, also follow `qualification.md`.
+
 ## Deterministic baseline
 
 `tests/test_product_journeys.py` is the credential-free Golden Project Corpus.

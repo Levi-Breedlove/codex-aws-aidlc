@@ -271,18 +271,23 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertIn("app/.gitkeep", manifest["required_files"])
-        self.assertIn("app/.gitkeep", manifest["source_sha256"])
+        self.assertIn("app/README.md", manifest["required_files"])
+        self.assertIn("app/README.md", manifest["source_sha256"])
         self.assertNotIn("app/AGENTS.md", manifest["required_files"])
         self.assertNotIn("app/AGENTS.md", manifest["source_sha256"])
-        self.assertEqual((REPOSITORY_ROOT / "app/.gitkeep").read_bytes(), b"")
+        app_readme = (REPOSITORY_ROOT / "app/README.md").read_text(encoding="utf-8")
+        self.assertIn("single application-code root", app_readme)
+        self.assertIn("New application", app_readme)
+        self.assertIn("Existing application", app_readme)
+        self.assertIn("Infrastructure-only project", app_readme)
+        self.assertIn("parallel top-level `apps/` or `src/`", app_readme)
         self.assertFalse((REPOSITORY_ROOT / "app/AGENTS.md").exists())
 
     def test_manifest_is_the_only_internal_version_source(self) -> None:
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.1")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.2")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
