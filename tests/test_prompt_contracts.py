@@ -108,7 +108,7 @@ class PromptPackContractTests(unittest.TestCase):
             "AGENTS.md",
             "SECURITY.md",
             "README.md",
-            "docs/advanced/HOOKS.md",
+            ".codex/hooks/README.md",
             "docs/TROUBLESHOOTING.md",
             "docs/WORKFLOW.md",
             "docs/project/PRD.md",
@@ -1105,11 +1105,9 @@ Approver: <name/handle>"""
         ):
             self.assertIn(phrase, self.security)
 
-    def test_human_first_documents_label_the_exact_agent_reference(self) -> None:
-        documents = {
+    def test_machine_references_stay_out_of_owner_project_records(self) -> None:
+        internal_documents = {
             "root AGENTS": self.agents,
-            "PRD": self.prd,
-            "TASKS": self.tasks,
             "prompt pack": self.prompts,
             "infrastructure AGENTS": (
                 PROJECT_ROOT / "infrastructure" / "AGENTS.md"
@@ -1118,8 +1116,10 @@ Approver: <name/handle>"""
                 encoding="utf-8"
             ),
         }
-        for name, document in documents.items():
+        for name, document in internal_documents.items():
             self.assertRegex(document, r"(?m)^## Agent reference", name)
+        self.assertNotRegex(self.prd, r"(?m)^## Agent reference")
+        self.assertNotRegex(self.tasks, r"(?m)^## Agent reference")
         self.assertLessEqual(len(self.root_readme.splitlines()), 80)
         self.assertIn("## Start", self.root_readme)
         self.assertIn("## What to expect", self.root_readme)
@@ -1167,14 +1167,19 @@ Approver: <name/handle>"""
             "Understand the workflow": "docs/WORKFLOW.md",
             "troubleshooting guide": "docs/TROUBLESHOOTING.md",
             "Security": "SECURITY.md",
-            "Optional hooks": "docs/advanced/HOOKS.md",
-            "Maintainer evaluation": "docs/maintainers/EVALUATION.md",
+            "Optional hooks": ".codex/hooks/README.md",
             "documentation index": "docs/README.md",
         }
         for label, target in links.items():
             with self.subTest(label=label):
                 self.assertIn(f"[{label}]({target})", self.root_readme)
                 self.assertTrue((REPOSITORY_ROOT / target).is_file())
+        for deferred in (
+            "docs/QUALIFICATION.md",
+            "docs/SHOWCASE.md",
+            "docs/maintainers/EVALUATION.md",
+        ):
+            self.assertNotIn(deferred, self.root_readme)
         handoff = (
             "After Gate B, Codex builds locally. For AWS preflight, deployment "
             "verification, or teardown preparation, ask Codex to use "
@@ -1272,7 +1277,7 @@ Approver: <name/handle>"""
         self.assertNotIn("hook conflict review", boot)
 
     def test_hook_docs_use_generated_opt_in_flow_and_discovery_order(self) -> None:
-        hooks = (PROJECT_ROOT / "docs/advanced/HOOKS.md").read_text(encoding="utf-8")
+        hooks = (PROJECT_ROOT / ".codex/hooks/README.md").read_text(encoding="utf-8")
         dependency = (PROJECT_ROOT / "docs/DEPENDENCY-POLICY.md").read_text(
             encoding="utf-8"
         )
@@ -1878,9 +1883,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.2.2")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.3")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.2.2", self.prompts)
+        self.assertIn("**Pack version:** 1.2.3", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]

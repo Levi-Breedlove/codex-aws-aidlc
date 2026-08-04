@@ -1,7 +1,7 @@
 # Fastlane documentation
 
-Use this page to find the right Fastlane guide without reading internal
-implementation instructions.
+Use this page to find the right customer or project guide. Framework maintenance
+procedure lives outside `docs/` so it cannot compete with project truth.
 
 ## Start here
 
@@ -9,10 +9,6 @@ implementation instructions.
   fresh template.
 - [Understand the workflow](WORKFLOW.md) — see the complete owner journey from
   idea through local construction and optional AWS operations.
-- [Review the 1.2 qualification and walkthrough](QUALIFICATION.md) - see the
-  complete owner journey, tested scenarios, and bounded release claims.
-- [See the customer showcase](SHOWCASE.md) — follow a synthetic project from
-  intake through local evidence without implying AWS deployment.
 - [Troubleshoot](TROUBLESHOOTING.md) — resolve setup, resume, AWS Core, and
   Engine blockers without regenerating an active project.
 - [Security policy](../SECURITY.md) — understand trust, data, credentials, and
@@ -35,19 +31,19 @@ in the same document; Fastlane never creates a separate human PRD.
 
 ## Optional operator features
 
-- [Hooks](advanced/HOOKS.md) — optional post-Gate-B defense in depth. Fastlane remains
+- [Hooks](../.codex/hooks/README.md) — optional post-Gate-B defense in depth. Fastlane remains
   correct when hooks are disabled.
 - [Dependency policy](DEPENDENCY-POLICY.md) — AWS Core, Ruff, and GitHub Actions
   maintenance boundaries.
 
-## Maintainers
+## Framework maintenance
 
-- [Evaluation overview](maintainers/EVALUATION.md) — what owner/AI and field qualification
-  can and cannot prove.
-- [Workflow](WORKFLOW.md) — the owner-visible lifecycle that maintenance must
-  preserve.
-- Framework procedures live in `maintain-fastlane`; deterministic behavior
-  lives in the Engine and tests.
+- [Maintenance skill](../.agents/skills/maintain-fastlane/SKILL.md) — bounded
+  framework-change and publication procedure.
+- [Evaluation procedure](../.agents/skills/maintain-fastlane/references/evaluation.md)
+  — deterministic readability and journey checks.
+- [Qualification procedure](../.agents/skills/maintain-fastlane/references/qualification.md)
+  — evidence boundaries for a release candidate.
 
 Fastlane has exactly two routine owner gates. Tool availability, hooks, AWS
 Core, and GitHub access never create approval or authorization.

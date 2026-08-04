@@ -1170,7 +1170,7 @@ Exact records below remain machine-validated and auditable. They do not add an o
 <details>
 <summary>Exact Gate B record-maintenance and validation rules</summary>
 
-## Agent reference — exact record maintenance
+## Exact record maintenance
 
 Project facts and owner decisions remain in this PRD. Phase procedures, receipt syntax, and Engine schemas remain in their designated Fastlane authorities; `docs/project/AGENTS.md` narrows safe edits here.
 ## 30. Gate B validation and invalidation rules

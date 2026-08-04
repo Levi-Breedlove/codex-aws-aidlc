@@ -27,7 +27,7 @@ current construction authorization (`AUTH`) permits the named GitHub writes.
 - [Active work and blockers](#active-work-blockers-and-next-action)
 - [Task definitions](#task-definitions)
 - [Checkpoint history](#checkpoints-and-resume)
-- [Exact execution state](#agent-reference-exact-run-and-task-state)
+- [Exact execution state](#exact-run-and-task-state)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
 Gate A and Gate B are the only routine human gates. Task readiness, wave
@@ -62,7 +62,7 @@ checkpoint, or evidence binding.
 <details>
 <summary>Exact run, task, dependency, attempt, and checkpoint records</summary>
 
-## Agent reference — exact run and task state
+## Exact run and task state
 
 ## Active execution snapshot
 

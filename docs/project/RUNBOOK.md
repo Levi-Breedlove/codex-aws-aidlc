@@ -35,6 +35,9 @@
 
 Use only the safest operation shown above. Stop whenever identity, account, Region, environment, resource scope, cost, rollback, expiry, evidence, or owner authority differs from the current Engine projection.
 
+<details>
+<summary>Exact AWS authority record</summary>
+
 ## Active operational boundary
 
 Complete this card before authenticated AWS work. It mirrors the authoritative
@@ -53,6 +56,8 @@ boundary; it does not create one.
 
 Missing, stale, conflicting, placeholder, or mismatched values grant no mutation
 authority.
+
+</details>
 
 ## 1. Environments
 
