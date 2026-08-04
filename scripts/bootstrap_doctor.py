@@ -806,6 +806,61 @@ EXAMPLE_SCENARIO_HEADERS = (
 EXAMPLE_SCENARIO_ID = re.compile(r"EX-\d{3,}")
 HARNESS_EVIDENCE_DESTINATION = "docs/project/VERIFY.md#harness-execution-evidence"
 MANAGED_SERVERLESS_MARKER = "MANAGED_SERVERLESS_BASELINE:"
+ERROR_HANDLING_HEADING = "## 19. Error handling strategy"
+ERROR_HANDLING_HEADERS = (
+    "Error class",
+    "Example",
+    "Retry?",
+    "User-visible behavior",
+    "Logging or metric",
+    "Recovery",
+)
+REQUIRED_ERROR_CLASSES = (
+    "Validation",
+    "Transient dependency",
+    "Permanent dependency",
+    "Concurrency conflict",
+    "Internal defect",
+)
+AWS_SERVICE_DECISION_HEADING = "## 20. AWS implementation approach"
+AWS_SERVICE_DECISION_HEADERS = (
+    "Concern",
+    "Decision IDs",
+    "AWS service or mechanism",
+    "Rationale",
+    "Tradeoff",
+)
+AWS_SERVICE_TECH_CONCERNS = {
+    "Compute": {"APPLICATION_RUNTIME", "APPLICATION_FRAMEWORK"},
+    "API and edge": {"APPLICATION_FRAMEWORK", "EDGE_NETWORKING"},
+    "Identity": {"IDENTITY_AUTHORIZATION"},
+    "Data": {"DATA_STORAGE"},
+    "Messaging": {"MESSAGING_RETRIES"},
+    "Observability": {"OBSERVABILITY_INCIDENT_RESPONSE"},
+    "Deployment": {"INFRASTRUCTURE_AS_CODE", "DEPLOYMENT_TOOLING"},
+    "Secrets and encryption": {"SECURITY_VALIDATION", "IDENTITY_AUTHORIZATION"},
+}
+IAC_VALIDATION_HEADING = "### IaC and delivery validation contract"
+IAC_VALIDATION_HEADERS = (
+    "Validation path",
+    "Applicability",
+    "TECH binding",
+    "Required local/static validation",
+    "AWS planning validation",
+    "Evidence destination",
+)
+IAC_VALIDATION_PATHS = (
+    "CloudFormation / SAM / CDK",
+    "Terraform",
+    "Container delivery",
+    "Other approved delivery path",
+)
+IAC_VALIDATION_TECH_CONCERNS = {
+    "INFRASTRUCTURE_AS_CODE",
+    "SECURITY_VALIDATION",
+    "DEPLOYMENT_TOOLING",
+}
+IAC_VALIDATION_EVIDENCE_DESTINATION = "docs/project/VERIFY.md#iac-validation-evidence"
 PROPERTY_EXECUTION_HEADING = "### Property execution contract"
 PROPERTY_EXECUTION_HEADERS = (
     "Property ID",
@@ -6237,6 +6292,235 @@ def derive_example_scenario_contract(
     return table, identifiers, issues
 
 
+def _support_value_is_concrete(value: str) -> bool:
+    cleaned = clean_cell(value)
+    return (
+        explicit_value(cleaned, allow_none=False)
+        and EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is None
+    )
+
+
+def _not_applicable_reason(value: str) -> str | None:
+    match = re.fullmatch(r"NOT_APPLICABLE (?:\u2014|-) (.+)", clean_cell(value))
+    if match is None or not _support_value_is_concrete(match.group(1)):
+        return None
+    return match.group(1)
+
+
+def design_support_record_issues(
+    text: str,
+    technology_by_id: Mapping[str, TechnologyDecision],
+) -> list[str]:
+    """Validate design support records that block modern Gate B readiness."""
+
+    issues: list[str] = []
+    try:
+        error_table = contract_table_after_heading(
+            text, ERROR_HANDLING_HEADING, ERROR_HANDLING_HEADERS
+        )
+    except ValueError as exc:
+        error_table = None
+        issues.append(f"Error handling contract: {exc}")
+    if error_table is None:
+        issues.append(f"Missing {ERROR_HANDLING_HEADING}")
+    else:
+        counts: dict[str, int] = {}
+        for row in error_table.rows:
+            error_class, _example, retry, *_remainder = row
+            counts[error_class] = counts.get(error_class, 0) + 1
+            if any(not _support_value_is_concrete(cell) for cell in row):
+                issues.append(
+                    f"{error_class or 'Error handling row'}: every error-handling "
+                    "field must be concrete"
+                )
+            retry_value = clean_cell(retry)
+            if not re.search(
+                r"\b(?:no|bounded|fresh state|max(?:imum)?)\b", retry_value, re.I
+            ):
+                issues.append(
+                    f"{error_class or 'Error handling row'}: retry posture must "
+                    "explicitly deny or bound retry"
+                )
+            if re.search(r"\b(?:unbounded|unlimited|forever)\b", retry_value, re.I):
+                issues.append(
+                    f"{error_class or 'Error handling row'}: retry posture is unbounded"
+                )
+        for error_class in REQUIRED_ERROR_CLASSES:
+            count = counts.get(error_class, 0)
+            if count != 1:
+                issues.append(
+                    f"Error class {error_class} must appear exactly once; found {count}"
+                )
+        unexpected = sorted(set(counts) - set(REQUIRED_ERROR_CLASSES))
+        if unexpected:
+            issues.append("Unexpected error classes: " + ", ".join(unexpected))
+
+    try:
+        aws_table = contract_table_after_heading(
+            text, AWS_SERVICE_DECISION_HEADING, AWS_SERVICE_DECISION_HEADERS
+        )
+    except ValueError as exc:
+        aws_table = None
+        issues.append(f"AWS service decision contract: {exc}")
+    if aws_table is None:
+        issues.append(f"Missing {AWS_SERVICE_DECISION_HEADING}")
+    else:
+        counts: dict[str, int] = {}
+        for concern, decision_ids, mechanism, rationale, tradeoff in aws_table.rows:
+            counts[concern] = counts.get(concern, 0) + 1
+            for label, value in (
+                ("AWS service or mechanism", mechanism),
+                ("Rationale", rationale),
+                ("Tradeoff", tradeoff),
+            ):
+                if not _support_value_is_concrete(value):
+                    issues.append(
+                        f"{concern or 'AWS decision row'}: {label} is unresolved"
+                    )
+            try:
+                identifiers = _canonical_id_list(
+                    decision_ids,
+                    TECHNOLOGY_DECISION_ID,
+                    f"{concern} AWS decision IDs",
+                )
+            except ValueError as exc:
+                issues.append(str(exc))
+                identifiers = []
+            decisions = [technology_by_id.get(identifier) for identifier in identifiers]
+            unknown = [
+                identifier
+                for identifier, decision in zip(identifiers, decisions)
+                if decision is None
+            ]
+            if unknown:
+                issues.append(
+                    f"{concern}: AWS decision IDs are not current technology IDs: "
+                    + ", ".join(unknown)
+                )
+            allowed_concerns = AWS_SERVICE_TECH_CONCERNS.get(concern, set())
+            if decisions and not any(
+                decision is not None and decision.concern in allowed_concerns
+                for decision in decisions
+            ):
+                issues.append(
+                    f"{concern}: AWS decision IDs do not bind the relevant "
+                    "technology concern"
+                )
+        for concern in AWS_SERVICE_TECH_CONCERNS:
+            count = counts.get(concern, 0)
+            if count != 1:
+                issues.append(
+                    f"AWS concern {concern} must appear exactly once; found {count}"
+                )
+        unexpected = sorted(set(counts) - set(AWS_SERVICE_TECH_CONCERNS))
+        if unexpected:
+            issues.append("Unexpected AWS decision concerns: " + ", ".join(unexpected))
+
+    try:
+        iac_table = contract_table_after_heading(
+            text, IAC_VALIDATION_HEADING, IAC_VALIDATION_HEADERS
+        )
+    except ValueError as exc:
+        iac_table = None
+        issues.append(f"IaC and delivery validation contract: {exc}")
+    if iac_table is None:
+        issues.append(f"Missing {IAC_VALIDATION_HEADING}")
+    else:
+        counts: dict[str, int] = {}
+        for row in iac_table.rows:
+            (
+                path,
+                applicability,
+                tech_binding,
+                local_check,
+                planning_check,
+                destination,
+            ) = row
+            counts[path] = counts.get(path, 0) + 1
+            for label, value in (
+                ("TECH binding", tech_binding),
+                ("Required local/static validation", local_check),
+                ("AWS planning validation", planning_check),
+            ):
+                if not _support_value_is_concrete(value):
+                    issues.append(
+                        f"{path or 'IaC validation row'}: {label} is unresolved"
+                    )
+            if destination != IAC_VALIDATION_EVIDENCE_DESTINATION:
+                issues.append(
+                    f"{path}: Evidence destination must be exactly "
+                    f"{IAC_VALIDATION_EVIDENCE_DESTINATION}"
+                )
+            if applicability == "APPLICABLE":
+                try:
+                    identifiers = _canonical_id_list(
+                        tech_binding,
+                        TECHNOLOGY_DECISION_ID,
+                        f"{path} TECH binding",
+                    )
+                except ValueError as exc:
+                    issues.append(str(exc))
+                    identifiers = []
+                decisions = [
+                    technology_by_id.get(identifier) for identifier in identifiers
+                ]
+                unknown = [
+                    identifier
+                    for identifier, decision in zip(identifiers, decisions)
+                    if decision is None
+                ]
+                if unknown:
+                    issues.append(
+                        f"{path}: TECH binding references unknown IDs: "
+                        + ", ".join(unknown)
+                    )
+                invalid_concerns = sorted(
+                    {
+                        decision.concern
+                        for decision in decisions
+                        if decision is not None
+                        and decision.concern not in IAC_VALIDATION_TECH_CONCERNS
+                    }
+                )
+                if invalid_concerns:
+                    issues.append(
+                        f"{path}: TECH binding uses unrelated concerns: "
+                        + ", ".join(invalid_concerns)
+                    )
+                if decisions and not any(
+                    decision is not None
+                    and decision.concern
+                    in {"INFRASTRUCTURE_AS_CODE", "DEPLOYMENT_TOOLING"}
+                    for decision in decisions
+                ):
+                    issues.append(
+                        f"{path}: TECH binding needs an infrastructure or deployment decision"
+                    )
+                for decision in decisions:
+                    if decision is not None and technology_value_is_not_applicable(
+                        decision.selection
+                    ):
+                        issues.append(
+                            f"{path}: applicable validation cannot bind non-applicable "
+                            f"technology decision {decision.decision_id}"
+                        )
+            elif _not_applicable_reason(applicability) is None:
+                issues.append(
+                    f"{path}: Applicability must be APPLICABLE or "
+                    "NOT_APPLICABLE - <concrete reason>"
+                )
+        for path in IAC_VALIDATION_PATHS:
+            count = counts.get(path, 0)
+            if count != 1:
+                issues.append(
+                    f"IaC validation path {path} must appear exactly once; found {count}"
+                )
+        unexpected = sorted(set(counts) - set(IAC_VALIDATION_PATHS))
+        if unexpected:
+            issues.append("Unexpected IaC validation paths: " + ", ".join(unexpected))
+    return issues
+
+
 def architecture_trace_declaration_issues(
     architecture: ArchitectureContract,
     project_contract: ProjectDesignContract,
@@ -9660,6 +9944,8 @@ def derive_design_contract(
                 )
 
     technology_by_id = {decision.decision_id: decision for decision in technologies}
+    if required and not grandfather_approved_v1:
+        issues.extend(design_support_record_issues(text, technology_by_id))
     for execution in executions:
         property_technology = technology_by_id.get(execution.framework_tech_id)
         if (
@@ -11356,7 +11642,11 @@ def derive_owner_decision_brief(
             ("validation-strategy", "Validation strategy", "Validation strategy"),
             ("harness-profile", "Harness checks", "Validation strategy"),
             ("release-acceptance", "Release acceptance", "26. Release acceptance"),
-            ("first-wave", "First construction wave", "First construction wave"),
+            (
+                "first-wave",
+                "First construction wave",
+                "21. Implementation boundaries and order",
+            ),
             ("gate-b-readiness", "Gate B readiness", "Gate B — readiness card"),
             (
                 "construction-boundary",

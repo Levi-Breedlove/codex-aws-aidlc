@@ -24,6 +24,7 @@ Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10. BUG-10 and SYNC-10 are requ
   failure. Never put AWS credentials or privileged AWS logic in client code.
 - Before completion, run every required formatter, linter, type checker, test,
   build, and applicable security check from the current Harness Profile.
+- For BUG-10, preserve the observed failure, confirmed evidence, approved repair boundary, unchanged behavior, and replayable regression check. Project `BUG-PROP-*` definitions into exact task validation and VERIFY evidence; do not let a generator or oracle defect masquerade as a product repair.
 
 ## Tasks and local construction
 

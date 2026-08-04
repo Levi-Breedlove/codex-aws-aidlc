@@ -687,13 +687,15 @@ class PromptPackContractTests(unittest.TestCase):
             "## 24. Property-based testing specification", 1
         )[1].split("\n## 25.", 1)[0]
         for record_contract in (
-            "classify every measurable Gate A requirement",
             "APPLICABLE` / `NOT_APPLICABLE",
             "### Property execution contract",
             "Seed or reproduction format",
-            "Every applicable property definition must contain concrete",
         ):
             self.assertIn(record_contract, property_section)
+        self.assertIn(
+            "Classify every measurable approved requirement", self.fastlane_design
+        )
+        self.assertIn("concrete generated inputs or states", self.fastlane_design)
         self.assertLess(
             property_section.index("| PROP-005 |"),
             property_section.index("### Property execution contract"),
@@ -987,10 +989,12 @@ Approver: <name/handle>"""
         residual_review = self.prompt_section("AWS-40")
         teardown = self.prompt_section("AWS-50")
 
-        for document in (self.prd, self.verify, self.prompts):
+        for document in (self.prompts, self.operate_fastlane_aws):
             self.assertIn("CreateChangeSet", document)
             self.assertRegex(document, r"(?is)CreateChangeSet.{0,180}mutation")
             self.assertRegex(document, r"(?i)access(?:analyzer| analyzer)")
+        self.assertNotIn("CreateChangeSet", self.prd)
+        self.assertNotIn("ValidatePolicy", self.prd)
         self.assertIn("API: accessanalyzer.ValidatePolicy", preflight)
         self.assertNotIn("Create a CloudFormation change set here", preflight)
         self.assertIn("separate allowed operations", deployment)
@@ -999,7 +1003,11 @@ Approver: <name/handle>"""
         self.assertIn("delayed AWS Budgets", deployment)
         self.assertIn("not guaranteed", deployment)
 
-        self.assertRegex(self.prd, r"(?i)do not impose a\s+universal scanner")
+        for document in (self.prompts, self.fastlane_design):
+            self.assertRegex(
+                document, r"(?i)(?:do not impose|do not add).*universal scanner"
+            )
+        self.assertNotIn("universal scanner", self.prd)
         self.assertIn("## IaC validation evidence", self.verify)
         self.assertIn(
             "| Phase | TECH IDs | Validation method | Exact command or API | "
@@ -1024,7 +1032,7 @@ Approver: <name/handle>"""
         self.assertNotIn("Perform post-teardown read-only verification", teardown)
 
         self.assertIn("Lightweight Well-Architected decision review", self.prd)
-        self.assertRegex(self.prd, r"not a separate audit or\s+gate")
+        self.assertRegex(self.prd, r"review does not add\s+another gate")
         self.assertLessEqual(len(self.root_readme.splitlines()), 80)
 
     def test_aws_execution_lanes_are_derived_and_do_not_create_authority(self) -> None:
@@ -1094,8 +1102,13 @@ Approver: <name/handle>"""
         self.assertIn(
             "approved access succeeds and unapproved access is denied", self.prd
         )
-        self.assertIn("Invalid, malformed, and oversized inputs are rejected", self.prd)
-        self.assertIn("actual discovered defect", self.prd)
+        self.assertIn(
+            "rejecting unsafe input without unintended changes",
+            " ".join(self.prd.split()),
+        )
+        self.assertIn(
+            "IF external input violates documented shape or size limits", self.prd
+        )
         for phrase in (
             "approved access succeeds and unapproved access is denied",
             "secrets stay out of code",
@@ -1591,12 +1604,14 @@ Approver: <name/handle>"""
 
     def test_aws_core_design_evidence_is_advisory_and_tech_bindable(self) -> None:
         design = self.prompt_section("DESIGN-10")
-        for document in (self.verify, design):
-            self.assertIn("DES-0001; TECH: TECH-0001, TECH-0002", document)
-            self.assertIn(
-                "DES-0001; TECH: NONE — no technology/toolchain impact", document
-            )
+        self.assertIn("DES-0001; TECH: TECH-0001, TECH-0002", design)
+        self.assertIn("DES-0001; TECH: NONE — no technology/toolchain impact", design)
         self.assertIn("Advisory Design binding", self.verify)
+        self.assertIn("DES-0001; TECH: TECH-0001, TECH-0002", self.verify)
+        self.assertRegex(
+            self.verify,
+            r"DES-0001; TECH: NONE . no technology/toolchain impact",
+        )
         self.assertRegex(self.verify, r"never\s+selects a technology")
         self.assertIn("observed AWS Core version is metadata, never a pin", design)
 
@@ -1634,7 +1649,6 @@ Approver: <name/handle>"""
 
         for surface in (
             self.agents,
-            self.prd,
             design,
             planning_references,
             architecture_challenger,
@@ -1643,7 +1657,7 @@ Approver: <name/handle>"""
         self.assertIn(
             "secure pay-per-use serverless options", " ".join(self.root_readme.split())
         )
-        for surface in (self.agents, self.prd, planning_references):
+        for surface in (self.agents, planning_references):
             self.assertIn("MINIMIZE_TOTAL_COST", surface)
         self.assertRegex(
             self.root_readme,
@@ -1656,7 +1670,7 @@ Approver: <name/handle>"""
             self.prompts,
         )
         self.assertIn("| AWS cost ceiling |", self.prd)
-        self.assertRegex(self.prd, r"not a guaranteed .*billing stop")
+        self.assertIn("Any owner budget is a ceiling, not a spending target.", self.prd)
         for surface in (self.root_readme, self.agents, self.prd, self.prompts):
             self.assertNotIn("{{MONTHLY_BUDGET}}", surface)
 
@@ -1883,9 +1897,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.2.3")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.4")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.2.3", self.prompts)
+        self.assertIn("**Pack version:** 1.2.4", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -2105,7 +2119,9 @@ Approver: <name/handle>"""
             "`NOT_APPLICABLE — <technology/risk reason>`",
         ):
             self.assertIn(status, design_reference)
-        self.assertIn("does not impose a universal", self.prd)
+        self.assertIn(
+            "chosen for this design rather than imposed universally", self.prd
+        )
         self.assertIn(
             "tests, and the first construction wave", " ".join(design_reference.split())
         )
@@ -2395,7 +2411,8 @@ Approver: <name/handle>"""
             self.prd.index(component_table), self.prd.index("### Layer boundaries")
         )
         for kind in ("PRIMARY_USER", "SECONDARY_USER", "OPERATOR", "EXTERNAL_SYSTEM"):
-            self.assertIn(kind, self.prd)
+            self.assertIn(kind, self.fastlane_define)
+            self.assertIn(kind, self.engine_source)
         for trigger in (
             "LIFECYCLE_RESOURCE",
             "ASYNCHRONOUS_WORK",
@@ -2404,9 +2421,9 @@ Approver: <name/handle>"""
             "MIGRATION_OR_CUTOVER",
             "OTHER_MEANINGFUL_TRANSITION",
         ):
-            self.assertIn(trigger, self.prd)
+            self.assertIn(trigger, self.fastlane_design)
+            self.assertIn(trigger, self.engine_source)
         self.assertIn("MAX_ATTEMPTS: <positive integer>", self.engine_source)
-        self.assertIn("RETRY_OR_RESUME", self.prd)
 
     def test_request_scoped_adjuncts_never_become_engine_routes(self) -> None:
         coordinator = (PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_text(

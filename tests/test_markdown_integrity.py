@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import unittest
 from pathlib import Path
@@ -18,11 +19,22 @@ MERMAID_DECLARATION = re.compile(
     r"stateDiagram(?:-v2)?|classDiagram|erDiagram|journey|gantt|pie|mindmap|"
     r"timeline|quadrantChart|requirementDiagram)\b"
 )
+PRD_DISCLOSURE = re.compile(
+    r"<details>\s*<summary>([^<\n]+)</summary>\s*(.*?)\s*</details>",
+    re.DOTALL,
+)
 AUTHORIZATION_STEP = "Authorize, validate, and apply idempotency"
 PERSISTENCE_STEP = "Persist approved data"
 QUEUE_ACK_STEP = "Durable enqueue acknowledged"
 ACCEPTED_STEP = "Accepted response with correlation ID"
 WORKER_DELIVERY_STEP = "Deliver work"
+RECEIPT_SHA256 = {
+    "gate-a-receipt": "7b6ad510b449d0095101c0ebdd75f9ac21d826076f5ee215c03dc17579880266",
+    "gate-b-receipt": "455995bf3557aa32ef9cd82513430eb25f26265924929aad4d6d32e1698275c4",
+    "aws-read-preflight-receipt": "72b244b89c1b2affd194ded7484147eef406ecfd09e8be9e4a1c86d318313433",
+    "aws-deployment-receipt": "0d58dd6348d513216cf57936f9b4ccada146389533c077d252145df91ac8d7de",
+    "aws-teardown-receipt": "a6bc0f3dca0104238b0c344af61386af00f167e9f326026b786197cfb1067119",
+}
 WORKER_VALIDATION_STEP = "Validate trusted source, schema, and idempotency"
 WORKER_PERSISTENCE_STEP = "Worker->>Data: Persist approved data"
 
@@ -236,7 +248,7 @@ sequenceDiagram
                 prd,
                 rf"\| DIAGRAM-[0-9]{{4}} \| {kind} \| .* \| NOT_YET_CREATED \|",
             )
-        self.assertIn("Diagrams describe planned design", prd)
+        self.assertIn("Diagrams describe planned design", " ".join(prd.split()))
         design = (
             REPOSITORY_ROOT / ".agents/skills/fastlane/references/design.md"
         ).read_text(encoding="utf-8")
@@ -352,6 +364,11 @@ sequenceDiagram
         }
         mermaid_fence = chr(96) * 3 + "mermaid"
         for heading, expected_anchor in required.items():
+            empty_slot_text = (
+                "No project architecture diagram has been created yet."
+                if expected_anchor == "proposed-system-at-a-glance"
+                else "No primary-outcome sequence has been created yet."
+            )
             self.assertEqual(lines.count(heading), 1, heading)
             heading_index = lines.index(heading)
             next_heading = next(
@@ -372,11 +389,9 @@ sequenceDiagram
             )
             self.assertEqual(depth_by_line[heading_index + 1], 0)
             if mermaid_index is None:
-                slot = lines[heading_index + 1 : next_heading]
-                self.assertTrue(
-                    any(line.startswith("NOT_YET_CREATED") for line in slot),
-                    heading,
-                )
+                slot = " ".join(lines[heading_index + 1 : next_heading])
+                self.assertIn(empty_slot_text, slot, heading)
+                self.assertNotIn("NOT_YET_CREATED", slot, heading)
             else:
                 self.assertEqual(lines[mermaid_index], lines[mermaid_index].lstrip())
                 self.assertFalse(lines[mermaid_index].startswith("|"))
@@ -387,6 +402,77 @@ sequenceDiagram
                 re.sub(r"[^\w -]", "", heading[4:].lower()),
             ).strip("-")
             self.assertEqual(anchor, expected_anchor)
+
+    def test_prd_disclosures_explain_and_contain_the_promised_records(self) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        disclosures = PRD_DISCLOSURE.findall(prd)
+        self.assertEqual(len(disclosures), prd.count("<details>"))
+        self.assertGreater(len(disclosures), 0)
+
+        for summary, body in disclosures:
+            with self.subTest(summary=summary):
+                self.assertRegex(summary, r"^(?:Exact|Detailed)\s+")
+                introduction = body.strip().split("\n\n", 1)[0]
+                self.assertNotRegex(introduction, r"^(?:#|\||[-*]\s|```)")
+                self.assertRegex(introduction, r"[.!?](?:\s|$)")
+                has_table = re.search(r"(?m)^\|.*\|\s*\n\|[-:| ]+\|", body) is not None
+                has_list = re.search(r"(?m)^(?:[-*]|\d+\.)\s+", body) is not None
+                has_code = chr(96) * 3 in body
+                self.assertTrue(
+                    has_table or has_list or has_code,
+                    f"{summary} explains records but does not contain them",
+                )
+
+        gate_b_body = dict(disclosures)["Detailed Gate B readiness basis"]
+        self.assertIn(
+            "| Field | Current design and construction decision basis |",
+            gate_b_body,
+        )
+        for field in (
+            "Design basis IDs",
+            "Architecture/components",
+            "Technology/toolchains/version policy",
+            "Interfaces/data flow",
+            "Identity/secrets",
+            "Failure/retry/concurrency",
+            "Deployment/operations",
+            "Validation/evidence",
+            "Rollback/recovery/teardown",
+            "Brownfield compatibility/migration",
+            "Outstanding gaps",
+        ):
+            self.assertIn(f"| {field} |", gate_b_body)
+
+    def test_prd_owner_path_stays_within_the_readability_ceiling(self) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        visible_lines = [
+            line
+            for _number, line, depth in disclosure_lines(prd)
+            if line
+            and line not in {"<details>", "</details>"}
+            and (depth == 0 or line.startswith("<summary>"))
+        ]
+        self.assertLessEqual(len(visible_lines), 330)
+
+    def test_prd_contains_records_but_no_framework_maintenance_instructions(
+        self,
+    ) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        for phrase in (
+            "Use only",
+            "Replace this table",
+            "During DESIGN-10",
+            "During REQ-10",
+            "schema migration",
+            "canonical order",
+            "parser-controlled",
+            "CreateChangeSet",
+            "ValidatePolicy",
+            "The Engine owns",
+            "recompute the",
+            "sort rows",
+        ):
+            self.assertNotIn(phrase, prd)
 
     def test_owner_reading_path_keeps_actions_boundaries_and_receipts_visible(
         self,
@@ -449,6 +535,31 @@ sequenceDiagram
         owner_path = "\n".join(visible.values())
         for phrase in forbidden_visible_instructions:
             self.assertNotIn(phrase, owner_path)
+
+        for line in visible["PRD.md"].splitlines():
+            if not (line.startswith("|") and line.endswith("|")):
+                continue
+            columns = len(re.findall(r"(?<!\\)\|", line)) - 1
+            self.assertLessEqual(columns, 6, ("PRD.md", columns, line))
+
+    def test_all_five_receipt_blocks_match_the_1_2_3_base_bytes(self) -> None:
+        locations = {
+            "gate-a-receipt": "docs/project/PRD.md",
+            "gate-b-receipt": "docs/project/PRD.md",
+            "aws-read-preflight-receipt": "docs/project/VERIFY.md",
+            "aws-deployment-receipt": "docs/project/VERIFY.md",
+            "aws-teardown-receipt": "docs/project/VERIFY.md",
+        }
+        for marker, relative_path in locations.items():
+            source = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+            start = f"<!-- bootstrap:{marker}:start -->"
+            end = f"<!-- bootstrap:{marker}:end -->"
+            block = source[source.index(start) : source.index(end) + len(end)] + "\n"
+            self.assertEqual(
+                hashlib.sha256(block.encode("utf-8")).hexdigest(),
+                RECEIPT_SHA256[marker],
+                marker,
+            )
 
     def test_automatic_agents_context_has_explicit_headroom(self) -> None:
         root_agents = REPOSITORY_ROOT / "AGENTS.md"

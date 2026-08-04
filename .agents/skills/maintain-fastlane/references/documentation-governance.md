@@ -24,7 +24,14 @@ project-record templates. It is a maintenance procedure, not an adopter phase.
 
 Never duplicate authority to make a document easier to read. Improve the view,
 navigation, labels, disclosure structure, or generated summary while preserving
-the single canonical record.
+the single canonical record. The marked first-screen summary is explicitly
+non-authoritative and excluded from parsers, routing, and canonical digests.
+
+Progressive disclosure is a presentation tool, not an authority loophole. A
+dropdown may contain exact canonical tables, but its label and introduction
+must explain those records to the owner. It may not retain Codex imperatives,
+parser or migration rules, digest or routing logic, or AWS operating procedure
+merely because the content is collapsed.
 
 Keep `docs/` for reusable customer guidance and canonical project records. Do
 not place maintainer procedures, qualification reports, showcase journeys,
@@ -37,10 +44,12 @@ stay outside the reusable template unless separately authorized.
 1. Identify the document's primary reader and first action.
 2. Keep the first screen focused on current state, owner need, next Codex action,
    and unapproved or unauthorized work.
-3. Relocate machine procedure to its canonical instructional home. Preserve any
+3. Audit both visible and collapsed prose, then relocate machine procedure to
+   its canonical instructional home. Preserve any
    parser-controlled heading, table, marker, stable ID, receipt, and record order.
-4. Keep active decisions, material risks, commands, diagrams, and formal receipts
-   open. Use balanced labeled disclosures only for exact records or appendices.
+4. Keep active decisions, material risks, project commands, diagrams, and formal
+   receipts open. Use balanced labeled disclosures only for exact records or
+   appendices.
 5. Validate all relative links, heading anchors, Mermaid fences, summary markers,
    UTF-8 text, visible-line budgets, package inventory, and version mirrors.
 
@@ -48,6 +57,11 @@ Count a visible line as a nonblank rendered line outside a closed `<details>`
 body; count its `<summary>` once. Machine terminology in an exact collapsed
 record is allowed when the parser requires it, but it must not leak into the
 ordinary owner path.
+
+Raw file length is not capped. Enforce the owner-visible ceilings: PRD 330,
+TASKS 65, VERIFY 90, RUNBOOK 220, and BUGFIX 90 nonblank lines. A stale generated
+first-screen summary is safe Codex-owned repair and may block presentation of a
+misleading Owner Brief; it never invalidates a gate.
 
 Any Semantic Contract change must update workflow guidance, the applicable
 phase procedure, project schema, Engine validation/projection, owner-visible
