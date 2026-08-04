@@ -443,7 +443,7 @@ sequenceDiagram
         ):
             self.assertIn(f"| {field} |", gate_b_body)
 
-    def test_gate_b_numbered_headings_are_visible_and_records_fold_together(
+    def test_numbered_record_headings_are_visible_and_records_fold_together(
         self,
     ) -> None:
         prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -453,21 +453,42 @@ sequenceDiagram
         disclosures = dict(PRD_DISCLOSURE.findall(prd))
         cases = (
             (
+                "## 13. Cross-requirement analysis",
+                "Exact Gate A analysis, lineage, assumptions, and open-decision records",
+                "These records show the findings, changes, assumptions, and unresolved decisions",
+                (
+                    "| ID | Type | Requirements involved | Finding | Resolution or decision | Blocking? | Status |",
+                    "| RA-001 |",
+                    "| Current revision | Prior revision | Trigger | Added IDs | Changed IDs | Removed IDs | Preserved IDs | Stale reason | Required revalidation |",
+                    "| REQ-0001 |",
+                    "| Assumption ID | Assumption | Status | Basis IDs | Validation or successor |",
+                    "| ASM-001 |",
+                    "| ID | Decision needed | Options | Decision owner | Blocking? | Resolution |",
+                    "| DEC-001 |",
+                    "| Field | Agent-recorded value |",
+                    "| Requirements revision analyzed |",
+                ),
+            ),
+            (
                 "## 27. Gate B agent review record",
                 "Detailed Gate B independent review record",
                 "This record shows what the independent read-only review examined",
-                "| Field | Agent-recorded value |",
-                "| Requirements revision reviewed |",
+                (
+                    "| Field | Agent-recorded value |",
+                    "| Requirements revision reviewed |",
+                ),
             ),
             (
                 "## 28. Construction envelope",
                 "Exact construction envelope",
                 "This record defines the bounded local work Codex may perform after Gate B.",
-                "| Boundary | Authorized value |",
-                "| Construction authorization ID |",
+                (
+                    "| Boundary | Authorized value |",
+                    "| Construction authorization ID |",
+                ),
             ),
         )
-        for heading, summary, introduction, table_header, required_row in cases:
+        for heading, summary, introduction, required_records in cases:
             with self.subTest(heading=heading):
                 self.assertEqual(prd.count(heading), 1)
                 heading_line = prd.splitlines().index(heading) + 1
@@ -476,8 +497,8 @@ sequenceDiagram
                 body = disclosures[summary]
                 self.assertNotIn(heading, body)
                 self.assertIn(introduction, " ".join(body.split()))
-                self.assertIn(table_header, body)
-                self.assertIn(required_row, body)
+                for required_record in required_records:
+                    self.assertIn(required_record, body)
 
     def test_prd_owner_path_stays_within_the_readability_ceiling(self) -> None:
         prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
