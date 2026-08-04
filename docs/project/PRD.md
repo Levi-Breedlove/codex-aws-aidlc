@@ -1135,8 +1135,7 @@ Release is acceptable when:
 
 # Gate B Review
 
-Gate B approves the complete technical plan and a bounded local construction
-run. It does not authorize GitHub publication or any AWS account operation.
+Gate B approves the technical plan and bounded local construction; it does not authorize GitHub publication or AWS account work.
 
 ## Executive decision
 
@@ -1155,13 +1154,13 @@ locally inside the approved envelope.
 | Reliability and operations | [Error handling](#19-error-handling-strategy), [release acceptance](#26-release-acceptance), and current project diagrams |
 | Validation and construction | [Validation strategy](#validation-strategy), readiness card, and the exact construction envelope |
 
+## 27. Gate B agent review record
+
 <details>
 <summary>Detailed Gate B independent review record</summary>
 
 This record shows what the independent read-only review examined and whether it
 found a gap that should be resolved before the owner decides.
-
-## 27. Gate B agent review record
 
 | Field | Agent-recorded value |
 |---|---|
@@ -1209,17 +1208,16 @@ Gate B authorizes only the exact local construction scope recorded below. It
 does not authorize GitHub publication or AWS account work. Any broader path,
 command, task, external target, cost, or operation requires the existing
 correction and authorization process. The **Application source disposition**
-names the one application-code home: `app/**` for greenfield work, the recorded
-preserved roots for brownfield work, or an explicit infrastructure-only
-exception. Fastlane rejects parallel greenfield `apps/**` and `src/**` roots.
+names one application-code home: greenfield `app/**`, recorded brownfield roots,
+or an explicit infrastructure-only exception; parallel `apps/**` and `src/**` roots are rejected.
+
+## 28. Construction envelope
 
 <details>
 <summary>Exact construction envelope</summary>
 
 This record defines the bounded local work Codex may perform after Gate B. Any
 repository, GitHub, or AWS action outside it remains unauthorized.
-
-## 28. Construction envelope
 
 | Boundary | Authorized value |
 |---|---|
