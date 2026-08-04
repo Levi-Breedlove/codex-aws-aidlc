@@ -522,22 +522,21 @@ to the scenario or journey that demonstrates its coverage.
 
 # Gate A Review
 
-Gate A confirms the complete product agreement: outcome, users, first-release
-scope, success measures, data and access boundaries, risk, recovery, Region,
-and cost posture. It does not approve a technical design, construction,
-publication, deployment, or teardown.
+Gate A confirms the complete product agreement: outcome, users, first-release scope,
+success measures, data and access boundaries, risk, recovery, Region, and cost posture.
+It does not approve a technical design, construction, publication, deployment, or teardown.
 
 Review the readiness card, request a correction with
 `Change the requirements: <correction>.`, or provide the exact receipt shown
 last in the owner acceptance record. After approval, Codex continues to Design.
+
+## 13. Cross-requirement analysis
 
 <details>
 <summary>Exact Gate A analysis, lineage, assumptions, and open-decision records</summary>
 
 These records show the findings, changes, assumptions, and unresolved decisions
 behind the Gate A recommendation and the current AWS-guidance basis.
-
-## 13. Cross-requirement analysis
 
 ### Findings
 
