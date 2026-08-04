@@ -478,9 +478,9 @@ class PromptPackContractTests(unittest.TestCase):
         setup_assistant = (PROJECT_ROOT / "scripts/setup_assistant.py").read_text(
             encoding="utf-8"
         )
-        fastlane_skill = (
-            PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md"
-        ).read_text(encoding="utf-8")
+        fastlane_skill = (PROJECT_ROOT / ".agents/skills/fastlane/SKILL.md").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("allowlisted, ephemeral stdin interface", setup_assistant)
         self.assertIn("allowlisted, ephemeral", fastlane_skill)
         self.assertIn("persist prerequisite observations", fastlane_skill)

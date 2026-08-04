@@ -60,8 +60,7 @@ def strip_generated_summary(source: str) -> str:
     if span is not None:
         start, end = span
         masked = "".join(
-            character if character in "\r\n" else " "
-            for character in source[start:end]
+            character if character in "\r\n" else " " for character in source[start:end]
         )
         masked_source = source[:start] + masked + source[end:]
     return strip_generated_view(masked_source)

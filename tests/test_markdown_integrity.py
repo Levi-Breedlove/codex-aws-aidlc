@@ -432,9 +432,7 @@ sequenceDiagram
                 "## Current progress",
                 "## Active work, blockers, and next action",
             ),
-            "VERIFY.md": (
-                "## Current result",
-            ),
+            "VERIFY.md": ("## Current result",),
             "RUNBOOK.md": (
                 "## Safety boundary",
                 "## 6. Deployment",

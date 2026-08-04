@@ -10279,9 +10279,14 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(observed["document_views"]["status"], "STALE")
         self.assertIn("DOCUMENT_VIEW_STALE", codes(observed))
         self.assertEqual(observed["gates"], baseline["gates"])
-        self.assertEqual(observed["requirements_contract"], baseline["requirements_contract"])
+        self.assertEqual(
+            observed["requirements_contract"], baseline["requirements_contract"]
+        )
         self.assertEqual(observed["design_contract"], baseline["design_contract"])
-        self.assertEqual(observed["basis"]["prd_snapshot_sha256"], baseline["basis"]["prd_snapshot_sha256"])
+        self.assertEqual(
+            observed["basis"]["prd_snapshot_sha256"],
+            baseline["basis"]["prd_snapshot_sha256"],
+        )
         self.assertEqual(observed["authorizations"], baseline["authorizations"])
 
     def test_stale_summary_blocks_only_a_pending_owner_brief(self) -> None:

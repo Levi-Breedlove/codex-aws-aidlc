@@ -37,7 +37,9 @@ BASELINE_VISIBLE_LINES = {
     "docs/project/BUGFIX.md": 109,
 }
 BASELINE_COMBINED_CHARACTERS = 136_153
-PRIMARY_RECORDS = tuple(path for path in BASELINE_VISIBLE_LINES if not path.endswith("BUGFIX.md"))
+PRIMARY_RECORDS = tuple(
+    path for path in BASELINE_VISIBLE_LINES if not path.endswith("BUGFIX.md")
+)
 HUMAN_FIRST_RECORDS = tuple(BASELINE_VISIBLE_LINES)
 VISIBLE_LINE_CEILINGS = {
     "docs/project/PRD.md": 330,
