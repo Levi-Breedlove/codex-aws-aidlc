@@ -82,7 +82,7 @@ Visible again
 
     def test_final_readability_thresholds_are_explicit(self) -> None:
         rules = (REPOSITORY_ROOT / "docs/project/AGENTS.md").read_text(encoding="utf-8")
-        evaluation = (REPOSITORY_ROOT / "docs/EVALUATION.md").read_text(
+        evaluation = (REPOSITORY_ROOT / "docs/maintainers/EVALUATION.md").read_text(
             encoding="utf-8"
         )
         for phrase in (

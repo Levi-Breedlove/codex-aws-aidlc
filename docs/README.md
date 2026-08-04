@@ -11,6 +11,8 @@ implementation instructions.
   idea through local construction and optional AWS operations.
 - [Review the 1.2 qualification and walkthrough](QUALIFICATION.md) - see the
   complete owner journey, tested scenarios, and bounded release claims.
+- [See the customer showcase](SHOWCASE.md) — follow a synthetic project from
+  intake through local evidence without implying AWS deployment.
 - [Troubleshoot](TROUBLESHOOTING.md) — resolve setup, resume, AWS Core, and
   Engine blockers without regenerating an active project.
 - [Security policy](../SECURITY.md) — understand trust, data, credentials, and
@@ -33,14 +35,14 @@ in the same document; Fastlane never creates a separate human PRD.
 
 ## Optional operator features
 
-- [Hooks](HOOKS.md) — optional post-Gate-B defense in depth. Fastlane remains
+- [Hooks](advanced/HOOKS.md) — optional post-Gate-B defense in depth. Fastlane remains
   correct when hooks are disabled.
 - [Dependency policy](DEPENDENCY-POLICY.md) — AWS Core, Ruff, and GitHub Actions
   maintenance boundaries.
 
 ## Maintainers
 
-- [Evaluation overview](EVALUATION.md) — what owner/AI and field qualification
+- [Evaluation overview](maintainers/EVALUATION.md) — what owner/AI and field qualification
   can and cannot prove.
 - [Workflow](WORKFLOW.md) — the owner-visible lifecycle that maintenance must
   preserve.

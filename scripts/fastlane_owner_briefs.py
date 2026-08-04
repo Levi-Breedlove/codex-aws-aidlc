@@ -30,17 +30,19 @@ ALLOWED_MATURITIES = frozenset(
     }
 )
 BRIEF_STATUSES = frozenset({"NONE", "BUILDING", "READY", "STALE", "BLOCKED"})
-TECHNICAL_DOMAINS = frozenset(
-    {
-        "application/runtime",
-        "identity",
-        "data",
-        "messaging",
-        "edge/networking",
-        "observability",
-        "deployment/recovery",
-        "validation/construction",
-    }
+TECHNICAL_DOMAIN_ORDER = (
+    "application/runtime",
+    "identity",
+    "data",
+    "messaging",
+    "edge/networking",
+    "observability",
+    "deployment/recovery",
+    "validation/construction",
+)
+TECHNICAL_DOMAINS = frozenset(TECHNICAL_DOMAIN_ORDER)
+GATE_A_DECISION_DOMAINS = frozenset(
+    {"product", "scope", "success", "data/access", "operations", "assumption"}
 )
 WINDOWS_ABSOLUTE = re.compile(r"^[A-Za-z]:[\\/]")
 SECRET_LIKE = re.compile(
@@ -238,7 +240,9 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
                 "evidence_status",
                 "reconsider_when",
             ):
-                if not isinstance(decision.get(field), str) or not decision.get(field):
+                if not isinstance(decision.get(field), str) or (
+                    status == "READY" and not decision.get(field)
+                ):
                     issues.append(f"{decision_id or 'decision'} is missing {field}")
             for field in ("basis_ids", "evidence_ids", "source_locator_keys"):
                 values = decision.get(field)
@@ -337,6 +341,145 @@ def finalize_owner_decision_brief(
     if output_bytes > MAX_OWNER_BRIEF_OUTPUT_BYTES:
         issues.append(
             "brief exceeds the deterministic owner-facing output budget "
+            f"({output_bytes} > {MAX_OWNER_BRIEF_OUTPUT_BYTES} bytes)"
+        )
+    projection["canonical_sha256"] = (
+        canonical_sha256(projection) if not issues else None
+    )
+    return projection, issues
+
+
+def empty_owner_decision_inventory() -> dict[str, Any]:
+    """Return the neutral additive inventory used outside a pending owner gate."""
+
+    return {
+        "schema_version": 1,
+        "kind": "NONE",
+        "status": "NONE",
+        "required_domains": [],
+        "decisions": [],
+        "canonical_sha256": None,
+    }
+
+
+def validate_owner_decision_inventory(projection: Mapping[str, Any]) -> list[str]:
+    """Validate one complete, derived inventory of owner-visible decisions."""
+
+    issues: list[str] = []
+    kind = projection.get("kind")
+    status = projection.get("status")
+    if projection.get("schema_version") != 1 or kind not in {
+        "NONE",
+        "GATE_A",
+        "GATE_B",
+    }:
+        issues.append("decision inventory identity is invalid")
+    if status not in BRIEF_STATUSES:
+        issues.append("decision inventory status is invalid")
+    required_domains = projection.get("required_domains")
+    decisions = projection.get("decisions")
+    if not _sequence(required_domains):
+        issues.append("decision inventory required_domains must be an array")
+        required_domains = []
+    if not _sequence(decisions):
+        issues.append("decision inventory decisions must be an array")
+        decisions = []
+    if kind == "NONE":
+        if required_domains or decisions:
+            issues.append("neutral decision inventory cannot contain decisions")
+        return issues
+    if status == "READY" and not decisions:
+        issues.append("ready decision inventory has no decisions")
+
+    seen_ids: set[str] = set()
+    observed_domains: list[str] = []
+    for decision in decisions:
+        if not isinstance(decision, Mapping):
+            issues.append("decision inventory contains an invalid decision")
+            continue
+        decision_id = decision.get("decision_id")
+        domain = decision.get("domain")
+        if (
+            not isinstance(decision_id, str)
+            or not decision_id
+            or decision_id in seen_ids
+        ):
+            issues.append("decision inventory IDs must be present and unique")
+        else:
+            seen_ids.add(decision_id)
+        if not isinstance(domain, str) or not domain:
+            issues.append(f"{decision_id or 'decision'} has no domain")
+        else:
+            observed_domains.append(domain)
+        for field in (
+            "title",
+            "selection",
+            "source",
+            "owner_effect",
+            "why",
+            "alternatives",
+            "tradeoff",
+            "risk_and_mitigation",
+            "evidence_status",
+            "reconsider_when",
+        ):
+            if not isinstance(decision.get(field), str) or (
+                status == "READY" and not decision.get(field)
+            ):
+                issues.append(f"{decision_id or 'decision'} is missing {field}")
+        if decision.get("maturity") not in ALLOWED_MATURITIES:
+            issues.append(f"{decision_id or 'decision'} has invalid maturity")
+        for field in ("basis_ids", "evidence_ids", "source_locator_keys"):
+            values = decision.get(field)
+            if not _sequence(values) or any(
+                not isinstance(item, str) or not item for item in values or []
+            ):
+                issues.append(f"{decision_id or 'decision'} has invalid {field}")
+        if status == "READY" and not decision.get("basis_ids"):
+            issues.append(f"{decision_id or 'decision'} has no canonical basis")
+        if status == "READY" and not decision.get("source_locator_keys"):
+            issues.append(f"{decision_id or 'decision'} has no source location")
+
+    if kind == "GATE_B" and status == "READY":
+        expected = list(TECHNICAL_DOMAIN_ORDER)
+        if list(required_domains) != expected:
+            issues.append("Gate B required domains are incomplete or out of order")
+        if observed_domains != expected:
+            issues.append(
+                "Gate B must contain exactly one decision for every technical domain"
+            )
+    elif kind == "GATE_A":
+        if required_domains:
+            issues.append("Gate A does not use a fixed technical-domain list")
+        invalid_domains = sorted(set(observed_domains) - GATE_A_DECISION_DOMAINS)
+        if invalid_domains:
+            issues.append(
+                "Gate A contains invalid decision domains: "
+                + ", ".join(invalid_domains)
+            )
+
+    serialized = json.dumps(projection, ensure_ascii=False)
+    if SECRET_LIKE.search(serialized) is not None:
+        issues.append("decision inventory contains secret-like content")
+    return issues
+
+
+def finalize_owner_decision_inventory(
+    projection: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
+    """Validate and digest a derived inventory without creating authority."""
+
+    projection = dict(projection)
+    projection.pop("canonical_sha256", None)
+    issues = validate_owner_decision_inventory(projection)
+    output_bytes = len(
+        json.dumps(
+            projection, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+    )
+    if output_bytes > MAX_OWNER_BRIEF_OUTPUT_BYTES:
+        issues.append(
+            "decision inventory exceeds the deterministic owner-facing output budget "
             f"({output_bytes} > {MAX_OWNER_BRIEF_OUTPUT_BYTES} bytes)"
         )
     projection["canonical_sha256"] = (

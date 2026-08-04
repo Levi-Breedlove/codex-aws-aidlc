@@ -55,6 +55,71 @@ class OwnerBriefProjectionTests(unittest.TestCase):
         self.assertEqual(issues, [])
         return finalized
 
+    def ready_gate_a_inventory(self) -> dict[str, object]:
+        projection = {
+            "schema_version": 1,
+            "kind": "GATE_A",
+            "status": "READY",
+            "required_domains": [],
+            "decisions": [
+                {
+                    "decision_id": "INTAKE-0001",
+                    "domain": "product",
+                    "title": "Starting point",
+                    "selection": "A new application",
+                    "source": "Validated owner intake",
+                    "maturity": "CONFIRMED_BY_OWNER",
+                    "owner_effect": "Fastlane can create one new application.",
+                    "why": "The owner confirmed this starting point.",
+                    "alternatives": "This is an owner fact, not an agent selection.",
+                    "tradeoff": "Existing behavior is not assumed.",
+                    "risk_and_mitigation": "A change requires Gate A revalidation.",
+                    "evidence_status": "CONFIRMED_BY_OWNER",
+                    "reconsider_when": "The owner changes the starting point.",
+                    "basis_ids": ["INTAKE-0001"],
+                    "evidence_ids": [],
+                    "source_locator_keys": ["gate-a-readiness"],
+                }
+            ],
+        }
+        finalized, issues = briefs.finalize_owner_decision_inventory(projection)
+        self.assertEqual(issues, [])
+        return finalized
+
+    def ready_gate_b_inventory(self) -> dict[str, object]:
+        decisions = []
+        for index, domain in enumerate(briefs.TECHNICAL_DOMAIN_ORDER, start=1):
+            decisions.append(
+                {
+                    "decision_id": f"OWNER-DES-{index:04d}",
+                    "domain": domain,
+                    "title": domain.replace("/", " and ").title(),
+                    "selection": f"Selected {domain} approach",
+                    "source": "Canonical Design-7 records",
+                    "maturity": "PLANNED_AFTER_APPROVAL",
+                    "owner_effect": f"This defines the {domain} boundary.",
+                    "why": "It satisfies the current requirement basis.",
+                    "alternatives": "A broader option was rejected as unnecessary.",
+                    "tradeoff": "The bounded choice favors simplicity.",
+                    "risk_and_mitigation": "The recorded validation limits risk.",
+                    "evidence_status": "PLANNED_AFTER_APPROVAL",
+                    "reconsider_when": "A measurable design basis changes.",
+                    "basis_ids": ["REQ-0001", "DES-0001"],
+                    "evidence_ids": [],
+                    "source_locator_keys": ["selected-architecture"],
+                }
+            )
+        projection = {
+            "schema_version": 1,
+            "kind": "GATE_B",
+            "status": "READY",
+            "required_domains": list(briefs.TECHNICAL_DOMAIN_ORDER),
+            "decisions": decisions,
+        }
+        finalized, issues = briefs.finalize_owner_decision_inventory(projection)
+        self.assertEqual(issues, [])
+        return finalized
+
     def test_source_locator_is_repository_relative_and_digest_bound(self) -> None:
         locator = briefs.source_locator(
             key="section",
@@ -81,9 +146,18 @@ class OwnerBriefProjectionTests(unittest.TestCase):
 
     def test_owner_decision_brief_is_digest_bound_and_presentable(self) -> None:
         brief = self.ready_gate_a()
-        report = {"owner_decision_brief": brief}
+        report = {
+            "owner_decision_brief": brief,
+            "owner_decision_inventory": self.ready_gate_a_inventory(),
+        }
         rendered = presenter.render_owner_decision_brief(report, "GATE_A")
         self.assertIn("Gate A Owner Decision Brief", rendered)
+        self.assertIn("| Starting point | A new application |", rendered)
+        self.assertIn(
+            "Validated owner intake — [Gate A readiness]"
+            "(docs/project/PRD.md#gate-a-readiness)",
+            rendered,
+        )
         self.assertIn("Not authorized", rendered)
         self.assertIn("docs/project/PRD.md#gate-a-readiness", rendered)
 
@@ -91,7 +165,11 @@ class OwnerBriefProjectionTests(unittest.TestCase):
         changed["status"] = "STALE"
         with self.assertRaisesRegex(presenter.PresentationError, "digest"):
             presenter.render_owner_decision_brief(
-                {"owner_decision_brief": changed}, "GATE_A"
+                {
+                    "owner_decision_brief": changed,
+                    "owner_decision_inventory": self.ready_gate_a_inventory(),
+                },
+                "GATE_A",
             )
 
     def test_ready_gate_b_requires_a_technical_decision_index(self) -> None:
@@ -177,55 +255,79 @@ class OwnerBriefProjectionTests(unittest.TestCase):
                 section_text="## Selected architecture\n\nARCH-0001\n",
             )
         ]
+        inventory = self.ready_gate_b_inventory()
         projection["technical_decision_groups"] = [
             {
-                "domain": "application/runtime",
+                "domain": decision["domain"],
                 "decisions": [
                     {
-                        "decision_id": "ARCH-0001",
-                        "decision": "Application architecture",
-                        "owner_effect": "The owner receives a managed application.",
-                        "selection": "Managed service design",
-                        "requirement_basis": "REQ-0001 and FR-001",
-                        "why": "It satisfies the approved first release.",
-                        "alternatives": (
-                            "Self-managed hosting was rejected for operations."
-                        ),
-                        "tradeoff": "Lower operations with provider dependency.",
-                        "risk_and_mitigation": "Limits are measured and monitored.",
-                        "evidence_status": (
-                            "Source verified; implementation unobserved."
-                        ),
-                        "reconsider_when": (
-                            "Revisit if latency exceeds its approved target."
-                        ),
-                        "basis_ids": ["REQ-0001", "FR-001"],
-                        "evidence_ids": ["AWS-EV-0001"],
+                        "decision_id": decision["decision_id"],
+                        "decision": decision["title"],
+                        "owner_effect": decision["owner_effect"],
+                        "selection": decision["selection"],
+                        "requirement_basis": "REQ-0001 and DES-0001",
+                        "why": decision["why"],
+                        "alternatives": decision["alternatives"],
+                        "tradeoff": decision["tradeoff"],
+                        "risk_and_mitigation": decision["risk_and_mitigation"],
+                        "evidence_status": decision["evidence_status"],
+                        "reconsider_when": decision["reconsider_when"],
+                        "basis_ids": ["REQ-0001", "DES-0001"],
+                        "evidence_ids": [],
                         "source_locator_keys": ["selected-architecture"],
                     }
                 ],
             }
+            for decision in inventory["decisions"]
         ]
         finalized, issues = briefs.finalize_owner_decision_brief(projection)
         self.assertEqual(issues, [])
         rendered = presenter.render_owner_decision_brief(
-            {"owner_decision_brief": finalized}, "GATE_B"
+            {
+                "owner_decision_brief": finalized,
+                "owner_decision_inventory": inventory,
+            },
+            "GATE_B",
         )
         for label in (
-            "What this means for you:",
-            "Selected:",
-            "Requirement basis:",
-            "Why selected:",
-            "Alternatives and rejection reasons:",
-            "Tradeoffs:",
+            "Meaning and selection:",
+            "Basis and rationale:",
+            "Alternatives and tradeoffs:",
             "Risks and safeguards:",
-            "Evidence status:",
-            "Reconsider when:",
+            "Evidence and revisit trigger:",
             "Exact source:",
         ):
             self.assertIn(label, rendered)
         self.assertIn("Change the design: <correction>.", rendered)
         self.assertIn("docs/project/PRD.md#selected-architecture", rendered)
+        self.assertEqual(
+            [item["domain"] for item in inventory["decisions"]],
+            list(briefs.TECHNICAL_DOMAIN_ORDER),
+        )
+        self.assertLessEqual(
+            len([line for line in rendered.splitlines() if line.strip()]), 140
+        )
+
+    def test_gate_b_inventory_fails_when_any_promised_domain_is_missing(self) -> None:
+        complete = self.ready_gate_b_inventory()
+        for missing_domain in briefs.TECHNICAL_DOMAIN_ORDER:
+            with self.subTest(domain=missing_domain):
+                candidate = dict(complete)
+                candidate.pop("canonical_sha256", None)
+                candidate["decisions"] = [
+                    decision
+                    for decision in complete["decisions"]
+                    if decision["domain"] != missing_domain
+                ]
+                finalized, issues = briefs.finalize_owner_decision_inventory(candidate)
+                self.assertIn(
+                    (
+                        "Gate B must contain exactly one decision for every "
+                        "technical domain"
+                    ),
+                    issues,
+                )
+                self.assertIsNone(finalized["canonical_sha256"])
 
     def test_output_budget_blocks_instead_of_truncating_owner_content(self) -> None:
         projection = self.ready_gate_a()

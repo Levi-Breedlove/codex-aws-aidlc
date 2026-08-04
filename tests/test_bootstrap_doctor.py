@@ -716,7 +716,8 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
         "Architecture/components": "`ARCH-0001`",
         "Technology/toolchains/version policy": (
             "`TECH-0001, TECH-0002, TECH-0003, TECH-0004, TECH-0005, "
-            "TECH-0006, TECH-0007, TECH-0008, TECH-0009`"
+            "TECH-0006, TECH-0007, TECH-0008, TECH-0009, TECH-0010, "
+            "TECH-0011, TECH-0012, TECH-0013, TECH-0014, TECH-0015`"
         ),
         "Interfaces/data flow": "`Local request and response flow`",
         "Identity/secrets": "`No secrets; local development identity`",
@@ -746,7 +747,7 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
                 (
                     *MODERN_APPROVED_REQUIREMENT_IDS,
                     "ARCH-0001",
-                    *(f"TECH-{number:04d}" for number in range(1, 10)),
+                    *(f"TECH-{number:04d}" for number in range(1, 16)),
                     "PROP-001",
                     "HARNESS-004",
                     "API-001",
@@ -1537,14 +1538,114 @@ def complete_design_contract(text: str) -> str:
         ("TECH-0007", "PROPERTY_TESTING", "Hypothesis", "MINIMUM: 6.0"),
         ("TECH-0008", "SECURITY_VALIDATION", "Bandit", "EXACT: 1.7.9"),
         ("TECH-0009", "DEPLOYMENT_TOOLING", "AWS SAM CLI", "MINIMUM: 1.120"),
+        (
+            "TECH-0010",
+            "IDENTITY_AUTHORIZATION",
+            "Local development identity with server-side authorization",
+            "ORG_MANAGED: approved design contract",
+        ),
+        (
+            "TECH-0011",
+            "DATA_STORAGE",
+            "Local JSON store with per-owner records",
+            "ORG_MANAGED: approved design contract",
+        ),
+        (
+            "TECH-0012",
+            "MESSAGING_RETRIES",
+            "NOT_APPLICABLE — synchronous local request flow",
+            "NOT_APPLICABLE — synchronous local request flow",
+        ),
+        (
+            "TECH-0013",
+            "EDGE_NETWORKING",
+            "NOT_APPLICABLE — local-only development surface",
+            "NOT_APPLICABLE — local-only development surface",
+        ),
+        (
+            "TECH-0014",
+            "OBSERVABILITY_INCIDENT_RESPONSE",
+            "Structured local logs and failure counters",
+            "ORG_MANAGED: approved design contract",
+        ),
+        (
+            "TECH-0015",
+            "RELIABILITY_RECOVERY",
+            "Baseline commit restore with explicit rollback checks",
+            "ORG_MANAGED: approved design contract",
+        ),
     )
+    reasoning = {
+        "APPLICATION_RUNTIME": (
+            "It is current, supported, and fits the approved local slice",
+            "A second runtime would add packaging and operations cost",
+        ),
+        "APPLICATION_FRAMEWORK": (
+            "It provides the smallest typed HTTP surface for the approved journey",
+            "A larger framework adds features the first release does not need",
+        ),
+        "FRONTEND_FRAMEWORK": (
+            "The approved slice uses a server-rendered interface",
+            "A separate browser framework adds a second build surface",
+        ),
+        "INFRASTRUCTURE_AS_CODE": (
+            "It keeps the planned AWS shape reviewable and reversible",
+            "Hand-written account changes are not deterministic",
+        ),
+        "PACKAGE_BUILD_TOOLING": (
+            "It matches the selected Python runtime",
+            "A second package manager adds lock and setup ambiguity",
+        ),
+        "TEST_TOOLING": (
+            "It is available with the runtime and fits the bounded slice",
+            "A second unit-test runner adds no current benefit",
+        ),
+        "PROPERTY_TESTING": (
+            "Generated boundary cases protect the approved invariant",
+            "Example-only checks miss important input combinations",
+        ),
+        "SECURITY_VALIDATION": (
+            "Static checks provide a repeatable local security baseline",
+            "Manual review alone is not reproducible",
+        ),
+        "DEPLOYMENT_TOOLING": (
+            "It matches the selected reversible infrastructure definition",
+            "An unrelated deployment tool would duplicate configuration",
+        ),
+        "IDENTITY_AUTHORIZATION": (
+            "It preserves server-side access decisions in the local slice",
+            "Client-only authorization would not enforce the boundary",
+        ),
+        "DATA_STORAGE": (
+            "It is sufficient for the bounded local journey and preserves ownership",
+            "A network database adds setup without current value",
+        ),
+        "MESSAGING_RETRIES": (
+            "The approved outcome completes synchronously",
+            "A queue adds delayed-state complexity without a requirement",
+        ),
+        "EDGE_NETWORKING": (
+            "The release is local and has no public edge",
+            "A public endpoint would widen exposure before authorization",
+        ),
+        "OBSERVABILITY_INCIDENT_RESPONSE": (
+            "Structured logs and counters expose local failures without sensitive content",
+            "Unstructured console output is harder to verify",
+        ),
+        "RELIABILITY_RECOVERY": (
+            "The authorized baseline provides a bounded local rollback",
+            "A separate recovery service is unnecessary before deployment",
+        ),
+    }
     technology_table = "\n".join(
         [
             "| Decision ID | Concern | Selection | Version policy | Source | Basis IDs | Alternatives and rationale | Compatibility/migration | Validation |",
             "|---|---|---|---|---|---|---|---|---|",
             *(
                 f"| {decision_id} | {concern} | {selection} | {policy} | "
-                "AGENT_RECOMMENDATION | DES-0001, FR-001 | Selected for the approved slice | "
+                "AGENT_RECOMMENDATION | DES-0001, FR-001 | "
+                f"RATIONALE: {reasoning[concern][0]}; "
+                f"REJECTED: {reasoning[concern][1]} | "
                 "No migration required | Validate with the task command |"
                 for decision_id, concern, selection, policy in technology_rows
             ),
@@ -2677,7 +2778,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.1")
+        self.assertEqual(report["bootstrap_version"], "1.2.2")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -2942,7 +3043,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         ready, issues = doctor.derive_design_contract(complete, "DES-0001")
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(len(ready.technology_decisions), 9)
+        self.assertEqual(len(ready.technology_decisions), 15)
         self.assertEqual(len(ready.property_execution), 1)
         self.assertRegex(ready.canonical_sha256 or "", r"^sha256:[0-9a-f]{64}$")
         self.assertTrue(
@@ -3099,7 +3200,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
             "placeholder rationale sentinel": (
                 complete.replace(
-                    "Selected for the approved slice",
+                    "Generated boundary cases protect the approved invariant",
                     "PLACEHOLDER",
                     1,
                 ),
@@ -4104,7 +4205,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 ["docs/project/PRD.md", "bootstrap.yaml"],
             )
             self.assertEqual(ready_report["external_authority"]["kind"], "NONE")
-            self.assertEqual(len(contract["technology_decisions"]), 9)
+            self.assertEqual(len(contract["technology_decisions"]), 15)
             self.assertEqual(
                 contract["technology_decisions"][6]["concern"], "PROPERTY_TESTING"
             )
@@ -9829,6 +9930,47 @@ class BootstrapDoctorTests(unittest.TestCase):
                     unsafe_issues,
                 )
 
+    def test_design_seven_fails_when_any_owner_technical_domain_is_missing(
+        self,
+    ) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        complete = complete_design_contract(source)
+        representative_concerns = {
+            "application/runtime": "APPLICATION_RUNTIME",
+            "identity": "IDENTITY_AUTHORIZATION",
+            "data": "DATA_STORAGE",
+            "messaging": "MESSAGING_RETRIES",
+            "edge/networking": "EDGE_NETWORKING",
+            "observability": "OBSERVABILITY_INCIDENT_RESPONSE",
+            "deployment/recovery": "RELIABILITY_RECOVERY",
+            "validation/construction": "TEST_TOOLING",
+        }
+        self.assertEqual(
+            set(representative_concerns),
+            set(doctor.TECHNICAL_DOMAIN_ORDER),
+        )
+        for domain, concern in representative_concerns.items():
+            with self.subTest(domain=domain, concern=concern):
+                without_concern = "\n".join(
+                    line
+                    for line in complete.splitlines()
+                    if f"| {concern} |" not in line
+                )
+                design, issues = doctor.derive_design_contract(
+                    without_concern,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(design.status, "BLOCKED")
+                self.assertTrue(
+                    any(
+                        f"Technology concern {concern} must appear exactly once"
+                        in issue
+                        for issue in issues
+                    ),
+                    issues,
+                )
+
     def test_real_approved_schema_12_gate_a_reaches_schema_six(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         approved_modern = complete_design_contract(approve_gate_a(source))
@@ -10020,6 +10162,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(report["classification"], "UNCONFIGURED_TEMPLATE")
         self.assertEqual(report["owner_decision_brief"]["schema_version"], 1)
         self.assertEqual(report["owner_decision_brief"]["status"], "NONE")
+        self.assertEqual(report["owner_decision_inventory"]["schema_version"], 1)
+        self.assertEqual(report["owner_decision_inventory"]["kind"], "NONE")
+        self.assertEqual(report["owner_decision_inventory"]["status"], "NONE")
+        self.assertEqual(report["owner_decision_inventory"]["decisions"], [])
         self.assertEqual(report["owner_answer_confirmation"]["schema_version"], 1)
         self.assertEqual(report["owner_answer_confirmation"]["status"], "NONE")
         self.assertEqual(

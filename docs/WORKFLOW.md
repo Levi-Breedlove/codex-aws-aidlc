@@ -19,15 +19,13 @@ only once:
 2. Preferred AWS Region.
 3. Development cost posture or hard cap.
 
-An initialized project resumes from its current state instead of repeating
-setup.
+Initialized projects resume without repeating setup.
 
 ## How the conversation works
 
 After the three setup settings, Fastlane asks exactly one unanswered project
-question per owner turn. Each decision explains the practical choices, gives a
-recommendation when appropriate, names its main tradeoff, and provides a short
-copyable reply. Facts already supplied are not asked again.
+question per owner turn. Each decision gives practical choices, a justified
+recommendation and tradeoff, and a valid reply form.
 
 After each answer, Fastlane confirms what it recorded and the practical effect.
 To correct it, reply:
@@ -78,12 +76,9 @@ AWS facts, compares credible whole-system candidates, and selects one complete
 recommendation. AWS Core advises; Codex applies the evidence; the owner approves
 the complete design.
 
-Gate B explains every material technical decision, including application and
-edge delivery, identity and authorization, APIs and compute, databases and
-access patterns, storage and uploads, messaging and retries, encryption and
-secrets, monitoring and incident response, deletion and restoration,
-reliability, performance, cost, deployment, rollback, trust boundaries, state
-transitions, tests, and the first construction wave.
+Gate B covers application/runtime, identity, data, messaging, edge/networking,
+observability, deployment/recovery, and validation/construction. It also makes
+security, cost, evidence maturity, and reconsideration triggers explicit.
 Gate B also records application source: greenfield uses `app/**`, never `apps/**`
 or `src/**`; infrastructure-only records none; brownfield keeps only Gate
 A-preserved roots. It adds no gate or routine question.
@@ -98,8 +93,7 @@ authorize AWS account access, spending, deployment, or teardown.
 
 ## Project records
 
-Start at the [project record guide](project/README.md). Fastlane keeps one
-canonical set:
+Start at the [project record guide](project/README.md):
 
 - PRD — product agreement, technical plan, Gate A, and Gate B.
 - TASKS — current progress, dependencies, and checkpoints.
@@ -107,9 +101,8 @@ canonical set:
 - RUNBOOK — operating, rollback, recovery, and teardown procedures.
 - BUGFIX — one bounded defect record when that adjunct is active.
 
-Each record begins with a compact current-state view showing the phase,
-one owner need or `Nothing`, what Codex does next, and what remains unapproved or
-unauthorized. Human summaries do not replace the exact records.
+Each record begins with current state, one owner need or `Nothing`, the next
+action, and the approval boundary. Summaries never replace exact records.
 
 ## AWS Core and AWS authority
 
@@ -145,12 +138,9 @@ out-of-bound tool requests after Gate B, but it creates no project state,
 approval, or authority. On resume, the Engine restores one current route and
 one next action.
 
-Internal engineering methods are conditional techniques, not lifecycle stages
-or approval gates. Their procedures stay outside the ordinary owner journey.
+Internal engineering methods are conditional techniques, not lifecycle stages or approval gates.
 
-## Agent reference
+## Responsibility map
 
-Global invariants live in `AGENTS.md`; phase procedures in Fastlane references;
-exact receipts in the prompt registry; deterministic behavior in the Engine and
-tests; AWS operations in `operate-fastlane-aws`; and project truth in
-`docs/project/`.
+Project truth lives in `docs/project/`; internal guidance owns procedures,
+receipts, tests, and AWS operations.

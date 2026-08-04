@@ -48,10 +48,11 @@ compatibility input for that same current card. Factual questions remain short
 free text. Recommend a choice
 only when current evidence justifies it; there is no universal default. If no
 recommendation is justified, render exactly
-`No recommendation—choose the option that matches your situation.` and use
-`1: <choose A, B, or C>` for that decision in the copyable reply. Rendering a card with
-`turn_boundary_required` ends the assistant turn; only a new owner message
-may resolve it.
+`No recommendation—choose the option that matches your situation.` followed
+by `Reply with one of:` and valid examples such as `1A`, `1B: <required
+detail>`, and `1C: <required detail>`. Never label an unresolved placeholder
+as a copyable reply. Rendering a card with `turn_boundary_required` ends the
+assistant turn; only a new owner message may resolve it.
 
 - Explain the real-world consequence before a technical name or abbreviation.
   Keep precise engineering terms in canonical records, but do not require the
@@ -66,7 +67,9 @@ may resolve it.
   limitation, and offer no more than two understandable alternatives. Do not
   label factual questions as decisions. Use `1 question remains before
   requirements analysis.` when only one question is pending.
-- End input requests with one short copyable reply. When every recommendation
+- End input requests with one short copyable reply only when that text is a
+  valid current-card answer. Otherwise label it `Reply format` or show valid
+  option examples. When every recommendation
   is independently safe and complete, allow plain
   `Accept all recommendations.` and clarify that it records
   planning decisions only, not AWS access or spending.

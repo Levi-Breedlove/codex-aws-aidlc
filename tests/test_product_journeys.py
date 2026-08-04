@@ -25,6 +25,7 @@ from tests import test_setup_assistant as setup_fixtures
 from tests import test_task_waves as task_fixtures
 
 import bootstrap_doctor as doctor
+import fastlane_owner_briefs as briefs
 import fastlane_presenter as presenter
 import fastlane_context as context_runtime
 import package_release
@@ -163,7 +164,9 @@ class ProductJourneyTests(unittest.TestCase):
             temporary = Path(directory)
             project = self.extract_template(temporary, "fresh")
             self.assertTrue((project / "app").is_dir())
-            self.assertEqual((project / "app/.gitkeep").read_bytes(), b"")
+            app_readme = (project / "app/README.md").read_text(encoding="utf-8")
+            self.assertIn("single application-code root", app_readme)
+            self.assertIn("parallel top-level `apps/` or `src/`", app_readme)
             self.assertFalse((project / "app/AGENTS.md").exists())
             self.assertFalse((project / "apps").exists())
 
@@ -386,8 +389,22 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertTrue(gate_a_brief["formal_receipt_required"])
             self.assertTrue(gate_a_brief["canonical_sha256"])
             verify_source_locators(gate_a_project, gate_a_brief)
+            gate_a_inventory = gate_a["owner_decision_inventory"]
+            self.assertEqual(gate_a_inventory["kind"], "GATE_A")
+            self.assertEqual(gate_a_inventory["status"], "READY")
+            gate_a_decision_ids = [
+                decision["decision_id"] for decision in gate_a_inventory["decisions"]
+            ]
+            self.assertEqual(len(gate_a_decision_ids), len(set(gate_a_decision_ids)))
+            self.assertTrue(
+                set(gate_a["intake_foundation"]["basis_ids"]).issubset(
+                    gate_a_decision_ids
+                )
+            )
             rendered_gate_a = presenter.render_owner_decision_brief(gate_a, "GATE_A")
             self.assertIn("Gate A Owner Decision Brief", rendered_gate_a)
+            self.assertIn("## Your recorded decisions", rendered_gate_a)
+            self.assertIn("First-release journey: JOURNEY-001", rendered_gate_a)
             self.assertIn("Not authorized", rendered_gate_a)
             for locator in gate_a_brief["source_locators"]:
                 anchor = presenter._markdown_anchor(str(locator["heading"]))
@@ -418,15 +435,11 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
             for label in (
-                "What this means for you:",
-                "Selected:",
-                "Requirement basis:",
-                "Why selected:",
-                "Alternatives and rejection reasons:",
-                "Tradeoffs:",
+                "Meaning and selection:",
+                "Basis and rationale:",
+                "Alternatives and tradeoffs:",
                 "Risks and safeguards:",
-                "Evidence status:",
-                "Reconsider when:",
+                "Evidence and revisit trigger:",
                 "Exact source:",
             ):
                 self.assertIn(label, rendered_gate_b)
@@ -438,26 +451,36 @@ class ProductJourneyTests(unittest.TestCase):
             for locator in gate_b_brief["source_locators"]:
                 anchor = presenter._markdown_anchor(str(locator["heading"]))
                 self.assertIn(f"({locator['path']}#{anchor})", rendered_gate_b)
-            design_contract = gate_b["design_contract"]
-            expected_decisions = {
-                design_contract["architecture"]["selection"]["architecture_id"],
-                *(
-                    item["decision_id"]
-                    for item in design_contract["technology_decisions"]
-                ),
-            }
-            if design_contract["harness"]["rows"]:
-                expected_decisions.add("HARNESS-PROFILE")
-            if design_contract["application_source_disposition"] is not None:
-                expected_decisions.add("SOURCE-0001")
-                self.assertIn("Application source layout", rendered_gate_b)
+            gate_b_inventory = gate_b["owner_decision_inventory"]
+            self.assertEqual(gate_b_inventory["kind"], "GATE_B")
+            self.assertEqual(gate_b_inventory["status"], "READY")
+            self.assertEqual(
+                gate_b_inventory["required_domains"],
+                list(briefs.TECHNICAL_DOMAIN_ORDER),
+            )
             actual_decisions = [
                 decision["decision_id"]
                 for group in gate_b_brief["technical_decision_groups"]
                 for decision in group["decisions"]
             ]
             self.assertEqual(len(actual_decisions), len(set(actual_decisions)))
-            self.assertEqual(set(actual_decisions), expected_decisions)
+            self.assertEqual(
+                actual_decisions,
+                [item["decision_id"] for item in gate_b_inventory["decisions"]],
+            )
+            self.assertEqual(
+                [item["domain"] for item in gate_b_inventory["decisions"]],
+                list(briefs.TECHNICAL_DOMAIN_ORDER),
+            )
+            self.assertLessEqual(
+                len([line for line in rendered_gate_b.splitlines() if line.strip()]),
+                140,
+            )
+            self.assertIn("Application And Runtime", rendered_gate_b)
+            self.assertIn(
+                "Application source: GREENFIELD_APP_ROOT: app/**", rendered_gate_b
+            )
+            design_contract = gate_b["design_contract"]
 
             diagram_contract = design_contract["diagram_contract"]
             self.assertEqual(diagram_contract["schema_version"], 1)
@@ -1613,7 +1636,11 @@ class ProductJourneyTests(unittest.TestCase):
             "No recommendation\u2014choose the option that matches your situation.",
             rendered,
         )
-        self.assertIn("1: <choose A, B, or C>", rendered)
+        self.assertIn("Reply with one of:", rendered)
+        self.assertIn("`1A`", rendered)
+        self.assertIn("`1B: <required detail>`", rendered)
+        self.assertIn("`1C: <required detail>`", rendered)
+        self.assertNotIn("<choose A, B, or C>", rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)
         self.assertNotIn("Welcome to AWS Codex Fastlane", rendered)

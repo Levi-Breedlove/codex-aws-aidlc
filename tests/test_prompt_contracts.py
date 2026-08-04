@@ -108,7 +108,7 @@ class PromptPackContractTests(unittest.TestCase):
             "AGENTS.md",
             "SECURITY.md",
             "README.md",
-            "docs/HOOKS.md",
+            "docs/advanced/HOOKS.md",
             "docs/TROUBLESHOOTING.md",
             "docs/WORKFLOW.md",
             "docs/project/PRD.md",
@@ -629,13 +629,19 @@ class PromptPackContractTests(unittest.TestCase):
             ("TECH-0007", "PROPERTY_TESTING"),
             ("TECH-0008", "SECURITY_VALIDATION"),
             ("TECH-0009", "DEPLOYMENT_TOOLING"),
+            ("TECH-0010", "IDENTITY_AUTHORIZATION"),
+            ("TECH-0011", "DATA_STORAGE"),
+            ("TECH-0012", "MESSAGING_RETRIES"),
+            ("TECH-0013", "EDGE_NETWORKING"),
+            ("TECH-0014", "OBSERVABILITY_INCIDENT_RESPONSE"),
+            ("TECH-0015", "RELIABILITY_RECOVERY"),
         ]
         rows = re.findall(r"(?m)^\| (TECH-\d{4}) \| ([A-Z_]+) \|", register)
         self.assertEqual(rows, expected)
         for decision_id, concern in expected:
             self.assertIn(
                 f"| {decision_id} | {concern} | TODO | TODO | TODO | TODO | "
-                "TODO | TODO | TODO |",
+                "RATIONALE: TODO; REJECTED: TODO | TODO | TODO |",
                 register,
             )
 
@@ -1122,8 +1128,11 @@ Approver: <name/handle>"""
         self,
     ) -> None:
         app_root = PROJECT_ROOT / "app"
-        self.assertTrue((app_root / ".gitkeep").is_file())
-        self.assertEqual((app_root / ".gitkeep").read_bytes(), b"")
+        self.assertTrue((app_root / "README.md").is_file())
+        self.assertIn(
+            "single application-code root",
+            (app_root / "README.md").read_text(encoding="utf-8"),
+        )
         self.assertFalse((app_root / "AGENTS.md").exists())
         engine = (PROJECT_ROOT / "scripts/bootstrap_doctor.py").read_text(
             encoding="utf-8"
@@ -1158,8 +1167,8 @@ Approver: <name/handle>"""
             "Understand the workflow": "docs/WORKFLOW.md",
             "troubleshooting guide": "docs/TROUBLESHOOTING.md",
             "Security": "SECURITY.md",
-            "Optional hooks": "docs/HOOKS.md",
-            "Maintainer evaluation": "docs/EVALUATION.md",
+            "Optional hooks": "docs/advanced/HOOKS.md",
+            "Maintainer evaluation": "docs/maintainers/EVALUATION.md",
             "documentation index": "docs/README.md",
         }
         for label, target in links.items():
@@ -1263,7 +1272,7 @@ Approver: <name/handle>"""
         self.assertNotIn("hook conflict review", boot)
 
     def test_hook_docs_use_generated_opt_in_flow_and_discovery_order(self) -> None:
-        hooks = (PROJECT_ROOT / "docs/HOOKS.md").read_text(encoding="utf-8")
+        hooks = (PROJECT_ROOT / "docs/advanced/HOOKS.md").read_text(encoding="utf-8")
         dependency = (PROJECT_ROOT / "docs/DEPENDENCY-POLICY.md").read_text(
             encoding="utf-8"
         )
@@ -1869,9 +1878,9 @@ Approver: <name/handle>"""
     def test_manifest_matches_pack_and_required_files_exist(self) -> None:
         manifest_path = PROJECT_ROOT / "bootstrap.manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["bootstrap_version"], "1.2.1")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.2")
         self.assertEqual(manifest["canonical_prompt_ids"], PROMPT_IDS)
-        self.assertIn("**Pack version:** 1.2.1", self.prompts)
+        self.assertIn("**Pack version:** 1.2.2", self.prompts)
         missing = [
             path
             for path in manifest["required_files"]
@@ -2067,7 +2076,6 @@ Approver: <name/handle>"""
         deliver_reference = (
             PROJECT_ROOT / ".agents/skills/fastlane/references/deliver.md"
         ).read_text(encoding="utf-8")
-        workflow = (PROJECT_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
 
         header = (
             "| Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | "
@@ -2094,7 +2102,7 @@ Approver: <name/handle>"""
             self.assertIn(status, design_reference)
         self.assertIn("does not impose a universal", self.prd)
         self.assertIn(
-            "tests, and the first construction wave", " ".join(workflow.split())
+            "tests, and the first construction wave", " ".join(design_reference.split())
         )
 
         evidence_header = (
@@ -2303,7 +2311,10 @@ Approver: <name/handle>"""
             "No recommendation\u2014choose the option that matches your situation.",
             owner,
         )
-        self.assertIn("`1: <choose A, B, or C>`", owner)
+        self.assertIn("`Reply with one of:`", owner)
+        self.assertIn("`1A`", owner)
+        self.assertIn("Never label an unresolved placeholder", owner)
+        self.assertNotIn("`1: <choose A, B, or C>`", owner)
         self.assertIn(
             "`A` to `NEW_APPLICATION`, `B` to `EXISTING_APPLICATION_CHANGE`, and `C` to",
             intake_compact,

@@ -1559,10 +1559,11 @@ class FastlanePresenterTests(unittest.TestCase):
             "No recommendation—choose the option that matches your situation.",
             rendered,
         )
-        self.assertIn(
-            "Copyable reply:\n1: <choose A, B, or C>",
-            rendered,
-        )
+        self.assertIn("Reply with one of:", rendered)
+        self.assertIn("- `1A`", rendered)
+        self.assertIn("- `1B: <required detail>`", rendered)
+        self.assertIn("- `1C: <required detail>`", rendered)
+        self.assertNotIn("Copyable reply:", rendered)
         self.assertNotIn("2.", rendered)
         foundation = current["intake_foundation"]
         assert isinstance(foundation, dict)
@@ -1654,7 +1655,9 @@ class FastlanePresenterTests(unittest.TestCase):
             "No recommendation—choose the option that matches your situation.",
             rendered,
         )
-        self.assertIn("1: <choose A, B, or C>", rendered)
+        self.assertIn("Reply with one of:", rendered)
+        self.assertIn("- `1A`", rendered)
+        self.assertNotIn("<choose A, B, or C>", rendered)
         self.assertNotIn("2: <your answer>", rendered)
 
     def test_current_understanding_is_bounded_restored_and_backward_compatible(
@@ -1748,7 +1751,8 @@ class FastlanePresenterTests(unittest.TestCase):
         rendered = presenter.render_owner_update(current)
         self.assertIn("Tell me about the app in your own words", rendered)
         self.assertIn("More detail is welcome.", rendered)
-        self.assertIn("Copyable reply:\n1: <your answer>", rendered)
+        self.assertIn("Reply format:\n`1: <your answer>`", rendered)
+        self.assertNotIn("Copyable reply:", rendered)
 
         fact["required_detail_for"] = []
         with self.assertRaises(presenter.PresentationError):

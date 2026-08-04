@@ -45,7 +45,9 @@ change budget.
 Before changing public or project-record documentation, read
 `references/documentation-governance.md` in full. Before evaluation,
 qualification, pilot, or release-claim work, read `references/evaluation.md` in
-full. These references consolidate maintainer procedure; they do not create
+full. Before final package, CI, rendered-review, or release qualification, also
+read `references/qualification.md` in full. These references consolidate
+maintainer procedure; they do not create
 project authority or another lifecycle.
 
 ## Procedure

@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.1
+**Pack version:** 1.2.2
 
 This pack turns a rough idea or an existing repository into a reviewed,
 executable AWS delivery plan, then lets Codex run the approved work for long
@@ -1094,7 +1094,10 @@ Owner Brief diagnostics. It must cover:
 - unresolved risks that do not block the gate;
 - material AWS feasibility facts verified through AWS Core, their sources, and
   any advisor finding the coordinator rejected with its reason;
-- every owner decision with its canonical source location and current claim maturity;
+- every decision in the current Engine `owner_decision_inventory`, exactly
+  once, with the plain-language owner answer, canonical source location, and
+  current claim maturity; render first-release journeys as human-readable
+  outcomes rather than IDs alone;
 - correction syntax, what remains unauthorized, and what continues automatically;
 - what Gate A does and does not approve.
 Resolve and render every canonical source link before the receipt. The exact
@@ -1294,6 +1297,12 @@ technical decision index and exact source locations. It must cover:
 - project mode and delivery profile;
 - exact local, GitHub, AWS, merge, branch-cleanup, and autonomous-run boundaries;
 - explicit exclusions and stop conditions.
+The current Engine `owner_decision_inventory` must contain exactly one complete
+decision in each domain, in this order: application/runtime; identity; data;
+messaging; edge/networking; observability; deployment/recovery; and
+validation/construction. Render the compact domain index before the detailed
+cards. Put the cards under progressive disclosure so the complete rendered
+response stays within its owner-facing line budget.
 For every Engine-marked decision, render what it means for the owner, the exact
 selection, requirement basis, rationale, alternatives and rejection reasons,
 tradeoffs, risks and safeguards, current evidence maturity, an exact canonical

@@ -93,7 +93,7 @@ Gate A, Gate B, deployment, or teardown.
 Deployment and teardown retain separate exact Fastlane authority.
 
 Repository hooks are optional and disabled by default. If you choose to enable
-them after Gate B, follow [Optional Fastlane hooks](HOOKS.md). Hook trust stays
+them after Gate B, follow [Optional Fastlane hooks](advanced/HOOKS.md). Hook trust stays
 in your local Codex profile.
 
 For help, see [Troubleshooting Fastlane](TROUBLESHOOTING.md).
