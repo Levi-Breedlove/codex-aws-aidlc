@@ -112,7 +112,7 @@
     "tests/test_product_journeys.py": "e191bac4ac0f45a8c5ab0ffe49ac3a6016bf8381f0923182c766e258f23ce6bc",
     "tests/test_project_identity.py": "848474bee725c8bba0effc5f3d1ae441d79ec119af6a65af67fc39cea97606ac",
     "tests/test_project_identity_integration.py": "0aa8fd550ae8a5652c6645d4e8eebd3d69160a782ef0953cf5f87745745c9121",
-    "tests/test_prompt_contracts.py": "7a3db6e3a2b04c051be8535528ca73c82c05846ba62d3f70d1516cdcc8f766db",
+    "tests/test_prompt_contracts.py": "b685a9c82d6641cb93a07a0bccb7d88c30095cdaa167c064f313e5db4a4770ce",
     "tests/test_repository_hygiene.py": "744da48708bad5f9b214d4e4a9ad848ef0a9753748844d55c6972cef92c2f437",
     "tests/test_setup_assistant.py": "a11f7ad8ce42b7c4b2ebad86ced0c6319ded3aa1a9c0b3f3ce07cc6913ca7937",
     "tests/test_task_waves.py": "ad1fb33bde18616ae478cc2c3afbe2758bab257434956e2b81828f8b281f9c14",

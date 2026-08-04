@@ -1610,9 +1610,7 @@ Approver: <name/handle>"""
     def test_aws_core_design_evidence_is_advisory_and_tech_bindable(self) -> None:
         design = self.prompt_section("DESIGN-10")
         self.assertIn("DES-0001; TECH: TECH-0001, TECH-0002", design)
-        self.assertIn(
-            "DES-0001; TECH: NONE — no technology/toolchain impact", design
-        )
+        self.assertIn("DES-0001; TECH: NONE — no technology/toolchain impact", design)
         self.assertIn("Advisory Design binding", self.verify)
         self.assertRegex(self.prompts, r"never\s+selects\s+(?:a\s+)?technology")
         self.assertIn("observed AWS Core version is metadata, never a pin", design)
@@ -1672,9 +1670,7 @@ Approver: <name/handle>"""
             self.prompts,
         )
         self.assertIn("| AWS cost ceiling |", self.prd)
-        self.assertIn(
-            "Any owner budget is a ceiling, not a spending target.", self.prd
-        )
+        self.assertIn("Any owner budget is a ceiling, not a spending target.", self.prd)
         for surface in (self.root_readme, self.agents, self.prd, self.prompts):
             self.assertNotIn("{{MONTHLY_BUDGET}}", surface)
 
