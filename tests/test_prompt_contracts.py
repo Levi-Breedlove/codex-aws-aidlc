@@ -129,6 +129,8 @@ class PromptPackContractTests(unittest.TestCase):
         )
         cls.operate_fastlane_aws = read(".agents/skills/operate-fastlane-aws/SKILL.md")
         cls.maintain_fastlane = read(".agents/skills/maintain-fastlane/SKILL.md")
+        cls.adr_template = read("docs/adr/0000-template.md")
+        cls.infrastructure_readme = read("infrastructure/README.md")
         cls.engine_source = read("scripts/bootstrap_doctor.py")
         cls.task_engine_source = read("scripts/task_waves.py")
         cls.manifest = json.loads(read("bootstrap.manifest.json"))
@@ -607,9 +609,14 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.8")
-        self.assertIn("**Pack version:** 1.2.8", self.prompts)
-        self.assertIn("Current customer build: **1.2.8**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.9")
+        self.assertIn("**Pack version:** 1.2.9", self.prompts)
+        self.assertIn("Current customer build: **1.2.9**", self.readme)
+        self.assertIn(
+            "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
+            self.readme,
+        )
+        self.assertNotIn("Levi-Breedlove/aws-bootstrap/generate", self.readme)
         for required in self.manifest["required_files"]:
             self.assertTrue((REPOSITORY_ROOT / required).is_file(), required)
         for link in (
@@ -619,6 +626,18 @@ class PromptPackContractTests(unittest.TestCase):
             "SECURITY.md",
         ):
             self.assertIn(link, self.readme)
+
+    def test_adr_and_infrastructure_surfaces_cannot_grant_authority(self) -> None:
+        self.assertIn("The PRD remains authoritative", self.fastlane_design)
+        self.assertIn(
+            "link `ADR-NNNN` to `../adr/NNNN-lowercase-slug.md`",
+            self.fastlane_design,
+        )
+        self.assertIn("supporting rationale", self.workflow)
+        for source in (self.adr_template, self.infrastructure_readme):
+            self.assertIn("no construction", source)
+            self.assertIn("AWS authority", source)
+        self.assertIn("SUPPORTING_RATIONALE_ONLY", self.adr_template)
 
 
 if __name__ == "__main__":

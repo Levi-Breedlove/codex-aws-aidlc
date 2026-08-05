@@ -467,6 +467,44 @@ class ContextPacketTests(unittest.TestCase):
         )
         self.assertNotIn(patterns_path, complete["on_demand_slices"])
 
+    def test_referenced_adr_is_on_demand_and_never_initial(self) -> None:
+        adr_path = "docs/adr/0001-runtime.md"
+        plan = doctor.derive_context_plan(
+            {
+                "owner_stage": "DESIGN",
+                "route_reason_code": "DESIGN_REQUIRED",
+                "blocking_ids": [],
+            },
+            doctor.TaskSummary(),
+            doctor.CoverageContract(status="READY", basis_ids=("REQ-0001",)),
+            next_prompt="DESIGN-10",
+            adr_rationale={
+                "schema_version": 1,
+                "status": "CURRENT",
+                "records": [{"path": adr_path}],
+            },
+        )
+        self.assertNotIn(adr_path, plan["source_slices"])
+        self.assertIn(adr_path, plan["on_demand_slices"])
+
+        deliver = doctor.derive_context_plan(
+            {
+                "owner_stage": "DELIVER",
+                "route_reason_code": "BUILD_READY",
+                "blocking_ids": [],
+            },
+            doctor.TaskSummary(statuses={"TASK-0001": "READY"}),
+            doctor.CoverageContract(status="READY", basis_ids=("REQ-0001",)),
+            next_prompt="BUILD-10",
+            adr_rationale={
+                "schema_version": 1,
+                "status": "CURRENT",
+                "records": [{"path": adr_path}],
+            },
+        )
+        self.assertNotIn(adr_path, deliver["source_slices"])
+        self.assertIn(adr_path, deliver["on_demand_slices"])
+
 
 if __name__ == "__main__":
     unittest.main()

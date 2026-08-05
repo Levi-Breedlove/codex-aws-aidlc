@@ -283,11 +283,24 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn("parallel top-level `apps/` or `src/`", app_readme)
         self.assertFalse((REPOSITORY_ROOT / "app/AGENTS.md").exists())
 
+    def test_template_explains_reserved_infrastructure_boundary(self) -> None:
+        manifest = json.loads(
+            (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
+        )
+        self.assertIn("infrastructure/README.md", manifest["required_files"])
+        self.assertIn("infrastructure/README.md", manifest["source_sha256"])
+        readme = (REPOSITORY_ROOT / "infrastructure/README.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("may remain empty", readme)
+        self.assertIn("does **not** authorize construction", readme)
+        self.assertIn("Every AWS mutation", readme)
+
     def test_manifest_is_the_only_internal_version_source(self) -> None:
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.8")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.9")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())

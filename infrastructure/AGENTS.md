@@ -15,6 +15,8 @@ Read the current REQ/DES/AUTH IDs and AWS boundary in
 `../docs/project/PRD.md`, the assigned task in `../docs/project/TASKS.md`,
 evidence in `../docs/project/VERIFY.md`, and deployment/recovery procedures in
 `../docs/project/RUNBOOK.md`.
+The human boundary summary is in `README.md`; neither this folder nor that
+summary creates authority.
 
 ## Agent reference — exact infrastructure rules
 

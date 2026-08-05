@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Mapping
 
 from scripts import fastlane_document_summaries as document_summaries
+from scripts.fastlane_adr import ADR_AUTHORITY
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = REPOSITORY_ROOT
@@ -886,6 +887,79 @@ def rebind_gate_b_envelope(text: str) -> str:
             ]
         ),
     )
+
+
+def bind_technology_adr(text: str) -> str:
+    table = doctor.contract_table_after_heading(
+        text,
+        doctor.TECHNOLOGY_DECISION_HEADING,
+        doctor.TECHNOLOGY_DECISION_HEADERS,
+    )
+    if table is None:
+        raise AssertionError("Technology decision register is missing")
+    rows = [list(row) for row in table.rows]
+    matches = [row for row in rows if row[0] == "TECH-0001"]
+    if len(matches) != 1:
+        raise AssertionError("TECH-0001 must appear exactly once")
+    matches[0][-1] += "; rationale: [ADR-0001](../adr/0001-runtime.md)"
+    rebound = replace_contract_table(
+        text,
+        doctor.TECHNOLOGY_DECISION_HEADING,
+        doctor.TECHNOLOGY_DECISION_HEADERS,
+        [tuple(row) for row in rows],
+    )
+    return rebind_gate_b_envelope(rebound)
+
+
+def accepted_runtime_adr(
+    *, design_revision: str = "DES-0001", context: str | None = None
+) -> str:
+    rationale = context or (
+        "The approved application needs the selected runtime and its bounded "
+        "packaging and support model."
+    )
+    return f"""# ADR-0001: Application runtime
+
+## Decision record
+
+| Field | Current value |
+|---|---|
+| Status | Accepted |
+| Design revision | {design_revision} |
+| Primary decision | TECH-0001 |
+| Decision value | Python |
+| Related basis IDs | DES-0001, FR-001 |
+| Canonical PRD section | Technology and toolchain decision register |
+| Evidence maturity | SOURCE_VERIFIED |
+| Evidence IDs | AWS-EV-0001 |
+| Supersedes | NONE |
+| Superseded by | NONE |
+| Authority | {ADR_AUTHORITY} |
+
+## Context
+
+{rationale}
+
+## Decision
+
+Use Python for the approved local application runtime.
+
+## Alternatives considered
+
+A second runtime was rejected because it adds packaging and operations cost.
+
+## Consequences
+
+The project accepts Python support and dependency lifecycle constraints.
+
+## Evidence and validation
+
+Current AWS source evidence and the selected task checks support the decision.
+
+## Revisit when
+
+Reconsider when support, performance, or compatibility requirements change.
+"""
 
 
 def current_greenfield_state(state: dict[str, object], *, gate_b: bool = False) -> None:
@@ -2933,7 +3007,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.8")
+        self.assertEqual(report["bootstrap_version"], "1.2.9")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -2959,6 +3033,89 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertIn(
             report["design_contract"]["status"],
             {"UNINITIALIZED", "BLOCKED"},
+        )
+        self.assertEqual(report["adr_rationale"]["status"], "NONE")
+        self.assertFalse(report["adr_rationale"]["authoritative"])
+
+    def test_current_adr_is_additive_and_digest_neutral(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = self.copy_project(Path(temporary))
+            self.approve_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            prd_path.write_text(
+                bind_technology_adr(prd_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+            adr_path = project / "docs/adr/0001-runtime.md"
+            adr_path.write_text(accepted_runtime_adr(), encoding="utf-8")
+            refresh_document_summaries(project)
+
+            first = doctor.inspect_project(project)
+            self.assertTrue(first["ok"], first["diagnostics"])
+            self.assertEqual(first["adr_rationale"]["status"], "CURRENT")
+            self.assertEqual(first["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
+            design_digest = first["design_contract"]["canonical_sha256"]
+            gate_b = dict(first["gates"])
+
+            adr_path.write_text(
+                accepted_runtime_adr(
+                    context=(
+                        "The same canonical selection now has clearer rationale for "
+                        "a human reviewer."
+                    )
+                ),
+                encoding="utf-8",
+            )
+            second = doctor.inspect_project(project)
+            self.assertTrue(second["ok"], second["diagnostics"])
+            self.assertEqual(second["adr_rationale"]["status"], "CURRENT")
+            self.assertNotEqual(
+                first["adr_rationale"]["projection_sha256"],
+                second["adr_rationale"]["projection_sha256"],
+            )
+            self.assertEqual(
+                second["design_contract"]["canonical_sha256"], design_digest
+            )
+            self.assertEqual(second["gates"], gate_b)
+
+    def test_stale_adr_is_safe_codex_correction_without_owner_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = self.copy_project(Path(temporary))
+            self.approve_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            prd_path.write_text(
+                bind_technology_adr(prd_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+            (project / "docs/adr/0001-runtime.md").write_text(
+                accepted_runtime_adr(design_revision="DES-0000"), encoding="utf-8"
+            )
+            refresh_document_summaries(project)
+
+            report = doctor.inspect_project(project)
+            self.assertFalse(report["ok"])
+            self.assertIn("ADR_RATIONALE_STALE", codes(report))
+            self.assertEqual(report["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
+            self.assertEqual(
+                report["remediation"]["next_action"]["action_kind"],
+                "CORRECT_AND_REVALIDATE",
+            )
+            self.assertFalse(report["interaction"]["turn_boundary_required"])
+
+    def test_prd_adr_link_is_not_auto_corrected_after_gate_b(self) -> None:
+        diagnostic = doctor.Diagnostic(
+            "ADR_RATIONALE_UNSAFE",
+            "unsafe canonical link",
+            doctor.PRD_FILE,
+        )
+        self.assertFalse(
+            doctor._agent_correction_is_safe(
+                diagnostic,
+                "DELIVER",
+                "APPROVED_FOR_CONSTRUCTION",
+                {},
+                doctor.TaskSummary(),
+            )
         )
 
     def test_each_ears_form_accepts_a_canonical_requirement(self) -> None:

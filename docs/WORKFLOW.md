@@ -76,6 +76,11 @@ AWS facts, compares credible whole-system candidates, and selects one complete
 recommendation. AWS Core advises; Codex applies the evidence; the owner approves
 the complete design.
 
+For a consequential, hard-to-reverse choice, the PRD may link to an optional
+architecture decision record that preserves supporting rationale. The PRD
+remains the authority; the supporting record grants no construction or AWS
+permission.
+
 Gate B covers application/runtime, identity, data, messaging, edge/networking,
 observability, deployment/recovery, and validation/construction. It also makes
 security, cost, evidence maturity, and reconsideration triggers explicit.

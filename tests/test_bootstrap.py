@@ -236,15 +236,21 @@ class BootstrapSafetyTests(unittest.TestCase):
             project = Path(temporary_directory) / "project"
             project.mkdir()
             (project / ".git").mkdir()
-            with mock.patch.object(
-                bootstrap,
-                "git_text",
-                return_value="git@github.com:Levi-Breedlove/aws-bootstrap.git",
-            ):
-                with self.assertRaisesRegex(
-                    ValueError, "official maintainer repository"
-                ):
-                    bootstrap.validate_in_place_repository(project)
+            official_remotes = (
+                "git@github.com:Levi-Breedlove/codex-aws-aidlc.git",
+                "https://github.com/Levi-Breedlove/aws-bootstrap.git",
+            )
+            for remote in official_remotes:
+                with self.subTest(remote=remote):
+                    with mock.patch.object(
+                        bootstrap,
+                        "git_text",
+                        return_value=remote,
+                    ):
+                        with self.assertRaisesRegex(
+                            ValueError, "official maintainer repository"
+                        ):
+                            bootstrap.validate_in_place_repository(project)
 
             with mock.patch.object(
                 bootstrap,
@@ -265,6 +271,7 @@ class BootstrapSafetyTests(unittest.TestCase):
                 "bootstrap.py": b"bootstrap",
                 "scripts/bootstrap_dependencies.py": b"dependencies",
                 "scripts/bootstrap_doctor.py": b"doctor",
+                "scripts/fastlane_adr.py": b"adr",
                 "scripts/fastlane_contracts.py": b"contracts",
                 "scripts/fastlane_process.py": b"process",
                 "scripts/fastlane_project_identity.py": b"identity",
