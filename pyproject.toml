@@ -10,5 +10,19 @@ select = ["E4", "E7", "E9", "F"]
 [tool.ruff.lint.per-file-ignores]
 "scripts/setup_assistant.py" = ["E402"]
 "tests/test_context_packets.py" = ["E402"]
+"tests/engine_parity_cases.py" = ["E402"]
 "tests/test_fastlane_presenter.py" = ["E402"]
 "tests/test_product_journeys.py" = ["E402"]
+
+[tool.fastlane.engine_characterization]
+baseline_commit = "312b53ce00f9db5263f3a72e778f833e70c7db8e"
+maximum_warm_median_ms = 964
+maximum_peak_memory_mib = 30
+doctor_preferred_lines = 1000
+doctor_hard_review_lines = 1200
+module_preferred_lines = 1200
+module_hard_review_lines = 1800
+function_preferred_lines = 60
+function_review_lines = 100
+complexity_preferred = 10
+complexity_review = 15

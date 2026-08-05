@@ -228,6 +228,7 @@ class PackageReleaseTests(unittest.TestCase):
             "Run Ruff lint",
             "Verify Ruff formatting",
             "Run repository governance monitors",
+            "Run Engine characterization contracts",
             "Verify template manifest hashes",
             "Enforce customer package version identity",
             "Verify deterministic release package",
@@ -303,7 +304,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.10")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.11")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -952,11 +953,14 @@ class PackageReleaseTests(unittest.TestCase):
             "1" + ".2.0",
             "1" + ".2.1",
             "1" + ".2.2",
+            "1" + ".2.10",
             "2" + ".0.0",
         )
         negative_fixture_marker = f'"bootstrap_version": "{stale_versions[0]}"'
+        characterization_fixture_marker = f'"package_version": "{stale_versions[-2]}"'
         text_suffixes = {".md", ".json", ".yaml", ".yml", ".py", ".txt"}
         allowed_negative_fixtures = 0
+        allowed_characterization_fixtures = 0
         allowed_aws_version_observations = 0
         violations: list[str] = []
         for path in REPOSITORY_ROOT.rglob("*"):
@@ -990,8 +994,16 @@ class PackageReleaseTests(unittest.TestCase):
                     ):
                         allowed_negative_fixtures += 1
                         continue
+                    if (
+                        relative == "tests/fixtures/engine_parity_v1.json"
+                        and version == stale_versions[-2]
+                        and characterization_fixture_marker in line
+                    ):
+                        allowed_characterization_fixtures += 1
+                        continue
                     violations.append(f"{relative}:{line_number}:{version}")
         self.assertEqual(allowed_negative_fixtures, 2)
+        self.assertEqual(allowed_characterization_fixtures, 1)
         self.assertEqual(allowed_aws_version_observations, 2)
         self.assertEqual(violations, [])
 

@@ -56,6 +56,13 @@ jobs:
           tests.test_package_release.PackageReleaseTests.test_ci_push_branches_and_precheck_order_are_exact
           -v
 
+      - name: Run Engine characterization contracts
+        run: >-
+          python -m unittest
+          tests.test_engine_characterization
+          tests.test_engine_parity
+          -v
+
       - name: Verify template manifest hashes
         run: python scripts/update_manifest.py --check
 
