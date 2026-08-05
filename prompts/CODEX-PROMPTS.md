@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.6
+**Pack version:** 1.2.7
 
 This pack turns a rough idea or an existing repository into a reviewed,
 executable AWS delivery plan, then lets Codex run the approved work for long
