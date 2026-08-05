@@ -191,9 +191,12 @@ class PackageReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            "push:\n    branches:\n      - fast-lane\n      - Legacy\n",
+            "push:\n    branches:\n      - fast-lane\n      - fast-lane-foundation\n",
             workflow,
         )
+        self.assertNotIn("      - fast-lane-maint\n", workflow)
+        self.assertNotIn("      - legacy\n", workflow)
+        self.assertNotIn("      - Legacy\n", workflow)
         self.assertNotIn("      - main\n", workflow)
         self.assertEqual(workflow.count("needs: repository-precheck"), 3)
         self.assertEqual(workflow.count("if: ${{ always() }}"), 3)
@@ -300,7 +303,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.9")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.10")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -972,7 +975,13 @@ class PackageReleaseTests(unittest.TestCase):
                     allowed_aws_version_observations += 1
                     continue
                 for version in stale_versions:
-                    if version not in line:
+                    if (
+                        re.search(
+                            rf"(?<![0-9.]){re.escape(version)}(?![0-9.])",
+                            line,
+                        )
+                        is None
+                    ):
                         continue
                     if (
                         relative == "tests/test_package_release.py"
