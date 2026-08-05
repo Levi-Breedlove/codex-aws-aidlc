@@ -42,6 +42,7 @@ class TemplateCompatibilityTests(unittest.TestCase):
         skill = (
             REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
         ).read_text(encoding="utf-8")
+        security = (REPOSITORY_ROOT / "SECURITY.md").read_text(encoding="utf-8")
         skill_words = " ".join(skill.split())
         for mode in ("AUDIT", "PLAN", "IMPLEMENT", "PUBLISH"):
             self.assertIn(f"`{mode}`", skill)
@@ -54,7 +55,11 @@ class TemplateCompatibilityTests(unittest.TestCase):
         )
         self.assertIn("Never force-push or delete", skill_words)
         self.assertIn("live `fast-lane` customer branch", skill_words)
-        self.assertIn("The protected `Legacy` branch", skill)
+        self.assertIn("The protected `fast-lane-foundation` branch", skill)
+        self.assertIn("protected `fast-lane-foundation` branch", security)
+        for stale_branch in ("`fast-lane-maint`", "`legacy`", "`Legacy`"):
+            self.assertNotIn(stale_branch, skill)
+            self.assertNotIn(stale_branch, security)
         self.assertIn("separate repository-setting action", skill_words)
         for check in (
             "safety-tests (3.11)",
