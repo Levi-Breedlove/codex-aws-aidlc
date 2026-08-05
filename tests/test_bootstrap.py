@@ -265,6 +265,7 @@ class BootstrapSafetyTests(unittest.TestCase):
                 "bootstrap.py": b"bootstrap",
                 "scripts/bootstrap_dependencies.py": b"dependencies",
                 "scripts/bootstrap_doctor.py": b"doctor",
+                "scripts/fastlane_contracts.py": b"contracts",
                 "scripts/fastlane_process.py": b"process",
                 "scripts/fastlane_project_identity.py": b"identity",
                 "scripts/fastlane_stdio.py": b"stdio",

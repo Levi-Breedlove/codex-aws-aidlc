@@ -36,6 +36,35 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     )
 
 try:
+    from fastlane_contracts import (
+        CHECKPOINT_HEADERS,
+        TASK_COMPLETION_EVIDENCE_HEADERS,
+        ContractParseError,
+        external_targets_overlap,
+        parse_checkpoint_cells,
+        parse_checkpoint_git_receipt_value,
+        parse_task_completion_evidence_cells,
+        path_boundaries_overlap,
+        path_boundary_contains,
+        split_markdown_table_row,
+        without_fenced_code,
+    )
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.fastlane_contracts import (
+        CHECKPOINT_HEADERS,
+        TASK_COMPLETION_EVIDENCE_HEADERS,
+        ContractParseError,
+        external_targets_overlap,
+        parse_checkpoint_cells,
+        parse_checkpoint_git_receipt_value,
+        parse_task_completion_evidence_cells,
+        path_boundaries_overlap,
+        path_boundary_contains,
+        split_markdown_table_row,
+        without_fenced_code,
+    )
+
+try:
     from fastlane_owner_briefs import (
         TECHNICAL_DOMAIN_ORDER,
         answer_confirmation,
@@ -986,6 +1015,7 @@ MANDATORY_REQUIRED_FILES = {
     "infrastructure/AGENTS.md",
     "prompts/CODEX-PROMPTS.md",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_contracts.py",
     "scripts/fastlane_owner_briefs.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/setup_assistant.py",
@@ -1866,17 +1896,6 @@ EVIDENCE_PATTERN = re.compile(
 )
 LOCAL_EVIDENCE_ID = re.compile(r"\bEV-\d{4,}\b")
 LOCAL_EVIDENCE_LIKE = re.compile(r"\b(?:EV|EVIDENCE)-[A-Za-z0-9._-]+\b", re.IGNORECASE)
-TASK_COMPLETION_EVIDENCE_HEADERS = (
-    "Evidence ID",
-    "Task",
-    "Command or observation",
-    "Result",
-    "Actor",
-    "Observed at",
-    "Commit / worktree / artifact",
-    "Durable source",
-    "Status",
-)
 TASK_COMPLETION_EVIDENCE_STATUSES = {"LOCAL_PASS", "VERIFIED"}
 EVIDENCE_PLACEHOLDER_PATTERN = re.compile(
     r"\b(?:TODO|TBD|TBC|UNKNOWN|UNASSIGNED|PENDING|PLACEHOLDER|"
@@ -1886,16 +1905,6 @@ EVIDENCE_PLACEHOLDER_PATTERN = re.compile(
 UNRESOLVED_TOKEN = re.compile(
     r"(?<![A-Z0-9])(?:TODO|TBD|TBC|UNKNOWN|UNASSIGNED)(?![A-Z0-9])",
     re.IGNORECASE,
-)
-CHECKPOINT_HEADERS = (
-    "Checkpoint",
-    "Run",
-    "Time",
-    "REQ / DES / AUTH",
-    "Commit and protected dirty paths",
-    "Task outcomes and attempts",
-    "Evidence and external actions",
-    "Blockers and next safe action",
 )
 SNAPSHOT_FIELDS = {
     "Task-plan revision",
@@ -1936,6 +1945,7 @@ CONTROL_HASH_FILES = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_contracts.py",
     "scripts/fastlane_process.py",
     "scripts/fastlane_project_identity.py",
     "scripts/fastlane_stdio.py",
@@ -2374,34 +2384,6 @@ class CheckpointReceiptRow:
     blockers_and_next: str
 
 
-def without_fenced_code(text: str) -> str:
-    """Hide fenced examples while preserving offsets for structural parsing."""
-
-    result: list[str] = []
-    fence: str | None = None
-    for line in text.splitlines(keepends=True):
-        stripped = line.lstrip()
-        marker = (
-            "```"
-            if stripped.startswith("```")
-            else "~~~"
-            if stripped.startswith("~~~")
-            else None
-        )
-        if marker is not None:
-            fence = None if fence == marker else marker if fence is None else fence
-            result.append(
-                " " * (len(line.rstrip("\r\n"))) + line[len(line.rstrip("\r\n")) :]
-            )
-        elif fence is None:
-            result.append(line)
-        else:
-            result.append(
-                " " * (len(line.rstrip("\r\n"))) + line[len(line.rstrip("\r\n")) :]
-            )
-    return "".join(result)
-
-
 def inspect_task_blocks(text: str) -> list[InspectedTask]:
     structural = without_fenced_code(text)
     matches = list(TASK_HEADER_PATTERN.finditer(structural))
@@ -2443,76 +2425,23 @@ def inspect_task_sections(block: str) -> tuple[dict[str, str], set[str]]:
     return sections, duplicates
 
 
-def split_markdown_table_row(line: str) -> list[str] | None:
-    """Split a pipe table row while honoring Markdown escaped pipes."""
-
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
-        return None
-    cells: list[str] = []
-    current: list[str] = []
-    escaped = False
-    for character in stripped[1:-1]:
-        if escaped:
-            current.append(character)
-            escaped = False
-        elif character == "\\":
-            escaped = True
-        elif character == "|":
-            cells.append("".join(current).strip())
-            current = []
-        else:
-            current.append(character)
-    if escaped:
-        current.append("\\")
-    cells.append("".join(current).strip())
-    return cells
-
-
 def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]:
-    structural = without_fenced_code(text)
-    headings = list(
-        re.finditer(r"^## Task completion evidence[ \t]*$", structural, re.MULTILINE)
-    )
-    if len(headings) != 1:
+    try:
+        parsed_rows = parse_task_completion_evidence_cells(text)
+    except ContractParseError as exc:
+        messages = {
+            "section_count": "VERIFY.md requires exactly one Task completion evidence section",
+            "header_count": "VERIFY.md requires one exact Task completion evidence table",
+            "separator_missing": "VERIFY.md Task completion evidence separator is invalid",
+            "separator_invalid": "VERIFY.md Task completion evidence separator is invalid",
+            "row_width": "VERIFY.md Task completion evidence row must have nine cells",
+            "discontiguous_rows": "VERIFY.md Task completion evidence rows must form one contiguous table",
+        }
         raise ValueError(
-            "VERIFY.md requires exactly one Task completion evidence section"
-        )
-    following = re.search(r"^##\s+", structural[headings[0].end() :], re.MULTILINE)
-    end = headings[0].end() + following.start() if following else len(structural)
-    lines = structural[headings[0].end() : end].splitlines()
-    header_indexes = [
-        index
-        for index, line in enumerate(lines)
-        if split_markdown_table_row(line) == list(TASK_COMPLETION_EVIDENCE_HEADERS)
-    ]
-    if len(header_indexes) != 1:
-        raise ValueError("VERIFY.md requires one exact Task completion evidence table")
-    header = header_indexes[0]
-    separator = (
-        split_markdown_table_row(lines[header + 1]) if header + 1 < len(lines) else None
-    )
-    if (
-        separator is None
-        or len(separator) != len(TASK_COMPLETION_EVIDENCE_HEADERS)
-        or any(re.fullmatch(r":?-{3,}:?", cell) is None for cell in separator)
-    ):
-        raise ValueError("VERIFY.md Task completion evidence separator is invalid")
+            messages.get(exc.reason, "VERIFY.md Task completion evidence is invalid")
+        ) from exc
     rows: list[TaskCompletionEvidenceRow] = []
-    for line in lines[header + 2 :]:
-        if not line.strip():
-            if rows:
-                break
-            continue
-        cells = split_markdown_table_row(line)
-        if cells is None:
-            if rows:
-                break
-            raise ValueError("VERIFY.md Task completion evidence row is missing")
-        if len(cells) != len(TASK_COMPLETION_EVIDENCE_HEADERS):
-            raise ValueError(
-                "VERIFY.md Task completion evidence row must have nine cells"
-            )
+    for cells in parsed_rows:
         row = TaskCompletionEvidenceRow(*(clean_cell(cell) for cell in cells))
         if re.fullmatch(r"EV-\d{4,}", row.evidence_id) is None:
             raise ValueError("VERIFY.md Task completion Evidence ID must be EV-nnnn")
@@ -13766,41 +13695,6 @@ def validate_prd(
     )
 
 
-def path_boundary_contains(allowed: str, requested: str) -> bool:
-    allowed = allowed.casefold()
-    requested = requested.casefold()
-    allowed_base = allowed[:-3] if allowed.endswith("/**") else allowed
-    requested_base = requested[:-3] if requested.endswith("/**") else requested
-    if allowed.endswith("/**"):
-        return requested_base == allowed_base or requested_base.startswith(
-            allowed_base + "/"
-        )
-    return allowed == requested and not requested.endswith("/**")
-
-
-def path_boundaries_overlap(first: str, second: str) -> bool:
-    first = first.casefold()
-    second = second.casefold()
-    first_base = first[:-3] if first.endswith("/**") else first
-    second_base = second[:-3] if second.endswith("/**") else second
-    return (
-        first_base == second_base
-        or first_base.startswith(second_base + "/")
-        or second_base.startswith(first_base + "/")
-    )
-
-
-def external_targets_overlap(first: str, second: str) -> bool:
-    first = first.casefold()
-    second = second.casefold()
-    if first == second:
-        return True
-    return any(
-        first.startswith(second + separator) or second.startswith(first + separator)
-        for separator in ("/", ":", "#")
-    )
-
-
 def external_target_contains(allowed: str, requested: str) -> bool:
     allowed = allowed.casefold()
     requested = requested.casefold()
@@ -14130,49 +14024,20 @@ def git_read(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
 
 
 def parse_checkpoint_rows(tasks_text: str) -> list[CheckpointReceiptRow]:
-    structural = without_fenced_code(tasks_text)
-    headings = list(
-        re.finditer(r"^## Checkpoints and resume[ \t]*$", structural, re.MULTILINE)
-    )
-    if len(headings) != 1:
-        raise ValueError("TASKS requires exactly one Checkpoints and resume section")
-    following = re.search(r"^##\s+", structural[headings[0].end() :], re.MULTILINE)
-    end = headings[0].end() + following.start() if following else len(structural)
-    raw_lines = tasks_text[headings[0].end() : end].splitlines()
-    structural_lines = structural[headings[0].end() : end].splitlines()
-    header_indexes = [
-        index
-        for index, (raw_line, structural_line) in enumerate(
-            zip(raw_lines, structural_lines)
-        )
-        if structural_line.strip().startswith("|")
-        and split_markdown_table_row(raw_line) == list(CHECKPOINT_HEADERS)
-    ]
-    if len(header_indexes) != 1:
-        raise ValueError("TASKS requires one exact checkpoint table header")
-    header = header_indexes[0]
-    table_lines: list[str] = []
-    for raw_line, structural_line in zip(raw_lines[header:], structural_lines[header:]):
-        if not structural_line.strip().startswith("|"):
-            break
-        table_lines.append(raw_line)
-    header = 0
-    separator = (
-        split_markdown_table_row(table_lines[header + 1])
-        if header + 1 < len(table_lines)
-        else None
-    )
-    if (
-        separator is None
-        or len(separator) != len(CHECKPOINT_HEADERS)
-        or any(re.fullmatch(r":?-{3,}:?", cell) is None for cell in separator)
-    ):
-        raise ValueError("TASKS checkpoint table separator is invalid")
+    try:
+        parsed_rows = parse_checkpoint_cells(tasks_text)
+    except ContractParseError as exc:
+        messages = {
+            "section_count": "TASKS requires exactly one Checkpoints and resume section",
+            "header_count": "TASKS requires one exact checkpoint table header",
+            "separator_missing": "TASKS checkpoint table separator is invalid",
+            "separator_invalid": "TASKS checkpoint table separator is invalid",
+            "row_width": "TASKS checkpoint rows must have exactly eight cells",
+            "discontiguous_rows": "TASKS checkpoint rows must form one contiguous table",
+        }
+        raise ValueError(messages.get(exc.reason, "TASKS checkpoint table is invalid")) from exc
     rows: list[CheckpointReceiptRow] = []
-    for line in table_lines[header + 2 :]:
-        cells = split_markdown_table_row(line)
-        if cells is None or len(cells) != len(CHECKPOINT_HEADERS):
-            raise ValueError("TASKS checkpoint rows must have exactly eight cells")
+    for cells in parsed_rows:
         cleaned = [clean_cell(cell) for cell in cells]
         if cleaned[0] == "NONE":
             continue
@@ -14196,17 +14061,14 @@ def parse_checkpoint_git_receipt(
     matches = [row for row in rows if row.checkpoint_id == checkpoint_id]
     if not rows or len(matches) != 1 or rows[-1].checkpoint_id != checkpoint_id:
         raise ValueError(f"{checkpoint_id}: must be the unique newest checkpoint row")
-    receipt = matches[0].commit_and_dirty
-    match = re.fullmatch(
-        r"Commit\s*:\s*`?([0-9a-fA-F]{7,64})`?\s*;\s*Dirty\s*:\s*(.+?)\s*",
-        receipt,
-        re.IGNORECASE,
-    )
-    if match is None:
+    try:
+        commit, dirty_value = parse_checkpoint_git_receipt_value(
+            matches[0].commit_and_dirty
+        )
+    except ContractParseError as exc:
         raise ValueError(
             f"{checkpoint_id}: commit receipt must use Commit: <sha>; Dirty: <paths|NONE>"
-        )
-    dirty_value = match.group(2).replace("`", "").strip()
+        ) from exc
     dirty = (
         []
         if dirty_value == "NONE"
@@ -14214,7 +14076,7 @@ def parse_checkpoint_git_receipt(
             dirty_value, f"{checkpoint_id} checkpoint Dirty paths"
         )
     )
-    return match.group(1), dirty
+    return commit, dirty
 
 
 def validate_checkpoint_record(
