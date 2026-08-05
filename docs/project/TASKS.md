@@ -1,8 +1,8 @@
-# {{PROJECT_NAME}} — Executable Tasks
+# {{PROJECT_NAME}} — Construction Progress
 
-`docs/project/TASKS.md` is the live construction ledger after Gate B. Task blocks are the
-only authoritative task records. GitHub Issues are conditional mirrors when the
-current construction authorization (`AUTH`) permits the named GitHub writes.
+This document shows the approved work plan, current progress, blockers, and
+validation for local construction. GitHub issues may mirror this work only when
+that separate update is approved.
 <!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
 ## Current state
 
@@ -30,44 +30,42 @@ current construction authorization (`AUTH`) permits the named GitHub writes.
 - [Exact execution state](#exact-run-and-task-state)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
-Gate A and Gate B are the only routine human gates. Task readiness, wave
-selection, checkpoints, verification, deployment preflight, and release checks
-are execution controls inside an approved envelope; they are not additional
-human gates.
+Tasks begin only after the technical plan is approved. Completing a task never
+authorizes GitHub publication or work in an AWS account.
 
 ## Current progress
 
-The Engine-derived table above is the current progress view. It grants no new
-authority and stays synchronized with the exact task records.
+The table above shows where construction stands and what happens next. It does
+not approve new work or an external action.
 
 ## Roadmap
 
 | State | Work |
 |---|---|
 | Current | No tasks generated |
-| Next | Complete Gate B, then derive the approved task graph |
+| Next | Approve the technical plan, then prepare the work plan |
 
 ## Active work, blockers, and next action
 
-No task is active in the untouched template. When work begins, the current task
-card shows its outcome, acceptance criteria, validation, blocker, and next safe
-action here in the normal reading path.
+No task is active yet. When construction begins, the current task card shows its
+outcome, success checks, blocker, and next safe action here.
 
 ## How to read a task card
 
-Read status and outcome first, then acceptance criteria and validation. Expand
-the exact execution records only when auditing a boundary, attempt, dependency,
-checkpoint, or evidence binding.
+Read the status and outcome first, then the success checks. Open the technical
+records only when you need task IDs, dependencies, attempt history, checkpoints,
+or evidence links.
 
 <details>
-<summary>Exact run, task, dependency, attempt, and checkpoint records</summary>
+<summary>Technical task records and history</summary>
 
 ## Exact run and task state
 
 ## Active execution snapshot
 
-This is a resumable snapshot, not a new authorization. It must match the
-authoritative values in `docs/project/PRD.md`. A mismatch or stale Gate B stops construction.
+This snapshot identifies the last safe place to resume. If the approved
+requirements or technical plan changes, construction pauses until the work plan
+is refreshed.
 
 | Field | Value |
 |---|---|
@@ -90,22 +88,13 @@ authoritative values in `docs/project/PRD.md`. A mismatch or stale Gate B stops 
 
 ## Derived requirement disposition contract
 
-The Engine derives requirement coverage from the approved PRD, task cards, and
-current verification evidence. This ledger never stores a second coverage source.
+This table shows how every approved requirement is covered or why it needs no
+new work. Fastlane calculates it from the existing project records.
 
 ## Coordinator contract
 
-Codex is the sole writer. The Deliver reference and Engine enforce task claims,
-attempts, checkpoints, path ownership, GitHub limits, and AWS boundaries.
-
-## Fastlane task methodology
-
-TASK-10 derives small, independently verifiable work from the approved boundary.
-
-### Fastlane Definition of Done
-
-The Deliver reference owns the complete rule. `DONE` always requires passing
-acceptance, validation, evidence, boundaries, and a current checkpoint.
+Codex is the only writer so task records cannot conflict. Read-only reviewers
+may comment but cannot change project state.
 
 ## Status and transition contract
 
@@ -118,13 +107,13 @@ acceptance, validation, evidence, boundaries, and a current checkpoint.
 | `DONE` | Acceptance criteria and required local evidence passed | Terminal |
 | `SKIPPED` | Intentionally omitted under an explicit skip record | Terminal |
 
-The Engine and `task_waves.py` enforce these transitions; do not hand-edit run or claim state.
+These statuses show where work stands. Fastlane rejects a status change that
+skips required validation or exceeds the approved plan.
 
 ## Required task record schema
 
-`TASK-10` creates task headings and these exact singleton metadata keys. There
-is intentionally no placeholder task: `UNINITIALIZED` plus a current Gate B
-routes to `TASK-10`, not construction.
+These fields connect each task to the approved plan and its proof. Fastlane
+maintains them automatically; owners are not expected to complete this table.
 
 | Metadata key | Required content |
 |---|---|
@@ -149,8 +138,8 @@ routes to `TASK-10`, not construction.
 | `Last checkpoint` | Coordinator checkpoint ID or `NONE` |
 | `Last updated` | ISO 8601 timestamp or `TODO` before initialization |
 
-The Deliver reference owns task generation. The Engine validates exact
-requirement, acceptance, design, property, Harness, and evidence bindings.
+The technical records below remain available for audit while the task card
+above stays focused on the outcome and how success will be checked.
 
 ~~~text
 ### <TASK-ID> — <short title>
@@ -170,18 +159,16 @@ requirement, acceptance, design, property, Harness, and evidence bindings.
 
 #### Validation
 
-<!-- Omit this table only when Requirements contains no approved PROP-* ID. -->
 | Property ID | Framework TECH ID | Exact command | Run target/time bound | Seed or reproduction format | Evidence destination |
 |---|---|---|---|---|---|
-| <copy one exact approved PRD row per referenced PROP-ID> |
+| TODO | TODO | TODO | TODO | TODO | TODO |
 
-<!-- Omit this table only when this task owns no REQUIRED Harness row. -->
 | Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | Exact command or API | Evidence destination | Required or conditional status |
 |---|---|---|---|---|---|---|---|
-| <copy each owned REQUIRED PRD Harness row; every required ID appears in exactly one task> |
+| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
 ```bash
-<each exact property and Harness command owned by this task, once>
+TODO
 ```
 
 #### Execution log
@@ -191,7 +178,7 @@ requirement, acceptance, design, property, Harness, and evidence bindings.
 #### Agent execution details
 
 <details>
-<summary>Exact metadata used by Codex and task_waves.py</summary>
+<summary>Technical task metadata</summary>
 
 - Requirements: <current REQ ID and requirement IDs>
 - Design: <DES-nnnn; TECH: TECH-nnnn[, TECH-nnnn...] or DES-nnnn; TECH: NONE — no technology/toolchain impact>
@@ -215,8 +202,8 @@ requirement, acceptance, design, property, Harness, and evidence bindings.
 
 ## Dependencies, waivers, and waves
 
-Dependencies determine structural waves, never parallel mutable work. Any
-waiver must preserve the approved acceptance and authority boundary.
+This section shows which work must finish first and any approved exception.
+Fastlane still changes one task at a time.
 
 ### Dependency waiver registry
 
@@ -226,19 +213,20 @@ waiver must preserve the approved acceptance and authority boundary.
 
 ## Attempt budget and stop conditions
 
-The Engine enforces the authorized attempt budget and stops on stale gates,
-boundary drift, failed evidence, exhausted attempts, or uncertain external state.
+Each task has a bounded number of attempts. Fastlane stops when evidence fails,
+the approved scope changes, attempts run out, or an external result is uncertain.
 
 ## Checkpoints and resume
 
-The coordinator records one durable checkpoint after each validated task or
-wave and before or after any separately authorized external action.
+A checkpoint records the last safe place to resume after verified work or a
+separately approved external action.
 
 | Checkpoint | Run | Time | REQ / DES / AUTH | Commit and protected dirty paths | Task outcomes and attempts | Evidence and external actions | Blockers and next safe action |
 |---|---|---|---|---|---|---|---|
 | `NONE` | `NONE` | TODO | `REQ-0001` / `DES-0001` / `AUTH-0001` | TODO | No work started | `NONE` | Complete Gate B; when current, run `TASK-10` |
 
-Resume only from a current Engine-validated checkpoint; never blindly repeat an external action.
+Fastlane resumes from the latest passing checkpoint. It confirms uncertain
+external work before continuing.
 
 ### Archived task-plan registry
 
@@ -250,9 +238,7 @@ Resume only from a current Engine-validated checkpoint; never blindly repeat an 
 
 ## Task definitions
 
-No tasks have been generated. After Gate B is current, run `TASK-10` when the
-plan state is `UNINITIALIZED` or `STALE` to create or replace the current
-`TASK-nnn` graph from the approved REQ/DES/AUTH envelope. Preserve the stale
-graph in its archive commit and registry row; never reuse its task IDs. Each task
-must include an observable outcome, bounded scope, objective acceptance criteria,
-exact validation commands, evidence references, blockers, and an execution log.
+No tasks have been prepared yet. After the technical plan is approved, Fastlane
+creates a work plan from the approved requirements and design. Each task explains
+the outcome, what may change, how success will be checked, any blocker, and the
+evidence produced.

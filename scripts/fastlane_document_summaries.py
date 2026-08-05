@@ -582,7 +582,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
         "docs/project/TASKS.md": (("Current progress", "#current-progress"), ("Roadmap", "#roadmap"), ("Active work and blockers", "#active-work-blockers-and-next-action"), ("Task definitions", "#task-definitions"), ("Checkpoint history", "#checkpoints-and-resume"), ("Exact execution state", "#exact-run-and-task-state")),
         "docs/project/VERIFY.md": (("Current result", "#current-result"), ("Passing evidence", "#verification-matrix"), ("Failed or stale evidence", "#failed-or-stale"), ("AWS evidence", "#aws-core-evidence"), ("Release decision", "#current-release-decision")),
         "docs/project/RUNBOOK.md": (("Before deploying", "#2-prerequisites"), ("Deploy", "#6-deployment"), ("Verify", "#7-smoke-tests"), ("Roll back", "#10-rollback"), ("Recover", "#11-backup-and-recovery"), ("Tear down", "#13-teardown-and-decommissioning")),
-        "docs/project/BUGFIX.md": (("Summary", "#1-summary"), ("Current behavior", "#2-current-behavior"), ("Root-cause analysis", "#7-root-cause-analysis"), ("Fix constraints", "#8-fix-constraints"), ("Regression evidence", "#9-regression-and-property-specification")),
+        "docs/project/BUGFIX.md": (("Summary", "#1-summary"), ("Current behavior", "#2-current-behavior"), ("Root-cause analysis", "#7-root-cause-analysis"), ("Fix constraints", "#8-fix-constraints"), ("Regression evidence", "#9-regression-and-property-specification"), ("Acceptance criteria", "#10-acceptance-criteria")),
     }
     # fmt: on
     return [

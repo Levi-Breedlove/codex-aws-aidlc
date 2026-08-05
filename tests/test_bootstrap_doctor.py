@@ -2878,7 +2878,13 @@ class BootstrapDoctorTests(unittest.TestCase):
             "TASK-001 READY attempts=0/3 | Evidence: NONE; External: NONE | "
             "Blockers: NONE; Next: resume TASK-001 |\n"
         )
-        text = text.replace("\n\nResume only", "\n" + checkpoint + "\nResume only", 1)
+        placeholder = (
+            "| `NONE` | `NONE` | TODO | `REQ-0001` / `DES-0001` / `AUTH-0001` | "
+            "TODO | No work started | `NONE` | Complete Gate B; when current, run "
+            "`TASK-10` |"
+        )
+        self.assertIn(placeholder, text)
+        text = text.replace(placeholder, placeholder + "\n" + checkpoint.rstrip(), 1)
         tasks_path.write_text(text, encoding="utf-8")
 
         verify_path = project / "docs/project/VERIFY.md"
@@ -2927,7 +2933,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.7")
+        self.assertEqual(report["bootstrap_version"], "1.2.8")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
