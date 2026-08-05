@@ -37,8 +37,6 @@ except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
 
 try:
     from fastlane_contracts import (
-        CHECKPOINT_HEADERS,
-        TASK_COMPLETION_EVIDENCE_HEADERS,
         ContractParseError,
         external_targets_overlap,
         parse_checkpoint_cells,
@@ -51,8 +49,6 @@ try:
     )
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     from scripts.fastlane_contracts import (
-        CHECKPOINT_HEADERS,
-        TASK_COMPLETION_EVIDENCE_HEADERS,
         ContractParseError,
         external_targets_overlap,
         parse_checkpoint_cells,

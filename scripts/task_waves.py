@@ -34,8 +34,6 @@ except ModuleNotFoundError:  # pragma: no cover - package-style test import
 
 try:
     from fastlane_contracts import (
-        CHECKPOINT_HEADERS,
-        TASK_COMPLETION_EVIDENCE_HEADERS,
         ContractParseError,
         external_targets_overlap,
         parse_checkpoint_cells,
@@ -49,8 +47,6 @@ try:
     )
 except ModuleNotFoundError:  # pragma: no cover - package-style test import
     from scripts.fastlane_contracts import (
-        CHECKPOINT_HEADERS,
-        TASK_COMPLETION_EVIDENCE_HEADERS,
         ContractParseError,
         external_targets_overlap,
         parse_checkpoint_cells,

@@ -5,13 +5,13 @@
   "control_sha256": {
     "bootstrap.py": "ceb45acc6358b387acd013fdd8d196f7ef926cc6299e9dee7d2b74146b8e8e9b",
     "scripts/bootstrap_dependencies.py": "edfc0162e365ec203017988e8da1efd8a34ef961d9a6ad068873ebc02d7c7146",
-    "scripts/bootstrap_doctor.py": "3e2ea40d3e8130029b7ab9b83d044cd2353e2b07781e156281bd97797ac51f64",
+    "scripts/bootstrap_doctor.py": "4cb79feeca8cc52f70d10228a83582c2a5fc815e4a762910fda1aafd68685295",
     "scripts/fastlane_contracts.py": "ffd34596913b1a293cf36cdea42db0c1da22d1130ca6fedbb2365470cec0fbd7",
     "scripts/fastlane_process.py": "21d97beecfefdade67a0ed7ee69ef3818926a4291c21987b53c25601548ac115",
     "scripts/fastlane_project_identity.py": "b4829cb524fe5171b65ddd6c1d970f67d1d8a771a63c9236a8ab473719c46af5",
     "scripts/fastlane_stdio.py": "06ab89a37c32842db40936b4d364dd54ef8cd626f69e20549c506fe852f594d1",
     "scripts/setup_assistant.py": "5ab85f672fe6a25186927e7e227d4b81f8618398c2cdf3c454e30d1ea7fee864",
-    "scripts/task_waves.py": "aba481d1659acbde1680d6bdcfe08ab3e517844b934e7c6ab9cb5874217b7fbf"
+    "scripts/task_waves.py": "bb5bfff209148a7cb41604cc79999c30e55ec7cca9dddfa7c374c87080177614"
   },
   "source_sha256": {
     ".agents/skills/build-fastlane/SKILL.md": "0133a46cbe6000e9fe7e42e50817944134beb66dd92099cda52eeb7e568098ab",
@@ -77,7 +77,7 @@
     "pyproject.toml": "b69ca9584b34a1e4a93f7f7b44d830d0dcd5ea499fd36a674ce55893746a86c1",
     "scripts/AGENTS.md": "779a58631681540b44de9e4fc3ead571b259638f469733496c1ff9f506005510",
     "scripts/bootstrap_dependencies.py": "edfc0162e365ec203017988e8da1efd8a34ef961d9a6ad068873ebc02d7c7146",
-    "scripts/bootstrap_doctor.py": "3e2ea40d3e8130029b7ab9b83d044cd2353e2b07781e156281bd97797ac51f64",
+    "scripts/bootstrap_doctor.py": "4cb79feeca8cc52f70d10228a83582c2a5fc815e4a762910fda1aafd68685295",
     "scripts/fastlane_context.py": "f2fe0ce148b010080386954db0e5667fd0ef855aa6ec62dab72f5f9719b17cbd",
     "scripts/fastlane_contracts.py": "ffd34596913b1a293cf36cdea42db0c1da22d1130ca6fedbb2365470cec0fbd7",
     "scripts/fastlane_document_summaries.py": "9f9c89f4ff2ae1e1391fdb6f6a55cc7a3b10a1a6719638df2735a9d744fefd5d",
@@ -91,7 +91,7 @@
     "scripts/model_roleplay_eval.py": "5311c725c8a35506e8cef650304d7afe43d58da210c89307bc710eb4fe0caa9b",
     "scripts/package_release.py": "c69234c05cb12c394b3b4aaa276a8f50551bc165d7658a77e95c8247d2674021",
     "scripts/setup_assistant.py": "5ab85f672fe6a25186927e7e227d4b81f8618398c2cdf3c454e30d1ea7fee864",
-    "scripts/task_waves.py": "aba481d1659acbde1680d6bdcfe08ab3e517844b934e7c6ab9cb5874217b7fbf",
+    "scripts/task_waves.py": "bb5bfff209148a7cb41604cc79999c30e55ec7cca9dddfa7c374c87080177614",
     "scripts/update_manifest.py": "b84869c98b48691a12cdee8c3b486fc60b43856bc8d4bb17a955b72135a4bb38",
     "tests/AGENTS.md": "5a336f5560150bbfd96f3c31c0d9e2722ecad7ce961c3278480d86422a0cbf07",
     "tests/test_bootstrap.py": "49724eebea35fda0f5678bc1dc22df363ad1202e7174be752882a6c50de90a05",
