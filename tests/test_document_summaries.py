@@ -219,7 +219,7 @@ class HumanFirstDocumentQualificationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            "<summary>Exact AWS authority record</summary>\n\n## Active operational boundary",
+            "<summary>View the detailed AWS authority record</summary>\n\n## Active operational boundary",
             runbook,
         )
         section = runbook.split("## Active operational boundary", 1)[1].split(

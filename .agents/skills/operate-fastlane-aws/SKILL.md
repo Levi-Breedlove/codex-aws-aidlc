@@ -52,6 +52,13 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
    alerts, and the exact mutation ceiling. Treat the ceiling as a maximum, not
    a spending goal, and never weaken an approved security or recovery control
    for savings.
+   Select `STRUCTURED_API` only for one attributable operation whose service,
+   operation, parameters, context, and resources are observable and exactly
+   inside current authority. Select `REVIEWED_SCRIPT` only for legitimate
+   multi-step work with one current `AWS-EXEC-*` record bound to the exact
+   reviewed script or immutable artifact digest, operations, resources,
+   evidence destination, and authority. A description, cached script, opaque
+   command, stale record, or tool name never proves or authorizes execution.
 8. Before `AWS-20`, prove the final infrastructure diff is completely contained
    in the current approved boundary and successful observed preflight. For
    `explicit-gate`, require the Engine's authoritative
@@ -163,13 +170,26 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
     valid after later expiry or replacement only because its durable tuple was
     proven; lifecycle intent never supplies these reads.
 13. Require the separate exact teardown receipt for `AWS-50`; preserve retained
-    data, record only the direct mutation result with the exact teardown
-    authorization ID and receipt digest, and return to `AWS-40` after every
-    attempt. AWS-50 performs no authenticated read-only reconciliation. AWS-40
-    verifies operation history, retained data, backups, residual resources, and
-    continuing billing signals under current read authority.
+    data and consume one current `READY_FOR_TEARDOWN` review. Allocate one new
+    `AWS-TEARDOWN-nnnn` Attempt ID and append its immutable `STARTED` record
+    before the call; STARTED reports no observed result and consumes that
+    teardown authority for exactly one matching request. Append exactly one
+    `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN` terminal row with the direct
+    result and exact receipt digest. If a session ends with only STARTED, never
+    replay the call; append the bounded local UNKNOWN closure the Engine permits.
+    Return to `AWS-40` after every attempt. AWS-50 performs no authenticated
+    read-only reconciliation. Under separate current read authority, AWS-40
+    verifies operation history, retained data, backups, residual resources,
+    discovery limits, and continuing billing signals. Never claim globally
+    clean state from an empty or scope-limited inventory.
 
 Stop on any identity, target, artifact, resource, operation, cost, validity, or
 state mismatch. Never broaden IAM, make sensitive data public, bypass a failed
 control, replay deployment authority, retry an unreconciled attempt, or claim
 deployment evidence without observing it.
+
+`docs/project/VERIFY.md` stores the canonical evidence rows and
+`docs/project/RUNBOOK.md` stores project-specific operator commands and stop
+conditions. Neither document owns this execution procedure. Exact receipt bytes
+remain in the prompt authority; the Engine owns routing, field grammar,
+matching, consumption, journal closure, and fail-closed diagnostics.

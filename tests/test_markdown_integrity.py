@@ -117,6 +117,25 @@ def visible_outside_disclosures(markdown: str) -> str:
     )
 
 
+def rendered_visible_lines(markdown: str) -> list[str]:
+    """Return owner-visible rendered lines outside closed disclosures."""
+
+    visible: list[str] = []
+    table_rule = re.compile(r"^\|(?:\s*:?-+:?\s*\|)+$")
+    fence = re.compile(r"^(?:```|~~~)(?:[A-Za-z0-9_-]+)?$")
+    for _number, line, depth in disclosure_lines(markdown):
+        if not line or line in {"<details>", "</details>"}:
+            continue
+        if depth and not line.startswith("<summary>"):
+            continue
+        if line.startswith("<!--") and line.endswith("-->"):
+            continue
+        if fence.fullmatch(line) or table_rule.fullmatch(line):
+            continue
+        visible.append(line)
+    return visible
+
+
 class MarkdownIntegrityTests(unittest.TestCase):
     def markdown_files(self) -> list[Path]:
         return sorted(
@@ -500,16 +519,20 @@ sequenceDiagram
                 for required_record in required_records:
                     self.assertIn(required_record, body)
 
-    def test_prd_owner_path_stays_within_the_readability_ceiling(self) -> None:
-        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
-        visible_lines = [
-            line
-            for _number, line, depth in disclosure_lines(prd)
-            if line
-            and line not in {"<details>", "</details>"}
-            and (depth == 0 or line.startswith("<summary>"))
-        ]
-        self.assertLessEqual(len(visible_lines), 330)
+    def test_project_owner_paths_stay_within_readability_ceilings(self) -> None:
+        ceilings = {
+            "PRD.md": 330,
+            "TASKS.md": 65,
+            "VERIFY.md": 90,
+            "RUNBOOK.md": 220,
+            "BUGFIX.md": 90,
+        }
+        for name, ceiling in ceilings.items():
+            with self.subTest(document=name):
+                source = (REPOSITORY_ROOT / "docs/project" / name).read_text(
+                    encoding="utf-8"
+                )
+                self.assertLessEqual(len(rendered_visible_lines(source)), ceiling)
 
     def test_prd_contains_records_but_no_framework_maintenance_instructions(
         self,

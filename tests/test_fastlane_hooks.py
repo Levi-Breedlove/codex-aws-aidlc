@@ -511,7 +511,7 @@ def closure_patch_input(
         anchor = next(
             line
             for line in lines
-            if line.startswith("This ledger proves current runtime")
+            if line.startswith("These values identify which project version")
         )
         following = lines[lines.index(anchor) + 1]
         hunks.extend(
@@ -979,26 +979,34 @@ class FastlaneHookTests(unittest.TestCase):
         self.assertNotIn("call_aws", human_guide)
         self.assertNotIn("run_script", human_guide)
         self.assertNotIn("STRUCTURED_API", human_guide)
-        documents = (
+        technical_documents = (
             REPOSITORY_ROOT / ".codex" / "hooks" / "AGENTS.md",
             REPOSITORY_ROOT / "docs" / "project" / "RUNBOOK.md",
             REPOSITORY_ROOT / "docs" / "project" / "VERIFY.md",
-            REPOSITORY_ROOT / "prompts" / "CODEX-PROMPTS.md",
+            REPOSITORY_ROOT
+            / ".agents"
+            / "skills"
+            / "operate-fastlane-aws"
+            / "SKILL.md",
         )
-        for path in documents:
+        for path in technical_documents:
             with self.subTest(path=path):
                 content = path.read_text(encoding="utf-8")
                 self.assertNotIn("call_aws", content)
                 self.assertNotIn("run_script", content)
                 self.assertIn("STRUCTURED_API", content)
                 self.assertIn("REVIEWED_SCRIPT", content)
-        self.assertIn(
-            "Codex follows current AWS Core guidance to select a supported "
-            "account-operation",
-            (REPOSITORY_ROOT / "prompts" / "CODEX-PROMPTS.md").read_text(
-                encoding="utf-8"
-            ),
+        prompt_pack = (REPOSITORY_ROOT / "prompts" / "CODEX-PROMPTS.md").read_text(
+            encoding="utf-8"
         )
+        self.assertNotIn("call_aws", prompt_pack)
+        self.assertNotIn("run_script", prompt_pack)
+        self.assertNotIn("STRUCTURED_API", prompt_pack)
+        self.assertNotIn("REVIEWED_SCRIPT", prompt_pack)
+        operate_skill = technical_documents[-1].read_text(encoding="utf-8")
+        self.assertIn("fresh live `search_documentation`", operate_skill)
+        self.assertIn("matching live `retrieve_skill`", operate_skill)
+        self.assertIn("Select `STRUCTURED_API`", operate_skill)
 
     def test_read_only_gh_api_is_not_misclassified_as_publication(self) -> None:
         read_result = fastlane_hook.handle_event(

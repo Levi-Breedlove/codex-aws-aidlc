@@ -1,8 +1,6 @@
-# {{PROJECT_NAME}} — Bugfix Specification
+# {{PROJECT_NAME}} — Bugfix Record
 
-Canonical path: `docs/project/BUGFIX.md`.
-
-Use this file for the active defect or regression. Archive or reset it after the fix is complete.
+This document explains the active defect, its impact, the approved repair, and the proof that it works without changing unrelated behavior; when no defect is active, the current-state summary says so.
 <!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
 ## Current state
 
@@ -29,6 +27,7 @@ Use this file for the active defect or regression. Archive or reset it after the
 - [Root-cause analysis](#7-root-cause-analysis)
 - [Fix constraints](#8-fix-constraints)
 - [Regression evidence](#9-regression-and-property-specification)
+- [Acceptance criteria](#10-acceptance-criteria)
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
 ## 1. Summary
@@ -43,35 +42,15 @@ Use this file for the active defect or regression. Archive or reset it after the
 
 ## 2. Current behavior
 
-Describe exactly what the system does now.
-
-Include:
-
-- observable output;
-- affected users or systems;
-- frequency;
-- environment;
-- logs, metrics, or evidence;
-- known workaround.
+TODO — Record the observable behavior, affected users, frequency, environment, evidence, and any known workaround.
 
 ## 3. Expected behavior
 
-Describe the correct behavior objectively.
-
-Reference existing PRD requirements when possible. A bugfix should not silently create a new feature.
+TODO — State the correct observable behavior and link existing requirements; a repair does not silently add a feature.
 
 ## 4. Intentionally unchanged behavior
 
-State what must remain unchanged after the fix:
-
-- public contracts;
-- unrelated user flows;
-- data formats;
-- permissions;
-- performance boundaries;
-- deployment behavior.
-
-This section defines the regression boundary.
+TODO — Name the public contracts, unrelated flows, data formats, permissions, performance boundaries, and deployment behavior that the repair must preserve.
 
 ## 5. Reproduction
 
@@ -114,8 +93,6 @@ TODO
 |---|---|---|---|---|
 | HYP-001 | TODO | TODO | TODO | Open |
 
-Do not present a hypothesis as confirmed root cause.
-
 ## 8. Fix constraints
 
 - Allowed scope: TODO
@@ -126,16 +103,18 @@ Do not present a hypothesis as confirmed root cause.
 
 ## 9. Regression and property specification
 
-### Example regression tests
+Fastlane uses repeatable checks to reproduce the defect, prove the expected behavior, and confirm that important neighboring behavior still works.
+
+### Repeatable checks
 
 | Test ID | Scenario | Expected result |
 |---|---|---|
 | REG-001 | Reproduction case | Expected behavior occurs |
 | REG-002 | Unchanged neighboring behavior | Behavior remains unchanged |
 
-### Properties
+### Broader safety checks
 
-| Property ID | Invariant | Generated inputs or states | Oracle |
+| Check ID | Rule that must always hold | Inputs or situations covered | How success is decided |
 |---|---|---|---|
 | BUG-PROP-001 | The reported failure cannot occur for any valid input in the affected domain. | TODO | TODO |
 | BUG-PROP-002 | Intentionally unchanged behavior remains equivalent before and after the fix. | TODO | TODO |
@@ -146,11 +125,11 @@ Do not present a hypothesis as confirmed root cause.
 - [ ] Root cause is supported by evidence
 - [ ] Expected behavior is restored
 - [ ] Unchanged behavior remains unchanged
-- [ ] Relevant property-based tests pass
+- [ ] Relevant broader safety checks pass
 - [ ] Security and failure paths are tested
 - [ ] Rollback path is understood
-- [ ] `docs/project/VERIFY.md` is updated with produced evidence
-- [ ] `docs/project/TASKS.md` and the GitHub Issue are synchronized
+- [ ] The verification record contains the produced evidence
+- [ ] The task record and any authorized GitHub issue agree
 
 ## 11. Task references
 
