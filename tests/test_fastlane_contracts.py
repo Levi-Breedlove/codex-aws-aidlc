@@ -13,9 +13,7 @@ CHECKPOINT_HEADERS = " | ".join(contracts.CHECKPOINT_HEADERS)
 
 def task_evidence_document(*rows: str) -> str:
     separator = (
-        "|"
-        + "|".join("---" for _ in contracts.TASK_COMPLETION_EVIDENCE_HEADERS)
-        + "|"
+        "|" + "|".join("---" for _ in contracts.TASK_COMPLETION_EVIDENCE_HEADERS) + "|"
     )
     body = "\n".join(rows)
     return (
@@ -87,14 +85,7 @@ class SharedMarkdownGrammarTests(unittest.TestCase):
         self.assertEqual(masked, task_waves.without_fenced_code(source))
 
     def test_fence_masking_ignores_mismatched_or_shorter_markers(self) -> None:
-        source = (
-            "~~~~text\n"
-            "```\n"
-            "~~~\n"
-            "## still fenced\n"
-            "~~~~\n"
-            "## visible\n"
-        )
+        source = "~~~~text\n```\n~~~\n## still fenced\n~~~~\n## visible\n"
         masked = contracts.without_fenced_code(source)
         self.assertNotIn("still fenced", masked)
         self.assertIn("## visible", masked)
@@ -168,8 +159,9 @@ class SharedEvidenceAndCheckpointTests(unittest.TestCase):
                 doctor.parse_checkpoint_rows,
                 task_waves.parse_checkpoint_rows,
             ):
-                with self.subTest(parser=parser.__module__), self.assertRaises(
-                    ValueError
+                with (
+                    self.subTest(parser=parser.__module__),
+                    self.assertRaises(ValueError),
                 ):
                     parser(document)
 

@@ -523,7 +523,9 @@ def parse_checkpoint_rows(text: str) -> list[CheckpointRow]:
             "row_width": "TASKS checkpoint rows must have exactly eight cells",
             "discontiguous_rows": "TASKS checkpoint rows must form one contiguous table",
         }
-        raise ValueError(messages.get(exc.reason, "TASKS checkpoint table is invalid")) from exc
+        raise ValueError(
+            messages.get(exc.reason, "TASKS checkpoint table is invalid")
+        ) from exc
     rows: list[CheckpointRow] = []
     for cells in parsed_rows:
         cleaned = [clean(cell) for cell in cells]
