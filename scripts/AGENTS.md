@@ -32,6 +32,23 @@ cross-platform, fail-closed, and free of hidden external actions.
   time, tested revision or artifact, durable source, and evidence status in
   `../docs/project/VERIFY.md`. Run the Engine before the next wave.
 
+## Engine extraction boundaries
+
+- Characterize complete public reports, diagnostics, routes, receipts, CLI
+  behavior, and performance before moving an Engine responsibility.
+- Keep `bootstrap_doctor.py` as the stable public command and compatibility
+  facade. Internal lifecycle policy belongs under `fastlane_engine/` only after
+  its characterization checkpoint passes.
+- Normal domain evaluation consumes one immutable project snapshot. Domain
+  validators do not read files, run Git, call subprocesses, write state, or
+  access GitHub or AWS.
+- Keep presentation, optional hooks, initialization, package production, and
+  task mutation outside lifecycle domains. `task_waves.py` remains the sole task
+  mutator and must eventually consume only a stable pure Engine task API.
+- Preserve report schema 2, diagnostic order, exact receipt bytes, exit codes,
+  and current compatibility facades unless a separate contract explicitly
+  authorizes a migration.
+
 ## Required validation
 
 For an affected script, run its focused tests and then:

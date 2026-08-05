@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+import ast
+import json
+import os
+import tomllib
+import unittest
+from pathlib import Path
+
+from tests import engine_parity_cases as parity
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def script_import_graph() -> dict[str, set[str]]:
+    scripts = {path.stem: path for path in (REPOSITORY_ROOT / "scripts").glob("*.py")}
+    graph = {name: set() for name in scripts}
+    for name, path in scripts.items():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            imported: list[str] = []
+            if isinstance(node, ast.Import):
+                imported.extend(alias.name.split(".")[-1] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.append(node.module.split(".")[-1])
+            graph[name].update(item for item in imported if item in scripts)
+    return graph
+
+
+def import_cycles(graph: dict[str, set[str]]) -> list[tuple[str, ...]]:
+    cycles: set[tuple[str, ...]] = set()
+
+    def visit(node: str, path: list[str]) -> None:
+        if node in path:
+            cycle = path[path.index(node) :] + [node]
+            rotations = [
+                tuple(cycle[index:-1] + cycle[:index] + [cycle[index]])
+                for index in range(len(cycle) - 1)
+            ]
+            cycles.add(min(rotations))
+            return
+        for dependency in sorted(graph[node]):
+            visit(dependency, [*path, node])
+
+    for node in sorted(graph):
+        visit(node, [])
+    return sorted(cycles)
+
+
+class EngineCharacterizationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.oracle = json.loads(parity.ORACLE_PATH.read_text(encoding="utf-8"))
+        cls.configuration = tomllib.loads(
+            (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        )["tool"]["fastlane"]["engine_characterization"]
+
+    def test_monolith_ast_inventory_matches_the_locked_baseline(self) -> None:
+        expected = self.oracle["doctor_characterization"]
+        current = parity.doctor_characterization()
+        engine_package = REPOSITORY_ROOT / "scripts/fastlane_engine"
+        if not engine_package.exists():
+            self.assertEqual(current, expected)
+        else:
+            self.assertLess(current["line_count"], expected["line_count"])
+            self.assertLess(current["function_count"], expected["function_count"])
+        self.assertEqual(expected["function_count"], 264)
+        self.assertEqual(expected["class_count"], 39)
+        self.assertGreater(expected["line_count"], 20_000)
+        self.assertEqual(len(expected["source_sha256"]), 64)
+        self.assertEqual(len(expected["structure_sha256"]), 64)
+
+    def test_current_static_script_import_graph_has_no_cycles(self) -> None:
+        graph = script_import_graph()
+        self.assertEqual(import_cycles(graph), [])
+        self.assertNotIn("tests", graph)
+
+    def test_task_wave_dynamic_doctor_load_is_explicitly_characterized(self) -> None:
+        text = (REPOSITORY_ROOT / "scripts/task_waves.py").read_text(encoding="utf-8")
+        tree = ast.parse(text)
+        calls = sum(
+            1
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "load_bootstrap_doctor"
+        )
+        engine_package = REPOSITORY_ROOT / "scripts/fastlane_engine"
+        if not engine_package.exists():
+            self.assertEqual(calls, 4)
+            self.assertEqual(text.count("spec_from_file_location(module_name"), 1)
+        else:
+            self.assertLessEqual(calls, 4)
+
+    def test_characterization_thresholds_are_explicit_and_non_runtime(self) -> None:
+        self.assertEqual(self.configuration["baseline_commit"], parity.BASELINE_COMMIT)
+        self.assertEqual(self.configuration["maximum_warm_median_ms"], 964)
+        self.assertEqual(self.configuration["maximum_peak_memory_mib"], 30)
+        self.assertEqual(self.configuration["doctor_hard_review_lines"], 1200)
+        self.assertEqual(self.configuration["module_hard_review_lines"], 1800)
+        self.assertEqual(self.configuration["function_review_lines"], 100)
+        self.assertEqual(self.configuration["complexity_review"], 15)
+
+    def test_same_process_benchmark_is_ephemeral_and_strict_when_requested(
+        self,
+    ) -> None:
+        result = parity.benchmark_template_source(iterations=1)
+        self.assertEqual(result["iterations"], 1)
+        self.assertGreater(result["warm_median_wall_ms"], 0)
+        self.assertGreater(result["warm_median_cpu_ms"], 0)
+        self.assertLessEqual(
+            result["peak_memory_mib"],
+            self.configuration["maximum_peak_memory_mib"],
+        )
+        ceiling = self.configuration["maximum_warm_median_ms"]
+        if os.environ.get("FASTLANE_ENFORCE_PERFORMANCE_BUDGET") == "1":
+            self.assertLessEqual(result["warm_median_wall_ms"], ceiling)
+        else:
+            self.assertLessEqual(result["warm_median_wall_ms"], ceiling * 4)
+        tracked_results = list(REPOSITORY_ROOT.glob("*benchmark*.json"))
+        self.assertEqual(tracked_results, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

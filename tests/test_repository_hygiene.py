@@ -251,10 +251,18 @@ class RepositoryHygieneTests(unittest.TestCase):
             {
                 "scripts/setup_assistant.py": ["E402"],
                 "tests/test_context_packets.py": ["E402"],
+                "tests/engine_parity_cases.py": ["E402"],
                 "tests/test_fastlane_presenter.py": ["E402"],
                 "tests/test_product_journeys.py": ["E402"],
             },
         )
+        characterization = config["tool"]["fastlane"]["engine_characterization"]
+        self.assertEqual(
+            characterization["baseline_commit"],
+            "312b53ce00f9db5263f3a72e778f833e70c7db8e",
+        )
+        self.assertEqual(characterization["maximum_warm_median_ms"], 964)
+        self.assertEqual(characterization["maximum_peak_memory_mib"], 30)
 
         dependabot = (REPOSITORY_ROOT / ".github/dependabot.yml").read_text(
             encoding="utf-8"

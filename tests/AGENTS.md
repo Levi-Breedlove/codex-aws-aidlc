@@ -25,3 +25,18 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
 - Use mocks for local confidence, but do not treat mocks as deployed integration proof.
 - Record meaningful release evidence in `../docs/project/VERIFY.md`.
 - Reference test suites or reports rather than listing every test case in Markdown.
+
+## Engine parity rules
+
+- Freeze complete normalized reports before extracting a lifecycle domain.
+  Normalize only repository roots, the bounded test clock, package-version
+  mirrors, and deliberately synthetic Git identities.
+- Preserve diagnostic IDs and order, messages, paths, routes, owner actions,
+  continuation, remediation, authority, projections, receipts, human output,
+  and exit codes exactly unless an approved contract changes them.
+- Bind every parity-corpus scenario to at least one named regression test. Do
+  not replace an exact assertion with a scenario label or coverage percentage.
+- Keep benchmark results ephemeral and machine-local. Repository fixtures may
+  store thresholds and structural baselines, never machine paths, usernames,
+  raw transcripts, credentials, AWS identifiers, or timing claims from a
+  different tree.
