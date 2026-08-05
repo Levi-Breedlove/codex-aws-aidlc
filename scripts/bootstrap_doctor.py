@@ -22,6 +22,45 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
 
+if __package__:
+    from .fastlane_engine.core.diagnostics import Diagnostic, DiagnosticCollector
+    from .fastlane_engine.core.ids import clean_cell, validate_relative_path
+    from .fastlane_engine.core.snapshot import (
+        ObservationError,
+        ProjectSnapshot,
+        SnapshotObserver,
+        has_symlink_component,
+    )
+    from .fastlane_engine.package.manifest import (
+        ManifestPolicy,
+        validate_manifest as validate_package_manifest,
+        validate_placeholders as validate_package_placeholders,
+        validate_prompt_pack as validate_package_prompt_pack,
+    )
+    from .fastlane_engine.package.state import (
+        StatePolicy,
+        validate_state_schema as validate_package_state_schema,
+    )
+else:  # Executed directly from scripts/.
+    from fastlane_engine.core.diagnostics import Diagnostic, DiagnosticCollector
+    from fastlane_engine.core.ids import clean_cell, validate_relative_path
+    from fastlane_engine.core.snapshot import (
+        ObservationError,
+        ProjectSnapshot,
+        SnapshotObserver,
+        has_symlink_component,
+    )
+    from fastlane_engine.package.manifest import (
+        ManifestPolicy,
+        validate_manifest as validate_package_manifest,
+        validate_placeholders as validate_package_placeholders,
+        validate_prompt_pack as validate_package_prompt_pack,
+    )
+    from fastlane_engine.package.state import (
+        StatePolicy,
+        validate_state_schema as validate_package_state_schema,
+    )
+
 try:
     from fastlane_adr import derive_adr_rationale, empty_adr_rationale
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
@@ -154,6 +193,20 @@ RUNBOOK_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/RUNBOOK.md"
 TASKS_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/TASKS.md"
 VERIFY_FILE = f"{PROJECT_DOCUMENT_DIRECTORY}/VERIFY.md"
 PROMPT_FILE = "prompts/CODEX-PROMPTS.md"
+ENGINE_RUNTIME_CONTROL_FILES = {
+    "scripts/fastlane_engine/__init__.py",
+    "scripts/fastlane_engine/api.py",
+    "scripts/fastlane_engine/core/__init__.py",
+    "scripts/fastlane_engine/core/contracts.py",
+    "scripts/fastlane_engine/core/diagnostics.py",
+    "scripts/fastlane_engine/core/digests.py",
+    "scripts/fastlane_engine/core/ids.py",
+    "scripts/fastlane_engine/core/markdown_index.py",
+    "scripts/fastlane_engine/core/snapshot.py",
+    "scripts/fastlane_engine/package/__init__.py",
+    "scripts/fastlane_engine/package/manifest.py",
+    "scripts/fastlane_engine/package/state.py",
+}
 DOCUMENT_SUMMARY_FILES = (
     PROJECT_README_FILE,
     PRD_FILE,
@@ -981,70 +1034,54 @@ CANONICAL_PLACEHOLDERS = {
     "{{SETUP_METHOD}}",
     "{{SETUP_STATUS}}",
 }
-MANDATORY_REQUIRED_FILES = {
-    ".github/ISSUE_TEMPLATE/aws-vertical-slice.yml",
-    ".github/ISSUE_TEMPLATE/bugfix.yml",
-    ".github/ISSUE_TEMPLATE/waf-risk.yml",
-    ".github/PULL_REQUEST_TEMPLATE.md",
-    ".gitignore",
-    ".agents/skills/build-fastlane/SKILL.md",
-    ".agents/skills/explain-fastlane/SKILL.md",
-    ".agents/skills/fastlane/SKILL.md",
-    ".agents/skills/launch-fastlane/SKILL.md",
-    ".agents/skills/maintain-fastlane/SKILL.md",
-    ".agents/skills/operate-fastlane-aws/SKILL.md",
-    ".agents/skills/plan-fastlane/SKILL.md",
-    "AGENTS.md",
-    BUGFIX_FILE,
-    "LICENSE",
-    PRD_FILE,
-    "README.md",
-    RUNBOOK_FILE,
-    "SECURITY.md",
-    TASKS_FILE,
-    VERIFY_FILE,
-    "app/README.md",
-    "bootstrap.manifest.json",
-    "bootstrap.py",
-    "bootstrap.yaml",
-    "docs/adr/0000-template.md",
-    "docs/DEPENDENCY-POLICY.md",
-    "docs/SETUP.md",
-    "docs/TROUBLESHOOTING.md",
-    "docs/WORKFLOW.md",
-    "scripts/fastlane_document_summaries.py",
-    "infrastructure/AGENTS.md",
-    "infrastructure/README.md",
-    "prompts/CODEX-PROMPTS.md",
-    "scripts/bootstrap_doctor.py",
-    "scripts/fastlane_adr.py",
-    "scripts/fastlane_contracts.py",
-    "scripts/fastlane_owner_briefs.py",
-    "scripts/bootstrap_dependencies.py",
-    "scripts/setup_assistant.py",
-    "scripts/task_waves.py",
-    "tests/AGENTS.md",
-}
-
-
-@dataclass(frozen=True)
-class Diagnostic:
-    code: str
-    message: str
-    path: str | None = None
-    severity: str = "ERROR"
-
-    def to_dict(self, diagnostic_id: str | None = None) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "code": self.code,
-            "severity": self.severity,
-            "message": self.message,
-        }
-        if diagnostic_id is not None:
-            result["diagnostic_id"] = diagnostic_id
-        if self.path is not None:
-            result["path"] = self.path
-        return result
+MANDATORY_REQUIRED_FILES = (
+    {
+        ".github/ISSUE_TEMPLATE/aws-vertical-slice.yml",
+        ".github/ISSUE_TEMPLATE/bugfix.yml",
+        ".github/ISSUE_TEMPLATE/waf-risk.yml",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".gitignore",
+        ".agents/skills/build-fastlane/SKILL.md",
+        ".agents/skills/explain-fastlane/SKILL.md",
+        ".agents/skills/fastlane/SKILL.md",
+        ".agents/skills/launch-fastlane/SKILL.md",
+        ".agents/skills/maintain-fastlane/SKILL.md",
+        ".agents/skills/operate-fastlane-aws/SKILL.md",
+        ".agents/skills/plan-fastlane/SKILL.md",
+        "AGENTS.md",
+        BUGFIX_FILE,
+        "LICENSE",
+        PRD_FILE,
+        "README.md",
+        RUNBOOK_FILE,
+        "SECURITY.md",
+        TASKS_FILE,
+        VERIFY_FILE,
+        "app/README.md",
+        "bootstrap.manifest.json",
+        "bootstrap.py",
+        "bootstrap.yaml",
+        "docs/adr/0000-template.md",
+        "docs/DEPENDENCY-POLICY.md",
+        "docs/SETUP.md",
+        "docs/TROUBLESHOOTING.md",
+        "docs/WORKFLOW.md",
+        "scripts/fastlane_document_summaries.py",
+        "infrastructure/AGENTS.md",
+        "infrastructure/README.md",
+        "prompts/CODEX-PROMPTS.md",
+        "scripts/bootstrap_doctor.py",
+        "scripts/fastlane_adr.py",
+        "scripts/fastlane_contracts.py",
+        "scripts/fastlane_owner_briefs.py",
+        "scripts/bootstrap_dependencies.py",
+        "scripts/setup_assistant.py",
+        "scripts/task_waves.py",
+        "tests/AGENTS.md",
+    }
+    | ENGINE_RUNTIME_CONTROL_FILES
+    | {"scripts/fastlane_engine/AGENTS.md"}
+)
 
 
 @dataclass
@@ -1056,17 +1093,51 @@ class Context:
     presentation_texts: dict[str, str] = field(default_factory=dict)
     source_file_bytes: dict[str, bytes] = field(default_factory=dict)
     source_bytes_read: int = 0
+    manifest_document: dict[str, Any] = field(default_factory=dict)
+    bootstrap_state_document: dict[str, Any] = field(default_factory=dict)
     prior_remediation_fingerprint: str | None = None
+    _observer: SnapshotObserver = field(init=False, repr=False)
+    _diagnostic_collector: DiagnosticCollector = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._diagnostic_collector = DiagnosticCollector(backing=self.diagnostics)
+        self._observer = SnapshotObserver(
+            self.root,
+            canonicalize_text=lambda relative, text: (
+                strip_generated_summary(text)
+                if relative in DOCUMENT_SUMMARY_FILES
+                else text
+            ),
+            max_files=MAX_REQUIRED_FILES,
+            max_file_bytes=MAX_REQUIRED_FILE_BYTES,
+            max_source_bytes=MAX_PROJECT_SOURCE_BYTES,
+        )
 
     def error(self, code: str, message: str, path: str | None = None) -> None:
-        self.diagnostics.append(Diagnostic(code, message, path))
+        self._diagnostic_collector.error(code, message, path)
 
     def warning(self, code: str, message: str, path: str | None = None) -> None:
-        self.diagnostics.append(Diagnostic(code, message, path, "WARNING"))
+        self._diagnostic_collector.warning(code, message, path)
 
     @property
     def has_errors(self) -> bool:
-        return any(item.severity == "ERROR" for item in self.diagnostics)
+        return self._diagnostic_collector.has_errors
+
+    @property
+    def snapshot(self) -> ProjectSnapshot:
+        """Freeze the files and Markdown indexes observed by this invocation."""
+
+        project = self.bootstrap_state_document.get("project", {})
+        project_identity = (
+            {key: str(project[key]) for key in ("name", "region") if key in project}
+            if isinstance(project, dict)
+            else {}
+        )
+        return self._observer.freeze(
+            project_identity=project_identity,
+            bootstrap_state=self.bootstrap_state_document,
+            manifest=self.manifest_document,
+        )
 
 
 @dataclass
@@ -1955,7 +2026,7 @@ CONTROL_HASH_FILES = {
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
-}
+} | ENGINE_RUNTIME_CONTROL_FILES
 COORDINATOR_LEDGER_PATHS = {TASKS_FILE, VERIFY_FILE, STATE_FILE}
 AUTHORIZED_ID = re.compile(r"[A-Z][A-Z0-9_]*-\d+")
 ID_LIKE = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*-\d+\b")
@@ -3881,13 +3952,6 @@ def derive_task_requirement_coverage(
         evidence_issues=tuple(evidence_issues),
         missing_requirement_ids=tuple(missing),
     )
-
-
-def clean_cell(value: Any) -> str:
-    text = str(value).strip()
-    if len(text) >= 2 and text.startswith("`") and text.endswith("`"):
-        text = text[1:-1].strip()
-    return text
 
 
 def unresolved(value: str) -> bool:
@@ -10475,33 +10539,45 @@ def validate_aws_artifact(value: str, baseline: str) -> None:
         )
 
 
-def validate_relative_path(value: Any) -> str | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    value = value.strip()
-    pure = PurePosixPath(value)
-    if (
-        pure.is_absolute()
-        or "\\" in value
-        or any(part in {"", ".", ".."} for part in pure.parts)
-    ):
-        return None
-    return value
-
-
-def has_symlink_component(root: Path, relative: str) -> bool:
-    current = root
-    for part in PurePosixPath(relative).parts:
-        current = current / part
-        if current.is_symlink():
-            return True
-    return False
-
-
 MAX_REQUIRED_FILES = 512
 MAX_REQUIRED_FILE_BYTES = 16 * 1024 * 1024
 MAX_PROJECT_SOURCE_BYTES = 64 * 1024 * 1024
 BINARY_REQUIRED_SUFFIXES = frozenset({".png"})
+
+MANIFEST_POLICY = ManifestPolicy(
+    manifest_file=MANIFEST_FILE,
+    prompt_file=PROMPT_FILE,
+    mandatory_required_files=frozenset(MANDATORY_REQUIRED_FILES),
+    control_hash_files=frozenset(CONTROL_HASH_FILES),
+    canonical_placeholders=frozenset(CANONICAL_PLACEHOLDERS),
+    max_required_files=MAX_REQUIRED_FILES,
+    binary_required_suffixes=BINARY_REQUIRED_SUFFIXES,
+)
+
+STATE_POLICY = StatePolicy(
+    state_file=STATE_FILE,
+    project_name_token=PROJECT_NAME_TOKEN,
+    setup_status_token="{{SETUP_STATUS}}",
+    setup_method_token="{{SETUP_METHOD}}",
+    aws_region_token="{{AWS_REGION}}",
+    cost_posture_token="{{COST_POSTURE}}",
+    project_modes=frozenset(PROJECT_MODES),
+    delivery_profiles=frozenset(DELIVERY_PROFILES),
+    risk_levels=frozenset(RISK_LEVELS),
+    aws_lanes=frozenset(AWS_LANES),
+    brownfield_states=frozenset(BROWNFIELD_STATES),
+    gate_a_states=frozenset(GATE_A_STATES),
+    gate_b_states=frozenset(GATE_B_STATES),
+    run_modes=frozenset(RUN_MODES),
+    run_states=frozenset(RUN_STATES),
+    req_id=REQ_ID,
+    des_id=DES_ID,
+    auth_id=AUTH_ID,
+    plan_id=PLAN_ID,
+    task_id=TASK_ID,
+    run_id=RUN_ID,
+    checkpoint_id=CHECKPOINT_ID,
+)
 
 
 def safe_read_required_binary(
@@ -10512,133 +10588,39 @@ def safe_read_required_binary(
     cached = ctx.source_file_bytes.get(relative)
     if cached is not None:
         return cached
-    if validate_relative_path(relative) is None:
-        ctx.error("MANIFEST_UNSAFE_PATH", f"Unsafe project-relative path: {relative!r}")
-        return None
-    if has_symlink_component(ctx.root, relative):
-        ctx.error(
-            "REQUIRED_FILE_SYMLINK", "Required path contains a symbolic link", relative
-        )
-        return None
-    path = ctx.root / relative
-    if not path.exists():
-        if required:
-            ctx.error("REQUIRED_FILE_MISSING", "Required file is missing", relative)
-        return None
-    if not path.is_file():
-        ctx.error(
-            "REQUIRED_FILE_NOT_REGULAR", "Required path is not a regular file", relative
-        )
-        return None
-    remaining = MAX_PROJECT_SOURCE_BYTES - ctx.source_bytes_read
-    if remaining <= 0:
-        ctx.error(
-            "PROJECT_SOURCE_LIMIT",
-            f"Required project files exceed the {MAX_PROJECT_SOURCE_BYTES}-byte aggregate limit",
-            relative,
-        )
-        return None
-    read_limit = min(MAX_REQUIRED_FILE_BYTES, remaining)
     try:
-        with path.open("rb") as stream:
-            raw = stream.read(read_limit + 1)
-    except OSError as exc:
-        ctx.error("REQUIRED_FILE_UNREADABLE", f"Unable to read file: {exc}", relative)
+        snapshot = ctx._observer.observe_binary(relative)
+    except ObservationError as exc:
+        if required or exc.code != "REQUIRED_FILE_MISSING":
+            ctx.error(exc.code, exc.message, exc.path)
         return None
-    if len(raw) > read_limit:
-        code = (
-            "REQUIRED_FILE_TOO_LARGE"
-            if read_limit == MAX_REQUIRED_FILE_BYTES
-            else "PROJECT_SOURCE_LIMIT"
-        )
-        limit = (
-            MAX_REQUIRED_FILE_BYTES
-            if code == "REQUIRED_FILE_TOO_LARGE"
-            else MAX_PROJECT_SOURCE_BYTES
-        )
-        scope = "per-file" if code == "REQUIRED_FILE_TOO_LARGE" else "aggregate"
-        ctx.error(
-            code,
-            f"Required project file exceeds the {limit}-byte {scope} limit",
-            relative,
-        )
-        return None
-    ctx.source_bytes_read += len(raw)
-    ctx.source_file_bytes[relative] = raw
-    return raw
+    ctx.source_bytes_read = ctx._observer.bytes_observed
+    ctx.source_file_bytes[relative] = snapshot.raw_bytes
+    return snapshot.raw_bytes
 
 
 def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str | None:
     cached = ctx.texts.get(relative)
     if cached is not None:
         return cached
-    if validate_relative_path(relative) is None:
-        ctx.error("MANIFEST_UNSAFE_PATH", f"Unsafe project-relative path: {relative!r}")
+    try:
+        snapshot = ctx._observer.observe_text(relative)
+    except ObservationError as exc:
+        if required or exc.code != "REQUIRED_FILE_MISSING":
+            ctx.error(exc.code, exc.message, exc.path)
         return None
-    if has_symlink_component(ctx.root, relative):
+    presentation_text = snapshot.presentation_text
+    canonical_text = snapshot.canonical_text
+    if presentation_text is None or canonical_text is None:
         ctx.error(
-            "REQUIRED_FILE_SYMLINK", "Required path contains a symbolic link", relative
-        )
-        return None
-    path = ctx.root / relative
-    if not path.exists():
-        if required:
-            ctx.error("REQUIRED_FILE_MISSING", "Required file is missing", relative)
-        return None
-    if not path.is_file():
-        ctx.error(
-            "REQUIRED_FILE_NOT_REGULAR", "Required path is not a regular file", relative
-        )
-        return None
-    remaining = MAX_PROJECT_SOURCE_BYTES - ctx.source_bytes_read
-    if remaining <= 0:
-        ctx.error(
-            "PROJECT_SOURCE_LIMIT",
-            f"Required project text exceeds the {MAX_PROJECT_SOURCE_BYTES}-byte aggregate limit",
+            "REQUIRED_FILE_UNREADABLE",
+            "Unable to read UTF-8 text: snapshot did not contain text",
             relative,
         )
         return None
-    read_limit = min(MAX_REQUIRED_FILE_BYTES, remaining)
-    try:
-        with path.open("rb") as stream:
-            raw = stream.read(read_limit + 1)
-    except OSError as exc:
-        ctx.error(
-            "REQUIRED_FILE_UNREADABLE", f"Unable to read UTF-8 text: {exc}", relative
-        )
-        return None
-    if len(raw) > read_limit:
-        code = (
-            "REQUIRED_FILE_TOO_LARGE"
-            if read_limit == MAX_REQUIRED_FILE_BYTES
-            else "PROJECT_SOURCE_LIMIT"
-        )
-        limit = (
-            MAX_REQUIRED_FILE_BYTES
-            if code == "REQUIRED_FILE_TOO_LARGE"
-            else MAX_PROJECT_SOURCE_BYTES
-        )
-        scope = "per-file" if code == "REQUIRED_FILE_TOO_LARGE" else "aggregate"
-        ctx.error(
-            code,
-            f"Required project text exceeds the {limit}-byte {scope} limit",
-            relative,
-        )
-        return None
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeError as exc:
-        ctx.error(
-            "REQUIRED_FILE_UNREADABLE", f"Unable to read UTF-8 text: {exc}", relative
-        )
-        return None
-    ctx.source_file_bytes[relative] = raw
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    ctx.source_bytes_read += len(raw)
-    ctx.presentation_texts[relative] = text
-    canonical_text = (
-        strip_generated_summary(text) if relative in DOCUMENT_SUMMARY_FILES else text
-    )
+    ctx.source_file_bytes[relative] = snapshot.raw_bytes
+    ctx.source_bytes_read = ctx._observer.bytes_observed
+    ctx.presentation_texts[relative] = presentation_text
     ctx.texts[relative] = canonical_text
     return canonical_text
 
@@ -11963,515 +11945,50 @@ def unselected_selection(value: str, allowed: set[str]) -> bool:
 
 
 def validate_manifest(ctx: Context, manifest: dict[str, Any]) -> None:
-    expected_fields = {
-        "schema_version",
-        "bootstrap_version",
-        "python_requires",
-        "required_files",
-        "canonical_prompt_ids",
-        "template_placeholders",
-        "control_sha256",
-        "source_sha256",
-    }
-    if set(manifest) != expected_fields:
-        ctx.error(
-            "MANIFEST_SCHEMA",
-            f"Manifest fields must be exactly {sorted(expected_fields)}",
-            MANIFEST_FILE,
-        )
-    if manifest.get("schema_version") != 1:
-        ctx.error(
-            "MANIFEST_SCHEMA", "Unsupported manifest schema_version", MANIFEST_FILE
-        )
-    version = manifest.get("bootstrap_version")
-    if not isinstance(version, str) or re.fullmatch(r"\d+\.\d+\.\d+", version) is None:
-        ctx.error(
-            "MANIFEST_VERSION",
-            "bootstrap_version must be semantic version text",
-            MANIFEST_FILE,
-        )
+    """Compatibility façade for package-manifest validation."""
 
-    files = manifest.get("required_files")
-    if not isinstance(files, list):
-        ctx.error(
-            "MANIFEST_REQUIRED_FILES", "required_files must be an array", MANIFEST_FILE
-        )
-        return
-    if len(files) > MAX_REQUIRED_FILES:
-        ctx.error(
-            "MANIFEST_REQUIRED_FILES_LIMIT",
-            f"required_files exceeds the {MAX_REQUIRED_FILES}-entry limit",
-            MANIFEST_FILE,
-        )
-        return
-    seen: set[str] = set()
-    folded: set[str] = set()
-    for item in files:
-        relative = validate_relative_path(item)
-        if relative is None:
-            ctx.error(
-                "MANIFEST_UNSAFE_PATH",
-                f"Unsafe required_files entry: {item!r}",
-                MANIFEST_FILE,
-            )
-            continue
-        if relative in seen or relative.casefold() in folded:
-            ctx.error(
-                "MANIFEST_DUPLICATE_PATH",
-                f"Duplicate required path: {relative}",
-                MANIFEST_FILE,
-            )
-            continue
-        seen.add(relative)
-        folded.add(relative.casefold())
-        if PurePosixPath(relative).suffix.lower() in BINARY_REQUIRED_SUFFIXES:
-            safe_read_required_binary(ctx, relative)
-        else:
-            safe_read_text(ctx, relative)
-    missing_mandatory = sorted(MANDATORY_REQUIRED_FILES - seen)
-    if missing_mandatory:
-        ctx.error(
-            "MANIFEST_REQUIRED_BASELINE",
-            "Manifest omits mandatory control files: " + ", ".join(missing_mandatory),
-            MANIFEST_FILE,
-        )
-    missing_controls = sorted(CONTROL_HASH_FILES - seen)
-    if missing_controls:
-        ctx.error(
-            "MANIFEST_CONTROL_REQUIRED_FILES",
-            "Manifest control files must also be required files: "
-            + ", ".join(missing_controls),
-            MANIFEST_FILE,
-        )
-    if set(manifest.get("template_placeholders", [])) != CANONICAL_PLACEHOLDERS:
-        ctx.error(
-            "MANIFEST_PLACEHOLDERS",
-            "template_placeholders must contain the canonical render tokens",
-            MANIFEST_FILE,
-        )
-    source_hashes = manifest.get("source_sha256")
-    expected_source_paths = seen - {MANIFEST_FILE}
-    if (
-        not isinstance(source_hashes, dict)
-        or set(source_hashes) != expected_source_paths
-    ):
-        ctx.error(
-            "MANIFEST_SOURCE_HASHES",
-            "source_sha256 must map every required file except the manifest itself",
-            MANIFEST_FILE,
-        )
-    else:
-        for relative in sorted(expected_source_paths):
-            expected = source_hashes.get(relative)
-            if (
-                not isinstance(expected, str)
-                or re.fullmatch(r"[0-9a-f]{64}", expected) is None
-            ):
-                ctx.error(
-                    "MANIFEST_SOURCE_HASHES",
-                    f"Invalid source SHA-256 for {relative}",
-                    MANIFEST_FILE,
-                )
-                continue
-            if ctx.template_source and not has_symlink_component(ctx.root, relative):
-                source_bytes = ctx.source_file_bytes.get(relative)
-                if source_bytes is None:
-                    source_text = ctx.presentation_texts.get(relative) or ctx.texts.get(
-                        relative
-                    )
-                    if source_text is None:
-                        continue
-                    source_bytes = source_text.encode("utf-8")
-                actual = hashlib.sha256(source_bytes).hexdigest()
-                if actual != expected:
-                    ctx.error(
-                        "MANIFEST_SOURCE_HASHES",
-                        f"Template source hash mismatch for {relative}",
-                        relative,
-                    )
-    controls = manifest.get("control_sha256")
-    if not isinstance(controls, dict) or set(controls) != CONTROL_HASH_FILES:
-        ctx.error(
-            "MANIFEST_CONTROL_HASHES",
-            "control_sha256 must map exactly the trusted runtime control files",
-            MANIFEST_FILE,
-        )
-        return
-    for relative in sorted(CONTROL_HASH_FILES):
-        expected = controls.get(relative)
-        if (
-            not isinstance(expected, str)
-            or re.fullmatch(r"[0-9a-f]{64}", expected) is None
-        ):
-            ctx.error(
-                "MANIFEST_CONTROL_HASHES",
-                f"Invalid SHA-256 for trusted control {relative}",
-                MANIFEST_FILE,
-            )
-            continue
-        if has_symlink_component(ctx.root, relative):
-            continue
-        control_text = ctx.texts.get(relative)
-        if control_text is None:
-            continue
-        actual = hashlib.sha256(control_text.encode("utf-8")).hexdigest()
-        if actual != expected:
-            ctx.error(
-                "CONTROL_HASH_MISMATCH",
-                f"Trusted runtime control hash mismatch: expected {expected}, observed {actual}",
-                relative,
-            )
+    validate_package_manifest(
+        ctx,
+        manifest,
+        policy=MANIFEST_POLICY,
+        read_binary=safe_read_required_binary,
+        read_text=safe_read_text,
+        has_symlink_component=has_symlink_component,
+    )
 
 
 def validate_prompt_pack(
     ctx: Context, manifest: dict[str, Any], state: dict[str, Any]
 ) -> None:
-    text = ctx.texts.get(PROMPT_FILE) or safe_read_text(ctx, PROMPT_FILE)
-    if text is None:
-        return
-    version_match = re.search(
-        r"^\*\*Pack version:\*\*\s*(\d+\.\d+\.\d+)\s*$", text, re.MULTILINE
-    )
-    if version_match is None:
-        ctx.error(
-            "PROMPT_VERSION_MISSING", "Prompt pack version is missing", PROMPT_FILE
-        )
-    else:
-        versions = {
-            str(manifest.get("bootstrap_version")),
-            str(state.get("bootstrap_version")),
-            version_match.group(1),
-        }
-        if len(versions) != 1:
-            ctx.error(
-                "BOOTSTRAP_VERSION_DRIFT",
-                f"Version values disagree: {sorted(versions)}",
-            )
+    """Compatibility façade for prompt-pack validation."""
 
-    expected = manifest.get("canonical_prompt_ids")
-    actual = re.findall(r"^##\s+([A-Z]+-\d{2})\s+", text, re.MULTILINE)
-    if not isinstance(expected, list) or not all(
-        isinstance(item, str) for item in expected
-    ):
-        ctx.error(
-            "PROMPT_IDS_MANIFEST",
-            "canonical_prompt_ids must be an array of strings",
-            MANIFEST_FILE,
-        )
-    elif actual != expected:
-        ctx.error(
-            "PROMPT_IDS_DRIFT",
-            f"Prompt headings do not match manifest order: {actual}",
-            PROMPT_FILE,
-        )
-    elif len(actual) != len(set(actual)):
-        ctx.error(
-            "PROMPT_IDS_DUPLICATE", "Canonical prompt IDs must be unique", PROMPT_FILE
-        )
+    validate_package_prompt_pack(
+        ctx,
+        manifest,
+        state,
+        policy=MANIFEST_POLICY,
+        read_text=safe_read_text,
+    )
 
 
 def validate_placeholders(ctx: Context) -> None:
-    if ctx.template_source:
-        return
-    excluded = {
-        MANIFEST_FILE,
-        "bootstrap.py",
-        "scripts/bootstrap_doctor.py",
-        "scripts/fastlane_project_identity.py",
-    }
-    for relative, text in sorted(ctx.texts.items()):
-        if relative in excluded or relative.startswith("tests/"):
-            continue
-        for token in sorted(CANONICAL_PLACEHOLDERS):
-            if token in text:
-                ctx.error(
-                    "PLACEHOLDER_UNRESOLVED",
-                    f"Unresolved bootstrap placeholder {token!r}",
-                    relative,
-                )
+    """Compatibility façade for unresolved-template validation."""
+
+    validate_package_placeholders(ctx, policy=MANIFEST_POLICY)
 
 
 def validate_state_schema(ctx: Context, state: dict[str, Any]) -> bool:
-    expected_top = {
-        "schema_version",
-        "bootstrap_version",
-        "setup",
-        "project",
-        "lifecycle",
-        "execution",
-    }
-    if set(state) != expected_top:
-        ctx.error(
-            "STATE_SCHEMA",
-            f"State keys must be exactly {sorted(expected_top)}",
-            STATE_FILE,
-        )
-    if state.get("schema_version") != 1:
-        ctx.error("STATE_SCHEMA", "Unsupported state schema_version", STATE_FILE)
+    """Compatibility façade for bootstrap-state validation."""
 
-    setup = state.get("setup")
-    project = state.get("project")
-    lifecycle = state.get("lifecycle")
-    execution = state.get("execution")
-    if (
-        not isinstance(setup, dict)
-        or not isinstance(project, dict)
-        or not isinstance(lifecycle, dict)
-        or not isinstance(execution, dict)
-    ):
-        ctx.error(
-            "STATE_SCHEMA",
-            "setup, project, lifecycle, and execution must be objects",
-            STATE_FILE,
-        )
-        return False
-
-    setup_expected = {"status", "method"}
-    project_expected = {
-        "name",
-        "region",
-        "cost_posture",
-        "mode",
-        "delivery_profile",
-        "effective_risk",
-        "aws_lane",
-        "brownfield_baseline",
-    }
-    lifecycle_expected = {
-        "requirements_revision",
-        "design_revision",
-        "construction_authorization",
-        "gate_a",
-        "gate_b",
-    }
-    execution_expected = {
-        "plan_revision",
-        "plan_state",
-        "run_id",
-        "coordinator",
-        "mode",
-        "state",
-        "basis",
-        "active_tasks",
-        "attempts",
-        "last_checkpoint",
-    }
-    for name, value, expected in (
-        ("setup", setup, setup_expected),
-        ("project", project, project_expected),
-        ("lifecycle", lifecycle, lifecycle_expected),
-        ("execution", execution, execution_expected),
-    ):
-        if set(value) != expected:
-            ctx.error(
-                "STATE_SCHEMA",
-                f"{name} keys must be exactly {sorted(expected)}",
-                STATE_FILE,
-            )
-
-    setup_status = setup.get("status")
-    setup_method = setup.get("method")
-    allowed_setup_statuses = {"UNCONFIGURED_TEMPLATE", "CONFIGURED"}
-    if ctx.template_source:
-        allowed_setup_statuses.add("{{SETUP_STATUS}}")
-    if setup_status not in allowed_setup_statuses:
-        ctx.error("STATE_SETUP", "Invalid setup.status", STATE_FILE)
-    allowed_methods = {"IN_PLACE", "EXTERNAL_COPY"}
-    if ctx.template_source:
-        allowed_methods.add("{{SETUP_METHOD}}")
-    if setup_method not in allowed_methods:
-        ctx.error("STATE_SETUP", "Invalid setup.method", STATE_FILE)
-    for key in ("name", "region", "cost_posture"):
-        value = project.get(key)
-        if not isinstance(value, str) or not value.strip():
-            ctx.error(
-                "PROJECT_IDENTITY", f"project.{key} must be non-empty text", STATE_FILE
-            )
-    name = project.get("name")
-    if (
-        isinstance(name, str)
-        and name.strip()
-        and not (ctx.template_source and name == PROJECT_NAME_TOKEN)
-    ):
-        try:
-            canonical_name = normalize_project_name(name)
-        except ValueError as exc:
-            ctx.error("PROJECT_IDENTITY", str(exc), STATE_FILE)
-        else:
-            if canonical_name != name:
-                ctx.error(
-                    "PROJECT_IDENTITY",
-                    "project.name must use its canonical normalized value",
-                    STATE_FILE,
-                )
-    region = project.get("region")
-    if (
-        isinstance(region, str)
-        and region.strip()
-        and not (ctx.template_source and region == "{{AWS_REGION}}")
-    ):
-        try:
-            canonical_region = normalize_aws_region(region)
-        except ValueError as exc:
-            ctx.error("PROJECT_IDENTITY", str(exc), STATE_FILE)
-        else:
-            if canonical_region != region:
-                ctx.error(
-                    "PROJECT_IDENTITY",
-                    "project.region must use its canonical lowercase value",
-                    STATE_FILE,
-                )
-    cost_posture = project.get("cost_posture")
-    if isinstance(cost_posture, str) and not (
-        ctx.template_source and cost_posture == "{{COST_POSTURE}}"
-    ):
-        try:
-            parse_cost_posture(cost_posture)
-        except ValueError as exc:
-            ctx.error("PROJECT_COST_POSTURE", str(exc), STATE_FILE)
-
-    for key, allowed in (
-        ("mode", PROJECT_MODES),
-        ("delivery_profile", DELIVERY_PROFILES),
-        ("effective_risk", RISK_LEVELS),
-        ("aws_lane", AWS_LANES),
-    ):
-        value = project.get(key)
-        if value is not None and (not isinstance(value, str) or value not in allowed):
-            ctx.error(
-                "PROJECT_VOCABULARY", f"Invalid project.{key}: {value!r}", STATE_FILE
-            )
-    baseline_state = project.get("brownfield_baseline")
-    if not isinstance(baseline_state, str) or baseline_state not in BROWNFIELD_STATES:
-        ctx.error("PROJECT_VOCABULARY", "Invalid brownfield_baseline state", STATE_FILE)
-
-    if REQ_ID.fullmatch(str(lifecycle.get("requirements_revision"))) is None:
-        ctx.error("STATE_REVISION_ID", "Invalid requirements revision", STATE_FILE)
-    if DES_ID.fullmatch(str(lifecycle.get("design_revision"))) is None:
-        ctx.error("STATE_REVISION_ID", "Invalid design revision", STATE_FILE)
-    if AUTH_ID.fullmatch(str(lifecycle.get("construction_authorization"))) is None:
-        ctx.error("STATE_REVISION_ID", "Invalid construction authorization", STATE_FILE)
-    gate_a = lifecycle.get("gate_a")
-    gate_b = lifecycle.get("gate_b")
-    if (
-        not isinstance(gate_a, str)
-        or gate_a not in GATE_A_STATES
-        or not isinstance(gate_b, str)
-        or gate_b not in GATE_B_STATES
-    ):
-        ctx.error("STATE_GATE", "Invalid derived gate state", STATE_FILE)
-
-    run_mode = execution.get("mode")
-    run_state_value = execution.get("state")
-    if (
-        not isinstance(run_mode, str)
-        or run_mode not in RUN_MODES
-        or not isinstance(run_state_value, str)
-        or run_state_value not in RUN_STATES
-    ):
-        ctx.error("STATE_RUN", "Invalid execution mode or state", STATE_FILE)
-    plan = execution.get("plan_revision")
-    if plan is not None and PLAN_ID.fullmatch(str(plan)) is None:
-        ctx.error("STATE_RUN", "plan_revision must be null or PLAN-nnnn", STATE_FILE)
-    plan_state = execution.get("plan_state")
-    if not isinstance(plan_state, str) or plan_state not in {
-        "UNINITIALIZED",
-        "CURRENT",
-        "STALE",
-    }:
-        ctx.error(
-            "STATE_RUN",
-            "plan_state must be UNINITIALIZED, CURRENT, or STALE",
-            STATE_FILE,
-        )
-    if (plan is None) != (plan_state == "UNINITIALIZED"):
-        ctx.error(
-            "STATE_RUN", "plan_revision and plan_state are inconsistent", STATE_FILE
-        )
-    active = execution.get("active_tasks")
-    if not isinstance(active, list) or not all(
-        isinstance(item, str) and TASK_ID.fullmatch(item) for item in active
-    ):
-        ctx.error("STATE_RUN", "active_tasks must contain only TASK IDs", STATE_FILE)
-    elif len(active) != len(set(active)):
-        ctx.error("STATE_RUN", "active_tasks contains duplicates", STATE_FILE)
-    attempts = execution.get("attempts")
-    if not isinstance(attempts, dict) or any(
-        TASK_ID.fullmatch(str(key)) is None
-        or not isinstance(value, int)
-        or isinstance(value, bool)
-        or value < 0
-        for key, value in (attempts.items() if isinstance(attempts, dict) else [])
-    ):
-        ctx.error(
-            "STATE_RUN",
-            "attempts must map TASK IDs to non-negative integers",
-            STATE_FILE,
-        )
-    run_id = execution.get("run_id")
-    coordinator = execution.get("coordinator")
-    run_state = run_state_value if isinstance(run_state_value, str) else ""
-    basis = execution.get("basis")
-    if run_id is not None and RUN_ID.fullmatch(str(run_id)) is None:
-        ctx.error("STATE_RUN", "run_id must be null or RUN-nnnn", STATE_FILE)
-    if run_state == "IDLE":
-        if (
-            run_id is not None
-            or coordinator is not None
-            or execution.get("mode") != "NONE"
-            or execution.get("active_tasks")
-        ):
-            ctx.error(
-                "STATE_RUN",
-                "IDLE execution cannot have a coordinator, run ID, run mode, or active tasks",
-                STATE_FILE,
-            )
-    else:
-        if run_id is None or coordinator is None or execution.get("mode") == "NONE":
-            ctx.error(
-                "STATE_RUN",
-                "A non-IDLE execution requires a coordinator, run ID, and run mode",
-                STATE_FILE,
-            )
-        expected_basis_keys = {
-            "requirements_revision",
-            "design_revision",
-            "construction_authorization",
-        }
-        if not isinstance(basis, dict) or set(basis) != expected_basis_keys:
-            ctx.error(
-                "STATE_RUN",
-                "A non-IDLE execution requires a complete revision basis",
-                STATE_FILE,
-            )
-    checkpoint = execution.get("last_checkpoint")
-    if checkpoint is not None:
-        checkpoint_keys = {"id", "at", "evidence_ref"}
-        if not isinstance(checkpoint, dict) or set(checkpoint) != checkpoint_keys:
-            ctx.error("STATE_RUN", "last_checkpoint has an invalid shape", STATE_FILE)
-        elif (
-            CHECKPOINT_ID.fullmatch(str(checkpoint.get("id"))) is None
-            or unresolved(str(checkpoint.get("at", "")))
-            or unresolved(str(checkpoint.get("evidence_ref", "")))
-        ):
-            ctx.error(
-                "STATE_RUN", "last_checkpoint fields must be explicit", STATE_FILE
-            )
-    if run_state in {"CHECKPOINTED", "BLOCKED", "COMPLETE"} and checkpoint is None:
-        ctx.error(
-            "STATE_RUN", f"{run_state} execution requires a checkpoint", STATE_FILE
-        )
-    if run_state == "COMPLETE" and execution.get("active_tasks"):
-        ctx.error(
-            "STATE_RUN", "COMPLETE execution cannot have active tasks", STATE_FILE
-        )
-    if execution.get("state") == "RUNNING":
-        ctx.error(
-            "RUN_UNCLEAN_INTERRUPTION",
-            "Persisted RUNNING state is not safe to resume; reconcile partial work and checkpoint first",
-            STATE_FILE,
-        )
-    return True
+    return validate_package_state_schema(
+        ctx,
+        state,
+        policy=STATE_POLICY,
+        normalize_project_name=normalize_project_name,
+        normalize_aws_region=normalize_aws_region,
+        parse_cost_posture=parse_cost_posture,
+        unresolved=unresolved,
+    )
 
 
 def validate_brownfield_contract(ctx: Context, text: str) -> None:
@@ -15409,7 +14926,7 @@ def _preserve_expired_authority_for_deployment_closure(
         and not completed_without_attempt
     ):
         return
-    ctx.diagnostics = [
+    ctx.diagnostics[:] = [
         Diagnostic(item.code, item.message, item.path, "WARNING")
         if item.code == "GATE_B_AUTHORITY_EXPIRED"
         else item
@@ -15427,7 +14944,7 @@ def _preserve_expired_authority_for_teardown_closure(
         "POST_ACTION_REVIEW",
     } or teardown_sequence.get("issues"):
         return
-    ctx.diagnostics = [
+    ctx.diagnostics[:] = [
         Diagnostic(item.code, item.message, item.path, "WARNING")
         if item.code == "GATE_B_AUTHORITY_EXPIRED"
         else item
@@ -15472,6 +14989,9 @@ def inspect_project(
             manifest=manifest,
             state=state,
         )
+
+    ctx.manifest_document = manifest
+    ctx.bootstrap_state_document = state
 
     validate_manifest(ctx, manifest)
     state_sections_valid = validate_state_schema(ctx, state)

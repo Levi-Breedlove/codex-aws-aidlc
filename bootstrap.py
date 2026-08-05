@@ -52,6 +52,20 @@ ISO_4217_CURRENCY_CODES = frozenset(
 SKIP_NAMES = {".git", "__pycache__"}
 SKIP_SUFFIXES = {".zip", ".pyc"}
 SKIP_NAMES_CASEFOLD = {name.casefold() for name in SKIP_NAMES}
+ENGINE_RUNTIME_CONTROL_PATHS = {
+    "scripts/fastlane_engine/__init__.py",
+    "scripts/fastlane_engine/api.py",
+    "scripts/fastlane_engine/core/__init__.py",
+    "scripts/fastlane_engine/core/contracts.py",
+    "scripts/fastlane_engine/core/diagnostics.py",
+    "scripts/fastlane_engine/core/digests.py",
+    "scripts/fastlane_engine/core/ids.py",
+    "scripts/fastlane_engine/core/markdown_index.py",
+    "scripts/fastlane_engine/core/snapshot.py",
+    "scripts/fastlane_engine/package/__init__.py",
+    "scripts/fastlane_engine/package/manifest.py",
+    "scripts/fastlane_engine/package/state.py",
+}
 NO_RENDER_PATHS = {
     "bootstrap.py",
     "bootstrap.manifest.json",
@@ -64,7 +78,8 @@ NO_RENDER_PATHS = {
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
-}
+    "scripts/fastlane_engine/AGENTS.md",
+} | ENGINE_RUNTIME_CONTROL_PATHS
 NO_RENDER_PREFIXES = ("tests/",)
 CORE_CONTROL_PATHS = {
     "AGENTS.md",
@@ -85,7 +100,7 @@ CORE_CONTROL_PATHS = {
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
-}
+} | ENGINE_RUNTIME_CONTROL_PATHS
 ADOPTION_ACTIONS = {"PRESERVE", "ADOPT_TEMPLATE", "STAGE_FOR_MERGE"}
 RUNTIME_CONTROL_PATHS = {
     "bootstrap.py",
@@ -98,7 +113,7 @@ RUNTIME_CONTROL_PATHS = {
     "scripts/fastlane_stdio.py",
     "scripts/setup_assistant.py",
     "scripts/task_waves.py",
-}
+} | ENGINE_RUNTIME_CONTROL_PATHS
 RFC3339_PATTERN = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})"
 )
