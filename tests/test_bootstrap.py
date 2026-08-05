@@ -268,18 +268,11 @@ class BootstrapSafetyTests(unittest.TestCase):
             source = Path(temporary_directory) / "source"
             (source / "scripts").mkdir(parents=True)
             controls = {
-                "bootstrap.py": b"bootstrap",
-                "scripts/bootstrap_dependencies.py": b"dependencies",
-                "scripts/bootstrap_doctor.py": b"doctor",
-                "scripts/fastlane_adr.py": b"adr",
-                "scripts/fastlane_contracts.py": b"contracts",
-                "scripts/fastlane_process.py": b"process",
-                "scripts/fastlane_project_identity.py": b"identity",
-                "scripts/fastlane_stdio.py": b"stdio",
-                "scripts/setup_assistant.py": b"setup-assistant",
-                "scripts/task_waves.py": b"tasks",
+                relative: f"control:{relative}".encode("utf-8")
+                for relative in sorted(bootstrap.RUNTIME_CONTROL_PATHS)
             }
             for relative, content in controls.items():
+                (source / relative).parent.mkdir(parents=True, exist_ok=True)
                 (source / relative).write_bytes(content)
             manifest = {
                 "control_sha256": {
