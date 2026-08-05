@@ -57,6 +57,7 @@ NO_RENDER_PATHS = {
     "bootstrap.manifest.json",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_adr.py",
     "scripts/fastlane_contracts.py",
     "scripts/fastlane_process.py",
     "scripts/fastlane_project_identity.py",
@@ -77,6 +78,7 @@ CORE_CONTROL_PATHS = {
     "bootstrap.yaml",
     "prompts/CODEX-PROMPTS.md",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_adr.py",
     "scripts/fastlane_contracts.py",
     "scripts/fastlane_process.py",
     "scripts/fastlane_project_identity.py",
@@ -89,6 +91,7 @@ RUNTIME_CONTROL_PATHS = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_adr.py",
     "scripts/fastlane_contracts.py",
     "scripts/fastlane_process.py",
     "scripts/fastlane_project_identity.py",
@@ -602,6 +605,8 @@ def validate_in_place_repository(source: Path) -> None:
     official_names = {
         "github.com/levi-breedlove/aws-bootstrap",
         "github.com/levi-breedlove/aws-bootstrap.git",
+        "github.com/levi-breedlove/codex-aws-aidlc",
+        "github.com/levi-breedlove/codex-aws-aidlc.git",
     }
     if normalized in official_names:
         raise ValueError(

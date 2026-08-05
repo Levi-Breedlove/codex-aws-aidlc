@@ -17,6 +17,7 @@ CONTROL_FILES = (
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_adr.py",
     "scripts/fastlane_contracts.py",
     "scripts/fastlane_process.py",
     "scripts/fastlane_project_identity.py",

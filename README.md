@@ -1,6 +1,6 @@
 # AWS Codex Fastlane 1.2
 
-Current customer build: **1.2.8**.
+Current customer build: **1.2.9**.
 
 Fastlane turns an AWS application idea into an approved product agreement, an AWS-informed
 technical plan, and a tested local build. You describe the outcome in plain language; Codex
@@ -29,7 +29,7 @@ It creates tasks, builds locally, and continues until needed. Neither gate autho
 
 ## Start
 
-1. Select [Use this template](https://github.com/Levi-Breedlove/aws-bootstrap/generate)
+1. Select [Use this template](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate)
    and clone the new repository.
 2. Open it in a signed-in interactive Codex CLI and send:
 

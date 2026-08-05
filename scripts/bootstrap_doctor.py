@@ -23,6 +23,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
 
 try:
+    from fastlane_adr import derive_adr_rationale, empty_adr_rationale
+except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
+    from scripts.fastlane_adr import derive_adr_rationale, empty_adr_rationale
+
+try:
     from fastlane_context import (
         SliceRequest,
         SourceSpan,
@@ -1009,8 +1014,10 @@ MANDATORY_REQUIRED_FILES = {
     "docs/WORKFLOW.md",
     "scripts/fastlane_document_summaries.py",
     "infrastructure/AGENTS.md",
+    "infrastructure/README.md",
     "prompts/CODEX-PROMPTS.md",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_adr.py",
     "scripts/fastlane_contracts.py",
     "scripts/fastlane_owner_briefs.py",
     "scripts/bootstrap_dependencies.py",
@@ -1941,6 +1948,7 @@ CONTROL_HASH_FILES = {
     "bootstrap.py",
     "scripts/bootstrap_dependencies.py",
     "scripts/bootstrap_doctor.py",
+    "scripts/fastlane_adr.py",
     "scripts/fastlane_contracts.py",
     "scripts/fastlane_process.py",
     "scripts/fastlane_project_identity.py",
@@ -15489,6 +15497,25 @@ def inspect_project(
         intake_contract,
         requirements_contract,
     ) = validate_prd(ctx, state)
+    adr_rationale, adr_rationale_issues, adr_sources = derive_adr_rationale(
+        root,
+        design_contract.to_dict(),
+        ctx.texts.get(PRD_FILE, ""),
+    )
+    for issue in adr_rationale_issues:
+        ctx.error(
+            str(issue.get("code", "ADR_RATIONALE_MALFORMED")),
+            str(issue.get("message", "ADR rationale is invalid")),
+            str(issue["path"]) if issue.get("path") else None,
+        )
+    for relative, expected_text in adr_sources.items():
+        observed_text = safe_read_text(ctx, relative)
+        if observed_text is not None and observed_text != expected_text:
+            ctx.error(
+                "ADR_RATIONALE_STALE",
+                "ADR content changed during Engine inspection; rerun validation.",
+                relative,
+            )
     allow_legacy_design_discovery = bool(
         prd_fields.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
         and design_contract.architecture.schema_version < 4
@@ -15902,6 +15929,7 @@ def inspect_project(
         aws_execution_planning_ready=aws_execution_planning_ready,
         design_aws_core_ready=design_aws_core_ready,
         design_contract=design_contract,
+        adr_rationale=adr_rationale,
         intake_contract=intake_contract,
         coverage_contract=coverage_contract,
         aws_execution=aws_execution,
@@ -15976,6 +16004,13 @@ DEFINE_AGENT_DIAGNOSTICS = frozenset(
 )
 DESIGN_AGENT_DIAGNOSTICS = frozenset(
     {
+        "ADR_RATIONALE_DUPLICATE",
+        "ADR_RATIONALE_MALFORMED",
+        "ADR_RATIONALE_MISMATCH",
+        "ADR_RATIONALE_MISSING",
+        "ADR_RATIONALE_STALE",
+        "ADR_RATIONALE_SUPERSESSION_INVALID",
+        "ADR_RATIONALE_UNSAFE",
         "APPLICATION_SOURCE_DISPOSITION_INVALID",
         "APPLICATION_SOURCE_DISPOSITION_MISSING",
         "APPLICATION_SOURCE_PARALLEL_ROOT",
@@ -16127,6 +16162,10 @@ def _agent_correction_is_safe(
         return False
     if diagnostic.code == "DOCUMENT_SUMMARY_STALE":
         return relative in DOCUMENT_SUMMARY_FILES
+    if diagnostic.code.startswith("ADR_RATIONALE_"):
+        return bool(
+            re.fullmatch(r"docs/adr/\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md", relative)
+        )
 
     if owner_stage == "DEFINE":
         if diagnostic.code not in DEFINE_AGENT_DIAGNOSTICS:
@@ -16832,6 +16871,7 @@ def derive_context_plan(
     restricted_deployment_closure: bool = False,
     restricted_teardown_closure: bool = False,
     source_texts: Mapping[str, str] | None = None,
+    adr_rationale: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Select an ephemeral, route-bounded canonical context packet."""
 
@@ -17040,6 +17080,15 @@ def derive_context_plan(
                 on_demand_slices.append(
                     ".agents/skills/fastlane/references/diagram-patterns.md"
                 )
+    if stage in {"DESIGN", "DELIVER"} and isinstance(adr_rationale, Mapping):
+        records = adr_rationale.get("records")
+        if isinstance(records, list):
+            for record in records:
+                if not isinstance(record, Mapping):
+                    continue
+                relative = validate_relative_path(record.get("path"))
+                if relative is not None and relative.startswith("docs/adr/"):
+                    on_demand_slices.append(relative)
     source_slices = list(dict.fromkeys(source_slices))
     on_demand_slices = list(dict.fromkeys(on_demand_slices))
 
@@ -22048,6 +22097,7 @@ def build_report(
     aws_execution_planning_ready: bool = False,
     design_aws_core_ready: bool = False,
     design_contract: DesignContract | None = None,
+    adr_rationale: Mapping[str, Any] | None = None,
     intake_contract: IntakeFoundationContract | None = None,
     coverage_contract: CoverageContract | None = None,
     requirements_contract: RequirementsContract | None = None,
@@ -22073,6 +22123,7 @@ def build_report(
     aws_execution_projection = dict(aws_execution or {})
     deployment_sequence_projection = dict(deployment_sequence or {})
     teardown_sequence_projection = dict(teardown_sequence or {})
+    adr_rationale_projection = dict(adr_rationale or empty_adr_rationale())
     aws_sequence_conflict = aws_deployment_teardown_sequence_conflict(
         deployment_sequence_projection, teardown_sequence_projection
     )
@@ -22388,6 +22439,7 @@ def build_report(
         restricted_deployment_closure=deployment_authority_restricted,
         restricted_teardown_closure=teardown_authority_restricted,
         source_texts=ctx.texts,
+        adr_rationale=adr_rationale_projection,
     )
     context_issues = context_plan.pop("_resolution_issues", [])
     if context_issues:
@@ -22500,6 +22552,7 @@ def build_report(
             restricted_deployment_closure=False,
             restricted_teardown_closure=False,
             source_texts=ctx.texts,
+            adr_rationale=adr_rationale_projection,
         )
         context_plan.pop("_resolution_issues", None)
     summary_sources: dict[str, str] = {}
@@ -22583,6 +22636,7 @@ def build_report(
             restricted_deployment_closure=deployment_authority_restricted,
             restricted_teardown_closure=teardown_authority_restricted,
             source_texts=ctx.texts,
+            adr_rationale=adr_rationale_projection,
         )
         context_plan.pop("_resolution_issues", None)
 
@@ -22672,6 +22726,7 @@ def build_report(
         "requirements_contract": requirements_contract.to_dict(),
         "coverage_plan": coverage_contract.to_dict(),
         "design_contract": design_contract.to_dict(),
+        "adr_rationale": adr_rationale_projection,
         "tasks": {
             "total": tasks.total,
             "completed": len(tasks.done),
