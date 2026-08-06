@@ -44,7 +44,12 @@ from .design import (
     DesignContract,
     required_diagram_kinds,
 )
-from .deliver import TaskSummary, inspect_task_blocks
+from .deliver import (
+    TaskSummary,
+    inspect_task_blocks,
+    parse_task_completion_evidence,
+    parse_verification_matrix,
+)
 from .owner_decisions import (
     derive_owner_answer_confirmation,
     derive_owner_decision_brief,
@@ -509,6 +514,218 @@ def _summary_bullet(text: str, label: str) -> str:
     return clean_cell(match.group("value")) if match else ""
 
 
+def _summary_section(text: str, heading: str) -> str:
+    """Return one Markdown section without treating its content as policy."""
+
+    level = len(heading) - len(heading.lstrip("#"))
+    if level < 1:
+        return ""
+    pattern = (
+        rf"(?ms)^{re.escape(heading)}[ \t]*\r?$\n"
+        rf"(?P<body>.*?)(?=^#{{1,{level}}}[ \t]+|\Z)"
+    )
+    match = re.search(pattern, text)
+    return match.group("body").strip() if match else ""
+
+
+def _summary_section_has_value(text: str, heading: str) -> bool:
+    section = _summary_section(text, heading)
+    if not section:
+        return False
+    values = [
+        clean_cell(re.sub(r"^(?:[-*]|\d+\.)[ \t]+", "", line))
+        for line in section.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    return any(explicit_value(value, allow_none=False) for value in values)
+
+
+def _summary_evidence_ids(verify_text: str) -> tuple[set[str], set[str]]:
+    """Derive local passing and failed IDs from typed canonical evidence rows."""
+
+    passing: set[str] = set()
+    failed: set[str] = set()
+    try:
+        completion_rows = parse_task_completion_evidence(verify_text)
+    except ValueError:
+        completion_rows = []
+    for row in completion_rows:
+        status = clean_cell(row.status).upper()
+        if status in {"LOCAL_PASS", "VERIFIED"}:
+            passing.add(row.evidence_id)
+        elif status in {"FAILED", "STALE", "BLOCKED"}:
+            failed.add(row.evidence_id)
+
+    try:
+        matrix_rows = parse_verification_matrix(verify_text)
+    except ValueError:
+        matrix_rows = []
+    for row in matrix_rows:
+        evidence_id = clean_cell(row.get("Evidence ID", ""))
+        status = clean_cell(row.get("Status", "")).upper()
+        if re.fullmatch(r"EV-\d{4,}", evidence_id) is None:
+            continue
+        if status in {"FAILED", "STALE", "BLOCKED"}:
+            failed.add(evidence_id)
+    return passing, failed
+
+
+def _summary_aws_core_evidence(
+    aws_core_usage: Mapping[str, Any],
+) -> tuple[bool, str]:
+    """Project only observed canonical AWS Core discovery chains."""
+
+    discovery_ids: set[str] = set()
+    for phase in ("REQ-10", "DESIGN-10", "AWS-10"):
+        usage = aws_core_usage.get(phase)
+        if not isinstance(usage, Mapping) or usage.get("status") != "OBSERVED":
+            continue
+        chains = usage.get("chains")
+        if not isinstance(chains, list):
+            continue
+        for chain in chains:
+            if not isinstance(chain, Mapping):
+                continue
+            discovery_id = clean_cell(chain.get("discovery_id", ""))
+            if re.fullmatch(r"AWS-DISC-\d{4,}", discovery_id):
+                discovery_ids.add(discovery_id)
+    return bool(discovery_ids), ", ".join(sorted(discovery_ids)) or "None"
+
+
+def _summary_updated_basis(
+    *,
+    lifecycle_state: str,
+    gate_b: str,
+    requirements_id: str | None,
+    design_id: str | None,
+    checkpoint: str,
+    cutoff: str,
+) -> str:
+    """Choose the latest material canonical identity for the current stage."""
+
+    if lifecycle_state in {"INTAKE_REQUIRED", "REQUIREMENTS_STALE", "WAITING_GATE_A"}:
+        return requirements_id or design_id or "Current canonical records"
+    if gate_b in {"PENDING_OWNER_APPROVAL", "STALE"}:
+        return design_id or requirements_id or "Current canonical records"
+    if cutoff != "Not yet recorded":
+        return cutoff
+    if checkpoint != "None":
+        return checkpoint
+    if gate_b == "APPROVED_FOR_CONSTRUCTION":
+        return design_id or requirements_id or "Current canonical records"
+    return requirements_id or design_id or "Current canonical records"
+
+
+def _summary_deployment_observation(
+    sequence: Mapping[str, Any],
+    environment: str,
+) -> dict[str, Any]:
+    """SAFETY: distinguish reconciliation from observed deployment success."""
+
+    status = clean_cell(sequence.get("status", "NOT_ACTIVE"))
+    action = clean_cell(sequence.get("action_status", "NONE"))
+    reconciliation = clean_cell(sequence.get("reconciliation_status", "NONE"))
+    raw_evidence = sequence.get("acceptance_evidence_ids", [])
+    evidence = (
+        [str(item) for item in raw_evidence]
+        if isinstance(raw_evidence, list)
+        else []
+    )
+    observed = bool(
+        status == "RECONCILED"
+        and action == "SUCCEEDED"
+        and reconciliation == "COMPLETE"
+        and evidence
+        and explicit_value(environment, allow_none=False)
+        and environment not in {"Not yet initialized", "Not yet recorded"}
+    )
+    if observed:
+        state = "Deployment observed"
+        emergency = "Follow the current runbook and authority"
+    elif (
+        status == "RECONCILED"
+        and reconciliation == "COMPLETE"
+        and action == "FAILED"
+    ):
+        state = "Failed deployment attempt reconciled; deployment not verified"
+        emergency = "No successful deployment is recorded"
+    elif (
+        status == "RECONCILED"
+        and reconciliation == "COMPLETE"
+        and action == "PARTIAL"
+    ):
+        state = "Partial deployment reconciled; expected release not fully observed"
+        emergency = "Environment state is only partially observed"
+    elif (
+        status == "RECONCILED"
+        and reconciliation == "COMPLETE"
+        and action == "UNKNOWN"
+    ):
+        state = "Deployment attempt reconciled, but terminal success remains unknown"
+        emergency = "Environment state is not proven"
+    elif action == "STARTED" or action in {"FAILED", "PARTIAL", "UNKNOWN"}:
+        state = "Deployment outcome pending reconciliation"
+        emergency = "Environment state is not proven"
+    elif (
+        status == "RECONCILED"
+        and reconciliation == "COMPLETE"
+        and action == "SUCCEEDED"
+    ):
+        state = "Deployment reconciled; acceptance evidence is incomplete"
+        emergency = "Deployment acceptance is not proven"
+    elif status in {"", "NOT_ACTIVE", "NONE"}:
+        state = "Not deployed"
+        emergency = "No deployed environment exists"
+    else:
+        state = status.replace("_", " ").title()
+        emergency = "No successful deployment is recorded"
+    return {
+        "observed": observed,
+        "state": state,
+        "emergency": emergency,
+        "evidence_ids": evidence,
+        "environment": environment,
+        "inactive": action in {"", "NONE"} and status in {"", "NOT_ACTIVE", "NONE"},
+    }
+
+
+def _summary_teardown_observation(
+    sequence: Mapping[str, Any], environment: str
+) -> dict[str, Any]:
+    """SAFETY: project teardown only from a validated terminal review."""
+
+    status = clean_cell(sequence.get("status", "NOT_ACTIVE"))
+    action = clean_cell(sequence.get("action_status", "NONE"))
+    evidence_id = clean_cell(sequence.get("evidence_id", "NONE"))
+    observed = bool(
+        status == "VERIFIED_CLEAN"
+        and action == "SUCCEEDED"
+        and explicit_value(evidence_id, allow_none=False)
+        and explicit_value(environment, allow_none=False)
+        and environment not in {"Not yet initialized", "Not yet recorded"}
+    )
+    if observed:
+        state = "Teardown observed"
+    elif status == "RESIDUALS_REMAIN":
+        state = "Teardown incomplete; residual resources remain"
+    elif action == "STARTED" or status in {
+        "ACTION_TERMINAL_REQUIRED",
+        "POST_ACTION_REVIEW",
+    }:
+        state = "Teardown outcome pending reconciliation"
+    elif action in {"FAILED", "PARTIAL", "UNKNOWN"}:
+        state = "Teardown attempt not verified"
+    else:
+        state = "Not yet observed"
+    return {
+        "observed": observed,
+        "state": state,
+        "evidence_id": evidence_id if evidence_id != "NONE" else "None",
+        "environment": environment,
+        "inactive": status in {"", "NOT_ACTIVE", "NONE"},
+    }
+
+
 def derive_document_summary_specifications(
     ctx: Context,
     *,
@@ -527,6 +744,11 @@ def derive_document_summary_specifications(
     interaction: Mapping[str, Any],
     active_artifact: str,
     deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+    aws_core_usage: Mapping[str, Any],
+    req_aws_core_materiality: str,
+    write_authority: Mapping[str, Any],
+    remediation: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     # fmt: on
     """SAFETY: normalize canonical values for presentation-only summaries."""
@@ -546,48 +768,65 @@ def derive_document_summary_specifications(
     authorization_id = prd_fields.get("construction_authorization")
     checkpoint = _summary_value(task_snapshot.get("Last checkpoint"), "None")
     cutoff = _summary_value(release_evidence_cutoff, "Not yet recorded")
-    updated = next(
+    environment = _summary_value(
+        runbook_boundary.get("Region and environment"),
         (
-            value
-            for value in (
-                cutoff if cutoff != "Not yet recorded" else "",
-                checkpoint if checkpoint != "None" else "",
-                design_id,
-                requirements_id,
-            )
-            if value
+            f"Development in {project.get('region')}"
+            if project.get("region")
+            else "Not yet recorded"
         ),
-        "Current canonical records",
+    )
+    updated = _summary_updated_basis(
+        lifecycle_state=lifecycle_state,
+        gate_b=gate_b,
+        requirements_id=requirements_id,
+        design_id=design_id,
+        checkpoint=checkpoint,
+        cutoff=cutoff,
     )
 
-    observed_ids: set[str] = set()
-    failed_ids: set[str] = set()
-    for line in verify_text.splitlines():
-        evidence_ids = re.findall(r"\b(?:AWS-)?EV-\d{4,}\b", line)
-        if not evidence_ids:
-            continue
-        upper = line.upper()
-        if any(status in upper for status in ("VERIFIED", "PASSED", "OBSERVED")):
-            observed_ids.update(evidence_ids)
-        if any(status in upper for status in ("FAILED", "STALE", "BLOCKED")):
-            failed_ids.update(evidence_ids)
+    observed_ids, failed_ids = _summary_evidence_ids(verify_text)
 
-    local_observed = release_decision in {"READY_TO_DEPLOY", "RELEASE_VERIFIED"}
-    deployment_status = clean_cell(deployment_sequence.get("status", "NOT_ACTIVE"))
-    deployment_observed = deployment_status == "RECONCILED"
+    local_observed = bool(observed_ids) and release_decision in {
+        "READY_TO_DEPLOY",
+        "RELEASE_VERIFIED",
+    }
+    deployment = _summary_deployment_observation(deployment_sequence, environment)
+    teardown = _summary_teardown_observation(teardown_sequence, environment)
+    deployment_observed = bool(deployment["observed"])
+    teardown_observed = bool(teardown["observed"])
     requirements_approved = gate_a == "APPROVED_FOR_DESIGN"
     design_approved = gate_b == "APPROVED_FOR_CONSTRUCTION"
-    guidance_ready = not any(
-        item.code.startswith("AWS_CORE_") and item.severity == "ERROR"
-        for item in ctx.diagnostics
+    guidance_ready, guidance_evidence = _summary_aws_core_evidence(aws_core_usage)
+    guidance_limitation = (
+        "Source guidance is not deployment evidence"
+        if template_like
+        else "No current AWS Core evidence was required or recorded"
+        if req_aws_core_materiality == "NOT_MATERIAL"
+        else "Current AWS Core evidence has not been recorded"
+    )
+    deployment_pending = (
+        ("Not authorized", "None", "No deployment evidence or authority")
+        if deployment["inactive"]
+        else (
+            "Not yet observed",
+            "None",
+            str(deployment["state"]),
+        )
+    )
+    teardown_pending = (
+        ("Not authorized", "None", "No teardown evidence or authority")
+        if teardown["inactive"]
+        else ("Not yet observed", str(teardown["evidence_id"]), str(teardown["state"]))
     )
     # fmt: off
     claim_rows = (
         ("Requirements are approved", requirements_approved, ("Owner confirmed", requirements_id, "Does not approve construction"), ("Not yet observed", "None", "Gate A is not approved")),
         ("Technical design is approved", design_approved, ("Owner confirmed", design_id, "Does not authorize AWS account work"), ("Not yet observed", "None", "Gate B is not approved")),
-        ("Current AWS guidance informed the plan", guidance_ready and not template_like, ("Source verified", "Current AWS Core evidence", "Source guidance is not deployment evidence"), ("Not yet observed", "None", "Source guidance is not deployment evidence")),
-        ("Local release checks passed", local_observed, ("Locally observed", release_decision, "Local evidence does not prove AWS behavior"), ("Not yet observed", "None", "Local evidence does not prove AWS behavior")),
-        ("Application is deployed", deployment_observed, ("Deployed observed", "Deployment reconciliation", "Bound to the observed environment"), ("Not authorized", "None", "No deployment evidence or authority")),
+        ("Current AWS guidance informed the plan", guidance_ready and not template_like, ("Source verified", guidance_evidence, "Source guidance is not deployment evidence"), ("Not yet observed", "None", guidance_limitation)),
+        ("Local release checks passed", local_observed, ("Locally observed", ", ".join(sorted(observed_ids)), "Local evidence does not prove AWS behavior"), ("Not yet observed", "None", "Local evidence does not prove AWS behavior")),
+        ("Application is deployed", deployment_observed, ("Deployed observed", ", ".join(deployment["evidence_ids"]), f"Bound to {deployment['environment']}"), deployment_pending),
+        ("Teardown is complete", teardown_observed, ("Teardown observed", str(teardown["evidence_id"]), f"Bound to {teardown['environment']}"), teardown_pending),
     )
     # fmt: on
     claims = []
@@ -602,6 +841,15 @@ def derive_document_summary_specifications(
             }
         )
 
+    unobserved = []
+    if not local_observed:
+        unobserved.append("Local build")
+    if not deployment_observed:
+        unobserved.append("AWS deployment")
+    unobserved.append("recovery")
+    if not teardown_observed:
+        unobserved.append("teardown")
+
     task_progress = (
         f"{len(tasks.done)} of {tasks.total} tasks complete"
         if tasks.total
@@ -609,15 +857,58 @@ def derive_document_summary_specifications(
     )
     bug_title = _summary_bullet(bugfix_text, "Title")
     bug_active = active_artifact == BUGFIX_FILE or explicit_value(bug_title)
+    bug_impact = _summary_bullet(bugfix_text, "User impact")
+    bug_scope = _summary_bullet(bugfix_text, "Allowed scope")
+    bug_aws_resources = _summary_bullet(bugfix_text, "AWS resources affected")
+    checked_criteria = len(re.findall(r"(?m)^- \[[xX]\] ", bugfix_text))
+    total_criteria = len(re.findall(r"(?m)^- \[[ xX]\] ", bugfix_text))
+    regression_status = (
+        "Passed"
+        if checked_criteria and checked_criteria == total_criteria
+        else "In progress"
+        if checked_criteria
+        else "Pending evidence"
+    )
+    architecture_impact = "Not yet assessed"
+    if explicit_value(bug_aws_resources, allow_none=True):
+        architecture_impact = (
+            "No AWS architecture change recorded"
+            if clean_cell(bug_aws_resources).upper() == "NONE"
+            else f"AWS resources affected: {clean_cell(bug_aws_resources)}"
+        )
     bugfix = {
         "status": "Active bounded defect" if bug_active else "No active bounded defect",
         "defect": _summary_value(bug_title, "None") if bug_active else "None",
-        "impact": "Recorded in the defect contract" if bug_active else "None",
-        "reproduction": "Pending evidence" if bug_active else "Not active",
-        "root_cause": "Pending evidence" if bug_active else "Not active",
-        "repair": "Not started" if bug_active else "Not active",
-        "regression": "Pending evidence" if bug_active else "Not active",
-        "architecture": "Not yet assessed" if bug_active else "None",
+        "impact": (
+            _summary_value(bug_impact, "Not yet recorded")
+            if bug_active
+            else "None"
+        ),
+        "reproduction": (
+            "Recorded"
+            if bug_active
+            and _summary_section_has_value(bugfix_text, "### Actual result")
+            else "Pending evidence"
+            if bug_active
+            else "Not active"
+        ),
+        "root_cause": (
+            "Confirmed"
+            if bug_active
+            and _summary_section_has_value(bugfix_text, "### Confirmed evidence")
+            else "Pending evidence"
+            if bug_active
+            else "Not active"
+        ),
+        "repair": (
+            "Bounded"
+            if bug_active and explicit_value(bug_scope)
+            else "Not started"
+            if bug_active
+            else "Not active"
+        ),
+        "regression": regression_status if bug_active else "Not active",
+        "architecture": architecture_impact if bug_active else "None",
         "environment": (
             _summary_value(_summary_bullet(bugfix_text, "Environment"), "Not recorded")
             if bug_active
@@ -632,32 +923,38 @@ def derive_document_summary_specifications(
         ),
         "updated": updated,
     }
+    authority_kind = str(external_authority.get("kind", "NONE"))
     account_access = external_authority.get(
         "validity"
-    ) == "CURRENT" and external_authority.get("kind") in {
+    ) == "CURRENT" and authority_kind in {
         "AWS_READ_ONLY",
         "AWS_DEPLOYMENT",
         "AWS_TEARDOWN",
         "FAST_DEV_GATE_B",
     }
-    environment = _summary_value(
-        runbook_boundary.get("Region and environment"),
-        (
-            f"Development in {project.get('region')}"
-            if project.get("region")
-            else "Development"
-        ),
-    )
+    authority_label = {
+        "AWS_READ_ONLY": "Read-only AWS access",
+        "AWS_DEPLOYMENT": "AWS deployment authority",
+        "AWS_TEARDOWN": "AWS teardown authority",
+        "FAST_DEV_GATE_B": "Fast-development AWS deployment authority",
+    }.get(authority_kind, "None")
     # fmt: off
     return build_summary_specifications({
         "template_like": template_like, "lifecycle_state": lifecycle_state, "next_prompt": next_prompt,
-        "owner_stage": interaction.get("owner_stage"), "action_kind": interaction.get("action_kind"),
+        "owner_stage": interaction.get("owner_stage"), "action_kind": interaction.get("owner_action_kind"),
+        "route_reason_code": interaction.get("route_reason_code"),
         "automatic_continuation_allowed": interaction.get("automatic_continuation_allowed"),
+        "automatic_action_kind": (
+            remediation.get("next_action", {}).get("action_kind")
+            if isinstance(remediation.get("next_action"), Mapping)
+            else ""
+        ),
         "gate_a": gate_a, "gate_b": gate_b, "requirements_revision": requirements_id,
         "design_revision": design_id, "construction_authorization": authorization_id,
+        "construction_authority_valid": write_authority.get("valid") is True,
         "aws_authorization": aws_authorization, "aws_account_access_authorized": account_access,
         "updated": updated, "product_outcome": _summary_value(prd_card.get("Outcome"), "Not yet confirmed"),
-        "release_boundary": _summary_value(prd_card.get("Scope"), "Not yet confirmed"),
+        "release_boundary": _summary_value(prd_card.get("Scope and non-goals"), "Not yet confirmed"),
         "region_and_cost": "Not yet recorded" if template_like else f"{project.get('region') or 'Region not recorded'}; {project.get('cost_posture') or 'Cost posture not recorded'}",
         "record_identities": "Not yet initialized" if template_like else " / ".join(item for item in (requirements_id, design_id, authorization_id) if item),
         "tasks": {
@@ -672,19 +969,19 @@ def derive_document_summary_specifications(
         "verify": {
             "release_result": release_decision.replace("_", " ").title(),
             "observed_count": str(len(observed_ids)), "failed_count": str(len(failed_ids)),
-            "unobserved": "Recovery and teardown" if deployment_observed else "AWS deployment, recovery, and teardown" if local_observed else "Local build, AWS deployment, recovery, and teardown",
+            "unobserved": ", ".join(unobserved),
             "cutoff": _summary_value(verify_scope.get("Evidence cutoff"), cutoff),
             "updated": cutoff if cutoff != "Not yet recorded" else updated, "claims": claims,
         },
         "operations": {
             "environment": environment,
-            "deployment_state": "Deployment observed" if deployment_observed else "Not deployed" if deployment_status in {"", "NOT_ACTIVE", "NONE"} else deployment_status.replace("_", " ").title(),
-            "authority": str(external_authority.get("kind", "None")).replace("_", " ").title() if account_access else "None",
+            "deployment_state": deployment["state"],
+            "authority": authority_label if account_access else "None",
             "safe_action": "Only the exact authorized AWS operation" if account_access else "Local validation only",
             "deployment_approval": "Authorized only for the current deployment" if account_access and external_authority.get("kind") in {"AWS_DEPLOYMENT", "FAST_DEV_GATE_B"} else "Not authorized",
             "teardown_approval": "Authorized only for the current teardown" if account_access and external_authority.get("kind") == "AWS_TEARDOWN" else "Not authorized",
             "recovery_state": "Not yet observed",
-            "emergency_state": "Follow the current runbook and authority" if deployment_observed else "No deployed environment exists",
+            "emergency_state": deployment["emergency"],
             "updated": updated,
         },
         "bugfix": bugfix,
@@ -1175,7 +1472,7 @@ def build_report(
         if summary_text is not None:
             summary_sources[summary_path] = summary_text
     # fmt: off
-    summary_specifications = derive_document_summary_specifications(ctx, classification=classification, lifecycle_state=lifecycle_state, next_prompt=next_prompt, project=project, prd_fields=prd_fields, gate_a=gate_a, gate_b=gate_b, tasks=tasks, release_decision=release_decision, release_evidence_cutoff=release_evidence_cutoff, aws_authorization=aws_authorization, external_authority=external_authority, interaction=interaction, active_artifact=active_artifact, deployment_sequence=deployment_sequence_projection)
+    summary_specifications = derive_document_summary_specifications(ctx, classification=classification, lifecycle_state=lifecycle_state, next_prompt=next_prompt, project=project, prd_fields=prd_fields, gate_a=gate_a, gate_b=gate_b, tasks=tasks, release_decision=release_decision, release_evidence_cutoff=release_evidence_cutoff, aws_authorization=aws_authorization, external_authority=external_authority, interaction=interaction, active_artifact=active_artifact, deployment_sequence=deployment_sequence_projection, teardown_sequence=teardown_sequence_projection, aws_core_usage=aws_core_usage or {}, req_aws_core_materiality=req_aws_core_materiality, write_authority=write_authority, remediation=remediation)
     # fmt: on
     document_summaries, summary_issues = project_document_summaries(
         summary_sources, summary_specifications

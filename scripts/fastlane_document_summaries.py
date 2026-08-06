@@ -23,6 +23,93 @@ FORBIDDEN_VISIBLE_VALUE = re.compile(
     + "home"
     + r"/|AKIA[0-9A-Z]{16}|R-[A-F0-9]{8,}|https?://[^\s/@]+:[^\s/@]+@)"
 )
+DEPLOYMENT_SUMMARY_SOURCE = (
+    "aws.deployment.action_status + aws.deployment.reconciliation_status + "
+    "aws.deployment.acceptance_evidence_ids + runbook.active_boundary + "
+    "project.region"
+)
+
+# CANONICALIZATION: each human field names the typed Engine result that supplies it.
+SUMMARY_FIELD_SOURCES = {
+    "Phase": "routing.lifecycle_state",
+    "Overall status": "define.gate_a.status + design.gate_b.status",
+    "Last completed milestone": "define.gate_a.status + design.gate_b.status",
+    "Gate A": "define.gate_a.status",
+    "Gate B": "design.gate_b.status",
+    "AWS deployment": DEPLOYMENT_SUMMARY_SOURCE,
+    "Construction tasks": "deliver.tasks",
+    "Verification": "deliver.release.status",
+    "Operations": DEPLOYMENT_SUMMARY_SOURCE,
+    "Bounded defect": "deliver.active_artifact + bugfix.title",
+    "AWS account access": "authority.external.kind + authority.external.validity",
+    "Product outcome": "define.gate_a_readiness.outcome",
+    "First-release boundary": "define.gate_a_readiness.scope_and_non_goals",
+    "Requirements": "define.gate_a.status",
+    "Technical design": "design.gate_b.status",
+    "Region and cost": "project.region + define.cost_posture",
+    "Construction authorization": (
+        "authority.write.valid + authority.write.authorization_id"
+    ),
+    "AWS account work": "authority.external.kind + authority.external.validity",
+    "Current records": "define.revision + design.revision + authority.record_id",
+    "Progress": "deliver.tasks.status",
+    "Current wave": "deliver.tasks.active_wave",
+    "Active task": "deliver.tasks.active",
+    "Readiness": "deliver.tasks.plan_state",
+    "Blocker": "deliver.tasks.blocked",
+    "Last passing checkpoint": "deliver.tasks.checkpoint",
+    "Construction approval": (
+        "authority.write.valid + authority.write.authorization_id"
+    ),
+    "Release result": "deliver.release.status",
+    "Locally observed evidence": "deliver.evidence.task_completion",
+    "Failed or stale evidence": "deliver.evidence",
+    "Still unobserved": "deliver.evidence + aws.deployment + aws.teardown",
+    "Evidence cutoff": "deliver.release.evidence_cutoff",
+    "Deployment state": DEPLOYMENT_SUMMARY_SOURCE,
+    "Current AWS authority": "authority.external.kind + authority.external.validity",
+    "Safest available operation": (
+        "authority.external.kind + authority.external.validity"
+    ),
+    "Deployment approval": "authority.external.kind + authority.external.validity",
+    "Teardown approval": "authority.external.kind + authority.external.validity",
+    "Recovery state": "deliver.evidence.recovery",
+    "Emergency condition": DEPLOYMENT_SUMMARY_SOURCE,
+    "Status": "deliver.active_artifact + bugfix.title",
+    "Defect": "bugfix.title",
+    "User impact": "bugfix.user_impact",
+    "Reproduction": "bugfix.actual_result",
+    "Related requirements": "bugfix.requirements",
+    "Root cause": "bugfix.confirmed_evidence",
+    "Repair": "bugfix.allowed_scope",
+    "Regression evidence": "bugfix.acceptance_criteria",
+    "Architecture impact": "bugfix.aws_resources_affected",
+    "Updated": (
+        "define.revision + design.revision + deliver.tasks.checkpoint + "
+        "deliver.release.evidence_cutoff"
+    ),
+}
+SUMMARY_FIELD_SOURCE_OVERRIDES = {
+    ("docs/project/RUNBOOK.md", "Environment"): (
+        "runbook.active_boundary + project.region"
+    ),
+    ("docs/project/BUGFIX.md", "Environment"): "bugfix.environment",
+}
+SUMMARY_CLAIM_SOURCES = {
+    "Requirements are approved": "define.gate_a.status",
+    "Technical design is approved": "design.gate_b.status",
+    "Current AWS guidance informed the plan": (
+        "aws_core.materiality + aws_core.observed_usage"
+    ),
+    "Local release checks passed": (
+        "deliver.evidence.task_completion + deliver.release.status"
+    ),
+    "Application is deployed": DEPLOYMENT_SUMMARY_SOURCE,
+    "Teardown is complete": (
+        "aws.teardown.action_status + aws.teardown.status + "
+        "aws.teardown.evidence_id + runbook.active_boundary + project.region"
+    ),
+}
 
 
 def _sha256(payload: bytes) -> str:
@@ -129,8 +216,11 @@ def normalized_document(specification: Mapping[str, Any]) -> dict[str, Any]:
                 "label": label,
                 "value": _plain(item.get("value")),
                 "basis_ids": _basis_ids(item.get("basis_ids", [])),
+                "source": _plain(item.get("source"), ""),
             }
         )
+        if not fields[-1]["source"]:
+            raise ValueError("summary field source must be explicit")
 
     raw_claims = specification.get("claims", [])
     if not isinstance(raw_claims, Sequence) or isinstance(raw_claims, (str, bytes)):
@@ -145,8 +235,11 @@ def normalized_document(specification: Mapping[str, Any]) -> dict[str, Any]:
                 "maturity": _plain(item.get("maturity"), ""),
                 "evidence": _plain(item.get("evidence"), "None"),
                 "limitation": _plain(item.get("limitation"), "None"),
+                "source": _plain(item.get("source"), ""),
             }
         )
+        if not claims[-1]["source"]:
+            raise ValueError("summary claim source must be explicit")
 
     raw_navigation = specification.get("navigation")
     if not isinstance(raw_navigation, Sequence) or isinstance(
@@ -166,6 +259,16 @@ def normalized_document(specification: Mapping[str, Any]) -> dict[str, Any]:
     if not navigation:
         raise ValueError("summary navigation cannot be empty")
 
+    raw_provenance = specification.get("provenance")
+    if not isinstance(raw_provenance, Mapping):
+        raise ValueError("summary provenance must be an object")
+    provenance = {
+        "need_from_owner": _plain(raw_provenance.get("need_from_owner"), ""),
+        "next_action": _plain(raw_provenance.get("next_action"), ""),
+    }
+    if not all(provenance.values()):
+        raise ValueError("summary owner-action provenance must be explicit")
+
     return {
         "path": path,
         "heading": "Current state",
@@ -174,6 +277,7 @@ def normalized_document(specification: Mapping[str, Any]) -> dict[str, Any]:
         "next_action": _plain(specification.get("next_action")),
         "claims": claims,
         "navigation": navigation,
+        "provenance": provenance,
     }
 
 
@@ -231,6 +335,7 @@ def _summary_basis_digest(document: Mapping[str, Any]) -> str:
         "need_from_owner": document["need_from_owner"],
         "next_action": document["next_action"],
         "claims": document["claims"],
+        "provenance": document["provenance"],
     }
     canonical = json.dumps(
         payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -321,6 +426,7 @@ def project_document_summaries(
                 "next_action": document["next_action"],
                 "claims": document["claims"],
                 "navigation": document["navigation"],
+                "provenance": document["provenance"],
                 "summary_basis_sha256": _summary_basis_digest(document),
                 "rendered_sha256": _sha256(expected.encode("utf-8")),
             }
@@ -354,11 +460,19 @@ def project_document_summaries(
     )
 
 
-def _field(label: str, value: object, *basis_ids: object) -> dict[str, Any]:
+def _field(
+    path: str, label: str, value: object, *basis_ids: object
+) -> dict[str, Any]:
+    source = SUMMARY_FIELD_SOURCE_OVERRIDES.get(
+        (path, label), SUMMARY_FIELD_SOURCES.get(label)
+    )
+    if source is None:
+        raise ValueError(f"summary field {path}:{label} has no typed source")
     return {
         "label": label,
         "value": value,
         "basis_ids": [item for item in basis_ids if item],
+        "source": source,
     }
 
 
@@ -372,8 +486,14 @@ def _spec(
     return {
         **base,
         "path": path,
-        "fields": [_field(*row) for row in fields],
-        "claims": list(claims),
+        "fields": [_field(path, *row) for row in fields],
+        "claims": [
+            {
+                **dict(claim),
+                "source": SUMMARY_CLAIM_SOURCES.get(str(claim.get("claim")), ""),
+            }
+            for claim in claims
+        ],
         "navigation": [
             {"label": label, "target": target} for label, target in navigation
         ],
@@ -402,6 +522,10 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
         "AUTHORIZE_AWS_TEARDOWN": "Review the exact teardown authorization.",
         "CHOOSE_AWS_RESIDUAL_DISPOSITION": "Choose what should happen to the remaining AWS resources.",
         "REVIEW_SAFETY_BLOCKER": "Review the reported safety boundary.",
+        "ENABLE_AWS_CORE": "Enable and verify AWS Core, then continue.",
+        "FIX_VALIDATION_FAILURE": (
+            "Review the validation failure and provide direction."
+        ),
     }
     prompt_actions = {
         "BOOT-00": "Codex will verify prerequisites and initialize the project.",
@@ -437,6 +561,58 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
             "Codex will continue from the current validated checkpoint.",
         )
     )
+    decision_next_actions = {
+        "APPROVE_GATE_A": (
+            "After your decision, Codex will continue to technical design or "
+            "apply your correction."
+        ),
+        "APPROVE_GATE_B": (
+            "After your decision, Codex will create the construction tasks or "
+            "apply your correction."
+        ),
+        "AUTHORIZE_AWS_READ_PREFLIGHT": (
+            "After your authorization, Codex will perform only the exact "
+            "read-only AWS preflight."
+        ),
+        "AUTHORIZE_AWS_OPERATION": (
+            "After your authorization, Codex will perform only the exact AWS "
+            "operation."
+        ),
+        "AUTHORIZE_AWS_TEARDOWN": (
+            "After your authorization, Codex will perform only the exact teardown."
+        ),
+        "CHOOSE_AWS_RESIDUAL_DISPOSITION": (
+            "After your decision, Codex will continue from the recorded AWS state."
+        ),
+        "REVIEW_SAFETY_BLOCKER": (
+            "After your direction, Codex will revalidate the safety boundary."
+        ),
+        "ENABLE_AWS_CORE": (
+            "After AWS Core is enabled and verified, Codex will rerun the "
+            "prerequisite check."
+        ),
+        "FIX_VALIDATION_FAILURE": (
+            "After your direction, Codex will revalidate the current records."
+        ),
+    }
+    if not automatic and action in decision_next_actions:
+        next_action = decision_next_actions[action]
+    if (
+        not automatic
+        and action == "ANSWER_OPEN_DECISIONS"
+        and str(state.get("next_prompt") or "") in {"BUILD-10", "BUILD-20"}
+    ):
+        next_action = (
+            "After your answer, Codex will resume the active local construction "
+            "task."
+        )
+    if automatic and state.get("route_reason_code") == "AWS_PREFLIGHT_RUNNING":
+        next_action = "Codex will complete the read-only AWS preflight."
+    automatic_action = str(state.get("automatic_action_kind") or "")
+    if automatic and automatic_action == "CORRECT_AND_REVALIDATE":
+        next_action = "Codex will repair the derived record and revalidate it."
+    elif automatic and automatic_action == "REPLAN_TASKS":
+        next_action = "Codex will repair the task plan and revalidate it."
     phase = (
         "Not yet initialized"
         if template
@@ -513,14 +689,38 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
 
     aws_id = state.get("aws_authorization")
     plan_id = tasks.get("plan_revision")
-    base = {"need_from_owner": need, "next_action": next_action}
+    construction_authority_valid = bool(state.get("construction_authority_valid"))
+    construction_authorization = (
+        "None"
+        if template
+        else f"Approved ({auth})"
+        if construction_authority_valid and auth
+        else f"Not approved (boundary record {auth})"
+        if auth
+        else "Not approved"
+    )
+    construction_status = (
+        "Not yet initialized" if template else construction_authorization
+    )
+    base = {
+        "need_from_owner": need,
+        "next_action": next_action,
+        "provenance": {
+            "need_from_owner": "interaction.owner_action_kind",
+            "next_action": (
+                "interaction.owner_action_kind + interaction.route_reason_code + "
+                "remediation.next_action.action_kind + routing.next_prompt"
+            ),
+        },
+    }
     # Declarative rows are kept compact because their order is part of the UI contract.
     # fmt: off
     fields = {
         "docs/project/README.md": (
             ("Phase", phase, req, des), ("Overall status", overall, req, des),
             ("Last completed milestone", milestone, req, des), ("Gate A", gate_a_status, req),
-            ("Gate B", gate_b_status, des, auth), ("AWS deployment", aws_boundary, aws_id),
+            ("Gate B", gate_b_status, des, auth),
+            ("AWS deployment", operations.get("deployment_state", "Not deployed")),
             ("Construction tasks", tasks.get("progress", "Not started"), auth),
             ("Verification", verify.get("release_result", "Not ready")),
             ("Operations", operations.get("deployment_state", "Not deployed")),
@@ -534,7 +734,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
             ("Gate A", gate_a_status, req), ("Gate B", gate_b_status, des, auth),
             ("Last completed milestone", milestone, req, des),
             ("Region and cost", state.get("region_and_cost", "Not yet recorded"), req),
-            ("Construction authorization", auth or "None", auth),
+            ("Construction authorization", construction_authorization, auth),
             ("AWS account work", aws_boundary, aws_id),
             ("Current records", state.get("record_identities", "Not yet initialized"), req, des, auth),
             ("Updated", updated, req, des),
@@ -543,7 +743,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
             ("Progress", tasks.get("progress", "No tasks generated"), plan_id),
             ("Current wave", tasks.get("wave", "None"), plan_id), ("Active task", tasks.get("active", "None")),
             ("Readiness", tasks.get("readiness", "Not started"), plan_id), ("Blocker", tasks.get("blocker", "None")),
-            ("Last passing checkpoint", tasks.get("checkpoint", "None")), ("Construction approval", gate_b_status, auth),
+            ("Last passing checkpoint", tasks.get("checkpoint", "None")), ("Construction approval", construction_status, auth),
             ("AWS account work", aws_boundary, aws_id),
             ("Updated", tasks.get("updated", updated), plan_id),
         ),
@@ -559,7 +759,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
             ("Environment", operations.get("environment", "Development")),
             ("Deployment state", operations.get("deployment_state", "Not deployed")),
             ("Current AWS authority", operations.get("authority", "None"), aws_id),
-            ("Construction approval", gate_b_status, auth),
+            ("Construction approval", construction_status, auth),
             ("Safest available operation", operations.get("safe_action", "Local validation only")),
             ("Deployment approval", operations.get("deployment_approval", "Not authorized")),
             ("Teardown approval", operations.get("teardown_approval", "Not authorized")),

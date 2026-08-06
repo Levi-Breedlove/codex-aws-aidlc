@@ -26,6 +26,7 @@
 | Current AWS guidance informed the plan | Not yet observed | None | Source guidance is not deployment evidence |
 | Local release checks passed | Not yet observed | None | Local evidence does not prove AWS behavior |
 | Application is deployed | Not authorized | None | No deployment evidence or authority |
+| Teardown is complete | Not authorized | None | No teardown evidence or authority |
 
 ## Go directly to
 
@@ -399,8 +400,6 @@ Valid until: <ISO 8601 time or exact one-operation condition>
 Approver: <name/handle>
 ```
 <!-- bootstrap:aws-teardown-receipt:end -->
-
-The Engine validates receipt equality, provenance, identity, cost, validity, and scope before the operational skill may act. Separately authorized read-only checks record what AWS actually returned.
 
 <details>
 <summary>Technical AWS attempt and verification records</summary>

@@ -635,6 +635,94 @@ class ProductJourneyTests(unittest.TestCase):
                 after_repair["interaction"]["automatic_continuation_allowed"]
             )
 
+    def test_gate_review_summaries_match_the_canonical_owner_action(self) -> None:
+        fixture = doctor_fixtures.BootstrapDoctorTests()
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+
+            gate_a_project = self.extract_template(temporary, "gate-a-summary")
+            self.initialize(gate_a_project)
+            fixture.pending_gate_a(gate_a_project)
+            gate_a = doctor.inspect_project(gate_a_project)
+            self.assertEqual(
+                gate_a["interaction"]["owner_action_kind"], "APPROVE_GATE_A"
+            )
+            self.assertFalse(
+                gate_a["interaction"]["automatic_continuation_allowed"]
+            )
+            gate_a_documents = gate_a["document_summaries"]["documents"]
+            self.assertEqual(
+                {item["need_from_owner"] for item in gate_a_documents},
+                {
+                    "Review the requirements and approve them or request a correction."
+                },
+            )
+            self.assertEqual(
+                {item["next_action"] for item in gate_a_documents},
+                {
+                    "After your decision, Codex will continue to technical design "
+                    "or apply your correction."
+                },
+            )
+            gate_a_prd = next(
+                item
+                for item in gate_a_documents
+                if item["path"] == "docs/project/PRD.md"
+            )
+            gate_a_fields = {
+                item["label"]: item["value"] for item in gate_a_prd["fields"]
+            }
+            prd_text = (gate_a_project / "docs/project/PRD.md").read_text(
+                encoding="utf-8"
+            )
+            readiness = doctor.table_after_heading(
+                prd_text, "### Gate A \u2014 readiness card"
+            )
+            self.assertEqual(
+                gate_a_fields["First-release boundary"],
+                readiness["Scope and non-goals"],
+            )
+            self.assertEqual(gate_a_fields["Updated"], "REQ-0001")
+            self.assertEqual(
+                gate_a_fields["Construction authorization"],
+                "Not approved (boundary record AUTH-0001)",
+            )
+
+            gate_b_project = self.extract_template(temporary, "gate-b-summary")
+            self.initialize(gate_b_project)
+            fixture.pending_gate_b(gate_b_project)
+            gate_b = doctor.inspect_project(gate_b_project)
+            self.assertEqual(
+                gate_b["interaction"]["owner_action_kind"], "APPROVE_GATE_B"
+            )
+            gate_b_documents = gate_b["document_summaries"]["documents"]
+            self.assertEqual(
+                {item["need_from_owner"] for item in gate_b_documents},
+                {
+                    "Review the technical plan and approve it or request a correction."
+                },
+            )
+            self.assertEqual(
+                {item["next_action"] for item in gate_b_documents},
+                {
+                    "After your decision, Codex will create the construction tasks "
+                    "or apply your correction."
+                },
+            )
+            gate_b_prd = next(
+                item
+                for item in gate_b_documents
+                if item["path"] == "docs/project/PRD.md"
+            )
+            gate_b_fields = {
+                item["label"]: item["value"] for item in gate_b_prd["fields"]
+            }
+            self.assertEqual(gate_b_fields["Updated"], "DES-0001")
+            self.assertEqual(
+                gate_b_fields["Construction authorization"],
+                "Not approved (boundary record AUTH-0001)",
+            )
+
     def test_hook_preserves_documentation_and_distinct_aws_authority_lanes(
         self,
     ) -> None:

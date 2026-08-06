@@ -11,7 +11,7 @@ This folder is the one durable project record Fastlane uses to define, design, b
 | Last completed milestone | None |
 | Gate A | Not yet initialized |
 | Gate B | Not yet initialized |
-| AWS deployment | Not authorized |
+| AWS deployment | Not deployed |
 | Construction tasks | No tasks generated |
 | Verification | Not yet initialized |
 | Operations | Not deployed |
