@@ -47,3 +47,7 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
   rendered digest, source-disposition rule, Harness binding, AWS evidence
   requirement, and exact receipt. Moving an unchanged diagram or evaluating an
   ADR may not stale Gate B or grant authority.
+- Delivery extraction must preserve task readiness, dependency and waiver
+  semantics, attempts, checkpoints, property and completion evidence, release
+  state, resume behavior, and the sole-mutator boundary. `task_waves.py` must
+  use the public Engine API without dynamically loading the doctor CLI.

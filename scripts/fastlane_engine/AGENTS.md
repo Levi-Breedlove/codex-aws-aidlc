@@ -20,6 +20,9 @@ This guide narrows the root rules and never widens approval or authorization.
 - ADR file inventory and bounded reads remain in `../fastlane_adr.py`; the
   Design evaluator consumes only repository-relative observed sources. ADRs
   remain supporting rationale and never enter requirements or design digests.
+- `deliver/` owns task, evidence, checkpoint, repository, and release
+  validation over already-observed records. It cannot mutate task state, run
+  Git, claim work, publish, or grant construction or external authority.
 - Routing consumes domain results, never parsers or snapshot builders.
 - Reporting serializes already-derived results and does not make policy.
 - Exact ordering, IDs, hashes, receipts, diagnostics, and compatibility behavior

@@ -56,6 +56,9 @@ cross-platform, fail-closed, and free of hidden external actions.
   interface/state, diagram, Harness, envelope, and ADR-rationale evaluation.
   `fastlane_adr.py` observes bounded ADR files and delegates evaluation; it
   cannot select architecture or affect design digests or authority.
+- `fastlane_engine.deliver` owns pure task, evidence, checkpoint, repository,
+  and release validation. `task_waves.py` remains the sole task mutator and
+  consumes only the public Engine Delivery API; it never loads the doctor CLI.
 
 ## Required validation
 

@@ -1978,10 +1978,8 @@ Not started.
             from tests import test_bootstrap_doctor as doctor_fixtures
 
             prd = prd_path.read_text(encoding="utf-8")
-            contract, issues = (
-                task_waves.load_bootstrap_doctor().derive_design_contract(
-                    prd, "DES-0001", required=True
-                )
+            contract, issues = task_waves.derive_current_design_contract(
+                prd, "DES-0001", required=True
             )
             self.assertEqual(issues, [])
             self.assertIsNotNone(contract.canonical_sha256)
