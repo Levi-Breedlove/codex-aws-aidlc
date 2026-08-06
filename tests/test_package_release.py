@@ -191,6 +191,15 @@ class PackageReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
+            "pull_request:\n"
+            "    types:\n"
+            "      - opened\n"
+            "      - synchronize\n"
+            "      - reopened\n"
+            "      - ready_for_review\n",
+            workflow,
+        )
+        self.assertIn(
             "push:\n    branches:\n      - fast-lane\n      - fast-lane-foundation\n",
             workflow,
         )
