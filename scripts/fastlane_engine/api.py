@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 from .aws import (
     AwsAuthorityPolicy,
@@ -111,6 +112,27 @@ def capture_project_snapshot(
         else:
             observer.observe_binary(relative)
     return observer.freeze()
+
+
+def inspect_project(
+    root: Path,
+    *,
+    template_source: bool = False,
+    prior_remediation_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Return the stable schema-2 report through the modular orchestrator.
+
+    The import is intentionally lazy so Delivery validation can consume this
+    public API without creating a cycle back through whole-project routing.
+    """
+
+    from .orchestration import inspect_project as _inspect_project
+
+    return _inspect_project(
+        root,
+        template_source=template_source,
+        prior_remediation_fingerprint=prior_remediation_fingerprint,
+    )
 
 
 def derive_current_design_contract(
@@ -496,6 +518,7 @@ __all__ = (
     "ProjectSnapshot",
     "RequirementsContract",
     "capture_project_snapshot",
+    "inspect_project",
     "aws_core_phase_evidence_issues",
     "derive_change_impact_contract",
     "derive_aws_core_observed_usage",

@@ -157,7 +157,8 @@ class EngineFoundationTests(unittest.TestCase):
                     imported.extend(alias.name for alias in node.names)
                 elif isinstance(node, ast.ImportFrom) and node.module:
                     imported.append(node.module)
-            self.assertNotIn("subprocess", imported, relative)
+            if relative != "core/snapshot.py":
+                self.assertNotIn("subprocess", imported, relative)
             if relative.startswith("core/"):
                 self.assertFalse(
                     any(

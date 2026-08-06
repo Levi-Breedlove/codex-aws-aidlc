@@ -1,9 +1,9 @@
 """Bounded, immutable, single-observation project snapshots.
 
 Canonical inputs are repository-relative regular files observed from one root.
-The observer returns frozen file and Markdown snapshots. It performs bounded
-read-only filesystem access only; it never writes, invokes Git/subprocesses,
-accesses a network, validates lifecycle state, or grants authority.
+The observer returns frozen file, Markdown, and trusted Git snapshots. It performs
+bounded read-only filesystem and Git observation only; it never writes, accesses a
+network, validates lifecycle state, or grants authority.
 """
 
 from __future__ import annotations
@@ -11,12 +11,20 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import os
 from pathlib import Path, PurePosixPath
+import re
+import subprocess
 from types import MappingProxyType
 
 from .digests import lf_normalized_text, sha256_hex
 from .ids import validate_relative_path
 from .markdown_index import MarkdownDocumentIndex
+
+try:
+    from fastlane_process import resolve_trusted_git
+except ModuleNotFoundError:  # Loaded as scripts.fastlane_engine in unit tests.
+    from scripts.fastlane_process import resolve_trusted_git
 
 
 MAX_REQUIRED_FILES = 512
@@ -32,6 +40,10 @@ class ObservationError(ValueError):
 
     def __str__(self) -> str:
         return self.message
+
+
+class GitObservationError(RuntimeError):
+    """SAFETY: report a failed bounded Git observation to pure evaluators."""
 
 
 @dataclass(frozen=True)
@@ -272,6 +284,69 @@ def has_symlink_component(root: Path, relative: str) -> bool:
         if current.is_symlink():
             return True
     return False
+
+
+def git_read(
+    root: Path,
+    *arguments: str,
+    resolve_git: Callable[[Path], str] | None = None,
+    run: Callable[..., subprocess.CompletedProcess[bytes]] | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """SAFETY: run one trusted, lock-free Git observation."""
+
+    environment = os.environ.copy()
+    environment["GIT_OPTIONAL_LOCKS"] = "0"
+    resolver = resolve_git or resolve_trusted_git
+    runner = run or subprocess.run
+    try:
+        return runner(
+            [
+                resolver(root),
+                "-c",
+                "core.fsmonitor=false",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-C",
+                str(root),
+                *arguments,
+            ],
+            check=False,
+            capture_output=True,
+            env=environment,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise GitObservationError(str(exc)) from exc
+
+
+def inspect_git_baseline(
+    root: Path,
+    *,
+    resolve_git: Callable[[Path], str] | None = None,
+    run: Callable[..., subprocess.CompletedProcess[bytes]] | None = None,
+) -> str:
+    """SAFETY: observe the current commit without changing Git state."""
+
+    try:
+        result = git_read(
+            root,
+            "rev-parse",
+            "--verify",
+            "HEAD",
+            resolve_git=resolve_git,
+            run=run,
+        )
+    except GitObservationError:
+        return "PENDING"
+    if result.returncode != 0:
+        return "PENDING"
+    stdout = result.stdout
+    commit = (
+        stdout.decode("utf-8", errors="replace").strip()
+        if isinstance(stdout, bytes)
+        else stdout.strip()
+    )
+    return commit if re.fullmatch(r"[0-9a-fA-F]{40,64}", commit) else "PENDING"
 
 
 def _freeze_value(value: object) -> object:
