@@ -86,60 +86,11 @@ is refreshed.
 | Last known-green commit | `TODO` |
 | Next safe action | Complete Gate B; when current, run `TASK-10` |
 
-## Derived requirement disposition contract
+## Task record template
 
-This table shows how every approved requirement is covered or why it needs no
-new work. Fastlane calculates it from the existing project records.
-
-## Coordinator contract
-
-Codex is the only writer so task records cannot conflict. Read-only reviewers
-may comment but cannot change project state.
-
-## Status and transition contract
-
-| Status | Meaning | Allowed next status |
-|---|---|---|
-| `BACKLOG` | Defined but not executable | `READY`, `BLOCKED`, `SKIPPED` |
-| `READY` | All execution preconditions are currently satisfied | `IN_PROGRESS`, `BACKLOG`, `BLOCKED`, `SKIPPED` |
-| `IN_PROGRESS` | Claimed inside the current run and attempt budget | `DONE`, `BLOCKED` |
-| `BLOCKED` | Cannot proceed; blocker and next action are recorded | `READY`, `BACKLOG`, `SKIPPED` |
-| `DONE` | Acceptance criteria and required local evidence passed | Terminal |
-| `SKIPPED` | Intentionally omitted under an explicit skip record | Terminal |
-
-These statuses show where work stands. Fastlane rejects a status change that
-skips required validation or exceeds the approved plan.
-
-## Required task record schema
-
-These fields connect each task to the approved plan and its proof. Fastlane
-maintains them automatically; owners are not expected to complete this table.
-
-| Metadata key | Required content |
-|---|---|
-| `Status` | One status from the transition contract |
-| `Requirements` | Current REQ ID, requirement IDs, applicable acceptance/journey/PROP IDs, `WAVE-*` for the walking skeleton, and `SPIKE-*` when authorized |
-| `Design` | Exact `DES-nnnn; TECH: TECH-nnnn[, TECH-nnnn...]` trace, or `DES-nnnn; TECH: NONE — no technology/toolchain impact` |
-| `Authorization` | Current AUTH ID |
-| `Depends on` | Stable task IDs or `NONE` |
-| `Dependency waivers` | `TASK-nnn=WAIVER-nnn` entries or `NONE` |
-| `Owner` | Assigned coordinator or `UNASSIGNED` |
-| `Run ID` | Active run ID while `IN_PROGRESS`, otherwise `NONE` |
-| `Risk` | Objective task risk classification |
-| `Write set` | Exact paths or narrow globs |
-| `External state` | Exact mutable targets or `NONE` |
-| `AWS mode` | `NONE` or `DOCS_ONLY`; authenticated AWS work routes outside TASK/BUILD |
-| `Attempt budget` | Positive integer from AUTH |
-| `Attempts used` | Non-negative integer not exceeding the budget |
-| `Evidence` | Evidence IDs or `NONE` before evidence exists |
-| `Blocker` | Current blocker and next action, or `NONE` |
-| `Skip record` | Explicit record ID or `NONE` |
-| `GitHub issue` | Authorized issue URL or `PENDING_SYNC` |
-| `Last checkpoint` | Coordinator checkpoint ID or `NONE` |
-| `Last updated` | ISO 8601 timestamp or `TODO` before initialization |
-
-The technical records below remain available for audit while the task card
-above stays focused on the outcome and how success will be checked.
+The exact task cards below preserve the approved basis, bounded work, validation,
+attempt history, and evidence needed to resume safely. Fastlane maintains their
+technical format automatically.
 
 ~~~text
 ### <TASK-ID> — <short title>
@@ -175,7 +126,7 @@ TODO
 
 - <timestamped coordinator entry or NOT_STARTED>
 
-#### Agent execution details
+#### Technical execution details
 
 <details>
 <summary>Technical task metadata</summary>

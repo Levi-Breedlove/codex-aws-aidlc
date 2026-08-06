@@ -381,8 +381,8 @@ class PromptPackContractTests(unittest.TestCase):
         required = {
             "docs/project/TASKS.md": (
                 "## Active execution snapshot",
+                "## Task record template",
                 "## Task definitions",
-                "## Derived requirement disposition contract",
                 "## Checkpoints and resume",
             ),
             "docs/project/VERIFY.md": (
@@ -485,6 +485,26 @@ class PromptPackContractTests(unittest.TestCase):
         ):
             self.assertIn(phrase, self.fastlane_deliver)
         self.assertIn("Maximum workers must be exactly 1", self.task_engine_source)
+
+    def test_task_record_keeps_state_while_engine_and_deliver_own_procedure(
+        self,
+    ) -> None:
+        for heading in (
+            "## Derived requirement disposition contract",
+            "## Coordinator contract",
+            "## Status and transition contract",
+            "## Required task record schema",
+        ):
+            self.assertNotIn(heading, self.tasks)
+        for phrase in (
+            "exact task fields",
+            "legal transitions",
+            "attempt bounds",
+            "does not teach that grammar",
+        ):
+            self.assertIn(phrase, self.fastlane_deliver)
+        self.assertIn("TASK_STATUSES", self.engine_source)
+        self.assertIn("ALLOWED_TRANSITIONS", self.task_engine_source)
 
     def test_aws_operation_skill_owns_execution_journal_and_reconciliation(
         self,
@@ -613,9 +633,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.17")
-        self.assertIn("**Pack version:** 1.2.17", self.prompts)
-        self.assertIn("Current customer build: **1.2.17**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.18")
+        self.assertIn("**Pack version:** 1.2.18", self.prompts)
+        self.assertIn("Current customer build: **1.2.18**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

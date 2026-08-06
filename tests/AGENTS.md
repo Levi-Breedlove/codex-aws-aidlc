@@ -26,9 +26,9 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
 - Record meaningful release evidence in `../docs/project/VERIFY.md`.
 - Reference test suites or reports rather than listing every test case in Markdown.
 
-## Engine parity rules
+## Engine parity and architecture rules
 
-- Freeze complete normalized reports before extracting a lifecycle domain.
+- Keep the locked characterization corpus as the compatibility oracle.
   Normalize only repository roots, the bounded test clock, package-version
   mirrors, and deliberately synthetic Git identities.
 - Preserve diagnostic IDs and order, messages, paths, routes, owner actions,
@@ -40,9 +40,9 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
   store thresholds and structural baselines, never machine paths, usernames,
   raw transcripts, credentials, AWS identifiers, or timing claims from a
   different tree.
-- Domain extraction tests must prove the public doctor and Engine API resolve
-  to the same pure implementation, and that domain modules cannot observe or
-  mutate repositories, Git, GitHub, AWS, clocks, or external processes.
+- Prove the public CLI and Engine API resolve to the same implementation, and
+  that domain modules cannot observe or mutate repositories, Git, GitHub, AWS,
+  clocks, or external processes.
 - Design extraction must preserve every Gate B decision, diagram semantic and
   rendered digest, source-disposition rule, Harness binding, AWS evidence
   requirement, and exact receipt. Moving an unchanged diagram or evaluating an
@@ -55,3 +55,6 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
   transition, residual disposition, read/deployment/teardown receipt binding,
   diagnostic order, and restricted closure. Tests remain synthetic and must
   prove that the AWS domain performs no account call or authority broadening.
+- Enforce import boundaries, one report builder, one route owner, one
+  diagnostic model, public Delivery API use by `task_waves.py`, and complete
+  control-manifest coverage for every packaged Engine module.

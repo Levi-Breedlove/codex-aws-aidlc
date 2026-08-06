@@ -61,6 +61,11 @@ project authority or another lifecycle.
    phase procedure, PRD schema, validator/router, owner-visible presentation
    when affected, tests, and manifest in the same bounded change.
 
+   `scripts/bootstrap_doctor.py` is the stable compatibility CLI. Modular policy
+   belongs in `scripts/fastlane_engine/`; keep domain imports acyclic, keep
+   state-changing code in the existing public mutators, and require every new
+   packaged Engine module in all independent control inventories.
+
 4. Before `IMPLEMENT` or `PUBLISH`, validate the ephemeral scope contract with
    `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`.
    The preflight is read-only; keep the contract outside tracked product state.
@@ -74,6 +79,8 @@ project authority or another lifecycle.
 6. Refresh `bootstrap.manifest.json` only after source edits are final. Run
    focused tests, the full suite, manifest and deterministic package checks,
    and `git diff --check` before any authorized publication.
+   Documentation alignment follows stable Engine ownership: remove procedural
+   prose only after its skill and deterministic validator remain proven.
 7. For canonical customer-package maintenance, compare current package bytes
    and inventory with one exact existing ancestor by running `python
    scripts/package_release.py --check --base-commit <exact-base-commit>`.

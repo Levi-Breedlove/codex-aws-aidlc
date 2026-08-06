@@ -1,6 +1,6 @@
 # Deliver phase
 
-Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10. BUG-10 and SYNC-10 are request-scoped adjuncts; rerun the Engine afterward and resume its route.
+Use for TASK-10, BUILD-10, BUILD-20, and RELEASE-10. BUG-10 and SYNC-10 are request-scoped adjuncts; rerun the Engine afterward and resume its route. The Engine owns exact task fields, statuses, legal transitions, readiness, dependency and waiver checks, attempt bounds, and evidence completeness; `TASKS.md` stores populated project records and does not teach that grammar.
 
 ## Application source layout
 

@@ -32,38 +32,32 @@ cross-platform, fail-closed, and free of hidden external actions.
   time, tested revision or artifact, durable source, and evidence status in
   `../docs/project/VERIFY.md`. Run the Engine before the next wave.
 
-## Engine extraction boundaries
+## Modular Engine boundaries
 
-- Characterize complete public reports, diagnostics, routes, receipts, CLI
-  behavior, and performance before moving an Engine responsibility.
 - Keep `bootstrap_doctor.py` as the stable public command and compatibility
-  facade. Internal lifecycle policy belongs under `fastlane_engine/` only after
-  its characterization checkpoint passes.
-- Normal domain evaluation consumes one immutable project snapshot. Domain
+  facade. Lifecycle policy belongs under `fastlane_engine/`; new callers use
+  its supported API rather than importing CLI internals.
+- Normal evaluation consumes one immutable project snapshot. `core.snapshot`
+  owns bounded filesystem and trusted read-only Git observation; domain
   validators do not read files, run Git, call subprocesses, write state, or
   access GitHub or AWS.
+- `define`, `design`, `deliver`, and `aws` own their domain validation.
+  `authority` owns exact receipt and envelope intersections. `orchestration`
+  composes immutable results; `routing` selects the next route; `remediation`
+  assigns safe correction responsibility; `report` alone serializes schema 2.
 - Keep presentation, optional hooks, initialization, package production, and
   task mutation outside lifecycle domains. `task_waves.py` remains the sole task
-  mutator and must eventually consume only a stable pure Engine task API.
-- Preserve report schema 2, diagnostic order, exact receipt bytes, exit codes,
-  and current compatibility facades unless a separate contract explicitly
-  authorizes a migration.
-- `fastlane_engine.define` owns pure intake, requirements, assumptions,
-  adaptive coverage, change impact, brownfield, AWS-materiality, and Gate A
-  readiness evaluation. The public doctor remains a compatibility facade and
-  supplies already-observed text and selections.
-- `fastlane_engine.design` owns pure architecture, technology, source,
-  interface/state, diagram, Harness, envelope, and ADR-rationale evaluation.
-  `fastlane_adr.py` observes bounded ADR files and delegates evaluation; it
-  cannot select architecture or affect design digests or authority.
-- `fastlane_engine.deliver` owns pure task, evidence, checkpoint, repository,
-  and release validation. `task_waves.py` remains the sole task mutator and
-  consumes only the public Engine Delivery API; it never loads the doctor CLI.
-- `fastlane_engine.aws` owns pure AWS Core evidence, preflight, deployment,
-  reconciliation, residual-review, and teardown state machines. It consumes
-  explicit authority projections, performs no AWS call, and cannot broaden a
-  receipt or authorize an action. The remaining authority callbacks stay in
-  the doctor facade only until the next serial extraction.
+  mutator and consumes the public Engine Delivery API; it never loads the
+  doctor CLI.
+- `fastlane_adr.py` observes bounded ADR files and delegates pure evaluation to
+  Design. ADRs cannot select architecture, alter design digests, approve a
+  gate, or grant authority.
+- Preserve report schema 2, diagnostic order, exact receipt bytes, CLI flags,
+  exit codes, and documented compatibility facades unless a separate contract
+  explicitly authorizes a migration.
+- Characterize complete reports and performance before moving any remaining
+  compatibility responsibility. Every new runtime Engine module must satisfy
+  import boundaries and every package control inventory.
 
 ## Required validation
 

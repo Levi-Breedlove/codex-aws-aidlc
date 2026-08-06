@@ -1,7 +1,7 @@
 # Documentation governance procedure
 
-Use this reference for changes to public Fastlane documentation or canonical
-project-record templates. It is a maintenance procedure, not an adopter phase.
+Use this reference for public Fastlane documentation or canonical project-record
+templates. It is a maintenance procedure, not an adopter phase.
 
 ## Authority map
 
@@ -39,14 +39,16 @@ screenshots, videos, social-preview art, or release evidence there. Maintenance
 procedure belongs in `maintain-fastlane`; run evidence and publication assets
 stay outside the reusable template unless separately authorized.
 
+TASKS stores task/checkpoint records, VERIFY observed evidence, and RUNBOOK
+project commands. Their grammar and procedure stay in the Engine and skills.
+
 ## Review method
 
 1. Identify the document's primary reader and first action.
 2. Keep the first screen focused on current state, owner need, next Codex action,
    and unapproved or unauthorized work.
-3. Audit both visible and collapsed prose, then relocate machine procedure to
-   its canonical instructional home. Preserve any
-   parser-controlled heading, table, marker, stable ID, receipt, and record order.
+3. Audit visible and collapsed prose, relocating machine procedure to its
+   canonical home while preserving headings, tables, markers, IDs, receipts, and order.
 4. Keep active decisions, material risks, project commands, diagrams, and formal
    receipts open. Use balanced labeled disclosures only for exact records or
    appendices.
@@ -63,7 +65,6 @@ TASKS 65, VERIFY 90, RUNBOOK 220, and BUGFIX 90 nonblank lines. A stale generate
 first-screen summary is safe Codex-owned repair and may block presentation of a
 misleading Owner Brief; it never invalidates a gate.
 
-Any Semantic Contract change must update workflow guidance, the applicable
-phase procedure, project schema, Engine validation/projection, owner-visible
-presentation, focused tests, compatibility handling, version mirrors, and the
-manifest in one bounded change.
+Any Semantic Contract change must update its workflow and phase guidance,
+project schema, Engine validation/projection, owner presentation, focused tests,
+compatibility, version mirrors, and manifest in one bounded change.

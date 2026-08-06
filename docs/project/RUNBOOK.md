@@ -86,7 +86,6 @@ Read-only AWS preflight happens only after local readiness and the owner's exact
 ```bash
 aws sts get-caller-identity
 aws configure get region
-# Add workload-specific read-only checks.
 TODO
 ```
 
@@ -99,7 +98,6 @@ Run the project-specific local checks selected in the technical plan and record
 their results in the verification record.
 
 ```bash
-# Format, lint, type-check, test, validate infrastructure, and scan dependencies
 TODO
 ```
 
@@ -159,7 +157,6 @@ separate read-only verification.
 ## 7. Smoke tests
 
 ```bash
-# Health, primary flow, authorization, persistence, and integrations
 TODO
 ```
 
@@ -231,11 +228,15 @@ TODO
 
 Default to read-only inventory. Deletion requires separate current teardown authorization covering targets, retained data, shared dependencies, cost, approver, and validity. A retain, investigate, or remove choice selects a route but grants no AWS access.
 
-```bash
-# Dry run or inventory
-TODO
+Inventory command:
 
-# Execution only under the exact teardown authorization
+```bash
+TODO
+```
+
+Authorized teardown command:
+
+```bash
 TODO
 ```
 
@@ -247,11 +248,15 @@ Never bypass protection, force-delete data, break a shared dependency, or change
 
 Read-only residual and billing verification runs before a teardown decision and after every teardown attempt.
 
-```bash
-# Resource inventory checks
-TODO
+Resource inventory command:
 
-# Billing and cost checks
+```bash
+TODO
+```
+
+Billing and cost command:
+
+```bash
 TODO
 ```
 

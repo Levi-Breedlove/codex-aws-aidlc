@@ -2842,14 +2842,14 @@ class BootstrapDoctorTests(unittest.TestCase):
         tasks = set_table_value(
             tasks_path.read_text(encoding="utf-8"),
             "## Active execution snapshot",
-            "## Coordinator contract",
+            "## Dependencies, waivers, and waves",
             "Gate B state",
             "`PENDING_OWNER_APPROVAL`",
         )
         tasks = set_table_value(
             tasks,
             "## Active execution snapshot",
-            "## Coordinator contract",
+            "## Dependencies, waivers, and waves",
             "Next safe action",
             "Complete Gate B; when current, run `TASK-10`.",
         )
@@ -2944,7 +2944,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             text = set_table_value(
                 text,
                 "## Active execution snapshot",
-                "## Coordinator contract",
+                "## Dependencies, waivers, and waves",
                 field,
                 value,
             )
@@ -3010,7 +3010,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.17")
+        self.assertEqual(report["bootstrap_version"], "1.2.18")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -7954,7 +7954,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 set_table_value(
                     tasks_path.read_text(encoding="utf-8"),
                     "## Active execution snapshot",
-                    "## Coordinator contract",
+                    "## Dependencies, waivers, and waves",
                     "Baseline commit",
                     "`ffffffffffffffffffffffffffffffffffffffff`",
                 ),
@@ -13170,14 +13170,14 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
             tasks_text = set_table_value(
                 tasks_text,
                 "## Active execution snapshot",
-                "## Coordinator contract",
+                "## Dependencies, waivers, and waves",
                 "Design revision",
                 "`DES-0002`",
             )
             tasks_text = set_table_value(
                 tasks_text,
                 "## Active execution snapshot",
-                "## Coordinator contract",
+                "## Dependencies, waivers, and waves",
                 "Gate B state",
                 "`STALE`",
             )

@@ -1,7 +1,7 @@
 # Fastlane documentation
 
-Use this page to find the right customer or project guide. Framework maintenance
-procedure lives outside `docs/` so it cannot compete with project truth.
+Use this page to find the right customer or project guide. Internal maintenance
+guidance stays outside this customer index so it cannot compete with project truth.
 
 ## Start here
 
@@ -35,15 +35,6 @@ in the same document; Fastlane never creates a separate human PRD.
   correct when hooks are disabled.
 - [Dependency policy](DEPENDENCY-POLICY.md) — AWS Core, Ruff, and GitHub Actions
   maintenance boundaries.
-
-## Framework maintenance
-
-- [Maintenance skill](../.agents/skills/maintain-fastlane/SKILL.md) — bounded
-  framework-change and publication procedure.
-- [Evaluation procedure](../.agents/skills/maintain-fastlane/references/evaluation.md)
-  — deterministic readability and journey checks.
-- [Qualification procedure](../.agents/skills/maintain-fastlane/references/qualification.md)
-  — evidence boundaries for a release candidate.
 
 Fastlane has exactly two routine owner gates. Tool availability, hooks, AWS
 Core, and GitHub access never create approval or authorization.
