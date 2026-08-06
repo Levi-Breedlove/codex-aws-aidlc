@@ -48,6 +48,10 @@ cross-platform, fail-closed, and free of hidden external actions.
 - Preserve report schema 2, diagnostic order, exact receipt bytes, exit codes,
   and current compatibility facades unless a separate contract explicitly
   authorizes a migration.
+- `fastlane_engine.define` owns pure intake, requirements, assumptions,
+  adaptive coverage, change impact, brownfield, AWS-materiality, and Gate A
+  readiness evaluation. The public doctor remains a compatibility facade and
+  supplies already-observed text and selections.
 
 ## Required validation
 
