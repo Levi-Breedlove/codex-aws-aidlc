@@ -82,6 +82,29 @@ class MarkdownDocumentIndex:
         return matches[0]
 
 
+def heading_title_span(text: str, title: str) -> MarkdownSpan:
+    """Resolve one unique visible heading, accepting its numbered display form."""
+
+    structural = without_fenced_code(text)
+    matches = list(
+        re.finditer(
+            rf"^(?P<marks>#{{1,6}})[ \t]+(?:\d+(?:\.\d+)*\.?[ \t]+)?{re.escape(title)}[ \t]*\r?$",
+            structural,
+            re.MULTILINE,
+        )
+    )
+    if len(matches) != 1:
+        raise ValueError(
+            f"expected exactly one heading title {title!r}; found {len(matches)}"
+        )
+    level = len(matches[0].group("marks"))
+    following = re.search(
+        rf"^#{{1,{level}}}[ \t]+", structural[matches[0].end() :], re.MULTILINE
+    )
+    end = matches[0].end() + following.start() if following else len(text)
+    return _span(matches[0].start(), end, _line_starts(text))
+
+
 def _line_starts(text: str) -> tuple[int, ...]:
     return (0,) + tuple(match.end() for match in re.finditer("\n", text))
 

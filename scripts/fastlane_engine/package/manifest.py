@@ -326,6 +326,9 @@ def validate_placeholders(ctx: ManifestContext, *, policy: ManifestPolicy) -> No
         "scripts/bootstrap_doctor.py",
         "scripts/fastlane_project_identity.py",
     }
+    # COMPATIBILITY: runtime controls contain the literal template tokens they
+    # validate; control hashes, not placeholder rendering, bind those bytes.
+    excluded.update(policy.control_hash_files)
     for relative, text in sorted(ctx.texts.items()):
         if relative in excluded or relative.startswith("tests/"):
             continue
