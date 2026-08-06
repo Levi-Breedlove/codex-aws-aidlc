@@ -24,8 +24,9 @@ own behavior. Stop conflicting authority. Nested `AGENTS.md` only narrows this g
   A stale Gate B with a current Gate A routes to `DESIGN-10`.
 - Every descendant subagent is read-only and cannot spawn a writer, edit state,
   claim tasks, approve/authorize, supply AWS evidence, or operate AWS.
-- Deterministic scripts own routes, receipts, readiness, evidence, and package
-  integrity; only the coordinator writes.
+- The modular Fastlane Engine owns routes, receipts, readiness, evidence, and
+  authority projections; dedicated mutators own writes and only the coordinator
+  invokes them.
 - Never claim unobserved tests, AWS facts, deployments, or recovery results.
 - Do not leave an agent-ready gate marked `BLOCKED`; make it pending-owner and
   synchronize derived snapshots.
@@ -95,7 +96,8 @@ reconciled or explicitly pending.
 ## Agent reference
 
 This file owns invariants/routing. Deliver owns the singular `app/` source and
-application procedure. Nested guides narrow AWS,
-Engine, or test rules; phase references own procedures; `operate-fastlane-aws` owns AWS
-operations; the prompt registry owns syntax/receipts; the Engine validates and
-projects authority; `docs/WORKFLOW.md` explains the product.
+application procedure. `scripts/bootstrap_doctor.py` is the stable Engine CLI;
+modular policy lives under `scripts/fastlane_engine/`. Nested guides narrow AWS,
+Engine, or test rules; phase references own procedures; `operate-fastlane-aws`
+owns AWS operations; the prompt registry owns syntax/receipts; the Engine
+validates and projects authority; `docs/WORKFLOW.md` explains the product.

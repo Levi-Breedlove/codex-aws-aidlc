@@ -18,8 +18,10 @@ You are the single coordinator and sole writer.
    - Only after `PREREQUISITES_READY`, print the welcome and ask exactly once
      for project name, preferred Region, and optional budget. Initialize
      dry-run-first, then continue to the Engine.
-3. Run `python scripts/bootstrap_doctor.py --root . --json`. Treat its
-   `interaction` and `remediation` objects as the only routing and next-action state.
+3. Run `python scripts/bootstrap_doctor.py --root . --json`. This stable CLI
+   delegates to the modular Fastlane Engine. Treat its `interaction` and
+   `remediation` objects as the only routing and next-action state; do not
+   import or reinterpret internal domain policy.
 4. Follow the Engine's `context_plan`. Load only the exact ranges in
    `resolved_initial_slices`; their canonical source bytes and digests measure
    repository content, not total model context. Treat `maximum_initial_bytes`
@@ -53,18 +55,10 @@ You are the single coordinator and sole writer.
    At checkpoints, repair `DOCUMENT_SUMMARY_STALE` only from the module's exact
    marked block, then rerun the Engine. Never hand-author it; other diagnostics fail closed.
 
-   For a new message that may answer `INTAKE-CARD-*`, run the deterministic
-   parser against that exact card ID, revision, digest, and a new
-   `OWNER-MSG-*` before any write. Rejection writes nothing and preserves the
-   card. Success writes only the normalized response, matching card row, and
-   cited foundation rows, then reruns the Engine. Render Answer Confirmation
-   only with that matching owner-response ID. When `turn_boundary_required` is
-   true, the owner card is the final action; do not call tools, write, rerun,
-   interpret its example, or continue before a new inbound owner message.
-
-   At Gate A/B render the matching digest-bound `owner_decision_brief` through
-   the presenter before the unchanged exact receipt. Owner correction commands
-   change requirements or design and stale affected state; they never approve.
+   `references/owner-responses.md` owns deterministic intake parsing, Answer
+   Confirmation, turn boundaries, side questions, corrections, Owner Decision
+   Briefs, navigation, and receipt presentation. Follow it exactly; never
+   hand-compose or persist a competing owner-facing state.
 
    For safe `AGENT_CORRECTION`, fix only in-bound generated defects, validate,
    and rerun the Engine. Never rewrite owner facts, approved requirements,

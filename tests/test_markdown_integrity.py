@@ -622,6 +622,24 @@ sequenceDiagram
             columns = len(re.findall(r"(?<!\\)\|", line)) - 1
             self.assertLessEqual(columns, 6, ("PRD.md", columns, line))
 
+    def test_runbook_command_examples_do_not_look_like_document_headings(
+        self,
+    ) -> None:
+        runbook = (REPOSITORY_ROOT / "docs/project/RUNBOOK.md").read_text(
+            encoding="utf-8"
+        )
+        misleading = (
+            "# Add workload-specific read-only checks.",
+            "# Format, lint, type-check, test, validate infrastructure, and scan dependencies",
+            "# Health, primary flow, authorization, persistence, and integrations",
+            "# Dry run or inventory",
+            "# Execution only under the exact teardown authorization",
+            "# Resource inventory checks",
+            "# Billing and cost checks",
+        )
+        for line in misleading:
+            self.assertNotIn(line, runbook)
+
     def test_all_five_receipt_blocks_match_the_1_2_3_base_bytes(self) -> None:
         locations = {
             "gate-a-receipt": "docs/project/PRD.md",
@@ -691,9 +709,6 @@ sequenceDiagram
             "TROUBLESHOOTING.md",
             "../.codex/hooks/README.md",
             "DEPENDENCY-POLICY.md",
-            "../.agents/skills/maintain-fastlane/SKILL.md",
-            "../.agents/skills/maintain-fastlane/references/evaluation.md",
-            "../.agents/skills/maintain-fastlane/references/qualification.md",
             "project/PRD.md",
             "project/TASKS.md",
             "project/VERIFY.md",
@@ -702,6 +717,12 @@ sequenceDiagram
         ):
             self.assertIn(f"]({target})", index_text)
             self.assertTrue((index.parent / target).is_file(), target)
+        for maintainer_target in (
+            "../.agents/skills/maintain-fastlane/SKILL.md",
+            "../.agents/skills/maintain-fastlane/references/evaluation.md",
+            "../.agents/skills/maintain-fastlane/references/qualification.md",
+        ):
+            self.assertNotIn(f"]({maintainer_target})", index_text)
         for removed in (
             "docs/AGENTS.md",
             "docs/QUALIFICATION.md",

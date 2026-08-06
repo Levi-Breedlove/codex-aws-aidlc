@@ -6,7 +6,8 @@ This guide narrows the root rules and never widens approval or authorization.
 
 - Domain evaluators consume immutable inputs. They do not read files, run Git,
   invoke subprocesses, access a network, or write state.
-- `core.snapshot` is the only normal read-only filesystem observation boundary.
+- `core.snapshot` is the only normal read-only filesystem and trusted Git
+  observation boundary. Rechecks are explicit facade operations.
 - `core` imports no lifecycle domain. `package` imports only `core`.
 - Lifecycle domains do not import sibling lifecycle domains.
 - `define/` owns intake, requirements, assumptions, adaptive coverage, change
@@ -27,8 +28,11 @@ This guide narrows the root rules and never widens approval or authorization.
   residual-review, and teardown state machines over already-observed records.
   It accepts current authority as an explicit input, performs no AWS call, and
   cannot expand resources, operations, time, cost, or receipt scope.
-- Routing consumes domain results, never parsers or snapshot builders.
-- Reporting serializes already-derived results and does not make policy.
+- `authority/` owns exact gate, GitHub, write, AWS, and journal-closure
+  intersections. It validates authority but performs no external action.
+- Orchestration composes immutable domain results. Routing consumes those
+  results, remediation assigns responsibility, and reporting is the sole JSON
+  serializer; none may reparse project files or broaden policy.
 - Exact ordering, IDs, hashes, receipts, diagnostics, and compatibility behavior
   are canonicalization or safety contracts. Preserve them byte-for-byte unless
   an approved migration changes the contract.
