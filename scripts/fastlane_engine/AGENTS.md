@@ -23,6 +23,10 @@ This guide narrows the root rules and never widens approval or authorization.
 - `deliver/` owns task, evidence, checkpoint, repository, and release
   validation over already-observed records. It cannot mutate task state, run
   Git, claim work, publish, or grant construction or external authority.
+- `aws/` owns AWS Core evidence plus preflight, deployment, reconciliation,
+  residual-review, and teardown state machines over already-observed records.
+  It accepts current authority as an explicit input, performs no AWS call, and
+  cannot expand resources, operations, time, cost, or receipt scope.
 - Routing consumes domain results, never parsers or snapshot builders.
 - Reporting serializes already-derived results and does not make policy.
 - Exact ordering, IDs, hashes, receipts, diagnostics, and compatibility behavior
