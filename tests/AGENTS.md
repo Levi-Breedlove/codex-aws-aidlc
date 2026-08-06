@@ -40,3 +40,6 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
   store thresholds and structural baselines, never machine paths, usernames,
   raw transcripts, credentials, AWS identifiers, or timing claims from a
   different tree.
+- Domain extraction tests must prove the public doctor and Engine API resolve
+  to the same pure implementation, and that domain modules cannot observe or
+  mutate repositories, Git, GitHub, AWS, clocks, or external processes.

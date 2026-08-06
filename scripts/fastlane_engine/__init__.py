@@ -6,13 +6,29 @@ state, authorizing an action, or rendering owner conversation. Public CLI
 compatibility remains in :mod:`scripts.bootstrap_doctor`.
 """
 
-from .api import capture_project_snapshot
+from .api import (
+    IntakeFoundationContract,
+    RequirementsContract,
+    capture_project_snapshot,
+    derive_change_impact_contract,
+    derive_coverage_contract,
+    derive_intake_foundation_contract,
+    derive_req_aws_materiality,
+    derive_requirements_contract,
+)
 from .core.diagnostics import Diagnostic, DiagnosticCollector
 from .core.snapshot import ProjectSnapshot
 
 __all__ = (
     "Diagnostic",
     "DiagnosticCollector",
+    "IntakeFoundationContract",
     "ProjectSnapshot",
+    "RequirementsContract",
     "capture_project_snapshot",
+    "derive_change_impact_contract",
+    "derive_coverage_contract",
+    "derive_intake_foundation_contract",
+    "derive_req_aws_materiality",
+    "derive_requirements_contract",
 )
