@@ -5,6 +5,42 @@
     "package_version": "1.2.10",
     "report_schema_version": 2
   },
+  "approved_behavior_changes": [
+    {
+      "id": "DOCUMENT_SUMMARY_TRUTH_1_2_19",
+      "base_commit": "8dbb11fd0e54af392ac073ce597cdb26fc336fcc",
+      "scope": [
+        "document summary owner action and next action",
+        "document summary canonical field selection",
+        "document summary evidence maturity"
+      ],
+      "prohibited": [
+        "lifecycle or routing change",
+        "gate or authority change",
+        "canonical digest change",
+        "receipt change"
+      ]
+    }
+  ],
+  "summary_truth_compatibility": {
+    "base_commit": "8dbb11fd0e54af392ac073ce597cdb26fc336fcc",
+    "allowed_projection": "document_summaries",
+    "allowed_locator_metadata": [
+      "canonical_sha256",
+      "source_bytes",
+      "start_line",
+      "end_line"
+    ],
+    "report_case_digests": {
+      "template_source": "3137e52e381bd524015f621805e1d1a973ec4b2b4dcf8db0bdf1c77d5d5559ff",
+      "unconfigured_template": "c92a5a86a32fbcd361ad4ab7d045cd354bd402b9d22352b379a5875358884d58",
+      "rendered_intake": "148d12873c7f29075cc3e26fc5ea3e086b072e797d39cfb92c0e2f4c3470324d",
+      "gate_a_pending": "e571531e8412407e9c227855f82f10c186dbc4e1d7bf271512f73b69cc6eeb9b",
+      "gate_a_approved": "ff0128a1e2e2a96ac08b47584388aadeb089b65563a14b5f33fe979b7d3dde5f",
+      "gate_b_pending": "4e3afacd02bfd47562de31b604b30541a06edc557bd021f2f4a10e8b2c60a688",
+      "gate_b_approved": "28b3d7001c738216fac2dae0d48be0a3a2e1b1b09375c62357c6adc068f92b0c"
+    }
+  },
   "normalization": {
     "allowed": [
       "package version",
@@ -2097,13 +2133,13 @@
     }
   },
   "report_case_digests": {
-    "template_source": "c128bb78c12785d7cf75b4562a194d02c57c5155ba31082cd20cc9c52cb47bd2",
-    "unconfigured_template": "243d5f5b5598c111ed35e52b2aa172a0fac8cada01e8619e9cfc2a489d909d3f",
-    "rendered_intake": "efc36ce911efdeeaae38de61539d43cc68751c77669700130d40b35e48c43641",
-    "gate_a_pending": "3d0d1bdd16723a99174c4e7209542a5026fb13a28bb6ff8455cc6c7eec76275a",
-    "gate_a_approved": "57bbf5af028a050add3affc747d61dd75479d3349e767fc084872ba8588bb3b3",
-    "gate_b_pending": "43cdb69e28b98d94679074d4ac08ec7909181de1427fddb3daaabe1b47f343d8",
-    "gate_b_approved": "6f6b9251df4a4c6463f3bac2395bb1420bffb520ca76e1fa2beec8bd71dd57bf"
+    "template_source": "3d52a51bf7d096795cec3762aadef3c4696c340450a01c4c410a41552c2fead2",
+    "unconfigured_template": "e28aa9ea71b1971c2c906bfa247452b0c728237007fd8a66c11622a0ea4614cf",
+    "rendered_intake": "488d1224bc4b29396c9ce84076cfe51c5a7b386fcd4dafae0dc9841446605730",
+    "gate_a_pending": "83b713bd6a87ac86d048876bc601f91709137e8472b2c085a34d34b3325df9e3",
+    "gate_a_approved": "2162163c9cf9033b5ff34b89dbd93492f8efb7c2f993fae4318bd928cf4dd8a6",
+    "gate_b_pending": "8c7c76cdc31af027b468d0a56cd1814ff8499fa04625ef3e602229afa3279e13",
+    "gate_b_approved": "539170e25e0f5a360539efdebc5140bba4ad8c5c2f4d2b9b5c2e7035f4293744"
   },
   "report_cases": {
     "template_source": {
@@ -2544,62 +2580,74 @@
                 {
                   "label": "Phase",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "routing.lifecycle_state"
                 },
                 {
                   "label": "Overall status",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "AWS deployment",
-                  "value": "Not authorized",
-                  "basis_ids": []
+                  "value": "Not deployed",
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Construction tasks",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks"
                 },
                 {
                   "label": "Verification",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Operations",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Bounded defect",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "AWS account access",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -2627,8 +2675,12 @@
                   "target": "BUGFIX.md#current-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:d01c95c9ea33c96bb004b0f3032b14b4bd50d9216868f3b4aa7b5e794fde8c42",
-              "rendered_sha256": "sha256:fe103d590e80c95f0b3d8f949d4d9ee9475dff2e3acb313f66118e7dd42d549a"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:2577cd17fc62c1eba48e2373dfdaa19e2f12de4415e68ff0cb00e55a0f58cd35",
+              "rendered_sha256": "sha256:a49d3c891ea333578b8db2e9dab1dab0e498be815177801fd5224ecb80d3a9f7"
             },
             {
               "path": "docs/project/PRD.md",
@@ -2639,62 +2691,74 @@
                 {
                   "label": "Product outcome",
                   "value": "Not yet confirmed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a_readiness.outcome"
                 },
                 {
                   "label": "First-release boundary",
                   "value": "Not yet confirmed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a_readiness.scope_and_non_goals"
                 },
                 {
                   "label": "Requirements",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Technical design",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Region and cost",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "project.region + define.cost_posture"
                 },
                 {
                   "label": "Construction authorization",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Current records",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + authority.record_id"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -2722,7 +2786,11 @@
                   "target": "#contract-appendices"
                 }
               ],
-              "summary_basis_sha256": "sha256:c59c6877235918a395a39c312205173eaec3473fc98699f4c90ed498f0433842",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:9513e4177b1f897f081aff11da7cd557c279b00bbcdbec83fbe2f93906d8ce58",
               "rendered_sha256": "sha256:d53589f193873e184b94b98d5e95d417c46040304105df29c4d6c7d14bf0e169"
             },
             {
@@ -2734,47 +2802,56 @@
                 {
                   "label": "Progress",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.status"
                 },
                 {
                   "label": "Current wave",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active_wave"
                 },
                 {
                   "label": "Active task",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active"
                 },
                 {
                   "label": "Readiness",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.plan_state"
                 },
                 {
                   "label": "Blocker",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.blocked"
                 },
                 {
                   "label": "Last passing checkpoint",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.checkpoint"
                 },
                 {
                   "label": "Construction approval",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -2806,7 +2883,11 @@
                   "target": "#exact-run-and-task-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:7fd22857e90432e760653d396c1447bd8bf09cd8e99639dfca0d7111cc01c616",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:58e3ae0b78f64a8adea44984d4f309ca9cf6e3c6d8ed16c180f47e1171d6b510",
               "rendered_sha256": "sha256:511cf9b3989548c4009b7bdc967464b2f30974fec10164fa03a899f8db64f700"
             },
             {
@@ -2818,37 +2899,44 @@
                 {
                   "label": "Release result",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Locally observed evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.task_completion"
                 },
                 {
                   "label": "Failed or stale evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence"
                 },
                 {
                   "label": "Still unobserved",
                   "value": "Local build, AWS deployment, recovery, and teardown",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence + aws.deployment + aws.teardown"
                 },
                 {
                   "label": "Evidence cutoff",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.evidence_cutoff"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -2858,31 +2946,43 @@
                   "claim": "Requirements are approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate A is not approved"
+                  "limitation": "Gate A is not approved",
+                  "source": "define.gate_a.status"
                 },
                 {
                   "claim": "Technical design is approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate B is not approved"
+                  "limitation": "Gate B is not approved",
+                  "source": "design.gate_b.status"
                 },
                 {
                   "claim": "Current AWS guidance informed the plan",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Source guidance is not deployment evidence"
+                  "limitation": "Source guidance is not deployment evidence",
+                  "source": "aws_core.materiality + aws_core.observed_usage"
                 },
                 {
                   "claim": "Local release checks passed",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Local evidence does not prove AWS behavior"
+                  "limitation": "Local evidence does not prove AWS behavior",
+                  "source": "deliver.evidence.task_completion + deliver.release.status"
                 },
                 {
                   "claim": "Application is deployed",
                   "maturity": "Not authorized",
                   "evidence": "None",
-                  "limitation": "No deployment evidence or authority"
+                  "limitation": "No deployment evidence or authority",
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
+                },
+                {
+                  "claim": "Teardown is complete",
+                  "maturity": "Not authorized",
+                  "evidence": "None",
+                  "limitation": "No teardown evidence or authority",
+                  "source": "aws.teardown.action_status + aws.teardown.status + aws.teardown.evidence_id + runbook.active_boundary + project.region"
                 }
               ],
               "navigation": [
@@ -2907,8 +3007,12 @@
                   "target": "#current-release-decision"
                 }
               ],
-              "summary_basis_sha256": "sha256:2de3818635400cf393842c7971fffb112095339fa565ff82227cbe1831386f36",
-              "rendered_sha256": "sha256:7f2bc6466ed4e3a028644845b9ffc9fa1d673b133a830a67d897d1d7830c28b0"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:9dae8853a7455addb89dcb466b0faf4af32b700747a39e8fade9958288cbc4b1",
+              "rendered_sha256": "sha256:3fbc5d3f7ec60b09b18d3555d196cccf8f4af0a8415411e44d738915e1610c62"
             },
             {
               "path": "docs/project/RUNBOOK.md",
@@ -2919,57 +3023,68 @@
                 {
                   "label": "Environment",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Deployment state",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Current AWS authority",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Construction approval",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "Safest available operation",
                   "value": "Local validation only",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Deployment approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Teardown approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Recovery state",
                   "value": "Not yet observed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.recovery"
                 },
                 {
                   "label": "Emergency condition",
                   "value": "No deployed environment exists",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -3001,7 +3116,11 @@
                   "target": "#13-teardown-and-decommissioning"
                 }
               ],
-              "summary_basis_sha256": "sha256:ec7d52c3ef797d2d9b794326dec66d66ecd8e86f2c7cc593819cbed84eeffb2d",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:aeff03c865d539691d1931442c02b82fda242f8a47efdf0dc5be86905d9a74f3",
               "rendered_sha256": "sha256:94be0d85fcc1b5bfcb9afab13908e31ee777b655c96eb90d47739634a5936399"
             },
             {
@@ -3013,57 +3132,68 @@
                 {
                   "label": "Status",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "Defect",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.title"
                 },
                 {
                   "label": "User impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.user_impact"
                 },
                 {
                   "label": "Reproduction",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.actual_result"
                 },
                 {
                   "label": "Environment",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.environment"
                 },
                 {
                   "label": "Related requirements",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.requirements"
                 },
                 {
                   "label": "Root cause",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.confirmed_evidence"
                 },
                 {
                   "label": "Repair",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.allowed_scope"
                 },
                 {
                   "label": "Regression evidence",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.acceptance_criteria"
                 },
                 {
                   "label": "Architecture impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.aws_resources_affected"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -3095,7 +3225,11 @@
                   "target": "#10-acceptance-criteria"
                 }
               ],
-              "summary_basis_sha256": "sha256:580ef0a79979fe36483eb1d746b8c40468541e7e4dbdc9aebc9faccdfe341701",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:8c5dbec0a9bf001016e8d8eb4ac168477d237c5a3afc50f6ec2e717eccf5e945",
               "rendered_sha256": "sha256:373d2e3a94c7540beeb1042e1608d41afb3556a9909f515605bf01e42d7722f2"
             }
           ]
@@ -4315,62 +4449,74 @@
                 {
                   "label": "Phase",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "routing.lifecycle_state"
                 },
                 {
                   "label": "Overall status",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "AWS deployment",
-                  "value": "Not authorized",
-                  "basis_ids": []
+                  "value": "Not deployed",
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Construction tasks",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks"
                 },
                 {
                   "label": "Verification",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Operations",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Bounded defect",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "AWS account access",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -4398,8 +4544,12 @@
                   "target": "BUGFIX.md#current-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:d01c95c9ea33c96bb004b0f3032b14b4bd50d9216868f3b4aa7b5e794fde8c42",
-              "rendered_sha256": "sha256:fe103d590e80c95f0b3d8f949d4d9ee9475dff2e3acb313f66118e7dd42d549a"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:2577cd17fc62c1eba48e2373dfdaa19e2f12de4415e68ff0cb00e55a0f58cd35",
+              "rendered_sha256": "sha256:a49d3c891ea333578b8db2e9dab1dab0e498be815177801fd5224ecb80d3a9f7"
             },
             {
               "path": "docs/project/PRD.md",
@@ -4410,62 +4560,74 @@
                 {
                   "label": "Product outcome",
                   "value": "Not yet confirmed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a_readiness.outcome"
                 },
                 {
                   "label": "First-release boundary",
                   "value": "Not yet confirmed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a_readiness.scope_and_non_goals"
                 },
                 {
                   "label": "Requirements",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Technical design",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Region and cost",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "project.region + define.cost_posture"
                 },
                 {
                   "label": "Construction authorization",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Current records",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + authority.record_id"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -4493,7 +4655,11 @@
                   "target": "#contract-appendices"
                 }
               ],
-              "summary_basis_sha256": "sha256:c59c6877235918a395a39c312205173eaec3473fc98699f4c90ed498f0433842",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:9513e4177b1f897f081aff11da7cd557c279b00bbcdbec83fbe2f93906d8ce58",
               "rendered_sha256": "sha256:d53589f193873e184b94b98d5e95d417c46040304105df29c4d6c7d14bf0e169"
             },
             {
@@ -4505,47 +4671,56 @@
                 {
                   "label": "Progress",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.status"
                 },
                 {
                   "label": "Current wave",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active_wave"
                 },
                 {
                   "label": "Active task",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active"
                 },
                 {
                   "label": "Readiness",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.plan_state"
                 },
                 {
                   "label": "Blocker",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.blocked"
                 },
                 {
                   "label": "Last passing checkpoint",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.checkpoint"
                 },
                 {
                   "label": "Construction approval",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -4577,7 +4752,11 @@
                   "target": "#exact-run-and-task-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:7fd22857e90432e760653d396c1447bd8bf09cd8e99639dfca0d7111cc01c616",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:58e3ae0b78f64a8adea44984d4f309ca9cf6e3c6d8ed16c180f47e1171d6b510",
               "rendered_sha256": "sha256:511cf9b3989548c4009b7bdc967464b2f30974fec10164fa03a899f8db64f700"
             },
             {
@@ -4589,37 +4768,44 @@
                 {
                   "label": "Release result",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Locally observed evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.task_completion"
                 },
                 {
                   "label": "Failed or stale evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence"
                 },
                 {
                   "label": "Still unobserved",
                   "value": "Local build, AWS deployment, recovery, and teardown",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence + aws.deployment + aws.teardown"
                 },
                 {
                   "label": "Evidence cutoff",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.evidence_cutoff"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -4629,31 +4815,43 @@
                   "claim": "Requirements are approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate A is not approved"
+                  "limitation": "Gate A is not approved",
+                  "source": "define.gate_a.status"
                 },
                 {
                   "claim": "Technical design is approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate B is not approved"
+                  "limitation": "Gate B is not approved",
+                  "source": "design.gate_b.status"
                 },
                 {
                   "claim": "Current AWS guidance informed the plan",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Source guidance is not deployment evidence"
+                  "limitation": "Source guidance is not deployment evidence",
+                  "source": "aws_core.materiality + aws_core.observed_usage"
                 },
                 {
                   "claim": "Local release checks passed",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Local evidence does not prove AWS behavior"
+                  "limitation": "Local evidence does not prove AWS behavior",
+                  "source": "deliver.evidence.task_completion + deliver.release.status"
                 },
                 {
                   "claim": "Application is deployed",
                   "maturity": "Not authorized",
                   "evidence": "None",
-                  "limitation": "No deployment evidence or authority"
+                  "limitation": "No deployment evidence or authority",
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
+                },
+                {
+                  "claim": "Teardown is complete",
+                  "maturity": "Not authorized",
+                  "evidence": "None",
+                  "limitation": "No teardown evidence or authority",
+                  "source": "aws.teardown.action_status + aws.teardown.status + aws.teardown.evidence_id + runbook.active_boundary + project.region"
                 }
               ],
               "navigation": [
@@ -4678,8 +4876,12 @@
                   "target": "#current-release-decision"
                 }
               ],
-              "summary_basis_sha256": "sha256:2de3818635400cf393842c7971fffb112095339fa565ff82227cbe1831386f36",
-              "rendered_sha256": "sha256:7f2bc6466ed4e3a028644845b9ffc9fa1d673b133a830a67d897d1d7830c28b0"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:9dae8853a7455addb89dcb466b0faf4af32b700747a39e8fade9958288cbc4b1",
+              "rendered_sha256": "sha256:3fbc5d3f7ec60b09b18d3555d196cccf8f4af0a8415411e44d738915e1610c62"
             },
             {
               "path": "docs/project/RUNBOOK.md",
@@ -4690,57 +4892,68 @@
                 {
                   "label": "Environment",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Deployment state",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Current AWS authority",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Construction approval",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "Safest available operation",
                   "value": "Local validation only",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Deployment approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Teardown approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Recovery state",
                   "value": "Not yet observed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.recovery"
                 },
                 {
                   "label": "Emergency condition",
                   "value": "No deployed environment exists",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -4772,7 +4985,11 @@
                   "target": "#13-teardown-and-decommissioning"
                 }
               ],
-              "summary_basis_sha256": "sha256:ec7d52c3ef797d2d9b794326dec66d66ecd8e86f2c7cc593819cbed84eeffb2d",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:aeff03c865d539691d1931442c02b82fda242f8a47efdf0dc5be86905d9a74f3",
               "rendered_sha256": "sha256:94be0d85fcc1b5bfcb9afab13908e31ee777b655c96eb90d47739634a5936399"
             },
             {
@@ -4784,57 +5001,68 @@
                 {
                   "label": "Status",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "Defect",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.title"
                 },
                 {
                   "label": "User impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.user_impact"
                 },
                 {
                   "label": "Reproduction",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.actual_result"
                 },
                 {
                   "label": "Environment",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.environment"
                 },
                 {
                   "label": "Related requirements",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.requirements"
                 },
                 {
                   "label": "Root cause",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.confirmed_evidence"
                 },
                 {
                   "label": "Repair",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.allowed_scope"
                 },
                 {
                   "label": "Regression evidence",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.acceptance_criteria"
                 },
                 {
                   "label": "Architecture impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.aws_resources_affected"
                 },
                 {
                   "label": "Updated",
                   "value": "Not yet initialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Run `init template`.",
@@ -4866,7 +5094,11 @@
                   "target": "#10-acceptance-criteria"
                 }
               ],
-              "summary_basis_sha256": "sha256:580ef0a79979fe36483eb1d746b8c40468541e7e4dbdc9aebc9faccdfe341701",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:8c5dbec0a9bf001016e8d8eb4ac168477d237c5a3afc50f6ec2e717eccf5e945",
               "rendered_sha256": "sha256:373d2e3a94c7540beeb1042e1608d41afb3556a9909f515605bf01e42d7722f2"
             }
           ]
@@ -6063,7 +6295,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "routing.lifecycle_state"
                 },
                 {
                   "label": "Overall status",
@@ -6071,7 +6304,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -6079,14 +6313,16 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Not yet ready",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -6094,50 +6330,58 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "AWS deployment",
-                  "value": "Not authorized",
-                  "basis_ids": []
+                  "value": "Not deployed",
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Construction tasks",
                   "value": "No tasks generated",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "deliver.tasks"
                 },
                 {
                   "label": "Verification",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Operations",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Bounded defect",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "AWS account access",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
+                  "value": "REQ-0001",
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
+              "need_from_owner": "Answer the current project question.",
               "next_action": "Codex will record the answer and ask the next material question.",
               "claims": [],
               "navigation": [
@@ -6162,8 +6406,12 @@
                   "target": "BUGFIX.md#current-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:c9b6ee4feacca8b946c0d4e89e12beab7ea6c45719f8f414845c6a436b619e2a",
-              "rendered_sha256": "sha256:fb4a686772f49447d0d95348c6cd0902c0a30d2e5a92c7a4f110a29b7dd74239"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:872801a13f5e302c059f06e82e403a9a96637f0fe25b0ada9746cf7921982552",
+              "rendered_sha256": "sha256:159d6c0e0741811b5e8b1c1954d503d3ee37c7c99dca6dbe205effb20539b0bd"
             },
             {
               "path": "docs/project/PRD.md",
@@ -6176,35 +6424,40 @@
                   "value": "Not yet confirmed",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.outcome"
                 },
                 {
                   "label": "First-release boundary",
-                  "value": "None",
+                  "value": "Not yet confirmed",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.scope_and_non_goals"
                 },
                 {
                   "label": "Requirements",
                   "value": "Not yet ready",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Technical design",
                   "value": "Not yet ready",
                   "basis_ids": [
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Not yet ready",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -6212,7 +6465,8 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -6220,26 +6474,30 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Region and cost",
                   "value": "us-west-2; MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "project.region + define.cost_posture"
                 },
                 {
                   "label": "Construction authorization",
-                  "value": "AUTH-0001",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Current records",
@@ -6248,18 +6506,20 @@
                     "AUTH-0001",
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + authority.record_id"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
+                  "value": "REQ-0001",
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
+              "need_from_owner": "Answer the current project question.",
               "next_action": "Codex will record the answer and ask the next material question.",
               "claims": [],
               "navigation": [
@@ -6284,8 +6544,12 @@
                   "target": "#contract-appendices"
                 }
               ],
-              "summary_basis_sha256": "sha256:eb0e7991787ebe628ab1dcc4e93ccae37c3ecaf6c56716ba28bf7a40047acbb7",
-              "rendered_sha256": "sha256:575a02329c038899e74d54022c7a84ac35a22d17aeb0af645aa26ef26263c267"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:e03e2640e115006bbb3ca02acb113071f459464e5f2adee7da19a97ffa60c9d2",
+              "rendered_sha256": "sha256:145fcc0aa3f20360d3aa30a3114bd1c2df44b3668ab3d4d7777f53e447cf59f5"
             },
             {
               "path": "docs/project/TASKS.md",
@@ -6296,52 +6560,61 @@
                 {
                   "label": "Progress",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.status"
                 },
                 {
                   "label": "Current wave",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active_wave"
                 },
                 {
                   "label": "Active task",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active"
                 },
                 {
                   "label": "Readiness",
                   "value": "Uninitialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.plan_state"
                 },
                 {
                   "label": "Blocker",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.blocked"
                 },
                 {
                   "label": "Last passing checkpoint",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.checkpoint"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Not yet ready",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
+              "need_from_owner": "Answer the current project question.",
               "next_action": "Codex will record the answer and ask the next material question.",
               "claims": [],
               "navigation": [
@@ -6370,8 +6643,12 @@
                   "target": "#exact-run-and-task-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:156b688fbcab36ddc09ea0b848ae44726847aba5a51b6d7f9f6aa20a9436ade2",
-              "rendered_sha256": "sha256:bbbc06bba69559255c6327f1757b9e7e08630ad05f82283b9fe02be0f96a2434"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:cce0aa919a491945573103582cddf3af7e6266bde6907ba7270f1640ea310fca",
+              "rendered_sha256": "sha256:3af095cbabaed791869e317775d6f2b5a194caa2632f2660b7bbffbb53302a5a"
             },
             {
               "path": "docs/project/VERIFY.md",
@@ -6382,71 +6659,90 @@
                 {
                   "label": "Release result",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Locally observed evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.task_completion"
                 },
                 {
                   "label": "Failed or stale evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence"
                 },
                 {
                   "label": "Still unobserved",
-                  "value": "Local build, AWS deployment, recovery, and teardown",
-                  "basis_ids": []
+                  "value": "Local build, AWS deployment, recovery, teardown",
+                  "basis_ids": [],
+                  "source": "deliver.evidence + aws.deployment + aws.teardown"
                 },
                 {
                   "label": "Evidence cutoff",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.evidence_cutoff"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
+              "need_from_owner": "Answer the current project question.",
               "next_action": "Codex will record the answer and ask the next material question.",
               "claims": [
                 {
                   "claim": "Requirements are approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate A is not approved"
+                  "limitation": "Gate A is not approved",
+                  "source": "define.gate_a.status"
                 },
                 {
                   "claim": "Technical design is approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate B is not approved"
+                  "limitation": "Gate B is not approved",
+                  "source": "design.gate_b.status"
                 },
                 {
                   "claim": "Current AWS guidance informed the plan",
-                  "maturity": "Source verified",
-                  "evidence": "Current AWS Core evidence",
-                  "limitation": "Source guidance is not deployment evidence"
+                  "maturity": "Not yet observed",
+                  "evidence": "None",
+                  "limitation": "Current AWS Core evidence has not been recorded",
+                  "source": "aws_core.materiality + aws_core.observed_usage"
                 },
                 {
                   "claim": "Local release checks passed",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Local evidence does not prove AWS behavior"
+                  "limitation": "Local evidence does not prove AWS behavior",
+                  "source": "deliver.evidence.task_completion + deliver.release.status"
                 },
                 {
                   "claim": "Application is deployed",
                   "maturity": "Not authorized",
                   "evidence": "None",
-                  "limitation": "No deployment evidence or authority"
+                  "limitation": "No deployment evidence or authority",
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
+                },
+                {
+                  "claim": "Teardown is complete",
+                  "maturity": "Not authorized",
+                  "evidence": "None",
+                  "limitation": "No teardown evidence or authority",
+                  "source": "aws.teardown.action_status + aws.teardown.status + aws.teardown.evidence_id + runbook.active_boundary + project.region"
                 }
               ],
               "navigation": [
@@ -6471,8 +6767,12 @@
                   "target": "#current-release-decision"
                 }
               ],
-              "summary_basis_sha256": "sha256:5205b426f2f4d134517827cbf69f52f480b60d87ecfd8b8f6203da58d506800b",
-              "rendered_sha256": "sha256:1706b6a75f31550285a61e385a973084cbff486f113a1ab0747110a28f8ed86f"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:34b1a7173fcc22f88b472ee6cce2aa45c688e999e65671e17aa6677d7318f0be",
+              "rendered_sha256": "sha256:1cc709520a861505d1718644052128c53cff4d0b223e9a579d9e5204e29031fc"
             },
             {
               "path": "docs/project/RUNBOOK.md",
@@ -6483,62 +6783,73 @@
                 {
                   "label": "Environment",
                   "value": "Development in us-west-2",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Deployment state",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Current AWS authority",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Not yet ready",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "Safest available operation",
                   "value": "Local validation only",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Deployment approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Teardown approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Recovery state",
                   "value": "Not yet observed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.recovery"
                 },
                 {
                   "label": "Emergency condition",
                   "value": "No deployed environment exists",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
+              "need_from_owner": "Answer the current project question.",
               "next_action": "Codex will record the answer and ask the next material question.",
               "claims": [],
               "navigation": [
@@ -6567,8 +6878,12 @@
                   "target": "#13-teardown-and-decommissioning"
                 }
               ],
-              "summary_basis_sha256": "sha256:767e68abd6d435865f778464f004bffbe7318a3f9d9f2d9f681befffa6fceaac",
-              "rendered_sha256": "sha256:621aa57c17f29560fac962692141dd1bf68c0bef8145ef1c2b3f3eba454fcafd"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:7ba0d32fd2288908c6afa086edda482c4211c6b64e78fc8e16e66b2ad8b1db2b",
+              "rendered_sha256": "sha256:bfb18ebb2173c75ca6e91991aa1417cd9dc15d2c519f996b1b9122b54afea202"
             },
             {
               "path": "docs/project/BUGFIX.md",
@@ -6579,60 +6894,71 @@
                 {
                   "label": "Status",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "Defect",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.title"
                 },
                 {
                   "label": "User impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.user_impact"
                 },
                 {
                   "label": "Reproduction",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.actual_result"
                 },
                 {
                   "label": "Environment",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.environment"
                 },
                 {
                   "label": "Related requirements",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.requirements"
                 },
                 {
                   "label": "Root cause",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.confirmed_evidence"
                 },
                 {
                   "label": "Repair",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.allowed_scope"
                 },
                 {
                   "label": "Regression evidence",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.acceptance_criteria"
                 },
                 {
                   "label": "Architecture impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.aws_resources_affected"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
+              "need_from_owner": "Answer the current project question.",
               "next_action": "Codex will record the answer and ask the next material question.",
               "claims": [],
               "navigation": [
@@ -6661,8 +6987,12 @@
                   "target": "#10-acceptance-criteria"
                 }
               ],
-              "summary_basis_sha256": "sha256:ea5c4858b3e43a5e49ae545c52add0e55e8c7a34bb8f764f37af0b9d450ccc44",
-              "rendered_sha256": "sha256:25fab7d5628c31563b4b875bca9bca321b2c9820cf74472b8e55a32a0a3e753d"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:32b327e94803554d30932433150463475709a1838c4d21b73691332f85b76416",
+              "rendered_sha256": "sha256:843e662852b53c5aeda763a6f2abf549307fb3f131cd262915e8e021be693652"
             }
           ]
         },
@@ -7724,8 +8054,8 @@
               "start_line": 1,
               "end_line": 136,
               "active_ids": [],
-              "canonical_sha256": "sha256:15079ffc83c1e7214f3b62ea33f6a405f90efee1072edf489c06b590d16adb8d",
-              "source_bytes": 3682,
+              "canonical_sha256": "sha256:b74e3e868da8c442856104457efbdf22ae34dd7486a8d5924240bc53624ff83d",
+              "source_bytes": 3776,
               "reason": "On-demand canonical source"
             },
             {
@@ -8084,7 +8414,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "routing.lifecycle_state"
                 },
                 {
                   "label": "Overall status",
@@ -8092,7 +8423,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -8100,14 +8432,16 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Ready for owner review",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -8115,51 +8449,59 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "AWS deployment",
-                  "value": "Not authorized",
-                  "basis_ids": []
+                  "value": "Not deployed",
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Construction tasks",
                   "value": "No tasks generated",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "deliver.tasks"
                 },
                 {
                   "label": "Verification",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Operations",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Bounded defect",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "AWS account access",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
+                  "value": "REQ-0001",
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate A requirements review.",
+              "need_from_owner": "Review the requirements and approve them or request a correction.",
+              "next_action": "After your decision, Codex will continue to technical design or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -8183,8 +8525,12 @@
                   "target": "BUGFIX.md#current-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:66c0b1d7a6d913304df93cf581e80f761771662e8e99b155049859fa2027abec",
-              "rendered_sha256": "sha256:bc4140453f5cf21c15cc863dfcf05159f58d515c47360d9f130a70727a5520b1"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:817bb9e39e9d10bab5af3de465bd17dc85cfdce7d484ffe157e08959ee1ea4c5",
+              "rendered_sha256": "sha256:2750fbe77f68836d13e5fd992a12a201ecc9c7b899b173ab6957366017fe284b"
             },
             {
               "path": "docs/project/PRD.md",
@@ -8197,35 +8543,40 @@
                   "value": "OUT-001 — Deliver FR-001",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.outcome"
                 },
                 {
                   "label": "First-release boundary",
-                  "value": "None",
+                  "value": "FR-001 in scope; production is out of scope",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.scope_and_non_goals"
                 },
                 {
                   "label": "Requirements",
                   "value": "Ready for owner review",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Technical design",
                   "value": "Not yet ready",
                   "basis_ids": [
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Ready for owner review",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -8233,7 +8584,8 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -8241,26 +8593,30 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Region and cost",
                   "value": "us-west-2; MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "project.region + define.cost_posture"
                 },
                 {
                   "label": "Construction authorization",
-                  "value": "AUTH-0001",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Current records",
@@ -8269,19 +8625,21 @@
                     "AUTH-0001",
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + authority.record_id"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
+                  "value": "REQ-0001",
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate A requirements review.",
+              "need_from_owner": "Review the requirements and approve them or request a correction.",
+              "next_action": "After your decision, Codex will continue to technical design or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -8305,8 +8663,12 @@
                   "target": "#contract-appendices"
                 }
               ],
-              "summary_basis_sha256": "sha256:0efc721361eae62f6ff522bf98db9dad4b2a0d015cbd1328b084e0e99e5cf389",
-              "rendered_sha256": "sha256:7c4343ec65c2308138a572a4a5112c56372fd63300ce6704f987a52ba908e016"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:fec7cde8be94f87463d3ecadc30d17d6b69dd887ead1c617a7499489d56febc8",
+              "rendered_sha256": "sha256:de1174f8e2c6c196ea5995cab10096c351e4c0531877c66dae57bd5b64e49415"
             },
             {
               "path": "docs/project/TASKS.md",
@@ -8317,53 +8679,62 @@
                 {
                   "label": "Progress",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.status"
                 },
                 {
                   "label": "Current wave",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active_wave"
                 },
                 {
                   "label": "Active task",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active"
                 },
                 {
                   "label": "Readiness",
                   "value": "Uninitialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.plan_state"
                 },
                 {
                   "label": "Blocker",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.blocked"
                 },
                 {
                   "label": "Last passing checkpoint",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.checkpoint"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Not yet ready",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate A requirements review.",
+              "need_from_owner": "Review the requirements and approve them or request a correction.",
+              "next_action": "After your decision, Codex will continue to technical design or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -8391,8 +8762,12 @@
                   "target": "#exact-run-and-task-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:e1c2c05da24a0b9f747faf3a0b6effc9ee2bb39dbb7e0083ede6048823f0d93a",
-              "rendered_sha256": "sha256:1b2e08ea6f60d240d2003dc3c86884f0530b1f66715b17bdb70c5b8425a92d6f"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:b16665c9969d8353e5d1b6d7d3392b9e2afc4e7ecedfb76afbaf6d1edda9b014",
+              "rendered_sha256": "sha256:902e390f1800a2e6f3cc64bef6cae11f56d7b3985caa56b8124cf81342ea92f9"
             },
             {
               "path": "docs/project/VERIFY.md",
@@ -8403,71 +8778,90 @@
                 {
                   "label": "Release result",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Locally observed evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.task_completion"
                 },
                 {
                   "label": "Failed or stale evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence"
                 },
                 {
                   "label": "Still unobserved",
-                  "value": "Local build, AWS deployment, recovery, and teardown",
-                  "basis_ids": []
+                  "value": "Local build, AWS deployment, recovery, teardown",
+                  "basis_ids": [],
+                  "source": "deliver.evidence + aws.deployment + aws.teardown"
                 },
                 {
                   "label": "Evidence cutoff",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.evidence_cutoff"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate A requirements review.",
+              "need_from_owner": "Review the requirements and approve them or request a correction.",
+              "next_action": "After your decision, Codex will continue to technical design or apply your correction.",
               "claims": [
                 {
                   "claim": "Requirements are approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate A is not approved"
+                  "limitation": "Gate A is not approved",
+                  "source": "define.gate_a.status"
                 },
                 {
                   "claim": "Technical design is approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate B is not approved"
+                  "limitation": "Gate B is not approved",
+                  "source": "design.gate_b.status"
                 },
                 {
                   "claim": "Current AWS guidance informed the plan",
-                  "maturity": "Source verified",
-                  "evidence": "Current AWS Core evidence",
-                  "limitation": "Source guidance is not deployment evidence"
+                  "maturity": "Not yet observed",
+                  "evidence": "None",
+                  "limitation": "No current AWS Core evidence was required or recorded",
+                  "source": "aws_core.materiality + aws_core.observed_usage"
                 },
                 {
                   "claim": "Local release checks passed",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Local evidence does not prove AWS behavior"
+                  "limitation": "Local evidence does not prove AWS behavior",
+                  "source": "deliver.evidence.task_completion + deliver.release.status"
                 },
                 {
                   "claim": "Application is deployed",
                   "maturity": "Not authorized",
                   "evidence": "None",
-                  "limitation": "No deployment evidence or authority"
+                  "limitation": "No deployment evidence or authority",
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
+                },
+                {
+                  "claim": "Teardown is complete",
+                  "maturity": "Not authorized",
+                  "evidence": "None",
+                  "limitation": "No teardown evidence or authority",
+                  "source": "aws.teardown.action_status + aws.teardown.status + aws.teardown.evidence_id + runbook.active_boundary + project.region"
                 }
               ],
               "navigation": [
@@ -8492,8 +8886,12 @@
                   "target": "#current-release-decision"
                 }
               ],
-              "summary_basis_sha256": "sha256:b1cd5d5e5196e26a1d33460e7cc2b70e800eeeb1ac3b644f95aae5e4700cdf0d",
-              "rendered_sha256": "sha256:bf6ea752966d25dd1f236b5eca8b3b719a729520846cd924f702ff62d2d673f4"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:07b54f99ee8c025a5e9b5616f63f9f4354d0adf65e41df6043c9327e8054c045",
+              "rendered_sha256": "sha256:7521d76322a1529d7c782a9b73a20ef0077ee2f310d92e5aa85dad9f46d91661"
             },
             {
               "path": "docs/project/RUNBOOK.md",
@@ -8504,63 +8902,74 @@
                 {
                   "label": "Environment",
                   "value": "Development in us-west-2",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Deployment state",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Current AWS authority",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Not yet ready",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "Safest available operation",
                   "value": "Local validation only",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Deployment approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Teardown approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Recovery state",
                   "value": "Not yet observed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.recovery"
                 },
                 {
                   "label": "Emergency condition",
                   "value": "No deployed environment exists",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate A requirements review.",
+              "need_from_owner": "Review the requirements and approve them or request a correction.",
+              "next_action": "After your decision, Codex will continue to technical design or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -8588,8 +8997,12 @@
                   "target": "#13-teardown-and-decommissioning"
                 }
               ],
-              "summary_basis_sha256": "sha256:7dceed118ef75f16bcdb4d1a86f7d4dfabc818b90c7a805f6b8a9155894cc54b",
-              "rendered_sha256": "sha256:de033dade82770925d64d20cc88e0b9a4e81fbcf8e4cf1e8bf8b77fa04000a5c"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:8decf2684b0095c78e1b9616e77c5d44f800e08ccfc1d9456a05880ca3c805db",
+              "rendered_sha256": "sha256:b72595aff865e5fb6b4516e13af00d3c07a96cf95426e576c2543617d27fb594"
             },
             {
               "path": "docs/project/BUGFIX.md",
@@ -8600,61 +9013,72 @@
                 {
                   "label": "Status",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "Defect",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.title"
                 },
                 {
                   "label": "User impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.user_impact"
                 },
                 {
                   "label": "Reproduction",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.actual_result"
                 },
                 {
                   "label": "Environment",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.environment"
                 },
                 {
                   "label": "Related requirements",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.requirements"
                 },
                 {
                   "label": "Root cause",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.confirmed_evidence"
                 },
                 {
                   "label": "Repair",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.allowed_scope"
                 },
                 {
                   "label": "Regression evidence",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.acceptance_criteria"
                 },
                 {
                   "label": "Architecture impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.aws_resources_affected"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate A requirements review.",
+              "need_from_owner": "Review the requirements and approve them or request a correction.",
+              "next_action": "After your decision, Codex will continue to technical design or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -8682,8 +9106,12 @@
                   "target": "#10-acceptance-criteria"
                 }
               ],
-              "summary_basis_sha256": "sha256:1b40ae03239eb57150f2d444f1c1c20f80757186baceb3a0b9db42d856617395",
-              "rendered_sha256": "sha256:3c904d57c4842435bfa9f63db9678fa3a279c3a63c0c8d06f4c1546b9e1eb9d7"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:1a8ddd2d8d592eb5ae53d41cc1ac04ace40fff21b8d070a486f34212c46e85a8",
+              "rendered_sha256": "sha256:42859411ad6c6b0e84d571fd26319a7fe9a2ca41bde4ef4b7790bfe928a91ec3"
             }
           ]
         },
@@ -10142,8 +10570,8 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "AWS Core evidence",
-              "start_line": 153,
-              "end_line": 169,
+              "start_line": 154,
+              "end_line": 170,
               "active_ids": [],
               "canonical_sha256": "sha256:b6f259986f4f9e9bac329d3ed3c6d857035c30c49ae39bc91fd823fa197f6fd2",
               "source_bytes": 2128,
@@ -10643,7 +11071,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "routing.lifecycle_state"
                 },
                 {
                   "label": "Overall status",
@@ -10651,7 +11080,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -10659,14 +11089,16 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -10674,47 +11106,55 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "AWS deployment",
-                  "value": "Not authorized",
-                  "basis_ids": []
+                  "value": "Not deployed",
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Construction tasks",
                   "value": "No tasks generated",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "deliver.tasks"
                 },
                 {
                   "label": "Verification",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Operations",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Bounded defect",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "AWS account access",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
+                  "value": "REQ-0001",
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -10742,8 +11182,12 @@
                   "target": "BUGFIX.md#current-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:68c953d3af4fe81c547c8f2e577850614e695e73b02ec02f5bcaafbd375e954c",
-              "rendered_sha256": "sha256:3805fe11e02a31f166d306c482e805adf073bba1aaccad029d367cea25872bd4"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:efc41d642547f043935cff2548d0a9de97fb48bebc7ee550cfd009309bac8e8a",
+              "rendered_sha256": "sha256:9dde81a5ef9fa01b5e5c937542bcc32cb7b254eb3b2da8eb32bcc6ef024b4c12"
             },
             {
               "path": "docs/project/PRD.md",
@@ -10756,35 +11200,40 @@
                   "value": "OUT-001 — Deliver FR-001",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.outcome"
                 },
                 {
                   "label": "First-release boundary",
-                  "value": "None",
+                  "value": "FR-001 in scope; production is out of scope",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.scope_and_non_goals"
                 },
                 {
                   "label": "Requirements",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Technical design",
                   "value": "Not yet ready",
                   "basis_ids": [
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -10792,7 +11241,8 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -10800,26 +11250,30 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Region and cost",
                   "value": "us-west-2; MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "project.region + define.cost_posture"
                 },
                 {
                   "label": "Construction authorization",
-                  "value": "AUTH-0001",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Current records",
@@ -10828,15 +11282,17 @@
                     "AUTH-0001",
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + authority.record_id"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
+                  "value": "REQ-0001",
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -10864,8 +11320,12 @@
                   "target": "#contract-appendices"
                 }
               ],
-              "summary_basis_sha256": "sha256:844feb00624cc687ea4fb6ad817ccbe4b085bf5c6b308530466eb65f4341f402",
-              "rendered_sha256": "sha256:f07547c64acc25abee086c8fa4d26aa08c6e2cb83cfba762fe9d6f4bf58eb827"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:619c1fb170220641448ce7b3b86a81043da959975c34628430414015ee6e3cc5",
+              "rendered_sha256": "sha256:72ebb2eab838e9b6b509a9205b356ea9c3f06e4f824fee49a7661f5d6aae79df"
             },
             {
               "path": "docs/project/TASKS.md",
@@ -10876,49 +11336,58 @@
                 {
                   "label": "Progress",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.status"
                 },
                 {
                   "label": "Current wave",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active_wave"
                 },
                 {
                   "label": "Active task",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active"
                 },
                 {
                   "label": "Readiness",
                   "value": "Uninitialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.plan_state"
                 },
                 {
                   "label": "Blocker",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.blocked"
                 },
                 {
                   "label": "Last passing checkpoint",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.checkpoint"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Not yet ready",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -10950,8 +11419,12 @@
                   "target": "#exact-run-and-task-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:d3e8e5b505c2fb56e48928efc36283f33b8cffca7c43ff1cfc918011b4d9f3a5",
-              "rendered_sha256": "sha256:d5de8a74514bab674602c25f23d5f6f0e729eaf3d446adfc010b2e2187b17dec"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:68f2d4c6d2d92e76dd1b1a503f82e04c11e0b5c9eb2faa0e74b50cd57d0f8de8",
+              "rendered_sha256": "sha256:a75f938883f18cb18d5430e8a02caac80f9158a0779b206cea9d3ee60610b820"
             },
             {
               "path": "docs/project/VERIFY.md",
@@ -10962,37 +11435,44 @@
                 {
                   "label": "Release result",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Locally observed evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.task_completion"
                 },
                 {
                   "label": "Failed or stale evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence"
                 },
                 {
                   "label": "Still unobserved",
-                  "value": "Local build, AWS deployment, recovery, and teardown",
-                  "basis_ids": []
+                  "value": "Local build, AWS deployment, recovery, teardown",
+                  "basis_ids": [],
+                  "source": "deliver.evidence + aws.deployment + aws.teardown"
                 },
                 {
                   "label": "Evidence cutoff",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.evidence_cutoff"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -11002,31 +11482,43 @@
                   "claim": "Requirements are approved",
                   "maturity": "Owner confirmed",
                   "evidence": "REQ-0001",
-                  "limitation": "Does not approve construction"
+                  "limitation": "Does not approve construction",
+                  "source": "define.gate_a.status"
                 },
                 {
                   "claim": "Technical design is approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate B is not approved"
+                  "limitation": "Gate B is not approved",
+                  "source": "design.gate_b.status"
                 },
                 {
                   "claim": "Current AWS guidance informed the plan",
-                  "maturity": "Source verified",
-                  "evidence": "Current AWS Core evidence",
-                  "limitation": "Source guidance is not deployment evidence"
+                  "maturity": "Not yet observed",
+                  "evidence": "None",
+                  "limitation": "No current AWS Core evidence was required or recorded",
+                  "source": "aws_core.materiality + aws_core.observed_usage"
                 },
                 {
                   "claim": "Local release checks passed",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Local evidence does not prove AWS behavior"
+                  "limitation": "Local evidence does not prove AWS behavior",
+                  "source": "deliver.evidence.task_completion + deliver.release.status"
                 },
                 {
                   "claim": "Application is deployed",
                   "maturity": "Not authorized",
                   "evidence": "None",
-                  "limitation": "No deployment evidence or authority"
+                  "limitation": "No deployment evidence or authority",
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
+                },
+                {
+                  "claim": "Teardown is complete",
+                  "maturity": "Not authorized",
+                  "evidence": "None",
+                  "limitation": "No teardown evidence or authority",
+                  "source": "aws.teardown.action_status + aws.teardown.status + aws.teardown.evidence_id + runbook.active_boundary + project.region"
                 }
               ],
               "navigation": [
@@ -11051,8 +11543,12 @@
                   "target": "#current-release-decision"
                 }
               ],
-              "summary_basis_sha256": "sha256:200508cd19a378883e529ef991e468042f7523272e59b939323c13c042364e63",
-              "rendered_sha256": "sha256:d66e340ffc648f8471055094d58dec46a72e928146192cbb190058554868e954"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:32320e6d384cf5c9421ce503f79f9ae46e686f7d53ed04459698e61a0a12d859",
+              "rendered_sha256": "sha256:12f63910e560d1c8ed60643d4917e141d17a421ac56f7d88991b75d1a0bf7eea"
             },
             {
               "path": "docs/project/RUNBOOK.md",
@@ -11063,59 +11559,70 @@
                 {
                   "label": "Environment",
                   "value": "Development in us-west-2",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Deployment state",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Current AWS authority",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Not yet ready",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "Safest available operation",
                   "value": "Local validation only",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Deployment approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Teardown approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Recovery state",
                   "value": "Not yet observed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.recovery"
                 },
                 {
                   "label": "Emergency condition",
                   "value": "No deployed environment exists",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -11147,8 +11654,12 @@
                   "target": "#13-teardown-and-decommissioning"
                 }
               ],
-              "summary_basis_sha256": "sha256:1f18c2c4d1f49596145d72ff2cfecea63dc574680b0571e5fcc14c74b7e65b2e",
-              "rendered_sha256": "sha256:e5edff0ba4c1a8786cb36056424c9816765a9c3444bb097e0da85fa9eb0066f8"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:936bc9128a691c7eb120084fea66cdcc100b9ee6caabf8e65dfa3797f53a4968",
+              "rendered_sha256": "sha256:5a424fccdb237a7f73d3649ec04c3fdd0cd3162f2ac63bc1e5075a88940c8d55"
             },
             {
               "path": "docs/project/BUGFIX.md",
@@ -11159,57 +11670,68 @@
                 {
                   "label": "Status",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "Defect",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.title"
                 },
                 {
                   "label": "User impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.user_impact"
                 },
                 {
                   "label": "Reproduction",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.actual_result"
                 },
                 {
                   "label": "Environment",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.environment"
                 },
                 {
                   "label": "Related requirements",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.requirements"
                 },
                 {
                   "label": "Root cause",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.confirmed_evidence"
                 },
                 {
                   "label": "Repair",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.allowed_scope"
                 },
                 {
                   "label": "Regression evidence",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.acceptance_criteria"
                 },
                 {
                   "label": "Architecture impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.aws_resources_affected"
                 },
                 {
                   "label": "Updated",
-                  "value": "DES-0001",
-                  "basis_ids": []
+                  "value": "REQ-0001",
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -11241,8 +11763,12 @@
                   "target": "#10-acceptance-criteria"
                 }
               ],
-              "summary_basis_sha256": "sha256:cdc1958852c21d83e36e899de9f7b0069adb2b8d8bfe09ebdb864f0c77f1b4f7",
-              "rendered_sha256": "sha256:dbdcb8772c2b9312974d5f8c4bc1821f9dc078b7f4392aa101827b35472c77c5"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:3f12e2dcf0e5fb89c34e11847b3d88ca7e3daedfac63b0aa0553d5734f5653cb",
+              "rendered_sha256": "sha256:0d8480f762f3dcefee1f7b7a24911e0ced3176271ac94dbc68a62850c0b51808"
             }
           ]
         },
@@ -12788,8 +13314,8 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "AWS Core evidence",
-              "start_line": 153,
-              "end_line": 169,
+              "start_line": 154,
+              "end_line": 170,
               "active_ids": [],
               "canonical_sha256": "sha256:0ee03ed7622ad001614c5c840112203f8f9df57856ed1d0b42e6b3ae18618bb4",
               "source_bytes": 2557,
@@ -13482,7 +14008,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "routing.lifecycle_state"
                 },
                 {
                   "label": "Overall status",
@@ -13490,7 +14017,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -13498,14 +14026,16 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -13513,39 +14043,46 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "AWS deployment",
-                  "value": "Not authorized",
-                  "basis_ids": []
+                  "value": "Not deployed",
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Construction tasks",
                   "value": "No tasks generated",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "deliver.tasks"
                 },
                 {
                   "label": "Verification",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Operations",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Bounded defect",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "AWS account access",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
@@ -13553,11 +14090,12 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate B technical review.",
+              "need_from_owner": "Review the technical plan and approve it or request a correction.",
+              "next_action": "After your decision, Codex will create the construction tasks or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -13581,8 +14119,12 @@
                   "target": "BUGFIX.md#current-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:307a80f3a12906657b59f29f55c5cf8c8d3203e49b1883d49a3f6a4d5b22db1c",
-              "rendered_sha256": "sha256:e0164ffee0408f1ef0fa6ce902992616584655fc97297ac4b272b39cc7d2640b"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:698fc579a716cead3b55728d6e76afbce87bd663e39347b3a31ead8ebfa61f90",
+              "rendered_sha256": "sha256:4f650bba41f6bba1965b33a4388876707d22cae00115481e0b6cc0179f1a6e0d"
             },
             {
               "path": "docs/project/PRD.md",
@@ -13595,35 +14137,40 @@
                   "value": "OUT-001 — Deliver FR-001",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.outcome"
                 },
                 {
                   "label": "First-release boundary",
-                  "value": "None",
+                  "value": "FR-001 in scope; production is out of scope",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.scope_and_non_goals"
                 },
                 {
                   "label": "Requirements",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Technical design",
                   "value": "Ready for owner review",
                   "basis_ids": [
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -13631,7 +14178,8 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -13639,26 +14187,30 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Region and cost",
                   "value": "us-west-2; MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "project.region + define.cost_posture"
                 },
                 {
                   "label": "Construction authorization",
-                  "value": "AUTH-0001",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Current records",
@@ -13667,7 +14219,8 @@
                     "AUTH-0001",
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + authority.record_id"
                 },
                 {
                   "label": "Updated",
@@ -13675,11 +14228,12 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate B technical review.",
+              "need_from_owner": "Review the technical plan and approve it or request a correction.",
+              "next_action": "After your decision, Codex will create the construction tasks or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -13703,8 +14257,12 @@
                   "target": "#contract-appendices"
                 }
               ],
-              "summary_basis_sha256": "sha256:e5fee2072f0079436780f4a89f44cf6d18494afe305e76fc20507147e2f44305",
-              "rendered_sha256": "sha256:97eb6f3b7aa07288a1cb4fc0ec2040d0e117b82ba8f0f58d6801d96c6e376d43"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:dc00a55c1758b5a5d89f5639beb75b47eba153b0029984469bd263f1ff22a549",
+              "rendered_sha256": "sha256:75be04ba59596624ebd083bdf0d9ef78f00630c52e65dd412cf77d0beee4ad8d"
             },
             {
               "path": "docs/project/TASKS.md",
@@ -13715,53 +14273,62 @@
                 {
                   "label": "Progress",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.status"
                 },
                 {
                   "label": "Current wave",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active_wave"
                 },
                 {
                   "label": "Active task",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active"
                 },
                 {
                   "label": "Readiness",
                   "value": "Uninitialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.plan_state"
                 },
                 {
                   "label": "Blocker",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.blocked"
                 },
                 {
                   "label": "Last passing checkpoint",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.checkpoint"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Ready for owner review",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate B technical review.",
+              "need_from_owner": "Review the technical plan and approve it or request a correction.",
+              "next_action": "After your decision, Codex will create the construction tasks or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -13789,8 +14356,12 @@
                   "target": "#exact-run-and-task-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:98a9986dce8d0a9831c5b0af0ac27688edc08296880e0191f65df89ee02731f7",
-              "rendered_sha256": "sha256:1565dcc9d9cfb74e4fc6333f715725595dfb1f2d9391649f3bd8d376324d4daa"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:e456209ecf62904d7827cb484d6f78dccdf1bfa57781302754d19a9089ce5788",
+              "rendered_sha256": "sha256:57058bd3356505ff2d38b29c89d3cd3df9531f064e20b2800f4508850d20bcd4"
             },
             {
               "path": "docs/project/VERIFY.md",
@@ -13801,71 +14372,90 @@
                 {
                   "label": "Release result",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Locally observed evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.task_completion"
                 },
                 {
                   "label": "Failed or stale evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence"
                 },
                 {
                   "label": "Still unobserved",
-                  "value": "Local build, AWS deployment, recovery, and teardown",
-                  "basis_ids": []
+                  "value": "Local build, AWS deployment, recovery, teardown",
+                  "basis_ids": [],
+                  "source": "deliver.evidence + aws.deployment + aws.teardown"
                 },
                 {
                   "label": "Evidence cutoff",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.evidence_cutoff"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate B technical review.",
+              "need_from_owner": "Review the technical plan and approve it or request a correction.",
+              "next_action": "After your decision, Codex will create the construction tasks or apply your correction.",
               "claims": [
                 {
                   "claim": "Requirements are approved",
                   "maturity": "Owner confirmed",
                   "evidence": "REQ-0001",
-                  "limitation": "Does not approve construction"
+                  "limitation": "Does not approve construction",
+                  "source": "define.gate_a.status"
                 },
                 {
                   "claim": "Technical design is approved",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Gate B is not approved"
+                  "limitation": "Gate B is not approved",
+                  "source": "design.gate_b.status"
                 },
                 {
                   "claim": "Current AWS guidance informed the plan",
                   "maturity": "Source verified",
-                  "evidence": "Current AWS Core evidence",
-                  "limitation": "Source guidance is not deployment evidence"
+                  "evidence": "AWS-DISC-0002",
+                  "limitation": "Source guidance is not deployment evidence",
+                  "source": "aws_core.materiality + aws_core.observed_usage"
                 },
                 {
                   "claim": "Local release checks passed",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Local evidence does not prove AWS behavior"
+                  "limitation": "Local evidence does not prove AWS behavior",
+                  "source": "deliver.evidence.task_completion + deliver.release.status"
                 },
                 {
                   "claim": "Application is deployed",
                   "maturity": "Not authorized",
                   "evidence": "None",
-                  "limitation": "No deployment evidence or authority"
+                  "limitation": "No deployment evidence or authority",
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
+                },
+                {
+                  "claim": "Teardown is complete",
+                  "maturity": "Not authorized",
+                  "evidence": "None",
+                  "limitation": "No teardown evidence or authority",
+                  "source": "aws.teardown.action_status + aws.teardown.status + aws.teardown.evidence_id + runbook.active_boundary + project.region"
                 }
               ],
               "navigation": [
@@ -13890,8 +14480,12 @@
                   "target": "#current-release-decision"
                 }
               ],
-              "summary_basis_sha256": "sha256:f4767be7176477c5c0779771659f974ae01778fcea7ea3ec60f98125969b37ae",
-              "rendered_sha256": "sha256:e1e056968df34d4a00cdbf6ae43a75cfbdabe7e1263df03993f2456f65ccd999"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:dac372ee8f447d6b71d082a7f8ee4e1972608b92bf919facf27d86f9cf8678d9",
+              "rendered_sha256": "sha256:fddcc930203b36a530eae20e3b9af8379f6fad88a7bfb272b5791b3d941469d3"
             },
             {
               "path": "docs/project/RUNBOOK.md",
@@ -13902,63 +14496,74 @@
                 {
                   "label": "Environment",
                   "value": "Development in us-west-2",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Deployment state",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Current AWS authority",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Ready for owner review",
+                  "value": "Not approved (boundary record AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "Safest available operation",
                   "value": "Local validation only",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Deployment approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Teardown approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Recovery state",
                   "value": "Not yet observed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.recovery"
                 },
                 {
                   "label": "Emergency condition",
                   "value": "No deployed environment exists",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate B technical review.",
+              "need_from_owner": "Review the technical plan and approve it or request a correction.",
+              "next_action": "After your decision, Codex will create the construction tasks or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -13986,8 +14591,12 @@
                   "target": "#13-teardown-and-decommissioning"
                 }
               ],
-              "summary_basis_sha256": "sha256:f5a19ba7e02a8659716da63a414fde34c1f4f3f56573d997ccd55478dd74ab3b",
-              "rendered_sha256": "sha256:63939673773c81c0dc95c2032f06eb29e2169aa85e9c8caaef50a5fef6a49022"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:fea06428db919a977d4fc314022019f21d68751378e0b78aa26c68fc213dc54a",
+              "rendered_sha256": "sha256:ee7fd2ecd66cf835782c354035167e7e13cf0cd29192a65c7a5c8151fb4cbf65"
             },
             {
               "path": "docs/project/BUGFIX.md",
@@ -13998,61 +14607,72 @@
                 {
                   "label": "Status",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "Defect",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.title"
                 },
                 {
                   "label": "User impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.user_impact"
                 },
                 {
                   "label": "Reproduction",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.actual_result"
                 },
                 {
                   "label": "Environment",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.environment"
                 },
                 {
                   "label": "Related requirements",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.requirements"
                 },
                 {
                   "label": "Root cause",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.confirmed_evidence"
                 },
                 {
                   "label": "Repair",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.allowed_scope"
                 },
                 {
                   "label": "Regression evidence",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.acceptance_criteria"
                 },
                 {
                   "label": "Architecture impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.aws_resources_affected"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
-              "need_from_owner": "Nothing",
-              "next_action": "Codex will prepare the Gate B technical review.",
+              "need_from_owner": "Review the technical plan and approve it or request a correction.",
+              "next_action": "After your decision, Codex will create the construction tasks or apply your correction.",
               "claims": [],
               "navigation": [
                 {
@@ -14080,8 +14700,12 @@
                   "target": "#10-acceptance-criteria"
                 }
               ],
-              "summary_basis_sha256": "sha256:32bf175a4b99c5a69b1b02030feb7cfb0a958b9b71e233f19b6d942d2ef31713",
-              "rendered_sha256": "sha256:442251174812749861ce940f329350dc22db0c871b75c150489532701dad8bc7"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:e120e1be37caf4917930e54df9d1ec42c5e7fe21f99dca2bb0414406a30b62b8",
+              "rendered_sha256": "sha256:6dbe839e53effdd5161f63edfe4cc587979c1c37830953f42be089304863569b"
             }
           ]
         },
@@ -15996,8 +16620,8 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "Task completion evidence",
-              "start_line": 191,
-              "end_line": 199,
+              "start_line": 192,
+              "end_line": 200,
               "active_ids": [],
               "canonical_sha256": "sha256:9021b258e9ca2c35d9da019f1d222649a361a03a4180246ec32723a894bfa438",
               "source_bytes": 437,
@@ -16007,8 +16631,8 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "Construction and release readiness checks",
-              "start_line": 247,
-              "end_line": 276,
+              "start_line": 248,
+              "end_line": 277,
               "active_ids": [],
               "canonical_sha256": "sha256:41a6a04132b57437b2b45865b3163850c224b3839551b9e8b006c87589196c2a",
               "source_bytes": 2750,
@@ -16337,7 +16961,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "routing.lifecycle_state"
                 },
                 {
                   "label": "Overall status",
@@ -16345,7 +16970,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -16353,14 +16979,16 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -16368,39 +16996,46 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "AWS deployment",
-                  "value": "Not authorized",
-                  "basis_ids": []
+                  "value": "Not deployed",
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Construction tasks",
                   "value": "No tasks generated",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "deliver.tasks"
                 },
                 {
                   "label": "Verification",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Operations",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Bounded defect",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "AWS account access",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
@@ -16408,7 +17043,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -16436,8 +17072,12 @@
                   "target": "BUGFIX.md#current-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:594ee9b18bb2e078e3e6bd49a6b94268587933b1089d84dd9aaf4870f219682c",
-              "rendered_sha256": "sha256:e32206da0665ee6529fd17ea6420bfc024cc900ff92ff1e0d8181de35049f90a"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:f4257cc729df319bdd4408c4b43db10299378870125d0918b6bb3cc628a0a126",
+              "rendered_sha256": "sha256:73c54442d3b66b2cfc0cb5ed80a1ee14bb7094f8eeb99852759d1ad48edd409d"
             },
             {
               "path": "docs/project/PRD.md",
@@ -16450,35 +17090,40 @@
                   "value": "OUT-001 — Deliver FR-001",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.outcome"
                 },
                 {
                   "label": "First-release boundary",
-                  "value": "None",
+                  "value": "FR-001 in scope; production is out of scope",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a_readiness.scope_and_non_goals"
                 },
                 {
                   "label": "Requirements",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Technical design",
                   "value": "Approved",
                   "basis_ids": [
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Gate A",
                   "value": "Approved",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status"
                 },
                 {
                   "label": "Gate B",
@@ -16486,7 +17131,8 @@
                   "basis_ids": [
                     "AUTH-0001",
                     "DES-0001"
-                  ]
+                  ],
+                  "source": "design.gate_b.status"
                 },
                 {
                   "label": "Last completed milestone",
@@ -16494,26 +17140,30 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.gate_a.status + design.gate_b.status"
                 },
                 {
                   "label": "Region and cost",
                   "value": "us-west-2; MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
                   "basis_ids": [
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "project.region + define.cost_posture"
                 },
                 {
                   "label": "Construction authorization",
-                  "value": "AUTH-0001",
+                  "value": "Approved (AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Current records",
@@ -16522,7 +17172,8 @@
                     "AUTH-0001",
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + authority.record_id"
                 },
                 {
                   "label": "Updated",
@@ -16530,7 +17181,8 @@
                   "basis_ids": [
                     "DES-0001",
                     "REQ-0001"
-                  ]
+                  ],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -16558,8 +17210,12 @@
                   "target": "#contract-appendices"
                 }
               ],
-              "summary_basis_sha256": "sha256:fd5f4d22a5b738c9acbfac3d555f08ecf7dfed8e25cdc1df3b8a79ff7b987b06",
-              "rendered_sha256": "sha256:e4d98bfccc67a825dc9282784026f3a5b2a7df2a066b47a833b8cd808254dcb6"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:87a0d3ad01837ef37f4773855351fa259ba32688d5c5d4b176c29606de5145ae",
+              "rendered_sha256": "sha256:8f142aed00014d198cc556f5ff1f1e875fb57d982b00b2d6762fba98d1b04843"
             },
             {
               "path": "docs/project/TASKS.md",
@@ -16570,49 +17226,58 @@
                 {
                   "label": "Progress",
                   "value": "No tasks generated",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.status"
                 },
                 {
                   "label": "Current wave",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active_wave"
                 },
                 {
                   "label": "Active task",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.active"
                 },
                 {
                   "label": "Readiness",
                   "value": "Uninitialized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.plan_state"
                 },
                 {
                   "label": "Blocker",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.blocked"
                 },
                 {
                   "label": "Last passing checkpoint",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.tasks.checkpoint"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Approved",
+                  "value": "Approved (AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -16644,8 +17309,12 @@
                   "target": "#exact-run-and-task-state"
                 }
               ],
-              "summary_basis_sha256": "sha256:d5a9735d5bb2b8a0c66b2d7ab6f77536fbaa51d094866910ef8bbfa3e8635bba",
-              "rendered_sha256": "sha256:8d9bc3f67942482819ced8e6b3d9bbc52d5e6d3c32dcef3b5ac3d1d65da1c1c1"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:e4deba153832341d34288414d06bfc31cf726decfd8ee64bb57a4d36790d2904",
+              "rendered_sha256": "sha256:25ddf4f7816c532be1eb1f133db66cecaf524a2b4084e368b41a86a00466dd92"
             },
             {
               "path": "docs/project/VERIFY.md",
@@ -16656,37 +17325,44 @@
                 {
                   "label": "Release result",
                   "value": "Not Ready",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.status"
                 },
                 {
                   "label": "Locally observed evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.task_completion"
                 },
                 {
                   "label": "Failed or stale evidence",
                   "value": "0",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence"
                 },
                 {
                   "label": "Still unobserved",
-                  "value": "Local build, AWS deployment, recovery, and teardown",
-                  "basis_ids": []
+                  "value": "Local build, AWS deployment, recovery, teardown",
+                  "basis_ids": [],
+                  "source": "deliver.evidence + aws.deployment + aws.teardown"
                 },
                 {
                   "label": "Evidence cutoff",
                   "value": "Not yet recorded",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.release.evidence_cutoff"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -16696,31 +17372,43 @@
                   "claim": "Requirements are approved",
                   "maturity": "Owner confirmed",
                   "evidence": "REQ-0001",
-                  "limitation": "Does not approve construction"
+                  "limitation": "Does not approve construction",
+                  "source": "define.gate_a.status"
                 },
                 {
                   "claim": "Technical design is approved",
                   "maturity": "Owner confirmed",
                   "evidence": "DES-0001",
-                  "limitation": "Does not authorize AWS account work"
+                  "limitation": "Does not authorize AWS account work",
+                  "source": "design.gate_b.status"
                 },
                 {
                   "claim": "Current AWS guidance informed the plan",
                   "maturity": "Source verified",
-                  "evidence": "Current AWS Core evidence",
-                  "limitation": "Source guidance is not deployment evidence"
+                  "evidence": "AWS-DISC-0002",
+                  "limitation": "Source guidance is not deployment evidence",
+                  "source": "aws_core.materiality + aws_core.observed_usage"
                 },
                 {
                   "claim": "Local release checks passed",
                   "maturity": "Not yet observed",
                   "evidence": "None",
-                  "limitation": "Local evidence does not prove AWS behavior"
+                  "limitation": "Local evidence does not prove AWS behavior",
+                  "source": "deliver.evidence.task_completion + deliver.release.status"
                 },
                 {
                   "claim": "Application is deployed",
                   "maturity": "Not authorized",
                   "evidence": "None",
-                  "limitation": "No deployment evidence or authority"
+                  "limitation": "No deployment evidence or authority",
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
+                },
+                {
+                  "claim": "Teardown is complete",
+                  "maturity": "Not authorized",
+                  "evidence": "None",
+                  "limitation": "No teardown evidence or authority",
+                  "source": "aws.teardown.action_status + aws.teardown.status + aws.teardown.evidence_id + runbook.active_boundary + project.region"
                 }
               ],
               "navigation": [
@@ -16745,8 +17433,12 @@
                   "target": "#current-release-decision"
                 }
               ],
-              "summary_basis_sha256": "sha256:fba54475bbee9fde87686fe70a29fc4936334d4a19a74464eaac5194ec905e81",
-              "rendered_sha256": "sha256:915126ccc9d92b4a1cf19925e809199e3fd65ba21f9102eb1830ad9d25acb911"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:66b6800f4c03ffca36e4d1d036cf631d7421d0b5a640955bafb1c3dd0534f6ef",
+              "rendered_sha256": "sha256:682b527cc95cf1fcc845619170a2de8f9daf3405394a13ba4c19872ff1f1165f"
             },
             {
               "path": "docs/project/RUNBOOK.md",
@@ -16757,59 +17449,70 @@
                 {
                   "label": "Environment",
                   "value": "Development in us-west-2",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Deployment state",
                   "value": "Not deployed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "Current AWS authority",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Construction approval",
-                  "value": "Approved",
+                  "value": "Approved (AUTH-0001)",
                   "basis_ids": [
                     "AUTH-0001"
-                  ]
+                  ],
+                  "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
                   "label": "Safest available operation",
                   "value": "Local validation only",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Deployment approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Teardown approval",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Recovery state",
                   "value": "Not yet observed",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.evidence.recovery"
                 },
                 {
                   "label": "Emergency condition",
                   "value": "No deployed environment exists",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "aws.deployment.action_status + aws.deployment.reconciliation_status + aws.deployment.acceptance_evidence_ids + runbook.active_boundary + project.region"
                 },
                 {
                   "label": "AWS account work",
                   "value": "Not authorized",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -16841,8 +17544,12 @@
                   "target": "#13-teardown-and-decommissioning"
                 }
               ],
-              "summary_basis_sha256": "sha256:246c3a1e0f6a6a3b5ab553e3566f3aef6e5d02c3d3aa8c5589447319079ace18",
-              "rendered_sha256": "sha256:ce5cd253171b901c244e6edf0f6ac0e5769769d52fdd590135561ac738a33ddc"
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:9f6e63bffa71da1f00a365bd396b3afba4734bbd50c78cbdbf5ba8a847ccaf79",
+              "rendered_sha256": "sha256:04152bd4e0d0401441ea07ad2bcea5732a2d11956aba6539558ed10c877a07ac"
             },
             {
               "path": "docs/project/BUGFIX.md",
@@ -16853,57 +17560,68 @@
                 {
                   "label": "Status",
                   "value": "No active bounded defect",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "deliver.active_artifact + bugfix.title"
                 },
                 {
                   "label": "Defect",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.title"
                 },
                 {
                   "label": "User impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.user_impact"
                 },
                 {
                   "label": "Reproduction",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.actual_result"
                 },
                 {
                   "label": "Environment",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.environment"
                 },
                 {
                   "label": "Related requirements",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.requirements"
                 },
                 {
                   "label": "Root cause",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.confirmed_evidence"
                 },
                 {
                   "label": "Repair",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.allowed_scope"
                 },
                 {
                   "label": "Regression evidence",
                   "value": "Not active",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.acceptance_criteria"
                 },
                 {
                   "label": "Architecture impact",
                   "value": "None",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "bugfix.aws_resources_affected"
                 },
                 {
                   "label": "Updated",
                   "value": "DES-0001",
-                  "basis_ids": []
+                  "basis_ids": [],
+                  "source": "define.revision + design.revision + deliver.tasks.checkpoint + deliver.release.evidence_cutoff"
                 }
               ],
               "need_from_owner": "Nothing",
@@ -16935,7 +17653,11 @@
                   "target": "#10-acceptance-criteria"
                 }
               ],
-              "summary_basis_sha256": "sha256:7ae527e9968245fdb553e9201d23a8de185797d6a65242b52aec0af66b4658e9",
+              "provenance": {
+                "need_from_owner": "interaction.owner_action_kind",
+                "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
+              },
+              "summary_basis_sha256": "sha256:c69837a5b5158f7ef7f768914b24dd70e1e2064b2c0c135993764aca774372cc",
               "rendered_sha256": "sha256:37153a289604dc4a7ebe428a206664382e6058f26e06a9d08bd193bc8f00b7a7"
             }
           ]

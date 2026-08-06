@@ -191,6 +191,15 @@ class PackageReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
+            "pull_request:\n"
+            "    types:\n"
+            "      - opened\n"
+            "      - synchronize\n"
+            "      - reopened\n"
+            "      - ready_for_review\n",
+            workflow,
+        )
+        self.assertIn(
             "push:\n    branches:\n      - fast-lane\n      - fast-lane-foundation\n",
             workflow,
         )
@@ -304,7 +313,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.18")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.19")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "bootstrap_version": "1.2.18",
+  "bootstrap_version": "1.2.19",
   "setup": {
     "status": "{{SETUP_STATUS}}",
     "method": "{{SETUP_METHOD}}"

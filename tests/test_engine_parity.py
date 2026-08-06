@@ -83,6 +83,97 @@ class EngineParityTests(unittest.TestCase):
             "canonical projections or receipts",
             self.oracle["normalization"]["forbidden"],
         )
+        self.assertEqual(
+            self.oracle["approved_behavior_changes"],
+            parity.APPROVED_BEHAVIOR_CHANGES,
+        )
+        self.assertEqual(
+            parity.frozen_doctor_characterization(),
+            self.oracle["doctor_characterization"],
+        )
+
+    def test_report_cases_preserve_truthful_summary_semantics(self) -> None:
+        reports = parity.build_parity_reports()
+        expected = {
+            "template_source": (
+                "ANSWER_OPEN_DECISIONS",
+                "Run `init template`.",
+                "Not yet confirmed",
+                "Not yet initialized",
+                "None",
+            ),
+            "unconfigured_template": (
+                "COMPLETE_PREREQUISITE_CHECKLIST",
+                "Run `init template`.",
+                "Not yet confirmed",
+                "Not yet initialized",
+                "None",
+            ),
+            "rendered_intake": (
+                "ANSWER_OPEN_DECISIONS",
+                "Answer the current project question.",
+                "Not yet confirmed",
+                "REQ-0001",
+                "Not approved (boundary record AUTH-0001)",
+            ),
+            "gate_a_pending": (
+                "APPROVE_GATE_A",
+                "Review the requirements and approve them or request a correction.",
+                "FR-001 in scope; production is out of scope",
+                "REQ-0001",
+                "Not approved (boundary record AUTH-0001)",
+            ),
+            "gate_a_approved": (
+                "NONE_CONTINUE_AUTOMATICALLY",
+                "Nothing",
+                "FR-001 in scope; production is out of scope",
+                "REQ-0001",
+                "Not approved (boundary record AUTH-0001)",
+            ),
+            "gate_b_pending": (
+                "APPROVE_GATE_B",
+                "Review the technical plan and approve it or request a correction.",
+                "FR-001 in scope; production is out of scope",
+                "DES-0001",
+                "Not approved (boundary record AUTH-0001)",
+            ),
+            "gate_b_approved": (
+                "NONE_CONTINUE_AUTOMATICALLY",
+                "Nothing",
+                "FR-001 in scope; production is out of scope",
+                "DES-0001",
+                "Approved (AUTH-0001)",
+            ),
+        }
+        for name, values in expected.items():
+            with self.subTest(case=name):
+                action, need, boundary, updated, construction = values
+                report = reports[name]["report"]
+                self.assertEqual(report["interaction"]["owner_action_kind"], action)
+                documents = report["document_summaries"]["documents"]
+                self.assertEqual(
+                    {item["need_from_owner"] for item in documents}, {need}
+                )
+                self.assertEqual(len({item["next_action"] for item in documents}), 1)
+                prd = next(
+                    item for item in documents if item["path"] == "docs/project/PRD.md"
+                )
+                fields = {item["label"]: item["value"] for item in prd["fields"]}
+                self.assertEqual(fields["First-release boundary"], boundary)
+                self.assertEqual(fields["Updated"], updated)
+                self.assertEqual(fields["Construction authorization"], construction)
+
+    def test_summary_truth_change_preserves_every_other_report_contract(self) -> None:
+        reports = parity.build_parity_reports()
+        observed = {
+            name: parity.canonical_digest(parity.summary_truth_compatibility_case(case))
+            for name, case in reports.items()
+        }
+        self.assertEqual(observed, parity.SUMMARY_TRUTH_COMPATIBILITY_DIGESTS)
+        self.assertEqual(
+            self.oracle["summary_truth_compatibility"]["report_case_digests"],
+            parity.SUMMARY_TRUTH_COMPATIBILITY_DIGESTS,
+        )
 
     def test_required_scenarios_are_bound_to_existing_regressions(self) -> None:
         expected = {
