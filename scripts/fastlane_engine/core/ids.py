@@ -12,6 +12,7 @@ from typing import Any, Pattern
 
 
 STABLE_CONTRACT_ID = re.compile(r"[A-Z][A-Z0-9_]*(?:-[A-Z][A-Z0-9_]*)*-\d{3,}")
+TASK_ID = re.compile(r"TASK-\d+")
 UNRESOLVED_TOKEN = re.compile(
     r"(?<![A-Z0-9])(?:TODO|TBD|TBC|UNKNOWN|UNASSIGNED)(?![A-Z0-9])",
     re.IGNORECASE,
@@ -51,6 +52,15 @@ def explicit_value(value: str, *, allow_none: bool = False) -> bool:
     if unresolved(cleaned):
         return False
     return allow_none or cleaned not in {"NONE", "NOT_RECORDED", "UNASSIGNED"}
+
+
+def none_with_reason(value: str) -> bool:
+    """Recognize the existing exact NONE-with-reason compatibility form."""
+
+    cleaned = clean_cell(value)
+    return bool(re.fullmatch(r"NONE\s+(?:-|â€”)\s+\S.*", cleaned)) and not unresolved(
+        cleaned
+    )
 
 
 def parse_exact_id_list(
@@ -101,10 +111,12 @@ def validate_relative_path(value: Any) -> str | None:
 __all__ = (
     "EVIDENCE_PLACEHOLDER_PATTERN",
     "STABLE_CONTRACT_ID",
+    "TASK_ID",
     "UNRESOLVED_TOKEN",
     "canonical_id_list",
     "clean_cell",
     "explicit_value",
+    "none_with_reason",
     "parse_exact_id_list",
     "unresolved",
     "validate_relative_path",

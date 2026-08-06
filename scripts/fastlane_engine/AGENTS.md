@@ -12,6 +12,14 @@ This guide narrows the root rules and never widens approval or authorization.
 - `define/` owns intake, requirements, assumptions, adaptive coverage, change
   impact, brownfield safeguards, AWS materiality, and Gate A readiness. It
   consumes observed text and explicit caller policy; it cannot approve Gate A.
+- `design/` owns architecture comparison, technology and property support,
+  source disposition, Harness selection, project interfaces and state models,
+  diagrams, the construction envelope, and optional ADR rationale evaluation.
+  Define projections and the invocation clock are explicit inputs; Design
+  cannot approve Gate B or grant construction or external authority.
+- ADR file inventory and bounded reads remain in `../fastlane_adr.py`; the
+  Design evaluator consumes only repository-relative observed sources. ADRs
+  remain supporting rationale and never enter requirements or design digests.
 - Routing consumes domain results, never parsers or snapshot builders.
 - Reporting serializes already-derived results and does not make policy.
 - Exact ordering, IDs, hashes, receipts, diagnostics, and compatibility behavior

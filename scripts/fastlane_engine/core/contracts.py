@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import PurePosixPath
 from typing import Sequence
 
 from .ids import clean_cell
@@ -45,6 +46,7 @@ CHECKPOINT_GIT_RECEIPT = re.compile(
     r"Dirty\s*:\s*(.+?)\s*",
     re.IGNORECASE,
 )
+SHELL_CONTROL = re.compile(r"[;&|><`$()\\\r\n]")
 
 
 @dataclass(frozen=True)
@@ -406,6 +408,52 @@ def parse_checkpoint_git_receipt_value(value: str) -> tuple[str, str]:
     return match.group(1), match.group(2).replace("`", "").strip()
 
 
+def parse_task_write_set(value: str, task_id: str) -> list[str]:
+    """Parse the shared safe repository write-set grammar."""
+
+    value = clean_cell(value)
+    if value in {"", "TODO", "TBD", "UNKNOWN"}:
+        raise ValueError(f"{task_id}: unresolved Write set")
+    if value == "NONE":
+        return []
+    result: list[str] = []
+    for item in (part.strip() for part in value.split(",")):
+        broad = item.endswith("/**")
+        base = item[:-3] if broad else item
+        pure = PurePosixPath(base)
+        if (
+            not base
+            or pure.is_absolute()
+            or "\\" in item
+            or any(part.casefold() in {"", ".", "..", ".git"} for part in pure.parts)
+            or any(character in base for character in "*?[]{}")
+            or pure.as_posix() != base
+        ):
+            raise ValueError(f"{task_id}: unsafe Write set entry {item!r}")
+        result.append(item)
+    if len(result) != len({item.casefold() for item in result}):
+        raise ValueError(f"{task_id}: duplicate Write set entry")
+    return result
+
+
+def parse_task_external_state(value: str, task_id: str) -> list[str]:
+    """Parse the shared duplicate-free external-target grammar."""
+
+    value = clean_cell(value)
+    if value in {"", "TODO", "TBD", "UNKNOWN"}:
+        raise ValueError(f"{task_id}: unresolved External state")
+    if value == "NONE":
+        return []
+    values = [item.strip() for item in value.split(",")]
+    if any(
+        not item or any(character in item for character in "*?[]{}") for item in values
+    ):
+        raise ValueError(f"{task_id}: ambiguous External state")
+    if len(values) != len({item.casefold() for item in values}):
+        raise ValueError(f"{task_id}: duplicate External state entry")
+    return values
+
+
 def path_boundary_base(value: str) -> tuple[str, bool]:
     normalized = value.casefold()
     return (
@@ -451,6 +499,7 @@ __all__ = (
     "ContractParseError",
     "ContractTable",
     "SEPARATOR_CELL",
+    "SHELL_CONTROL",
     "TASK_COMPLETION_EVIDENCE_HEADERS",
     "contract_table_after_heading",
     "contract_table_in_section",
@@ -459,7 +508,9 @@ __all__ = (
     "parse_checkpoint_cells",
     "parse_checkpoint_git_receipt_value",
     "parse_exact_section_table",
+    "parse_task_external_state",
     "parse_task_completion_evidence_cells",
+    "parse_task_write_set",
     "path_boundaries_overlap",
     "path_boundary_base",
     "path_boundary_contains",

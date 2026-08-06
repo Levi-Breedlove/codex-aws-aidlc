@@ -52,6 +52,10 @@ cross-platform, fail-closed, and free of hidden external actions.
   adaptive coverage, change impact, brownfield, AWS-materiality, and Gate A
   readiness evaluation. The public doctor remains a compatibility facade and
   supplies already-observed text and selections.
+- `fastlane_engine.design` owns pure architecture, technology, source,
+  interface/state, diagram, Harness, envelope, and ADR-rationale evaluation.
+  `fastlane_adr.py` observes bounded ADR files and delegates evaluation; it
+  cannot select architecture or affect design digests or authority.
 
 ## Required validation
 

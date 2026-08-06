@@ -7,14 +7,17 @@ compatibility remains in :mod:`scripts.bootstrap_doctor`.
 """
 
 from .api import (
+    DesignContract,
     IntakeFoundationContract,
     RequirementsContract,
     capture_project_snapshot,
     derive_change_impact_contract,
     derive_coverage_contract,
+    derive_design_contract,
     derive_intake_foundation_contract,
     derive_req_aws_materiality,
     derive_requirements_contract,
+    evaluate_adr_rationale,
 )
 from .core.diagnostics import Diagnostic, DiagnosticCollector
 from .core.snapshot import ProjectSnapshot
@@ -22,13 +25,16 @@ from .core.snapshot import ProjectSnapshot
 __all__ = (
     "Diagnostic",
     "DiagnosticCollector",
+    "DesignContract",
     "IntakeFoundationContract",
     "ProjectSnapshot",
     "RequirementsContract",
     "capture_project_snapshot",
     "derive_change_impact_contract",
     "derive_coverage_contract",
+    "derive_design_contract",
     "derive_intake_foundation_contract",
     "derive_req_aws_materiality",
     "derive_requirements_contract",
+    "evaluate_adr_rationale",
 )
