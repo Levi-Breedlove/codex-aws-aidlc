@@ -55,6 +55,13 @@ SKIP_NAMES_CASEFOLD = {name.casefold() for name in SKIP_NAMES}
 ENGINE_RUNTIME_CONTROL_PATHS = {
     "scripts/fastlane_engine/__init__.py",
     "scripts/fastlane_engine/api.py",
+    "scripts/fastlane_engine/aws/__init__.py",
+    "scripts/fastlane_engine/aws/deployment.py",
+    "scripts/fastlane_engine/aws/evidence.py",
+    "scripts/fastlane_engine/aws/lifecycle.py",
+    "scripts/fastlane_engine/aws/models.py",
+    "scripts/fastlane_engine/aws/preflight.py",
+    "scripts/fastlane_engine/aws/teardown.py",
     "scripts/fastlane_engine/core/__init__.py",
     "scripts/fastlane_engine/core/contracts.py",
     "scripts/fastlane_engine/core/diagnostics.py",

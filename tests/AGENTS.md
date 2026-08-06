@@ -51,3 +51,7 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
   semantics, attempts, checkpoints, property and completion evidence, release
   state, resume behavior, and the sole-mutator boundary. `task_waves.py` must
   use the public Engine API without dynamically loading the doctor CLI.
+- AWS extraction must preserve linked AWS Core evidence, every journal row and
+  transition, residual disposition, read/deployment/teardown receipt binding,
+  diagnostic order, and restricted closure. Tests remain synthetic and must
+  prove that the AWS domain performs no account call or authority broadening.

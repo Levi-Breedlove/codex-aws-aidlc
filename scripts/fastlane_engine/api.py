@@ -1,7 +1,7 @@
 """Supported read-only entry points for the Fastlane Engine foundation.
 
 Inputs are repository-relative paths and caller-supplied observation policy.
-Outputs are immutable snapshots, Define projections, or Design projections.
+Outputs are immutable snapshots, Define, Design, Delivery, or AWS projections.
 Snapshot capture may read bounded regular files; domain evaluators consume caller-supplied text and
 perform no I/O. The API never writes, runs Git, invokes AWS, approves a gate, or
 grants authority.
@@ -12,6 +12,18 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable
 from pathlib import Path
+
+from .aws import (
+    AwsAuthorityPolicy,
+    AwsCoreEvidenceRow,
+    aws_core_phase_evidence_issues,
+    derive_aws_core_observed_usage,
+    derive_aws_execution_projection,
+    derive_deployment_sequence_state,
+    derive_read_preflight_state,
+    derive_teardown_sequence_state,
+    parse_aws_core_evidence,
+)
 
 from .core.contracts import (
     contract_table_after_heading,
@@ -476,22 +488,31 @@ __all__ = (
     "ApprovedDeliveryContract",
     "ApprovedSpikeContract",
     "ApprovedTaskContract",
+    "AwsAuthorityPolicy",
+    "AwsCoreEvidenceRow",
     "DELIVERY_VALIDATION_POLICY",
     "HarnessExecutionRow",
     "PropertyExecutionRow",
     "ProjectSnapshot",
     "RequirementsContract",
     "capture_project_snapshot",
+    "aws_core_phase_evidence_issues",
     "derive_change_impact_contract",
+    "derive_aws_core_observed_usage",
+    "derive_aws_execution_projection",
     "derive_coverage_contract",
     "derive_design_contract",
+    "derive_deployment_sequence_state",
     "derive_current_design_contract",
     "derive_approved_task_contract",
     "derive_task_requirement_coverage",
     "derive_intake_foundation_contract",
     "derive_req_aws_materiality",
+    "derive_read_preflight_state",
     "derive_requirements_contract",
+    "derive_teardown_sequence_state",
     "evaluate_adr_rationale",
+    "parse_aws_core_evidence",
     "validate_approved_property_evidence",
     "validate_task_execution_basis",
 )

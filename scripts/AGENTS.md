@@ -59,6 +59,11 @@ cross-platform, fail-closed, and free of hidden external actions.
 - `fastlane_engine.deliver` owns pure task, evidence, checkpoint, repository,
   and release validation. `task_waves.py` remains the sole task mutator and
   consumes only the public Engine Delivery API; it never loads the doctor CLI.
+- `fastlane_engine.aws` owns pure AWS Core evidence, preflight, deployment,
+  reconciliation, residual-review, and teardown state machines. It consumes
+  explicit authority projections, performs no AWS call, and cannot broaden a
+  receipt or authorize an action. The remaining authority callbacks stay in
+  the doctor facade only until the next serial extraction.
 
 ## Required validation
 

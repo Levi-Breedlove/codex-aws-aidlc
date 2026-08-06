@@ -69,6 +69,33 @@ def explicit_timestamp(value: str) -> bool:
     return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 
+def iso_datetime(value: str) -> datetime | None:
+    """Parse one timezone-aware ISO timestamp without consulting a clock."""
+
+    cleaned = clean_cell(value)
+    normalized = cleaned[:-1] + "+00:00" if cleaned.endswith("Z") else cleaned
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed
+
+
+def require_explicit_evidence_value(value: str, label: str) -> str:
+    """SAFETY: reject empty, multiline, or placeholder evidence values."""
+
+    cleaned = clean_cell(value)
+    if (
+        not cleaned
+        or any(character in cleaned for character in "\r\n")
+        or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
+    ):
+        raise ValueError(f"{label} is unresolved or placeholder evidence")
+    return cleaned
+
+
 def none_with_reason(value: str) -> bool:
     """Recognize the existing exact NONE-with-reason compatibility form."""
 
@@ -132,8 +159,10 @@ __all__ = (
     "clean_cell",
     "explicit_value",
     "explicit_timestamp",
+    "iso_datetime",
     "none_with_reason",
     "parse_exact_id_list",
+    "require_explicit_evidence_value",
     "unresolved",
     "validate_relative_path",
 )

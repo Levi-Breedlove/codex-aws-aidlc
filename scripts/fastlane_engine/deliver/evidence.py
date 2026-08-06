@@ -27,6 +27,7 @@ from ..core.ids import (
     EVIDENCE_PLACEHOLDER_PATTERN,
     clean_cell,
     explicit_timestamp,
+    require_explicit_evidence_value,
     unresolved,
 )
 from .models import (
@@ -121,17 +122,6 @@ def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]
     if len(identifiers) != len(set(identifiers)):
         raise ValueError("VERIFY.md Task completion Evidence IDs must be unique")
     return rows
-
-
-def require_explicit_evidence_value(value: str, label: str) -> str:
-    cleaned = clean_cell(value)
-    if (
-        not cleaned
-        or any(character in cleaned for character in "\r\n")
-        or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
-    ):
-        raise ValueError(f"{label} is unresolved or placeholder evidence")
-    return cleaned
 
 
 def require_durable_evidence_source(value: str, label: str) -> str:
