@@ -156,9 +156,7 @@ class EngineParityTests(unittest.TestCase):
                 )
                 self.assertEqual(len({item["next_action"] for item in documents}), 1)
                 prd = next(
-                    item
-                    for item in documents
-                    if item["path"] == "docs/project/PRD.md"
+                    item for item in documents if item["path"] == "docs/project/PRD.md"
                 )
                 fields = {item["label"]: item["value"] for item in prd["fields"]}
                 self.assertEqual(fields["First-release boundary"], boundary)
@@ -168,9 +166,7 @@ class EngineParityTests(unittest.TestCase):
     def test_summary_truth_change_preserves_every_other_report_contract(self) -> None:
         reports = parity.build_parity_reports()
         observed = {
-            name: parity.canonical_digest(
-                parity.summary_truth_compatibility_case(case)
-            )
+            name: parity.canonical_digest(parity.summary_truth_compatibility_case(case))
             for name, case in reports.items()
         }
         self.assertEqual(observed, parity.SUMMARY_TRUTH_COMPATIBILITY_DIGESTS)

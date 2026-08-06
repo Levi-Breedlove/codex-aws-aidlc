@@ -647,15 +647,11 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(
                 gate_a["interaction"]["owner_action_kind"], "APPROVE_GATE_A"
             )
-            self.assertFalse(
-                gate_a["interaction"]["automatic_continuation_allowed"]
-            )
+            self.assertFalse(gate_a["interaction"]["automatic_continuation_allowed"])
             gate_a_documents = gate_a["document_summaries"]["documents"]
             self.assertEqual(
                 {item["need_from_owner"] for item in gate_a_documents},
-                {
-                    "Review the requirements and approve them or request a correction."
-                },
+                {"Review the requirements and approve them or request a correction."},
             )
             self.assertEqual(
                 {item["next_action"] for item in gate_a_documents},
@@ -698,9 +694,7 @@ class ProductJourneyTests(unittest.TestCase):
             gate_b_documents = gate_b["document_summaries"]["documents"]
             self.assertEqual(
                 {item["need_from_owner"] for item in gate_b_documents},
-                {
-                    "Review the technical plan and approve it or request a correction."
-                },
+                {"Review the technical plan and approve it or request a correction."},
             )
             self.assertEqual(
                 {item["next_action"] for item in gate_b_documents},

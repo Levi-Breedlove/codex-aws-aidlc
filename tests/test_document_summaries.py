@@ -481,8 +481,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
                     "next_prompt": "AWS-50",
                 },
                 "Review the exact teardown authorization.",
-                "After your authorization, Codex will perform only the exact "
-                "teardown.",
+                "After your authorization, Codex will perform only the exact teardown.",
             ),
         )
         base_state = {
@@ -493,9 +492,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         }
         for name, state, expected_need, expected_next in cases:
             with self.subTest(state=name):
-                documents = build_summary_specifications(
-                    {**base_state, **state}
-                )
+                documents = build_summary_specifications({**base_state, **state})
                 self.assertEqual(
                     {item["need_from_owner"] for item in documents},
                     {expected_need},
@@ -598,9 +595,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         self,
     ) -> None:
         expected = {
-            "FAILED": (
-                "Failed deployment attempt reconciled; deployment not verified"
-            ),
+            "FAILED": ("Failed deployment attempt reconciled; deployment not verified"),
             "PARTIAL": (
                 "Partial deployment reconciled; expected release not fully observed"
             ),
@@ -687,8 +682,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
                 )
                 by_path = {
                     str(item["path"]): {
-                        field["label"]: field["value"]
-                        for field in item["fields"]
+                        field["label"]: field["value"] for field in item["fields"]
                     }
                     for item in documents
                 }
@@ -840,19 +834,24 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
     def test_every_owner_visible_value_has_typed_internal_provenance(self) -> None:
         by_path = self.summary_specifications()
         expected_examples = {
-            ("docs/project/PRD.md", "First-release boundary"):
-                "define.gate_a_readiness.scope_and_non_goals",
-            ("docs/project/PRD.md", "Construction authorization"):
-                "authority.write.valid + authority.write.authorization_id",
-            ("docs/project/VERIFY.md", "Locally observed evidence"):
-                "deliver.evidence.task_completion",
-            ("docs/project/RUNBOOK.md", "Deployment state"):
-                (
-                    "aws.deployment.action_status + "
-                    "aws.deployment.reconciliation_status + "
-                    "aws.deployment.acceptance_evidence_ids + "
-                    "runbook.active_boundary + project.region"
-                ),
+            (
+                "docs/project/PRD.md",
+                "First-release boundary",
+            ): "define.gate_a_readiness.scope_and_non_goals",
+            (
+                "docs/project/PRD.md",
+                "Construction authorization",
+            ): "authority.write.valid + authority.write.authorization_id",
+            (
+                "docs/project/VERIFY.md",
+                "Locally observed evidence",
+            ): "deliver.evidence.task_completion",
+            ("docs/project/RUNBOOK.md", "Deployment state"): (
+                "aws.deployment.action_status + "
+                "aws.deployment.reconciliation_status + "
+                "aws.deployment.acceptance_evidence_ids + "
+                "runbook.active_boundary + project.region"
+            ),
         }
         for path, document in by_path.items():
             with self.subTest(path=path):
@@ -957,9 +956,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
     def test_active_bugfix_summary_uses_recorded_defect_state(self) -> None:
         source = canonical_sources()["docs/project/BUGFIX.md"]
         source = source.replace("- Title: TODO", "- Title: Uploads remain queued", 1)
-        source = source.replace(
-            "- Environment: TODO", "- Environment: Development", 1
-        )
+        source = source.replace("- Environment: TODO", "- Environment: Development", 1)
         source = source.replace(
             "- Related PRD requirements: TODO",
             "- Related PRD requirements: FR-001",
@@ -994,9 +991,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
             for item in by_path["docs/project/BUGFIX.md"]["fields"]
         }
         self.assertEqual(fields["Defect"], "Uploads remain queued")
-        self.assertEqual(
-            fields["User impact"], "Users cannot view the uploaded file"
-        )
+        self.assertEqual(fields["User impact"], "Users cannot view the uploaded file")
         self.assertEqual(fields["Reproduction"], "Recorded")
         self.assertEqual(fields["Root cause"], "Confirmed")
         self.assertEqual(fields["Repair"], "Bounded")

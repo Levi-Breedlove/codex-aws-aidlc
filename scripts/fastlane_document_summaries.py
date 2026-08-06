@@ -460,9 +460,7 @@ def project_document_summaries(
     )
 
 
-def _field(
-    path: str, label: str, value: object, *basis_ids: object
-) -> dict[str, Any]:
+def _field(path: str, label: str, value: object, *basis_ids: object) -> dict[str, Any]:
     source = SUMMARY_FIELD_SOURCE_OVERRIDES.get(
         (path, label), SUMMARY_FIELD_SOURCES.get(label)
     )
@@ -575,8 +573,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
             "read-only AWS preflight."
         ),
         "AUTHORIZE_AWS_OPERATION": (
-            "After your authorization, Codex will perform only the exact AWS "
-            "operation."
+            "After your authorization, Codex will perform only the exact AWS operation."
         ),
         "AUTHORIZE_AWS_TEARDOWN": (
             "After your authorization, Codex will perform only the exact teardown."
@@ -603,8 +600,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
         and str(state.get("next_prompt") or "") in {"BUILD-10", "BUILD-20"}
     ):
         next_action = (
-            "After your answer, Codex will resume the active local construction "
-            "task."
+            "After your answer, Codex will resume the active local construction task."
         )
     if automatic and state.get("route_reason_code") == "AWS_PREFLIGHT_RUNNING":
         next_action = "Codex will complete the read-only AWS preflight."

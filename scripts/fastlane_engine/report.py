@@ -627,9 +627,7 @@ def _summary_deployment_observation(
     reconciliation = clean_cell(sequence.get("reconciliation_status", "NONE"))
     raw_evidence = sequence.get("acceptance_evidence_ids", [])
     evidence = (
-        [str(item) for item in raw_evidence]
-        if isinstance(raw_evidence, list)
-        else []
+        [str(item) for item in raw_evidence] if isinstance(raw_evidence, list) else []
     )
     observed = bool(
         status == "RECONCILED"
@@ -642,24 +640,16 @@ def _summary_deployment_observation(
     if observed:
         state = "Deployment observed"
         emergency = "Follow the current runbook and authority"
-    elif (
-        status == "RECONCILED"
-        and reconciliation == "COMPLETE"
-        and action == "FAILED"
-    ):
+    elif status == "RECONCILED" and reconciliation == "COMPLETE" and action == "FAILED":
         state = "Failed deployment attempt reconciled; deployment not verified"
         emergency = "No successful deployment is recorded"
     elif (
-        status == "RECONCILED"
-        and reconciliation == "COMPLETE"
-        and action == "PARTIAL"
+        status == "RECONCILED" and reconciliation == "COMPLETE" and action == "PARTIAL"
     ):
         state = "Partial deployment reconciled; expected release not fully observed"
         emergency = "Environment state is only partially observed"
     elif (
-        status == "RECONCILED"
-        and reconciliation == "COMPLETE"
-        and action == "UNKNOWN"
+        status == "RECONCILED" and reconciliation == "COMPLETE" and action == "UNKNOWN"
     ):
         state = "Deployment attempt reconciled, but terminal success remains unknown"
         emergency = "Environment state is not proven"
@@ -880,9 +870,7 @@ def derive_document_summary_specifications(
         "status": "Active bounded defect" if bug_active else "No active bounded defect",
         "defect": _summary_value(bug_title, "None") if bug_active else "None",
         "impact": (
-            _summary_value(bug_impact, "Not yet recorded")
-            if bug_active
-            else "None"
+            _summary_value(bug_impact, "Not yet recorded") if bug_active else "None"
         ),
         "reproduction": (
             "Recorded"
