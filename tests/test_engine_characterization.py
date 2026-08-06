@@ -76,7 +76,7 @@ class EngineCharacterizationTests(unittest.TestCase):
         self.assertEqual(import_cycles(graph), [])
         self.assertNotIn("tests", graph)
 
-    def test_task_wave_dynamic_doctor_load_is_explicitly_characterized(self) -> None:
+    def test_task_wave_has_eliminated_dynamic_doctor_loading(self) -> None:
         text = (REPOSITORY_ROOT / "scripts/task_waves.py").read_text(encoding="utf-8")
         tree = ast.parse(text)
         calls = sum(
@@ -86,12 +86,9 @@ class EngineCharacterizationTests(unittest.TestCase):
             and isinstance(node.func, ast.Name)
             and node.func.id == "load_bootstrap_doctor"
         )
-        engine_package = REPOSITORY_ROOT / "scripts/fastlane_engine"
-        if not engine_package.exists():
-            self.assertEqual(calls, 4)
-            self.assertEqual(text.count("spec_from_file_location(module_name"), 1)
-        else:
-            self.assertLessEqual(calls, 4)
+        self.assertEqual(calls, 0)
+        self.assertNotIn("spec_from_file_location(module_name", text)
+        self.assertNotIn("import importlib.util", text)
 
     def test_characterization_thresholds_are_explicit_and_non_runtime(self) -> None:
         self.assertEqual(self.configuration["baseline_commit"], parity.BASELINE_COMMIT)

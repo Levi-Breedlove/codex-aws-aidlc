@@ -35,6 +35,7 @@ if __package__:
     from .fastlane_engine.core.ids import (
         canonical_id_list,
         clean_cell,
+        explicit_timestamp,
         explicit_value,
         parse_exact_id_list,
         unresolved,
@@ -181,8 +182,8 @@ if __package__:
     )
 else:  # Executed directly from scripts/.
     from fastlane_engine.core.contracts import (
-        ContractTable,
-        _parse_contract_table_lines,
+        ContractTable as ContractTable,
+        _parse_contract_table_lines as _parse_contract_table_lines,
         contract_table_after_heading,
         markdown_tables,
         split_table_row,
@@ -192,6 +193,7 @@ else:  # Executed directly from scripts/.
     from fastlane_engine.core.ids import (
         canonical_id_list,
         clean_cell,
+        explicit_timestamp,
         explicit_value,
         parse_exact_id_list,
         unresolved,
@@ -283,10 +285,10 @@ else:  # Executed directly from scripts/.
         LAYER_BOUNDARY_HEADERS as LAYER_BOUNDARY_HEADERS,
         LAYER_BOUNDARY_HEADING as LAYER_BOUNDARY_HEADING,
         MATERIAL_AWS_EVIDENCE_HEADING as MATERIAL_AWS_EVIDENCE_HEADING,
-        PROPERTY_EXECUTION_HEADERS,
+        PROPERTY_EXECUTION_HEADERS as PROPERTY_EXECUTION_HEADERS,
         PROPERTY_EXECUTION_HEADING as PROPERTY_EXECUTION_HEADING,
-        PROPERTY_ID,
-        PROPERTY_TEST_EVIDENCE_DESTINATION,
+        PROPERTY_ID as PROPERTY_ID,
+        PROPERTY_TEST_EVIDENCE_DESTINATION as PROPERTY_TEST_EVIDENCE_DESTINATION,
         RICH_TO_STATE_TRIGGER as RICH_TO_STATE_TRIGGER,
         SPIKE_HEADING as SPIKE_HEADING,
         STATE_APPLICABILITY_HEADERS as STATE_APPLICABILITY_HEADERS,
@@ -320,14 +322,14 @@ else:  # Executed directly from scripts/.
         parse_envelope_targets,
         parse_future_expiry_at,
         parse_github_constraints,
-        parse_property_run_target,
+        parse_property_run_target as parse_property_run_target,
         parse_task_boundary,
-        parsed_numeric_version,
+        parsed_numeric_version as parsed_numeric_version,
         required_diagram_kinds,
-        technology_contract_value_is_unresolved,
+        technology_contract_value_is_unresolved as technology_contract_value_is_unresolved,
         technology_reasoning_parts,
         machine_comparable_property_version_policy as machine_comparable_property_version_policy,
-        valid_property_execution_command,
+        valid_property_execution_command as valid_property_execution_command,
         valid_technology_selection as valid_technology_selection,
         valid_technology_version_policy as valid_technology_version_policy,
         validate_application_source_disposition as validate_application_source_disposition,
@@ -474,6 +476,190 @@ def parse_future_expiry(value: str) -> datetime:
     return parse_future_expiry_at(value, datetime.now(timezone.utc))
 
 
+if __package__:
+    from .fastlane_engine.api import DELIVERY_VALIDATION_POLICY
+    from .fastlane_engine.deliver import (
+        CheckpointReceiptRow,
+        InspectedTask,
+        PropertyTestEvidenceRow,
+        TaskCompletionEvidenceRow,
+        TaskRequirementCoverage,
+        TaskRequirementCoverageResult,
+        TaskSummary,
+        declared_task_waivers,
+        derive_task_requirement_coverage as _derive_task_requirement_coverage_core,
+        evidence_timestamp,
+        external_target_contains,
+        inspect_task_blocks,
+        inspect_task_sections,
+        missing_current_property_task_coverage as _missing_property_coverage_core,
+        parse_checkpoint_git_receipt,
+        parse_checkpoint_rows,
+        parse_observed_property_run,
+        parse_property_test_evidence as _parse_property_test_evidence_core,
+        parse_release_decision_record as _parse_release_decision_record_core,
+        parse_task_completion_evidence,
+        parse_verification_matrix,
+        replay_evidence_matches_contract,
+        require_durable_evidence_source,
+        require_explicit_evidence_value,
+        task_property_execution_table,
+        task_requirement_evidence_dispositions,
+        task_requirement_rules as _task_requirement_rules_core,
+        task_waiver_rows,
+        technology_version_policy_allows as _technology_version_policy_allows_core,
+        validate_done_evidence,
+        validate_done_property_evidence as _validate_done_property_evidence_core,
+        validate_task_property_execution_projection as _validate_property_projection_core,
+        validate_task_records as _validate_task_records_core,
+    )
+else:
+    from fastlane_engine.api import DELIVERY_VALIDATION_POLICY
+    from fastlane_engine.deliver import (
+        CheckpointReceiptRow as CheckpointReceiptRow,
+        InspectedTask,
+        PropertyTestEvidenceRow,
+        TaskCompletionEvidenceRow,
+        TaskRequirementCoverage as TaskRequirementCoverage,
+        TaskRequirementCoverageResult,
+        TaskSummary,
+        declared_task_waivers as declared_task_waivers,
+        derive_task_requirement_coverage as _derive_task_requirement_coverage_core,
+        evidence_timestamp as evidence_timestamp,
+        external_target_contains,
+        inspect_task_blocks,
+        inspect_task_sections,
+        missing_current_property_task_coverage as _missing_property_coverage_core,
+        parse_checkpoint_git_receipt,
+        parse_checkpoint_rows,
+        parse_observed_property_run as parse_observed_property_run,
+        parse_property_test_evidence as _parse_property_test_evidence_core,
+        parse_release_decision_record as _parse_release_decision_record_core,
+        parse_task_completion_evidence as parse_task_completion_evidence,
+        parse_verification_matrix,
+        replay_evidence_matches_contract as replay_evidence_matches_contract,
+        require_durable_evidence_source as require_durable_evidence_source,
+        require_explicit_evidence_value,
+        task_property_execution_table as task_property_execution_table,
+        task_requirement_evidence_dispositions,
+        task_requirement_rules as _task_requirement_rules_core,
+        task_waiver_rows as task_waiver_rows,
+        technology_version_policy_allows as _technology_version_policy_allows_core,
+        validate_done_evidence as validate_done_evidence,
+        validate_done_property_evidence as _validate_done_property_evidence_core,
+        validate_task_property_execution_projection as _validate_property_projection_core,
+        validate_task_records as _validate_task_records_core,
+    )
+
+
+def validate_task_property_execution_projection(
+    validation_section: str,
+    task_id: str,
+    requirements: str,
+    technology_refs: list[str],
+    property_execution_by_id: dict[str, PropertyExecution] | None,
+) -> None:
+    """COMPATIBILITY: supply the current Design grammar to Delivery validation."""
+
+    _validate_property_projection_core(
+        validation_section,
+        task_id,
+        requirements,
+        technology_refs,
+        property_execution_by_id,
+        DELIVERY_VALIDATION_POLICY,
+    )
+
+
+def parse_property_test_evidence(text: str) -> list[PropertyTestEvidenceRow]:
+    """COMPATIBILITY: parse property evidence with the current Design grammar."""
+
+    return _parse_property_test_evidence_core(text, DELIVERY_VALIDATION_POLICY)
+
+
+def technology_version_policy_allows(policy: str, observed: str) -> bool:
+    """COMPATIBILITY: preserve the public Delivery evidence helper."""
+
+    return _technology_version_policy_allows_core(
+        policy, observed, DELIVERY_VALIDATION_POLICY
+    )
+
+
+def validate_done_property_evidence(
+    rows: list[PropertyTestEvidenceRow],
+    task: InspectedTask,
+    snapshot: dict[str, str],
+    expected: PropertyExecution,
+    technology: TechnologyDecision,
+    completion_rows: list[TaskCompletionEvidenceRow],
+    *,
+    require_done_pass: bool = True,
+) -> None:
+    """COMPATIBILITY: validate evidence through the pure Delivery domain."""
+
+    _validate_done_property_evidence_core(
+        rows,
+        task,
+        snapshot,
+        expected,
+        technology,
+        completion_rows,
+        DELIVERY_VALIDATION_POLICY,
+        require_done_pass=require_done_pass,
+    )
+
+
+def validate_task_records(
+    text: str,
+    snapshot: dict[str, str],
+    verify_text: str | None = None,
+    approved_tech_ids: set[str] | None = None,
+    property_execution_by_id: dict[str, PropertyExecution] | None = None,
+    technology_decisions_by_id: dict[str, TechnologyDecision] | None = None,
+) -> tuple[list[InspectedTask], dict[str, InspectedTask], list[str]]:
+    """COMPATIBILITY: preserve the historical task-graph validator signature."""
+
+    return _validate_task_records_core(
+        text,
+        snapshot,
+        verify_text,
+        approved_tech_ids,
+        property_execution_by_id,
+        technology_decisions_by_id,
+        DELIVERY_VALIDATION_POLICY,
+    )
+
+
+def missing_current_property_task_coverage(
+    tasks: list[InspectedTask],
+    plan_state: str,
+    property_execution_by_id: dict[str, PropertyExecution],
+) -> list[str]:
+    return _missing_property_coverage_core(
+        tasks, plan_state, property_execution_by_id, DELIVERY_VALIDATION_POLICY
+    )
+
+
+def task_requirement_rules(
+    prd_text: str,
+    requirements_contract: RequirementsContract,
+) -> dict[str, tuple[str, str]]:
+    return _task_requirement_rules_core(
+        prd_text, requirements_contract, _schema_13_requirement_rows
+    )
+
+
+def derive_task_requirement_coverage(
+    tasks: Sequence[Any],
+    plan_state: str,
+    requirement_rules: Mapping[str, tuple[str, str]],
+    evidence_dispositions: Mapping[str, tuple[str, tuple[str, ...]]],
+) -> TaskRequirementCoverageResult:
+    return _derive_task_requirement_coverage_core(
+        tasks, plan_state, requirement_rules, evidence_dispositions
+    )
+
+
 try:
     from fastlane_adr import derive_adr_rationale, empty_adr_rationale
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
@@ -506,11 +692,11 @@ try:
     )
 except ModuleNotFoundError:  # Loaded as scripts.bootstrap_doctor in unit tests.
     from scripts.fastlane_contracts import (
-        ContractParseError,
+        ContractParseError as ContractParseError,
         external_targets_overlap,
-        parse_checkpoint_cells,
-        parse_checkpoint_git_receipt_value,
-        parse_task_completion_evidence_cells,
+        parse_checkpoint_cells as parse_checkpoint_cells,
+        parse_checkpoint_git_receipt_value as parse_checkpoint_git_receipt_value,
+        parse_task_completion_evidence_cells as parse_task_completion_evidence_cells,
         path_boundaries_overlap,
         path_boundary_contains,
         split_markdown_table_row,
@@ -655,6 +841,12 @@ ENGINE_RUNTIME_CONTROL_FILES = {
     "scripts/fastlane_engine/design/project.py",
     "scripts/fastlane_engine/design/source.py",
     "scripts/fastlane_engine/design/support.py",
+    "scripts/fastlane_engine/deliver/__init__.py",
+    "scripts/fastlane_engine/deliver/evidence.py",
+    "scripts/fastlane_engine/deliver/models.py",
+    "scripts/fastlane_engine/deliver/release.py",
+    "scripts/fastlane_engine/deliver/repository.py",
+    "scripts/fastlane_engine/deliver/tasks.py",
     "scripts/fastlane_engine/package/__init__.py",
     "scripts/fastlane_engine/package/manifest.py",
     "scripts/fastlane_engine/package/state.py",
@@ -1172,75 +1364,6 @@ class Context:
         )
 
 
-@dataclass
-class TaskSummary:
-    plan_revision: str | None = None
-    plan_state: str = "UNINITIALIZED"
-    statuses: dict[str, str] = field(default_factory=dict)
-    ready: list[str] = field(default_factory=list)
-    active: list[str] = field(default_factory=list)
-    write_sets: dict[str, list[str]] = field(default_factory=dict)
-    attempts_used: dict[str, int] = field(default_factory=dict)
-    attempt_budgets: dict[str, int] = field(default_factory=dict)
-    requirement_coverage_complete: bool = False
-    requirement_coverage: dict[str, dict[str, Any]] = field(default_factory=dict)
-    missing_requirement_ids: list[str] = field(default_factory=list)
-
-    @property
-    def total(self) -> int:
-        return len(self.statuses)
-
-    @property
-    def done(self) -> list[str]:
-        return sorted(
-            task_id for task_id, status in self.statuses.items() if status == "DONE"
-        )
-
-    @property
-    def skipped(self) -> list[str]:
-        return sorted(
-            task_id for task_id, status in self.statuses.items() if status == "SKIPPED"
-        )
-
-    @property
-    def blocked(self) -> list[str]:
-        return sorted(
-            task_id for task_id, status in self.statuses.items() if status == "BLOCKED"
-        )
-
-    @property
-    def terminal(self) -> bool:
-        return bool(self.statuses) and all(
-            status in {"DONE", "SKIPPED"} for status in self.statuses.values()
-        )
-
-
-@dataclass(frozen=True)
-class TaskRequirementCoverage:
-    requirement_id: str
-    acceptance_id: str
-    disposition: str
-    task_ids: tuple[str, ...] = ()
-    evidence_ids: tuple[str, ...] = ()
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "requirement_id": self.requirement_id,
-            "acceptance_id": self.acceptance_id,
-            "disposition": self.disposition,
-            "task_ids": list(self.task_ids),
-            "evidence_ids": list(self.evidence_ids),
-        }
-
-
-@dataclass(frozen=True)
-class TaskRequirementCoverageResult:
-    records: tuple[TaskRequirementCoverage, ...] = ()
-    trace_issues: tuple[str, ...] = ()
-    evidence_issues: tuple[str, ...] = ()
-    missing_requirement_ids: tuple[str, ...] = ()
-
-
 TASK_METADATA_KEYS = (
     "Status",
     "Requirements",
@@ -1663,69 +1786,6 @@ AWS_CORE_EVIDENCE_STATUSES = {
 }
 
 
-@dataclass
-class InspectedTask:
-    task_id: str
-    title: str
-    block: str
-    metadata: dict[str, str]
-    duplicates: set[str]
-
-    @property
-    def status(self) -> str:
-        return clean_cell(self.metadata.get("Status", "")).upper()
-
-    @property
-    def dependencies(self) -> list[str]:
-        raw = clean_cell(self.metadata.get("Depends on", "NONE"))
-        return (
-            []
-            if raw in {"", "NONE", "-"}
-            else [item.strip() for item in raw.split(",")]
-        )
-
-    @property
-    def attempts_used(self) -> int:
-        return int(clean_cell(self.metadata["Attempts used"]))
-
-    @property
-    def attempt_budget(self) -> int:
-        return int(clean_cell(self.metadata["Attempt budget"]))
-
-
-@dataclass(frozen=True)
-class TaskCompletionEvidenceRow:
-    evidence_id: str
-    task_id: str
-    command_or_observation: str
-    result: str
-    actor: str
-    observed_at: str
-    commit_worktree_artifact: str
-    durable_source: str
-    status: str
-
-
-@dataclass(frozen=True)
-class PropertyTestEvidenceRow:
-    evidence_id: str
-    task_id: str
-    requirements_design_authorization: str
-    property_id: str
-    framework_tech_id: str
-    framework_selection: str
-    observed_exact_version: str
-    exact_command: str
-    observed_run: str
-    replay_seed_or_exact_command: str
-    minimized_counterexample: str
-    failure_class_resolution: str
-    result: str
-    observed_at: str
-    commit_worktree_artifact: str
-    durable_source: str
-
-
 @dataclass(frozen=True)
 class AwsCoreEvidenceRow:
     phase: str
@@ -1747,86 +1807,6 @@ class AwsCoreEvidenceRow:
     observed_at: str
     evidence_binding: str
     observed_status: str
-
-
-@dataclass(frozen=True)
-class CheckpointReceiptRow:
-    checkpoint_id: str
-    run_id: str
-    recorded_at: str
-    basis: str
-    commit_and_dirty: str
-    task_outcomes: str
-    evidence_and_external: str
-    blockers_and_next: str
-
-
-def inspect_task_blocks(text: str) -> list[InspectedTask]:
-    structural = without_fenced_code(text)
-    matches = list(TASK_HEADER_PATTERN.finditer(structural))
-    tasks: list[InspectedTask] = []
-    for index, match in enumerate(matches):
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        block = text[match.start() : end]
-        structural_block = structural[match.start() : end]
-        metadata: dict[str, str] = {}
-        duplicates: set[str] = set()
-        for found in TASK_META_PATTERN.finditer(structural_block):
-            key = found.group("key")
-            if key in metadata:
-                duplicates.add(key)
-            metadata[key] = found.group("value")
-        tasks.append(
-            InspectedTask(
-                match.group(1), match.group(2).strip(), block, metadata, duplicates
-            )
-        )
-    return tasks
-
-
-def inspect_task_sections(block: str) -> tuple[dict[str, str], set[str]]:
-    structural = without_fenced_code(block)
-    pattern = re.compile(
-        r"^####[ \t]+(Outcome|Acceptance criteria|Validation|Execution log)[ \t]*$",
-        re.MULTILINE,
-    )
-    matches = list(pattern.finditer(structural))
-    sections: dict[str, str] = {}
-    duplicates: set[str] = set()
-    for index, match in enumerate(matches):
-        name = match.group(1)
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(block)
-        if name in sections:
-            duplicates.add(name)
-        sections[name] = block[match.end() : end]
-    return sections, duplicates
-
-
-def parse_task_completion_evidence(text: str) -> list[TaskCompletionEvidenceRow]:
-    try:
-        parsed_rows = parse_task_completion_evidence_cells(text)
-    except ContractParseError as exc:
-        messages = {
-            "section_count": "VERIFY.md requires exactly one Task completion evidence section",
-            "header_count": "VERIFY.md requires one exact Task completion evidence table",
-            "separator_missing": "VERIFY.md Task completion evidence separator is invalid",
-            "separator_invalid": "VERIFY.md Task completion evidence separator is invalid",
-            "row_width": "VERIFY.md Task completion evidence row must have nine cells",
-            "discontiguous_rows": "VERIFY.md Task completion evidence rows must form one contiguous table",
-        }
-        raise ValueError(
-            messages.get(exc.reason, "VERIFY.md Task completion evidence is invalid")
-        ) from exc
-    rows: list[TaskCompletionEvidenceRow] = []
-    for cells in parsed_rows:
-        row = TaskCompletionEvidenceRow(*(clean_cell(cell) for cell in cells))
-        if re.fullmatch(r"EV-\d{4,}", row.evidence_id) is None:
-            raise ValueError("VERIFY.md Task completion Evidence ID must be EV-nnnn")
-        rows.append(row)
-    identifiers = [row.evidence_id for row in rows]
-    if len(identifiers) != len(set(identifiers)):
-        raise ValueError("VERIFY.md Task completion Evidence IDs must be unique")
-    return rows
 
 
 def parse_aws_core_evidence(
@@ -2361,100 +2341,6 @@ def require_aws_core_phase_evidence(
         ctx.error(aws_core_evidence_diagnostic_code(issue), issue, VERIFY_FILE)
 
 
-def require_explicit_evidence_value(value: str, label: str) -> str:
-    cleaned = clean_cell(value)
-    if (
-        not cleaned
-        or any(character in cleaned for character in "\r\n")
-        or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
-    ):
-        raise ValueError(f"{label} is unresolved or placeholder evidence")
-    return cleaned
-
-
-def require_durable_evidence_source(value: str, label: str) -> str:
-    """Require one safe local, git, artifact, HTTPS, or S3 evidence reference."""
-
-    source = require_explicit_evidence_value(value, label)
-    candidate = re.sub(r"^artifact\s*:\s*", "", source, flags=re.IGNORECASE)
-    candidate_path = candidate.split("#", 1)[0]
-    path_source = bool(
-        re.fullmatch(
-            r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+(?:#[A-Za-z0-9._-]+)?",
-            candidate,
-        )
-        and ".." not in PurePosixPath(candidate_path).parts
-    )
-    if (
-        re.fullmatch(r"VERIFY\.md#[A-Za-z0-9._-]+", source) is None
-        and re.fullmatch(r"git:[0-9a-fA-F]{7,64}", source, re.IGNORECASE) is None
-        and re.fullmatch(r"(?:https?|s3)://\S+", source, re.IGNORECASE) is None
-        and not path_source
-    ):
-        raise ValueError(f"{label} is not a local durable reference")
-    return source
-
-
-def validate_done_evidence(verify_text: str | None, task: InspectedTask) -> None:
-    evidence = clean_cell(task.metadata.get("Evidence", ""))
-    references = [match.group(0) for match in EVIDENCE_PATTERN.finditer(evidence)]
-    local = [
-        reference for reference in references if re.fullmatch(r"EV-\d{4,}", reference)
-    ]
-    invalid_local = [
-        reference
-        for reference in references
-        if LOCAL_EVIDENCE_LIKE.fullmatch(reference) is not None
-        and re.fullmatch(r"EV-\d{4,}", reference) is None
-    ]
-    if invalid_local:
-        raise ValueError(
-            f"{task.task_id}: invalid local Evidence ID: {', '.join(invalid_local)}"
-        )
-    if not local:
-        raise ValueError(
-            f"{task.task_id}: DONE requires at least one local Evidence reference"
-        )
-    if len(local) != len(set(local)):
-        raise ValueError(f"{task.task_id}: local Evidence references must be unique")
-    if verify_text is None:
-        raise ValueError(f"{task.task_id}: local Evidence requires VERIFY.md")
-    rows = parse_task_completion_evidence(verify_text)
-    for reference in local:
-        matching = [row for row in rows if row.evidence_id == reference]
-        if len(matching) != 1:
-            raise ValueError(
-                f"{task.task_id}: Evidence is not recorded in VERIFY.md: {reference}"
-            )
-        row = matching[0]
-        if row.task_id != task.task_id:
-            raise ValueError(
-                f"{task.task_id}: Evidence row names the wrong task {row.task_id!r}"
-            )
-        label = f"{task.task_id} Evidence {row.evidence_id}"
-        require_explicit_evidence_value(row.command_or_observation, f"{label} command")
-        require_explicit_evidence_value(row.result, f"{label} result")
-        require_explicit_evidence_value(row.actor, f"{label} actor")
-        if not explicit_timestamp(row.observed_at):
-            raise ValueError(f"{label} observed time must be ISO 8601 with timezone")
-        material = require_explicit_evidence_value(
-            row.commit_worktree_artifact, f"{label} commit/worktree/artifact"
-        )
-        if (
-            re.search(r"\b[0-9a-fA-F]{7,64}\b", material) is None
-            and re.search(
-                r"\b(?:worktree|artifact)\s*[:=]\s*\S+", material, re.IGNORECASE
-            )
-            is None
-        ):
-            raise ValueError(
-                f"{label} requires an explicit commit, worktree, or artifact"
-            )
-        require_durable_evidence_source(row.durable_source, f"{label} durable source")
-        if row.status not in TASK_COMPLETION_EVIDENCE_STATUSES:
-            raise ValueError(f"{label} status must be LOCAL_PASS or VERIFIED")
-
-
 def parse_task_write_set(value: str, task_id: str) -> list[str]:
     value = clean_cell(value)
     if value in {"", "TODO", "TBD", "UNKNOWN"}:
@@ -2495,765 +2381,6 @@ def parse_task_external_state(value: str, task_id: str) -> list[str]:
     if len(values) != len({item.casefold() for item in values}):
         raise ValueError(f"{task_id}: duplicate External state entry")
     return values
-
-
-def task_waiver_rows(text: str) -> dict[str, tuple[str, str, str, str, str]]:
-    marker = "### Dependency waiver registry"
-    if text.count(marker) != 1:
-        raise ValueError("Expected exactly one dependency waiver registry")
-    body = text.split(marker, 1)[1].split("\n## ", 1)[0]
-    result: dict[str, tuple[str, str, str, str, str]] = {}
-    for line in body.splitlines():
-        if not line.startswith("|"):
-            continue
-        cells = [clean_cell(item) for item in split_table_row(line)]
-        if len(cells) != 6 or cells[0] in {"Waiver ID", "---", "NONE"}:
-            continue
-        if re.fullmatch(r"WAIVER-\d+", cells[0]) is None:
-            continue
-        if cells[0] in result:
-            raise ValueError(f"Duplicate waiver ID: {cells[0]}")
-        result[cells[0]] = (cells[1], cells[2], cells[3], cells[4], cells[5])
-    return result
-
-
-def declared_task_waivers(task: InspectedTask) -> dict[str, str]:
-    raw = clean_cell(task.metadata.get("Dependency waivers", "NONE"))
-    if raw in {"", "NONE", "-"}:
-        return {}
-    result: dict[str, str] = {}
-    for entry in raw.split(","):
-        pair = [item.strip() for item in entry.split("=", 1)]
-        if (
-            len(pair) != 2
-            or re.fullmatch(r"TASK-\d+", pair[0]) is None
-            or re.fullmatch(r"WAIVER-\d+", pair[1]) is None
-        ):
-            raise ValueError(f"{task.task_id}: invalid dependency waiver {entry!r}")
-        result[pair[0]] = pair[1]
-    return result
-
-
-def validate_task_records(
-    text: str,
-    snapshot: dict[str, str],
-    verify_text: str | None = None,
-    approved_tech_ids: set[str] | None = None,
-    property_execution_by_id: dict[str, PropertyExecution] | None = None,
-    technology_decisions_by_id: dict[str, TechnologyDecision] | None = None,
-) -> tuple[list[InspectedTask], dict[str, InspectedTask], list[str]]:
-    tasks = inspect_task_blocks(text)
-    by_id: dict[str, InspectedTask] = {}
-    errors: list[str] = []
-    waivers = task_waiver_rows(text)
-    current_req = snapshot.get("Requirements revision", "")
-    current_des = snapshot.get("Design revision", "")
-    current_auth = snapshot.get("Construction authorization", "")
-    done_property_ids = {
-        property_id
-        for task in tasks
-        if task.status == "DONE"
-        for property_id in PROPERTY_ID.findall(
-            clean_cell(task.metadata.get("Requirements", ""))
-        )
-    }
-    property_evidence_rows: list[PropertyTestEvidenceRow] = []
-    completion_evidence_rows: list[TaskCompletionEvidenceRow] = []
-    property_section_present = bool(
-        verify_text is not None
-        and re.search(
-            rf"^{re.escape(PROPERTY_TEST_EVIDENCE_HEADING)}[ \t]*$",
-            without_fenced_code(verify_text),
-            re.MULTILINE,
-        )
-    )
-    if verify_text is not None and property_section_present:
-        try:
-            property_evidence_rows = parse_property_test_evidence(verify_text)
-        except ValueError as exc:
-            errors.append(str(exc))
-    observed_property_evidence = any(
-        row.result in {"PASS", "FAIL"} for row in property_evidence_rows
-    )
-    if done_property_ids or observed_property_evidence:
-        if verify_text is None:
-            errors.append(
-                "DONE property tasks require VERIFY.md property-test evidence"
-            )
-        elif not property_section_present:
-            errors.append(
-                "VERIFY.md requires exactly one Property-based test evidence section"
-            )
-        else:
-            try:
-                completion_evidence_rows = parse_task_completion_evidence(verify_text)
-            except ValueError as exc:
-                errors.append(str(exc))
-
-    for task in tasks:
-        execution_contract_required = task.status in {
-            "READY",
-            "IN_PROGRESS",
-            "BLOCKED",
-            "DONE",
-        } or (task.status == "BACKLOG" and snapshot.get("Task-plan state") == "CURRENT")
-        if task.task_id in by_id:
-            errors.append(f"Duplicate task ID: {task.task_id}")
-        by_id[task.task_id] = task
-        for key in sorted(task.duplicates):
-            errors.append(f"{task.task_id}: duplicate {key} metadata")
-        for key in TASK_METADATA_KEYS:
-            if key not in task.metadata:
-                errors.append(f"{task.task_id}: missing {key} metadata")
-        if task.status not in TASK_STATUSES:
-            errors.append(f"{task.task_id}: invalid status {task.status!r}")
-            continue
-        try:
-            budget = int(clean_cell(task.metadata.get("Attempt budget", "")))
-            used = int(clean_cell(task.metadata.get("Attempts used", "")))
-            if budget < 1 or used < 0 or used > budget:
-                raise ValueError
-        except ValueError:
-            errors.append(f"{task.task_id}: invalid attempt counters")
-            budget = used = 0
-        aws_mode = clean_cell(task.metadata.get("AWS mode", "")).upper()
-        if aws_mode not in TASK_AWS_MODES:
-            errors.append(f"{task.task_id}: invalid AWS mode {aws_mode!r}")
-        for field_name, expected, pattern in (
-            ("Requirements", current_req, REQ_ID),
-            ("Authorization", current_auth, AUTH_ID),
-        ):
-            match = pattern.search(clean_cell(task.metadata.get(field_name, "")))
-            if match is None or match.group(0) != expected:
-                errors.append(
-                    f"{task.task_id}: {field_name} does not match current execution basis"
-                )
-        design_value = clean_cell(task.metadata.get("Design", ""))
-        technology_refs: list[str] = []
-        if execution_contract_required:
-            design_match = TASK_DESIGN_TRACE_PATTERN.fullmatch(design_value)
-            if design_match is None:
-                errors.append(
-                    f"{task.task_id}: Design must exactly match "
-                    "DES-nnnn; TECH: TECH-nnnn[, TECH-nnnn...] or "
-                    "DES-nnnn; TECH: NONE — no technology/toolchain impact"
-                )
-            else:
-                if design_match.group("design") != current_des:
-                    errors.append(
-                        f"{task.task_id}: Design does not match current execution basis"
-                    )
-                technologies = design_match.group("technologies")
-                technology_refs = technologies.split(", ") if technologies else []
-                if len(technology_refs) != len(set(technology_refs)):
-                    errors.append(f"{task.task_id}: duplicate TECH reference in Design")
-                if approved_tech_ids is not None:
-                    unknown = [
-                        tech_id
-                        for tech_id in technology_refs
-                        if tech_id not in approved_tech_ids
-                    ]
-                    if unknown:
-                        errors.append(
-                            f"{task.task_id}: Design references unapproved TECH IDs: "
-                            + ", ".join(unknown)
-                        )
-        else:
-            design_match = DES_ID.search(design_value)
-            if design_match is None or design_match.group(0) != current_des:
-                errors.append(
-                    f"{task.task_id}: Design does not match current execution basis"
-                )
-        if (
-            task.status in {"READY", "IN_PROGRESS"}
-            and snapshot.get("Gate B state") != "APPROVED_FOR_CONSTRUCTION"
-        ):
-            errors.append(f"{task.task_id}: Gate B is not approved for construction")
-        if (
-            task.status in {"READY", "IN_PROGRESS"}
-            and snapshot.get("Task-plan state") != "CURRENT"
-        ):
-            errors.append(f"{task.task_id}: task plan is not CURRENT")
-        try:
-            parse_task_write_set(task.metadata.get("Write set", ""), task.task_id)
-            parse_task_external_state(
-                task.metadata.get("External state", ""), task.task_id
-            )
-        except ValueError as exc:
-            errors.append(str(exc))
-        run_id = clean_cell(task.metadata.get("Run ID", "NONE"))
-        if task.status == "IN_PROGRESS":
-            if (
-                run_id != snapshot.get("Active run ID")
-                or snapshot.get("Run state") != "RUNNING"
-                or clean_cell(task.metadata.get("Owner", ""))
-                in {"", "NONE", "UNASSIGNED"}
-                or used < 1
-                or CHECKPOINT_ID.fullmatch(
-                    clean_cell(task.metadata.get("Last checkpoint", ""))
-                )
-                is None
-            ):
-                errors.append(f"{task.task_id}: invalid IN_PROGRESS claim")
-        elif run_id != "NONE":
-            errors.append(f"{task.task_id}: non-IN_PROGRESS task must use Run ID NONE")
-        if task.status == "READY" and used >= budget:
-            errors.append(f"{task.task_id}: attempt budget exhausted")
-        if task.status == "DONE":
-            evidence = clean_cell(task.metadata.get("Evidence", ""))
-            if (
-                evidence in {"", "NONE", "TODO"}
-                or EVIDENCE_PATTERN.search(evidence) is None
-            ):
-                errors.append(f"{task.task_id}: DONE requires Evidence")
-            try:
-                validate_done_evidence(verify_text, task)
-            except ValueError as exc:
-                errors.append(str(exc))
-        if task.status == "BLOCKED" and clean_cell(
-            task.metadata.get("Blocker", "")
-        ) in {"", "NONE", "TODO"}:
-            errors.append(f"{task.task_id}: BLOCKED requires a blocker")
-        if task.status == "SKIPPED" and clean_cell(
-            task.metadata.get("Skip record", "")
-        ) in {"", "NONE", "TODO"}:
-            errors.append(f"{task.task_id}: SKIPPED requires a skip record")
-        updated = clean_cell(task.metadata.get("Last updated", ""))
-        if updated not in {"", "TODO"} and not explicit_timestamp(updated):
-            errors.append(
-                f"{task.task_id}: Last updated must be ISO 8601 with timezone"
-            )
-        try:
-            declared = declared_task_waivers(task)
-            for dependency_id, waiver_id in declared.items():
-                waiver = waivers.get(waiver_id)
-                if waiver is None:
-                    errors.append(
-                        f"{task.task_id}: unknown dependency waiver {waiver_id}"
-                    )
-                elif waiver[0] != dependency_id or waiver[1] != task.task_id:
-                    errors.append(
-                        f"{task.task_id}: waiver {waiver_id} does not match its task pair"
-                    )
-        except ValueError as exc:
-            errors.append(str(exc))
-        if execution_contract_required:
-            sections, duplicate_sections = inspect_task_sections(task.block)
-            for name in sorted(duplicate_sections):
-                errors.append(f"{task.task_id}: duplicate required section #### {name}")
-            for name in (
-                "Outcome",
-                "Acceptance criteria",
-                "Validation",
-                "Execution log",
-            ):
-                if name not in sections:
-                    errors.append(
-                        f"{task.task_id}: missing required section #### {name}"
-                    )
-            outcome = sections.get("Outcome", "")
-            if not outcome.strip() or "TODO" in outcome.upper():
-                errors.append(f"{task.task_id}: unresolved Outcome")
-            acceptance = sections.get("Acceptance criteria", "")
-            if "- [" not in acceptance or "TODO" in acceptance.upper():
-                errors.append(
-                    f"{task.task_id}: objective acceptance criteria are required"
-                )
-            validation = sections.get("Validation", "")
-            if "```" not in validation or "TODO" in validation.upper():
-                errors.append(
-                    f"{task.task_id}: executable validation commands are required"
-                )
-            try:
-                validate_task_property_execution_projection(
-                    validation,
-                    task.task_id,
-                    task.metadata.get("Requirements", ""),
-                    technology_refs,
-                    property_execution_by_id,
-                )
-            except ValueError as exc:
-                errors.append(str(exc))
-            execution_log = sections.get("Execution log", "")
-            normalized_log = execution_log.strip().upper().replace("_", " ")
-            if not execution_log.strip() or "TODO" in execution_log.upper():
-                errors.append(f"{task.task_id}: execution log must be explicit")
-            if task.status == "DONE" and any(
-                marker in normalized_log
-                for marker in (
-                    "TODO",
-                    "TBD",
-                    "NOT STARTED",
-                    "NO EXECUTION HAS BEEN RECORDED",
-                )
-            ):
-                errors.append(
-                    f"{task.task_id}: DONE requires an observed Execution log"
-                )
-            if task.status == "DONE" and "- [ ]" in acceptance:
-                errors.append(
-                    f"{task.task_id}: DONE has incomplete acceptance criteria"
-                )
-
-    observed_property_pairs = {
-        (row.task_id, row.property_id)
-        for row in property_evidence_rows
-        if row.result in {"PASS", "FAIL"}
-    }
-    done_property_pairs = {
-        (task.task_id, property_id)
-        for task in tasks
-        if task.status == "DONE"
-        for property_id in PROPERTY_ID.findall(
-            clean_cell(task.metadata.get("Requirements", ""))
-        )
-    }
-    for task_id, property_id in sorted(observed_property_pairs | done_property_pairs):
-        task = by_id.get(task_id)
-        if task is None:
-            errors.append(
-                f"{task_id} {property_id}: observed property-test evidence "
-                "references an unknown current task"
-            )
-            continue
-        task_property_ids = set(
-            PROPERTY_ID.findall(clean_cell(task.metadata.get("Requirements", "")))
-        )
-        if property_id not in task_property_ids:
-            errors.append(
-                f"{task_id} {property_id}: observed property-test evidence is not "
-                "linked by the current task Requirements"
-            )
-            continue
-        if property_execution_by_id is None:
-            errors.append(
-                f"{task_id} {property_id}: current property execution contract is "
-                "unavailable"
-            )
-            continue
-        expected = property_execution_by_id.get(property_id)
-        if expected is None:
-            errors.append(
-                f"{task_id} {property_id}: observed property-test evidence "
-                "references an unknown current property contract"
-            )
-            continue
-        technology = (technology_decisions_by_id or {}).get(expected.framework_tech_id)
-        if technology is None:
-            errors.append(
-                f"{task_id}: {property_id} requires its current PROPERTY_TESTING "
-                "technology decision"
-            )
-            continue
-        try:
-            validate_done_property_evidence(
-                property_evidence_rows,
-                task,
-                snapshot,
-                expected,
-                technology,
-                completion_evidence_rows,
-                require_done_pass=task.status == "DONE",
-            )
-        except ValueError as exc:
-            errors.append(str(exc))
-
-    for task in tasks:
-        for dependency in task.dependencies:
-            if dependency not in by_id:
-                errors.append(f"{task.task_id}: missing dependency {dependency}")
-            elif dependency == task.task_id:
-                errors.append(f"{task.task_id}: cannot depend on itself")
-
-    visiting: set[str] = set()
-    visited: set[str] = set()
-    stack: list[str] = []
-
-    def visit(task_id: str) -> None:
-        if task_id in visited:
-            return
-        if task_id in visiting:
-            start = stack.index(task_id)
-            raise ValueError(
-                "Dependency cycle detected: " + " -> ".join([*stack[start:], task_id])
-            )
-        visiting.add(task_id)
-        stack.append(task_id)
-        for dependency in by_id[task_id].dependencies:
-            if dependency in by_id:
-                visit(dependency)
-        stack.pop()
-        visiting.remove(task_id)
-        visited.add(task_id)
-
-    try:
-        for task_id in sorted(by_id):
-            visit(task_id)
-    except ValueError as exc:
-        errors.append(str(exc))
-
-    for waiver_id, waiver in waivers.items():
-        skipped_id, applies_to, authority, rationale, recorded_at = waiver
-        if skipped_id not in by_id or applies_to not in by_id:
-            errors.append(f"{waiver_id}: references an unknown task")
-            continue
-        if by_id[skipped_id].status != "SKIPPED":
-            errors.append(f"{waiver_id}: dependency is not SKIPPED")
-        if skipped_id not in by_id[applies_to].dependencies:
-            errors.append(f"{waiver_id}: skipped task is not a dependency")
-        authority_is_current = bool(
-            re.fullmatch(
-                rf"{re.escape(current_auth)}(?:\s+clause\s+[A-Za-z0-9._:-]+)?",
-                authority,
-            )
-            or re.fullmatch(r"OWNER-DECISION-\d+", authority)
-        )
-        if not authority_is_current:
-            errors.append(f"{waiver_id}: authority is not an exact current authority")
-        if not explicit_value(rationale) or EVIDENCE_PATTERN.search(rationale) is None:
-            errors.append(f"{waiver_id}: missing rationale or preserved evidence")
-        if not explicit_timestamp(recorded_at):
-            errors.append(f"{waiver_id}: Recorded at must be ISO 8601 with timezone")
-
-    ready: list[str] = []
-    for task in tasks:
-        if task.status != "READY":
-            continue
-        declared = declared_task_waivers(task)
-        satisfied = True
-        for dependency_id in task.dependencies:
-            dependency = by_id.get(dependency_id)
-            if dependency is None:
-                satisfied = False
-            elif dependency.status == "DONE":
-                continue
-            elif dependency.status == "SKIPPED":
-                waiver_id = declared.get(dependency_id)
-                waiver = waivers.get(waiver_id or "")
-                if (
-                    waiver is None
-                    or waiver[0] != dependency_id
-                    or waiver[1] != task.task_id
-                ):
-                    satisfied = False
-                else:
-                    authority, rationale, recorded_at = waiver[2], waiver[3], waiver[4]
-                    current_auth_match = re.search(
-                        rf"(?<![A-Z0-9-]){re.escape(current_auth)}(?!\d)", authority
-                    )
-                    owner_match = re.search(r"\bOWNER-DECISION-\d+\b", authority)
-                    if (
-                        (current_auth_match is None and owner_match is None)
-                        or unresolved(rationale)
-                        or rationale == "NONE"
-                        or unresolved(recorded_at)
-                    ):
-                        satisfied = False
-            else:
-                satisfied = False
-        if satisfied:
-            ready.append(task.task_id)
-    if errors:
-        raise ValueError("\n".join(errors))
-    return tasks, by_id, ready
-
-
-def missing_current_property_task_coverage(
-    tasks: list[InspectedTask],
-    plan_state: str,
-    property_execution_by_id: dict[str, PropertyExecution],
-) -> list[str]:
-    """Return approved properties omitted from a current task plan."""
-
-    if plan_state != "CURRENT":
-        return []
-    covered_property_ids = {
-        property_id
-        for task in tasks
-        if task.status in {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE"}
-        for property_id in PROPERTY_ID.findall(
-            clean_cell(task.metadata.get("Requirements", ""))
-        )
-    }
-    return sorted(set(property_execution_by_id) - covered_property_ids)
-
-
-def task_requirement_rules(
-    prd_text: str,
-    requirements_contract: RequirementsContract,
-) -> dict[str, tuple[str, str]]:
-    """Return current requirement ID to acceptance ID and EARS form."""
-
-    if requirements_contract.grandfathered_approved_gate_a:
-        return {}
-    rows, acceptance_by_requirement, _legacy_ids = _schema_13_requirement_rows(prd_text)
-    row_by_id = {row[0]: row for row in rows}
-    expected_requirements = set(requirements_contract.requirement_ids)
-    if set(row_by_id) != expected_requirements:
-        raise ValueError(
-            "Task requirement rules do not match the current requirements contract"
-        )
-    expected_acceptance = set(requirements_contract.acceptance_ids)
-    observed_acceptance = {
-        acceptance_by_requirement.get(requirement_id, "")
-        for requirement_id in expected_requirements
-    }
-    if observed_acceptance != expected_acceptance:
-        raise ValueError(
-            "Task acceptance rules do not match the current requirements contract"
-        )
-    return {
-        requirement_id: (
-            acceptance_by_requirement[requirement_id],
-            row_by_id[requirement_id][2],
-        )
-        for requirement_id in sorted(expected_requirements)
-    }
-
-
-def task_requirement_evidence_dispositions(
-    verify_text: str | None,
-    expected_basis: Mapping[str, str],
-    rules: Mapping[str, tuple[str, str]],
-) -> tuple[
-    dict[str, tuple[str, tuple[str, ...]]],
-    tuple[str, ...],
-]:
-    """Resolve current no-task requirement dispositions from VERIFY.md."""
-
-    if verify_text is None or not rules:
-        return {}, ()
-    try:
-        active_scope = table_after_heading(verify_text, "## Active evidence scope")
-        rows = parse_verification_matrix(verify_text)
-    except ValueError as exc:
-        return {}, (str(exc),)
-    for key in (
-        "Requirements revision",
-        "Design revision",
-        "Construction authorization",
-    ):
-        if clean_cell(active_scope.get(key, "")) != clean_cell(
-            expected_basis.get(key, "")
-        ):
-            return {}, ()
-
-    issues: list[str] = []
-    by_requirement: dict[str, dict[str, list[str]]] = {}
-    seen_evidence_ids: set[str] = set()
-    for row in rows:
-        status = clean_cell(row.get("Status", "")).upper()
-        if status not in {"LOCAL_PASS", "VERIFIED", "NOT_APPLICABLE"}:
-            continue
-        if clean_cell(row.get("Task IDs", "")).upper() != "NONE":
-            continue
-        evidence_id = clean_cell(row.get("Evidence ID", ""))
-        if re.fullmatch(r"EV-\d{4,}", evidence_id) is None:
-            issues.append(
-                "No-task requirement evidence requires an EV-nnnn Evidence ID"
-            )
-            continue
-        if evidence_id in seen_evidence_ids:
-            issues.append(f"Duplicate no-task requirement evidence ID {evidence_id}")
-            continue
-        seen_evidence_ids.add(evidence_id)
-        try:
-            basis_ids = _canonical_id_list(
-                row.get("PRD / property IDs", ""),
-                STABLE_CONTRACT_ID,
-                f"{evidence_id} PRD / property IDs",
-            )
-        except ValueError as exc:
-            issues.append(str(exc))
-            continue
-        matching_requirements = [
-            requirement_id
-            for requirement_id, (acceptance_id, _ears_form) in rules.items()
-            if basis_ids == [requirement_id, acceptance_id]
-        ]
-        if len(matching_requirements) != 1:
-            issues.append(
-                f"{evidence_id}: no-task evidence must bind exactly one current "
-                "requirement and its canonical acceptance ID"
-            )
-            continue
-        requirement_id = matching_requirements[0]
-        acceptance_id, ears_form = rules[requirement_id]
-        requirement_or_invariant = clean_cell(row.get("Requirement or invariant", ""))
-        artifact = clean_cell(row.get("Artifact/environment", ""))
-        automated = clean_cell(row.get("Automated evidence", ""))
-        manual = clean_cell(row.get("AWS/manual evidence", ""))
-        if not explicit_value(requirement_or_invariant, allow_none=False):
-            issues.append(
-                f"{evidence_id}: no-task evidence requires a concrete requirement or invariant"
-            )
-        if not explicit_value(artifact, allow_none=False):
-            issues.append(
-                f"{evidence_id}: no-task evidence requires a concrete artifact/environment"
-            )
-        if not (
-            explicit_value(automated, allow_none=False)
-            or explicit_value(manual, allow_none=False)
-        ):
-            issues.append(
-                f"{evidence_id}: no-task evidence requires automated or AWS/manual evidence"
-            )
-        disposition = (
-            "NOT_APPLICABLE" if status == "NOT_APPLICABLE" else "ALREADY_SATISFIED"
-        )
-        if disposition == "NOT_APPLICABLE" and ears_form != "OPTIONAL_FEATURE":
-            issues.append(
-                f"{evidence_id}: NOT_APPLICABLE is allowed only for OPTIONAL_FEATURE requirements"
-            )
-            continue
-        by_requirement.setdefault(requirement_id, {}).setdefault(
-            disposition, []
-        ).append(evidence_id)
-        if acceptance_id not in basis_ids:
-            issues.append(
-                f"{evidence_id}: missing canonical acceptance ID {acceptance_id}"
-            )
-
-    dispositions: dict[str, tuple[str, tuple[str, ...]]] = {}
-    for requirement_id, observed in sorted(by_requirement.items()):
-        if len(observed) != 1:
-            issues.append(
-                f"{requirement_id}: conflicting no-task evidence dispositions"
-            )
-            continue
-        disposition, evidence_ids = next(iter(observed.items()))
-        dispositions[requirement_id] = (
-            disposition,
-            tuple(sorted(evidence_ids)),
-        )
-    return dispositions, tuple(issues)
-
-
-def derive_task_requirement_coverage(
-    tasks: Sequence[Any],
-    plan_state: str,
-    rules: Mapping[str, tuple[str, str]],
-    evidence_dispositions: Mapping[str, tuple[str, tuple[str, ...]]],
-) -> TaskRequirementCoverageResult:
-    """Derive one complete disposition for every approved requirement."""
-
-    if plan_state != "CURRENT" or not rules:
-        return TaskRequirementCoverageResult()
-    counted_statuses = {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE"}
-    acceptance_owner = {
-        acceptance_id: requirement_id
-        for requirement_id, (acceptance_id, _ears_form) in rules.items()
-    }
-    requirement_families = {
-        requirement_id.rsplit("-", 1)[0] for requirement_id in rules
-    }
-    covered_by_task: dict[str, set[str]] = {
-        requirement_id: set() for requirement_id in rules
-    }
-    trace_issues: list[str] = []
-    evidence_issues: list[str] = []
-    for task in tasks:
-        task_id = str(getattr(task, "task_id", "TASK-UNKNOWN"))
-        status = clean_cell(getattr(task, "status", "")).upper()
-        metadata = getattr(task, "metadata", {})
-        requirements_value = clean_cell(metadata.get("Requirements", ""))
-        tokens = STABLE_CONTRACT_ID.findall(requirements_value)
-        relevant_tokens = [
-            token
-            for token in tokens
-            if token in rules
-            or token in acceptance_owner
-            or ACCEPTANCE_ID.fullmatch(token) is not None
-            or token.rsplit("-", 1)[0] in requirement_families
-        ]
-        duplicates = sorted(
-            token for token in set(relevant_tokens) if relevant_tokens.count(token) > 1
-        )
-        if duplicates:
-            trace_issues.append(
-                f"{task_id}: duplicate requirement/acceptance IDs: "
-                + ", ".join(duplicates)
-            )
-        unknown_acceptance = sorted(
-            {
-                token
-                for token in relevant_tokens
-                if ACCEPTANCE_ID.fullmatch(token) is not None
-                and token not in acceptance_owner
-            }
-        )
-        if unknown_acceptance:
-            trace_issues.append(
-                f"{task_id}: unknown acceptance IDs: " + ", ".join(unknown_acceptance)
-            )
-        unknown_requirements = sorted(
-            {
-                token
-                for token in relevant_tokens
-                if ACCEPTANCE_ID.fullmatch(token) is None
-                and token not in rules
-                and token.rsplit("-", 1)[0] in requirement_families
-            }
-        )
-        if unknown_requirements:
-            trace_issues.append(
-                f"{task_id}: unknown approved-requirement references: "
-                + ", ".join(unknown_requirements)
-            )
-        token_set = set(relevant_tokens)
-        valid_pairs: set[str] = set()
-        for requirement_id, (acceptance_id, _ears_form) in rules.items():
-            has_requirement = requirement_id in token_set
-            has_acceptance = acceptance_id in token_set
-            if has_requirement and not has_acceptance:
-                trace_issues.append(
-                    f"{task_id}: {requirement_id} requires {acceptance_id}"
-                )
-            if has_acceptance and not has_requirement:
-                trace_issues.append(
-                    f"{task_id}: {acceptance_id} requires owning requirement {requirement_id}"
-                )
-            if has_requirement and has_acceptance:
-                valid_pairs.add(requirement_id)
-        if status in counted_statuses:
-            for requirement_id in valid_pairs:
-                covered_by_task[requirement_id].add(task_id)
-
-    records: list[TaskRequirementCoverage] = []
-    missing: list[str] = []
-    for requirement_id, (acceptance_id, _ears_form) in sorted(rules.items()):
-        task_ids = tuple(sorted(covered_by_task[requirement_id]))
-        evidence = evidence_dispositions.get(requirement_id)
-        if task_ids:
-            if evidence is not None and evidence[0] == "NOT_APPLICABLE":
-                evidence_issues.append(
-                    f"{requirement_id}: task coverage conflicts with NOT_APPLICABLE evidence"
-                )
-            records.append(
-                TaskRequirementCoverage(
-                    requirement_id,
-                    acceptance_id,
-                    "TASK_COVERED",
-                    task_ids=task_ids,
-                )
-            )
-        elif evidence is not None:
-            records.append(
-                TaskRequirementCoverage(
-                    requirement_id,
-                    acceptance_id,
-                    evidence[0],
-                    evidence_ids=evidence[1],
-                )
-            )
-        else:
-            missing.append(requirement_id)
-    return TaskRequirementCoverageResult(
-        records=tuple(records),
-        trace_issues=tuple(trace_issues),
-        evidence_issues=tuple(evidence_issues),
-        missing_requirement_ids=tuple(missing),
-    )
 
 
 def parse_positive_cost(
@@ -3323,134 +2450,11 @@ def validate_aws_cost_ceiling(value: str, cost_posture: str) -> None:
         raise ValueError("AWS cost ceiling exceeds the Gate A owner hard cap")
 
 
-def explicit_timestamp(value: str) -> bool:
-    cleaned = clean_cell(value)
-    if unresolved(cleaned):
-        return False
-    candidate = cleaned[:-1] + "+00:00" if cleaned.endswith("Z") else cleaned
-    try:
-        parsed = datetime.fromisoformat(candidate)
-    except ValueError:
-        return False
-    return parsed.tzinfo is not None and parsed.utcoffset() is not None
-
-
 def explicit_human_approver(value: str) -> bool:
     """Require an explicit owner identity that is not an agent or automation."""
 
     cleaned = clean_cell(value)
     return explicit_value(cleaned) and NON_HUMAN_APPROVER.search(cleaned) is None
-
-
-def task_property_execution_table(
-    validation_section: str, task_id: str
-) -> ContractTable | None:
-    """Return the one exact property-execution projection outside code fences."""
-
-    structural = without_fenced_code(validation_section)
-    source_lines = validation_section.splitlines()
-    structural_lines = structural.splitlines()
-    matches: list[ContractTable] = []
-    index = 0
-    while index < len(source_lines):
-        if not structural_lines[index].strip().startswith("|"):
-            index += 1
-            continue
-        raw_lines: list[str] = []
-        while index < len(source_lines) and structural_lines[index].strip().startswith(
-            "|"
-        ):
-            raw_lines.append(source_lines[index])
-            index += 1
-        header = split_markdown_table_row(raw_lines[0])
-        if header is None or not header or clean_cell(header[0]) != "Property ID":
-            continue
-        try:
-            matches.append(
-                _parse_contract_table_lines(raw_lines, PROPERTY_EXECUTION_HEADERS)
-            )
-        except ValueError as exc:
-            raise ValueError(f"{task_id}: property execution projection {exc}") from exc
-    if len(matches) > 1:
-        raise ValueError(
-            f"{task_id}: Validation must contain exactly one property execution projection"
-        )
-    return matches[0] if matches else None
-
-
-def validate_task_property_execution_projection(
-    validation_section: str,
-    task_id: str,
-    requirements: str,
-    technology_refs: list[str],
-    property_execution_by_id: dict[str, PropertyExecution] | None,
-) -> None:
-    """Require an exact PRD projection and one exact command per referenced property."""
-
-    property_ids = PROPERTY_ID.findall(clean_cell(requirements))
-    if len(property_ids) != len(set(property_ids)):
-        raise ValueError(f"{task_id}: Requirements contains duplicate PROP IDs")
-    table = task_property_execution_table(validation_section, task_id)
-    if not property_ids:
-        if table is not None:
-            raise ValueError(
-                f"{task_id}: Validation has a property execution projection without a PROP requirement"
-            )
-        return
-    if property_execution_by_id is None:
-        raise ValueError(
-            f"{task_id}: property execution contract is unavailable for PROP validation"
-        )
-    unknown = [item for item in property_ids if item not in property_execution_by_id]
-    if unknown:
-        raise ValueError(
-            f"{task_id}: Requirements references unknown PROP IDs: "
-            + ", ".join(unknown)
-        )
-    if table is None:
-        raise ValueError(
-            f"{task_id}: Validation requires the exact property execution projection"
-        )
-    projected_ids = [row[0] for row in table.rows]
-    if projected_ids != property_ids or len(projected_ids) != len(set(projected_ids)):
-        raise ValueError(
-            f"{task_id}: property execution projection IDs must exactly match Requirements"
-        )
-    for row in table.rows:
-        expected = property_execution_by_id[row[0]]
-        if not valid_property_execution_command(expected.exact_command):
-            raise ValueError(
-                f"{task_id}: {row[0]} Exact command is not an executable local command"
-            )
-        if not valid_property_execution_command(row[2]):
-            raise ValueError(
-                f"{task_id}: projected {row[0]} Exact command is not an executable "
-                "local command"
-            )
-        expected_row = (
-            expected.property_id,
-            expected.framework_tech_id,
-            expected.exact_command,
-            expected.run_target_time_bound,
-            expected.seed_or_reproduction_format,
-            expected.evidence_destination,
-        )
-        if row != expected_row:
-            raise ValueError(
-                f"{task_id}: property execution projection for {row[0]} does not match the PRD contract"
-            )
-        if expected.framework_tech_id not in technology_refs:
-            raise ValueError(
-                f"{task_id}: Design must reference {expected.framework_tech_id} for {row[0]}"
-            )
-    commands = validation_commands(validation_section, task_id)
-    for command in dict.fromkeys(
-        property_execution_by_id[item].exact_command for item in property_ids
-    ):
-        if commands.count(command) != 1:
-            raise ValueError(
-                f"{task_id}: property command {command!r} must appear exactly once in Validation"
-            )
 
 
 def _heading_title_span(text: str, title: str) -> SourceSpan:
@@ -3474,329 +2478,6 @@ def _heading_title_span(text: str, title: str) -> SourceSpan:
     )
     end = matches[0].end() + following.start() if following else len(text)
     return SourceSpan(matches[0].start(), end)
-
-
-def parse_property_test_evidence(text: str) -> list[PropertyTestEvidenceRow]:
-    """Parse the exact durable property-test evidence table from VERIFY.md."""
-
-    table = contract_table_after_heading(
-        text,
-        PROPERTY_TEST_EVIDENCE_HEADING,
-        PROPERTY_TEST_EVIDENCE_HEADERS,
-    )
-    if table is None:
-        raise ValueError(
-            "VERIFY.md requires exactly one Property-based test evidence section"
-        )
-    rows: list[PropertyTestEvidenceRow] = []
-    seen_evidence_ids: set[str] = set()
-    for cells in table.rows:
-        row = PropertyTestEvidenceRow(*cells)
-        if re.fullmatch(r"EV-\d{4,}", row.evidence_id) is None:
-            raise ValueError(
-                "VERIFY.md Property-based test evidence Evidence ID must be EV-nnnn"
-            )
-        if row.evidence_id in seen_evidence_ids:
-            raise ValueError(
-                "VERIFY.md Property-based test evidence Evidence IDs must be unique"
-            )
-        seen_evidence_ids.add(row.evidence_id)
-        if PROPERTY_ID.fullmatch(row.property_id) is None:
-            raise ValueError(
-                "VERIFY.md Property-based test evidence Property ID must be PROP-nnn"
-            )
-        if row.result not in PROPERTY_TEST_RESULTS:
-            raise ValueError(
-                f"{row.property_id}: property-test Result must be NOT_STARTED, PASS, or FAIL"
-            )
-        rows.append(row)
-    return rows
-
-
-def parse_observed_property_run(value: str) -> tuple[int, Decimal]:
-    """Parse one exact observed case count and elapsed duration."""
-
-    match = re.fullmatch(
-        r"CASES: (?P<cases>[1-9]\d*); "
-        r"ELAPSED_SECONDS: (?P<seconds>\d+(?:\.\d+)?)",
-        clean_cell(value),
-    )
-    if match is None:
-        raise ValueError(
-            "Observed run must be CASES: <positive integer>; "
-            "ELAPSED_SECONDS: <nonnegative number>"
-        )
-    elapsed = Decimal(match.group("seconds"))
-    if not elapsed.is_finite() or elapsed < 0:
-        raise ValueError("ELAPSED_SECONDS must be finite and nonnegative")
-    return int(match.group("cases")), elapsed
-
-
-def technology_version_policy_allows(policy: str, observed: str) -> bool:
-    """Check an observed exact version against the machine-comparable policy forms."""
-
-    if technology_contract_value_is_unresolved(
-        policy
-    ) or technology_contract_value_is_unresolved(observed):
-        return False
-    if policy.startswith("EXACT: "):
-        return observed == policy.removeprefix("EXACT: ")
-    observed_parts = parsed_numeric_version(observed)
-    if observed_parts is None:
-        return False
-    if policy.startswith("COMPATIBLE_MAJOR: "):
-        return observed_parts[0] == int(policy.removeprefix("COMPATIBLE_MAJOR: "))
-    if policy.startswith("MINIMUM: "):
-        minimum = parsed_numeric_version(policy.removeprefix("MINIMUM: "))
-        if minimum is None:
-            return False
-        width = max(len(observed_parts), len(minimum))
-        return observed_parts + (0,) * (width - len(observed_parts)) >= minimum + (
-            0,
-        ) * (width - len(minimum))
-    # These policies require external evidence mapping the observed version to
-    # the dated LTS release or organization constraint. A numeric-looking
-    # version alone cannot prove either policy, so local validation fails closed.
-    return False
-
-
-def replay_evidence_matches_contract(
-    approved_format: str,
-    observed_replay: str,
-    exact_command: str,
-) -> bool:
-    """Bind replay evidence to the current PRD reproduction-format contract."""
-
-    approved = clean_cell(approved_format)
-    observed = clean_cell(observed_replay)
-    if unresolved(approved) or unresolved(observed):
-        return False
-    lowered_approved = approved.casefold()
-    lowered_observed = observed.casefold()
-    if EVIDENCE_PLACEHOLDER_PATTERN.search(observed) is not None or re.search(
-        r"\b(?:unavailable|missing|not[ _-]*recorded|not[ _-]*captured)\b",
-        lowered_observed,
-    ):
-        return False
-    if "seed" in lowered_approved:
-        match = re.fullmatch(
-            r"(?:seed\s*[:=]\s*|.*(?:^|\s)--seed(?:=|\s+))(?P<seed>\S+)",
-            observed,
-            re.IGNORECASE,
-        )
-        if match is None:
-            return False
-        seed = match.group("seed").strip("'\"")
-        if not seed or EVIDENCE_PLACEHOLDER_PATTERN.fullmatch(seed) is not None:
-            return False
-        if "integer" in lowered_approved and re.fullmatch(r"\d+", seed) is None:
-            return False
-        return True
-    if "command" in lowered_approved:
-        return observed == exact_command
-    return observed == approved
-
-
-def evidence_timestamp(value: str, label: str) -> datetime:
-    if not explicit_timestamp(value):
-        raise ValueError(f"{label} must be ISO 8601 with timezone")
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
-def validate_done_property_evidence(
-    rows: list[PropertyTestEvidenceRow],
-    task: InspectedTask,
-    snapshot: dict[str, str],
-    expected: PropertyExecution,
-    technology: TechnologyDecision,
-    completion_rows: list[TaskCompletionEvidenceRow],
-    *,
-    require_done_pass: bool = True,
-) -> None:
-    """Validate observed property history and, for DONE, require a final pass."""
-
-    task_id = task.task_id
-    if expected.evidence_destination != PROPERTY_TEST_EVIDENCE_DESTINATION:
-        raise ValueError(
-            f"{task_id}: {expected.property_id} PRD evidence destination does not "
-            "identify the exact VERIFY.md property evidence section"
-        )
-    observed = [
-        row
-        for row in rows
-        if row.task_id == task_id
-        and row.property_id == expected.property_id
-        and row.result in {"PASS", "FAIL"}
-    ]
-    if not observed and require_done_pass:
-        raise ValueError(
-            f"{task_id}: DONE {expected.property_id} requires observed property-test evidence"
-        )
-    if not observed:
-        return
-    expected_basis = (
-        f"{snapshot.get('Requirements revision', '')} / "
-        f"{snapshot.get('Design revision', '')} / "
-        f"{snapshot.get('Construction authorization', '')}"
-    )
-    completion_by_id = {row.evidence_id: row for row in completion_rows}
-    task_evidence_ids = set(
-        LOCAL_EVIDENCE_ID.findall(clean_cell(task.metadata.get("Evidence", "")))
-    )
-    passing = False
-    timestamps: list[tuple[datetime, PropertyTestEvidenceRow]] = []
-    for index, row in enumerate(observed, start=1):
-        label = f"{task_id} {expected.property_id} evidence row {index}"
-        if re.fullmatch(r"EV-\d{4,}", row.evidence_id) is None:
-            raise ValueError(f"{label} Evidence ID must be EV-nnnn")
-        if row.requirements_design_authorization != expected_basis:
-            raise ValueError(f"{label} REQ / DES / AUTH is not current")
-        if row.framework_tech_id != expected.framework_tech_id:
-            raise ValueError(
-                f"{label} Framework TECH ID does not match the current PRD property contract"
-            )
-        if row.framework_selection != technology.selection:
-            raise ValueError(
-                f"{label} Framework selection does not match {technology.decision_id}"
-            )
-        observed_version = require_explicit_evidence_value(
-            row.observed_exact_version,
-            f"{label} observed exact version",
-        )
-        if not technology_version_policy_allows(
-            technology.version_policy, observed_version
-        ):
-            raise ValueError(
-                f"{label} observed exact version does not satisfy "
-                f"{technology.version_policy}"
-            )
-        if row.exact_command != expected.exact_command:
-            raise ValueError(
-                f"{label} Exact command does not match the current PRD property contract"
-            )
-        try:
-            observed_cases, observed_seconds = parse_observed_property_run(
-                row.observed_run
-            )
-            minimum_cases, maximum_seconds = parse_property_run_target(
-                expected.run_target_time_bound
-            )
-        except ValueError as exc:
-            raise ValueError(f"{label} {exc}") from exc
-        replay = require_explicit_evidence_value(
-            row.replay_seed_or_exact_command,
-            f"{label} replay seed or exact command",
-        )
-        if not replay_evidence_matches_contract(
-            expected.seed_or_reproduction_format,
-            replay,
-            expected.exact_command,
-        ):
-            raise ValueError(
-                f"{label} replay evidence does not match the approved PRD "
-                "Seed or reproduction format"
-            )
-        observed_at = evidence_timestamp(row.observed_at, f"{label} Observed at")
-        timestamps.append((observed_at, row))
-        material = require_explicit_evidence_value(
-            row.commit_worktree_artifact,
-            f"{label} commit/worktree/artifact",
-        )
-        require_durable_evidence_source(row.durable_source, f"{label} durable source")
-        completion = completion_by_id.get(row.evidence_id)
-        if completion is None:
-            raise ValueError(
-                f"{label} Evidence ID is missing from Task completion evidence"
-            )
-        if (
-            completion.task_id != task_id
-            or completion.command_or_observation != row.exact_command
-            or completion.observed_at != row.observed_at
-            or completion.commit_worktree_artifact != material
-            or completion.durable_source != row.durable_source
-        ):
-            raise ValueError(
-                f"{label} does not match its Task completion evidence binding"
-            )
-        require_explicit_evidence_value(
-            completion.result,
-            f"{label} Task completion result",
-        )
-        require_explicit_evidence_value(
-            completion.actor,
-            f"{label} Task completion actor",
-        )
-        if row.result == "PASS":
-            passing = True
-            if require_done_pass and row.evidence_id not in task_evidence_ids:
-                raise ValueError(
-                    f"{label} PASS Evidence ID is not cited by the DONE task"
-                )
-            if completion.status not in TASK_COMPLETION_EVIDENCE_STATUSES:
-                raise ValueError(
-                    f"{label} PASS completion status must be LOCAL_PASS or VERIFIED"
-                )
-            if minimum_cases is not None and observed_cases < minimum_cases:
-                raise ValueError(
-                    f"{label} observed cases do not meet MIN_CASES: {minimum_cases}"
-                )
-            if maximum_seconds is not None and observed_seconds > maximum_seconds:
-                raise ValueError(
-                    f"{label} elapsed time exceeds MAX_SECONDS: {maximum_seconds}"
-                )
-            if row.minimized_counterexample != "NONE":
-                raise ValueError(
-                    f"{label} PASS must record Minimized counterexample as NONE"
-                )
-            if row.failure_class_resolution != "NONE":
-                raise ValueError(
-                    f"{label} PASS must record Failure class / resolution as NONE"
-                )
-            continue
-        if completion.status != "FAILED":
-            raise ValueError(f"{label} FAIL completion status must be FAILED")
-        counterexample = require_explicit_evidence_value(
-            row.minimized_counterexample,
-            f"{label} minimized counterexample",
-        )
-        if counterexample == "NONE":
-            raise ValueError(f"{label} FAIL requires a minimized counterexample")
-        failure_match = re.fullmatch(
-            "(?P<class>"
-            + "|".join(sorted(PROPERTY_TEST_FAILURE_CLASSES))
-            + r") — (?P<resolution>.+)",
-            row.failure_class_resolution,
-        )
-        if failure_match is None:
-            raise ValueError(
-                f"{label} FAIL requires one supported failure class and a concrete "
-                "resolution separated by an em dash"
-            )
-        try:
-            require_explicit_evidence_value(
-                failure_match.group("resolution"),
-                f"{label} failure resolution",
-            )
-        except ValueError as exc:
-            raise ValueError(
-                f"{label} FAIL requires one supported failure class and a concrete "
-                "resolution separated by an em dash"
-            ) from exc
-    if len({stamp for stamp, _row in timestamps}) != len(timestamps):
-        raise ValueError(
-            f"{task_id}: {expected.property_id} observed timestamps must be unique"
-        )
-    if require_done_pass and not passing:
-        raise ValueError(
-            f"{task_id}: DONE {expected.property_id} requires preserved failure rows "
-            "and a later PASS row"
-        )
-    latest = max(timestamps, key=lambda item: item[0])[1]
-    if require_done_pass and latest.result != "PASS":
-        raise ValueError(
-            f"{task_id}: DONE {expected.property_id} requires the latest observed "
-            "property-test result to be PASS"
-        )
 
 
 MAX_REQUIRED_FILES = 512
@@ -6251,16 +4932,6 @@ def validate_prd(
     )
 
 
-def external_target_contains(allowed: str, requested: str) -> bool:
-    allowed = allowed.casefold()
-    requested = requested.casefold()
-    if allowed == requested:
-        return True
-    return any(
-        requested.startswith(allowed + separator) for separator in ("/", ":", "#")
-    )
-
-
 def validate_tasks_against_envelope(
     ctx: Context,
     tasks: list[InspectedTask],
@@ -6577,64 +5248,6 @@ def git_read(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
         env=environment,
         timeout=10,
     )
-
-
-def parse_checkpoint_rows(tasks_text: str) -> list[CheckpointReceiptRow]:
-    try:
-        parsed_rows = parse_checkpoint_cells(tasks_text)
-    except ContractParseError as exc:
-        messages = {
-            "section_count": "TASKS requires exactly one Checkpoints and resume section",
-            "header_count": "TASKS requires one exact checkpoint table header",
-            "separator_missing": "TASKS checkpoint table separator is invalid",
-            "separator_invalid": "TASKS checkpoint table separator is invalid",
-            "row_width": "TASKS checkpoint rows must have exactly eight cells",
-            "discontiguous_rows": "TASKS checkpoint rows must form one contiguous table",
-        }
-        raise ValueError(
-            messages.get(exc.reason, "TASKS checkpoint table is invalid")
-        ) from exc
-    rows: list[CheckpointReceiptRow] = []
-    for cells in parsed_rows:
-        cleaned = [clean_cell(cell) for cell in cells]
-        if cleaned[0] == "NONE":
-            continue
-        if CHECKPOINT_ID.fullmatch(cleaned[0]) is None:
-            raise ValueError(f"Invalid checkpoint table ID: {cleaned[0]!r}")
-        rows.append(CheckpointReceiptRow(*cleaned))
-    identifiers = [row.checkpoint_id for row in rows]
-    if len(identifiers) != len(set(identifiers)):
-        raise ValueError("Checkpoint table IDs must be unique")
-    ordinals = [int(identifier.split("-", 1)[1]) for identifier in identifiers]
-    if ordinals != sorted(ordinals) or len(ordinals) != len(set(ordinals)):
-        raise ValueError("Checkpoint table IDs must be strictly monotonic")
-    return rows
-
-
-def parse_checkpoint_git_receipt(
-    tasks_text: str,
-    checkpoint_id: str,
-) -> tuple[str, list[str]]:
-    rows = parse_checkpoint_rows(tasks_text)
-    matches = [row for row in rows if row.checkpoint_id == checkpoint_id]
-    if not rows or len(matches) != 1 or rows[-1].checkpoint_id != checkpoint_id:
-        raise ValueError(f"{checkpoint_id}: must be the unique newest checkpoint row")
-    try:
-        commit, dirty_value = parse_checkpoint_git_receipt_value(
-            matches[0].commit_and_dirty
-        )
-    except ContractParseError as exc:
-        raise ValueError(
-            f"{checkpoint_id}: commit receipt must use Commit: <sha>; Dirty: <paths|NONE>"
-        ) from exc
-    dirty = (
-        []
-        if dirty_value == "NONE"
-        else parse_task_write_set(
-            dirty_value, f"{checkpoint_id} checkpoint Dirty paths"
-        )
-    )
-    return commit, dirty
 
 
 def validate_checkpoint_record(
@@ -7480,54 +6093,14 @@ def validate_tasks(
 
 
 def validate_release_decision_record(ctx: Context) -> dict[str, str]:
-    """Validate the release state and its durable evidence acknowledgment."""
+    """Observe VERIFY and delegate release validation to Delivery."""
 
     relative = VERIFY_FILE
     text = ctx.texts.get(relative) or safe_read_text(ctx, relative)
-    if text is None:
-        return {"release_state": "NOT_READY", "active_evidence_cutoff": "NONE"}
-    heading = "## Current release decision"
-    matches = list(re.finditer(rf"^{re.escape(heading)}[ \t]*$", text, re.MULTILINE))
-    if len(matches) != 1:
-        ctx.error("RELEASE_DECISION", f"Expected exactly one {heading!r}", relative)
-        return {"release_state": "NOT_READY", "active_evidence_cutoff": "NONE"}
-    section = text[matches[0].end() :]
-    next_heading = re.search(r"^##\s+", section, re.MULTILINE)
-    if next_heading:
-        section = section[: next_heading.start()]
-    decisions = re.findall(r"^- Release state:\s*`([^`]+)`\s*$", section, re.MULTILINE)
-    release_state = decisions[0] if len(decisions) == 1 else "NOT_READY"
-    if len(decisions) != 1 or decisions[0] not in {
-        "NOT_READY",
-        "READY_TO_DEPLOY",
-        "RELEASE_VERIFIED",
-    }:
-        ctx.error(
-            "RELEASE_DECISION",
-            "Release decision must be exactly NOT_READY, READY_TO_DEPLOY, or RELEASE_VERIFIED",
-            relative,
-        )
-        release_state = "NOT_READY"
-    cutoff_rows = re.findall(
-        r"^- Active evidence cutoff:\s*(?P<value>[^\r\n]+?)\s*$",
-        section,
-        re.MULTILINE,
-    )
-    cutoff = clean_cell(cutoff_rows[0]) if len(cutoff_rows) == 1 else "NONE"
-    if len(cutoff_rows) != 1 or (
-        cutoff not in {"TODO", "NONE"} and re.fullmatch(r"EV-\d{4,}", cutoff) is None
-    ):
-        ctx.error(
-            "RELEASE_EVIDENCE_CUTOFF",
-            "Active evidence cutoff must appear exactly once and be TODO, NONE, "
-            "or one canonical EV-* ID",
-            relative,
-        )
-        cutoff = "NONE"
-    return {
-        "release_state": release_state,
-        "active_evidence_cutoff": cutoff,
-    }
+    record, issues = _parse_release_decision_record_core(text)
+    for code, message in issues:
+        ctx.error(code, message, relative)
+    return record
 
 
 def validate_release_decision(ctx: Context) -> str:
@@ -10587,17 +9160,6 @@ def parse_deployment_reconciliation_evidence(
 
     table = contract_table_after_heading(
         text, AWS_DEPLOYMENT_EVIDENCE_HEADING, AWS_DEPLOYMENT_EVIDENCE_HEADERS
-    )
-    if table is None:
-        return []
-    return [dict(zip(table.headers, row)) for row in table.rows]
-
-
-def parse_verification_matrix(text: str) -> list[dict[str, str]]:
-    """Parse the canonical release acceptance registry."""
-
-    table = contract_table_after_heading(
-        text, VERIFICATION_MATRIX_HEADING, VERIFICATION_MATRIX_HEADERS
     )
     if table is None:
         return []

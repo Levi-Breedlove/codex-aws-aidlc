@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -14,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 try:
@@ -31,6 +30,33 @@ try:
     from fastlane_document_summaries import strip_generated_summary
 except ModuleNotFoundError:  # pragma: no cover - package-style test import
     from scripts.fastlane_document_summaries import strip_generated_summary
+
+try:
+    from fastlane_engine.api import (
+        ApprovedDeliveryContract,
+        ApprovedSpikeContract,
+        ApprovedTaskContract,
+        HarnessExecutionRow,
+        PropertyExecutionRow,
+        derive_approved_task_contract,
+        derive_current_design_contract,
+        derive_task_requirement_coverage as engine_task_requirement_coverage,
+        validate_approved_property_evidence,
+        validate_task_execution_basis,
+    )
+except ModuleNotFoundError:  # pragma: no cover - package-style test import
+    from scripts.fastlane_engine.api import (
+        ApprovedDeliveryContract,
+        ApprovedSpikeContract as ApprovedSpikeContract,
+        ApprovedTaskContract,
+        HarnessExecutionRow,
+        PropertyExecutionRow,
+        derive_approved_task_contract,
+        derive_current_design_contract as derive_current_design_contract,
+        derive_task_requirement_coverage as engine_task_requirement_coverage,
+        validate_approved_property_evidence,
+        validate_task_execution_basis,
+    )
 
 try:
     from fastlane_contracts import (
@@ -333,30 +359,6 @@ class TaskCompletionEvidenceRow:
 
 
 @dataclass(frozen=True)
-class PropertyExecutionRow:
-    property_id: str
-    framework_tech_id: str
-    exact_command: str
-    run_target_time_bound: str
-    seed_or_reproduction_format: str
-    evidence_destination: str
-    framework_selection: str | None = field(default=None, compare=False)
-    framework_version_policy: str | None = field(default=None, compare=False)
-
-
-@dataclass(frozen=True)
-class HarnessExecutionRow:
-    harness_id: str
-    layer: str
-    selected_check: str
-    trigger: str
-    basis_ids: str
-    exact_command: str
-    evidence_destination: str
-    requirement_status: str
-
-
-@dataclass(frozen=True)
 class HarnessEvidenceRow:
     evidence_id: str
     harness_id: str
@@ -368,37 +370,6 @@ class HarnessEvidenceRow:
     observed_at: str
     durable_source: str
     status: str
-
-
-@dataclass(frozen=True)
-class ApprovedSpikeContract:
-    spike_id: str
-    max_attempts: int
-    disposable_boundaries: tuple[str, ...]
-    exit_criterion: str
-
-
-@dataclass(frozen=True)
-class ApprovedDeliveryContract:
-    grandfathered: bool
-    application_source_kind: str | None = None
-    application_source_paths: tuple[str, ...] = ()
-    wave_contract_id: str | None = None
-    journey_id: str | None = None
-    requirement_ids: tuple[str, ...] = ()
-    acceptance_test_ids: tuple[str, ...] = ()
-    harness_id: str | None = None
-    spike: ApprovedSpikeContract | None = None
-
-
-@dataclass(frozen=True)
-class ApprovedTaskContract:
-    technology_ids: frozenset[str]
-    property_execution: dict[str, PropertyExecutionRow]
-    harness: dict[str, HarnessExecutionRow]
-    delivery: ApprovedDeliveryContract | None = None
-    requirement_rules: dict[str, tuple[str, str]] | None = None
-    requirement_evidence: dict[str, tuple[str, tuple[str, ...]]] | None = None
 
 
 def clean(value: str) -> str:
@@ -1588,6 +1559,8 @@ def validate_property_done_evidence(
     snapshot: Snapshot,
     approved_property_execution: dict[str, PropertyExecutionRow] | None,
 ) -> None:
+    """Delegate observed property evidence to the pure Delivery API."""
+
     property_ids = PROPERTY_ID_PATTERN.findall(
         clean(task.metadata.get("Requirements", ""))
     )
@@ -1597,57 +1570,16 @@ def validate_property_done_evidence(
         raise ValueError(
             f"{task.task_id}: approved PRD property execution contract is unavailable"
         )
-    doctor = load_bootstrap_doctor()
-    rows = doctor.parse_property_test_evidence(verify_text)
-    completion_rows = doctor.parse_task_completion_evidence(verify_text)
-    inspected_task = doctor.InspectedTask(
-        task.task_id,
-        task.title,
-        task.block,
-        task.metadata,
-        task.duplicate_metadata,
+    validate_approved_property_evidence(
+        verify_text,
+        task_id=task.task_id,
+        title=task.title,
+        block=task.block,
+        metadata=task.metadata,
+        duplicate_metadata=task.duplicate_metadata,
+        snapshot_fields={key: clean(value) for key, value in snapshot.fields.items()},
+        approved_property_execution=approved_property_execution,
     )
-    snapshot_fields = {key: clean(value) for key, value in snapshot.fields.items()}
-    for property_id in property_ids:
-        contract = approved_property_execution.get(property_id)
-        if contract is None:
-            raise ValueError(
-                f"{task.task_id}: {property_id} is not approved by the PRD property execution contract"
-            )
-        if (
-            contract.framework_selection is None
-            or contract.framework_version_policy is None
-        ):
-            raise ValueError(
-                f"{task.task_id}: {property_id} approved framework selection and version policy are unavailable"
-            )
-        expected = doctor.PropertyExecution(
-            contract.property_id,
-            contract.framework_tech_id,
-            contract.exact_command,
-            contract.run_target_time_bound,
-            contract.seed_or_reproduction_format,
-            contract.evidence_destination,
-        )
-        technology = doctor.TechnologyDecision(
-            contract.framework_tech_id,
-            "PROPERTY_TESTING",
-            contract.framework_selection,
-            contract.framework_version_policy,
-            "REPOSITORY_FACT",
-            snapshot.get("Design revision"),
-            "Validated by the current PRD",
-            "NONE",
-            "Observed property evidence",
-        )
-        doctor.validate_done_property_evidence(
-            rows,
-            inspected_task,
-            snapshot_fields,
-            expected,
-            technology,
-            completion_rows,
-        )
 
 
 def validate_done_evidence_file(
@@ -2054,7 +1986,7 @@ def validate(
         and snapshot.get("Task-plan state") == "CURRENT"
         and approved_requirement_rules is not None
     ):
-        requirement_coverage = load_bootstrap_doctor().derive_task_requirement_coverage(
+        requirement_coverage = engine_task_requirement_coverage(
             tasks,
             snapshot.get("Task-plan state"),
             approved_requirement_rules,
@@ -2660,27 +2592,6 @@ def project_root_for_tasks(tasks_path: Path) -> Path:
     return resolved.parent
 
 
-def load_bootstrap_doctor():
-    """Load the sibling doctor so both runtimes use one contract grammar."""
-
-    module_name = "_fastlane_bootstrap_doctor_for_task_waves"
-    existing = sys.modules.get(module_name)
-    if existing is not None:
-        return existing
-    module_path = Path(__file__).resolve().with_name("bootstrap_doctor.py")
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    if spec is None or spec.loader is None:
-        raise ValueError("Unable to load scripts/bootstrap_doctor.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    try:
-        spec.loader.exec_module(module)
-    except Exception:
-        sys.modules.pop(module_name, None)
-        raise
-    return module
-
-
 def validate_gate_b_design_contract_binding(
     tasks_path: Path,
     tasks_text: str,
@@ -2690,9 +2601,6 @@ def validate_gate_b_design_contract_binding(
 
     root = project_root_for_tasks(tasks_path)
     manifest_path = root / "bootstrap.manifest.json"
-    # Standalone task-ledger fixtures intentionally exercise the reusable engine
-    # without the full template surface. Canonical Fastlane projects always carry
-    # the manifest, so only those projects can claim Gate B hash freshness.
     if not manifest_path.exists():
         if (root / "bootstrap.py").exists() or (root / "AGENTS.md").exists():
             raise ValueError(
@@ -2704,97 +2612,14 @@ def validate_gate_b_design_contract_binding(
     snapshot = parse_snapshot(tasks_text)
     if snapshot.get("Task-plan state") != "CURRENT":
         return
-    doctor = load_bootstrap_doctor()
-    contract, issues = doctor.derive_design_contract(
-        prd_text,
-        snapshot.get("Design revision"),
-        required=True,
-        grandfather_approved_v1=True,
-    )
-    if issues or contract.status != "READY" or contract.canonical_sha256 is None:
-        detail = "; ".join(issues) if issues else contract.status
-        raise ValueError(
-            "Current PRD design contract is not ready for task execution: " + detail
-        )
-    envelope = doctor.table_after_heading(prd_text, "## 28. Construction envelope")
-    observed_hash = doctor.clean_cell(envelope.get("Design contract SHA-256", ""))
-    if observed_hash != contract.canonical_sha256:
-        raise ValueError(
-            "Gate B design contract hash is stale; rerun DESIGN-10 and obtain "
-            "current Gate B approval before task execution"
-        )
-    envelope_digest = doctor.canonical_envelope_sha256(prd_text)
-    document = doctor.table_after_heading(prd_text, "## Document status")
-    agent = doctor.table_after_heading(prd_text, "## 27. Gate B agent review record")
-    owner = doctor.table_after_heading(
-        prd_text, "## 29. Gate B owner authorization record"
-    )
-    expected_revisions = {
-        "Requirements revision reviewed": snapshot.get("Requirements revision"),
-        "Design revision reviewed": snapshot.get("Design revision"),
-        "Construction authorization ID reviewed": snapshot.get(
-            "Construction authorization"
-        ),
-    }
-    expected_owner_revisions = {
-        "Authorized requirements revision": snapshot.get("Requirements revision"),
-        "Authorized design revision": snapshot.get("Design revision"),
-        "Authorized construction authorization ID": snapshot.get(
-            "Construction authorization"
-        ),
-    }
-    gate_b_binding_valid = (
-        document.get("Gate A derived status") == "APPROVED_FOR_DESIGN"
-        and document.get("Gate B derived status") == "APPROVED_FOR_CONSTRUCTION"
-        and all(agent.get(key) == value for key, value in expected_revisions.items())
-        and agent.get("Construction envelope SHA-256 reviewed") == envelope_digest
-        and agent.get("Agent recommendation") == "READY_FOR_CONSTRUCTION_APPROVAL"
-        and all(
-            agent.get(key) == "NONE"
-            for key in (
-                "PRD completeness gaps",
-                "Requirement-to-design-and-test traceability gaps",
-                "Unresolved risk or preservation gaps",
-            )
-        )
-        and owner.get("Owner decision") == "APPROVED"
-        and all(
-            owner.get(key) == value for key, value in expected_owner_revisions.items()
-        )
-        and owner.get("Authorized construction envelope SHA-256") == envelope_digest
-        and owner.get("Derived Gate B state") == "APPROVED_FOR_CONSTRUCTION"
-        and owner.get("Verbatim owner receipt") == "RECORDED_BELOW"
-        and doctor.explicit_human_approver(owner.get("Approver", ""))
-        and doctor.explicit_timestamp(owner.get("Authorization provided at", ""))
-        and doctor.explicit_value(owner.get("Authorization source", ""))
-    )
-    expected_receipt = "\n".join(
-        [
-            "APPROVE PRD AND CONSTRUCTION GATE B",
-            f"Requirements revision: {snapshot.get('Requirements revision')}",
-            f"Design revision: {snapshot.get('Design revision')}",
-            "Construction authorization: " + snapshot.get("Construction authorization"),
-            f"Construction envelope SHA-256: {envelope_digest}",
-            "Use the proposed construction envelope above.",
-            f"Approver: {owner.get('Approver', '')}",
-        ]
-    )
-    try:
-        receipt_matches = doctor.marked_receipt(prd_text, "gate-b") == expected_receipt
-    except ValueError:
-        receipt_matches = False
-    if not gate_b_binding_valid or not receipt_matches:
-        raise ValueError(
-            "Gate B approval binding is stale; rerun DESIGN-20 and obtain current "
-            "owner approval before task execution"
-        )
+    validate_task_execution_basis(prd_text, tasks_text)
 
 
 def approved_contract_for_tasks(
     tasks_path: Path,
     tasks_text: str | None = None,
 ) -> ApprovedTaskContract | None:
-    """Read approved TECH and property execution rows for a Fastlane ledger."""
+    """Read the immutable approved construction contract for one task ledger."""
 
     root = project_root_for_tasks(tasks_path)
     prd_path = root / "docs" / "project" / "PRD.md"
@@ -2813,224 +2638,21 @@ def approved_contract_for_tasks(
         if not tasks_path.is_file() or tasks_path.is_symlink():
             raise ValueError("TASKS.md must be a regular file")
         tasks_text = tasks_path.read_text(encoding="utf-8")
-    validate_gate_b_design_contract_binding(tasks_path, tasks_text, prd_text)
-    doctor = load_bootstrap_doctor()
-    try:
-        technology_table = doctor.contract_table_after_heading(
-            prd_text,
-            doctor.TECHNOLOGY_DECISION_HEADING,
-            doctor.TECHNOLOGY_DECISION_HEADERS,
-        )
-    except ValueError as exc:
-        raise ValueError(
-            f"docs/project/PRD.md technology decision register: {exc}"
-        ) from exc
-    if technology_table is None:
-        raise ValueError(
-            "docs/project/PRD.md must contain exactly one technology decision register"
-        )
-    technology_decisions = [
-        doctor.TechnologyDecision(*row) for row in technology_table.rows
-    ]
-    approved = [decision.decision_id for decision in technology_decisions]
-    if len(approved) != len(set(approved)):
-        raise ValueError("docs/project/PRD.md has duplicate technology decision IDs")
-    technology_by_id = {
-        decision.decision_id: decision for decision in technology_decisions
-    }
-    property_execution, _table_present = parse_property_execution_rows(
-        prd_text, "docs/project/PRD.md"
-    )
-    unknown_frameworks = sorted(
-        {
-            row.framework_tech_id
-            for row in property_execution.values()
-            if row.framework_tech_id not in approved
-        }
-    )
-    if unknown_frameworks:
-        raise ValueError(
-            "docs/project/PRD.md property execution rows reference unknown TECH IDs: "
-            + ", ".join(unknown_frameworks)
-        )
-    enriched_property_execution: dict[str, PropertyExecutionRow] = {}
-    for property_id, execution in property_execution.items():
-        framework = technology_by_id[execution.framework_tech_id]
-        if framework.concern != "PROPERTY_TESTING":
-            raise ValueError(
-                f"docs/project/PRD.md {property_id} Framework TECH ID must reference "
-                "the PROPERTY_TESTING decision"
-            )
-        enriched_property_execution[property_id] = PropertyExecutionRow(
-            execution.property_id,
-            execution.framework_tech_id,
-            execution.exact_command,
-            execution.run_target_time_bound,
-            execution.seed_or_reproduction_format,
-            execution.evidence_destination,
-            framework.selection,
-            framework.version_policy,
-        )
-    approved_harness: dict[str, HarnessExecutionRow] = {}
-    requirement_rules: dict[str, tuple[str, str]] | None = None
-    requirement_evidence: dict[str, tuple[str, tuple[str, ...]]] | None = None
-    approved_delivery: ApprovedDeliveryContract | None = None
-    if (root / "bootstrap.manifest.json").exists():
-        execution_snapshot = parse_snapshot(tasks_text)
-        design_revision = execution_snapshot.get("Design revision")
-        design_contract, design_issues = doctor.derive_design_contract(
-            prd_text,
-            design_revision,
-            required=True,
-            grandfather_approved_v1=True,
-        )
-        if design_issues:
-            raise ValueError(
-                "docs/project/PRD.md design contract is not current: "
-                + "; ".join(design_issues)
-            )
-        approved_harness = {
-            row.harness_id: HarnessExecutionRow(
-                row.harness_id,
-                row.layer,
-                row.selected_check,
-                row.trigger,
-                row.basis_ids,
-                row.exact_command,
-                row.evidence_destination,
-                row.requirement_status,
-            )
-            for row in design_contract.harness.rows
-            if row.harness_id in design_contract.harness.required_ids
-        }
-        project_contract = design_contract.project_contract
-        source_disposition = project_contract.application_source_disposition
-        source_kind = (
-            source_disposition.kind if source_disposition is not None else None
-        )
-        source_paths = (
-            source_disposition.paths if source_disposition is not None else ()
-        )
-        if project_contract.grandfathered_v4:
-            approved_delivery = ApprovedDeliveryContract(grandfathered=True)
-        elif project_contract.first_wave is None:
-            approved_delivery = ApprovedDeliveryContract(
-                grandfathered=False,
-                application_source_kind=source_kind,
-                application_source_paths=source_paths,
-            )
-        else:
-            first_wave = project_contract.first_wave
-            approved_spike: ApprovedSpikeContract | None = None
-            if first_wave.blocking_spike_id is not None:
-                spike = project_contract.spike
-                if spike is None or spike.spike_id != first_wave.blocking_spike_id:
-                    raise ValueError(
-                        "docs/project/PRD.md approved blocking spike is unavailable"
-                    )
-                match = re.fullmatch(r"MAX_ATTEMPTS: ([1-9]\d*)", spike.time_box)
-                if match is None:
-                    raise ValueError(
-                        f"docs/project/PRD.md {spike.spike_id} has an invalid time box"
-                    )
-                disposable_boundaries = tuple(
-                    validate_write_boundary(
-                        spike.disposable_boundary,
-                        f"docs/project/PRD.md {spike.spike_id}",
-                    )
-                )
-                approved_spike = ApprovedSpikeContract(
-                    spike_id=spike.spike_id,
-                    max_attempts=int(match.group(1)),
-                    disposable_boundaries=disposable_boundaries,
-                    exit_criterion=spike.exit_criterion,
-                )
-            approved_delivery = ApprovedDeliveryContract(
-                grandfathered=False,
-                wave_contract_id=first_wave.wave_contract_id,
-                journey_id=first_wave.journey_id,
-                requirement_ids=first_wave.requirement_ids,
-                acceptance_test_ids=first_wave.acceptance_test_ids,
-                harness_id=first_wave.harness_id,
-                application_source_kind=source_kind,
-                application_source_paths=source_paths,
-                spike=approved_spike,
-            )
-        try:
-            requirements_document = doctor.table_after_heading(
-                prd_text, "## Document status"
-            )
-        except ValueError:
-            requirements_document = {}
-        repository_mode = doctor.clean_cell(
-            requirements_document.get("Repository mode", "")
-        ).lower()
-        intake_contract, _intake_issues = doctor.derive_intake_foundation_contract(
-            prd_text,
-            repository_mode if repository_mode in doctor.PROJECT_MODES else None,
-            grandfather_current_gate_a=True,
-        )
-        requirements_contract, requirements_issues = (
-            doctor.derive_requirements_contract(
-                prd_text,
-                doctor.clean_cell(requirements_document.get("Effective risk", ""))
-                or None,
-                intake_contract,
-                required=True,
-                grandfather_current_gate_a=True,
-            )
-        )
-        if requirements_issues or requirements_contract.status not in {
-            "READY",
-            "GRANDFATHERED",
-        }:
-            issue_text = "; ".join(
-                f"{code}: {message}" for code, message in requirements_issues
-            )
-            if not issue_text:
-                issue_text = f"status={requirements_contract.status}"
-            raise ValueError(
-                "docs/project/PRD.md requirements contract is not current: "
-                + issue_text
-            )
-        requirement_rules = doctor.task_requirement_rules(
-            prd_text, requirements_contract
-        )
+    full_template = (root / "bootstrap.manifest.json").exists()
+    verify_text: str | None = None
+    if full_template:
         verify_path = tasks_path.with_name("VERIFY.md")
-        verify_text: str | None = None
         if verify_path.exists():
             if not verify_path.is_file() or verify_path.is_symlink():
                 raise ValueError("docs/project/VERIFY.md must be a regular file")
             verify_text = strip_generated_summary(
                 verify_path.read_text(encoding="utf-8")
             )
-        requirement_evidence, evidence_issues = (
-            doctor.task_requirement_evidence_dispositions(
-                verify_text,
-                {
-                    "Requirements revision": execution_snapshot.get(
-                        "Requirements revision"
-                    ),
-                    "Design revision": execution_snapshot.get("Design revision"),
-                    "Construction authorization": execution_snapshot.get(
-                        "Construction authorization"
-                    ),
-                },
-                requirement_rules,
-            )
-        )
-        if evidence_issues:
-            raise ValueError(
-                "docs/project/VERIFY.md requirement evidence is invalid: "
-                + "; ".join(evidence_issues)
-            )
-    return ApprovedTaskContract(
-        frozenset(approved),
-        enriched_property_execution,
-        approved_harness,
-        approved_delivery,
-        requirement_rules,
-        requirement_evidence,
+    return derive_approved_task_contract(
+        prd_text,
+        tasks_text,
+        verify_text,
+        full_template=full_template,
     )
 
 

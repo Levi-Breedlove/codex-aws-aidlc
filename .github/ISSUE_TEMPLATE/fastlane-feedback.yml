@@ -14,7 +14,7 @@ body:
     attributes:
       label: Public Fastlane baseline
       description: Enter the public version, commit SHA, or release checksum only. Do not paste a local path.
-      placeholder: "Example: 1.2.14 or a public commit SHA"
+      placeholder: "Example: 1.2.15 or a public commit SHA"
     validations:
       required: true
 

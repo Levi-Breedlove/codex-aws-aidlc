@@ -7,6 +7,7 @@ not determine whether a domain record is ready or authorized.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Any, Pattern
 
@@ -52,6 +53,20 @@ def explicit_value(value: str, *, allow_none: bool = False) -> bool:
     if unresolved(cleaned):
         return False
     return allow_none or cleaned not in {"NONE", "NOT_RECORDED", "UNASSIGNED"}
+
+
+def explicit_timestamp(value: str) -> bool:
+    """Recognize one timezone-aware ISO 8601 canonical timestamp."""
+
+    cleaned = clean_cell(value)
+    if unresolved(cleaned):
+        return False
+    candidate = cleaned[:-1] + "+00:00" if cleaned.endswith("Z") else cleaned
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 
 def none_with_reason(value: str) -> bool:
@@ -116,6 +131,7 @@ __all__ = (
     "canonical_id_list",
     "clean_cell",
     "explicit_value",
+    "explicit_timestamp",
     "none_with_reason",
     "parse_exact_id_list",
     "unresolved",

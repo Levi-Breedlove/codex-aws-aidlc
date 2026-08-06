@@ -20,6 +20,9 @@ from scripts.fastlane_adr import ADR_AUTHORITY
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = REPOSITORY_ROOT
+SCRIPTS = REPOSITORY_ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 TEMPLATE_SOURCE_MODE = "{{SETUP_STATUS}}" in (
     REPOSITORY_ROOT / "bootstrap.yaml"
 ).read_text(encoding="utf-8")
@@ -3007,7 +3010,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.14")
+        self.assertEqual(report["bootstrap_version"], "1.2.15")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
