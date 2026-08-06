@@ -16,7 +16,7 @@ import os
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -25,11 +25,8 @@ from typing import Any, Iterable, Mapping, Sequence
 if __package__:
     from .fastlane_engine.core.contracts import (
         ContractTable,
-        _heading_section_lines,
-        _heading_section_offsets,
         _parse_contract_table_lines,
         contract_table_after_heading,
-        contract_table_in_section,
         markdown_tables,
         split_table_row,
         table_after_heading,
@@ -60,7 +57,6 @@ if __package__:
         validate_state_schema as validate_package_state_schema,
     )
     from .fastlane_engine.define.coverage import (
-        _none_with_reason,
         derive_change_impact_contract,
         derive_coverage_contract,
     )
@@ -70,7 +66,6 @@ if __package__:
     )
     from .fastlane_engine.define.models import (
         AssumptionLifecycleRecord,
-        ChangeImpactContract,
         ChangeImpactRow,
         CoverageContract,
         CoverageOmission,
@@ -87,8 +82,6 @@ if __package__:
         gate_a_readiness_card_issues,
     )
     from .fastlane_engine.define.requirements import (
-        _contract_ids,
-        _contract_table_or_issue,
         _schema_13_requirement_rows,
         _state_trigger_map,
         authoritative_requirement_ids,
@@ -100,14 +93,97 @@ if __package__:
         quality_attribute_scenario_issues,
         requirement_method_issues,
     )
+    from .fastlane_engine.design import (
+        APPLICATION_SOURCE_BROWNFIELD,
+        APPLICATION_SOURCE_DIAGNOSTIC_CODES,
+        APPLICATION_SOURCE_DISPOSITION_FIELD,
+        APPLICATION_SOURCE_GREENFIELD,
+        APPLICATION_SOURCE_NOT_APPLICABLE as APPLICATION_SOURCE_NOT_APPLICABLE,
+        ARCHITECTURE_CANDIDATE_HEADING as ARCHITECTURE_CANDIDATE_HEADING,
+        ARCHITECTURE_DRIVER_HEADING as ARCHITECTURE_DRIVER_HEADING,
+        ARCHITECTURE_SELECTION_HEADING as ARCHITECTURE_SELECTION_HEADING,
+        ARCHITECTURE_TRACEABILITY_HEADERS as ARCHITECTURE_TRACEABILITY_HEADERS,
+        ARCHITECTURE_TRACEABILITY_HEADING as ARCHITECTURE_TRACEABILITY_HEADING,
+        AWS_SERVICE_DECISION_HEADERS as AWS_SERVICE_DECISION_HEADERS,
+        AWS_SERVICE_DECISION_HEADING as AWS_SERVICE_DECISION_HEADING,
+        AWS_DERIVED_ARTIFACT,
+        AWS_DISCOVERY_ID,
+        AWS_EXACT_ARTIFACT,
+        DIAGRAM_CONTRACT_HEADERS,
+        DIAGRAM_CONTRACT_HEADING,
+        ERROR_HANDLING_HEADERS as ERROR_HANDLING_HEADERS,
+        ERROR_HANDLING_HEADING as ERROR_HANDLING_HEADING,
+        FIRST_WAVE_HEADERS as FIRST_WAVE_HEADERS,
+        FIRST_WAVE_HEADING as FIRST_WAVE_HEADING,
+        HARNESS_HEADING as HARNESS_HEADING,
+        IAC_VALIDATION_EVIDENCE_DESTINATION as IAC_VALIDATION_EVIDENCE_DESTINATION,
+        IAC_VALIDATION_HEADERS as IAC_VALIDATION_HEADERS,
+        IAC_VALIDATION_HEADING as IAC_VALIDATION_HEADING,
+        INTERFACE_HEADERS as INTERFACE_HEADERS,
+        INTERFACE_HEADING as INTERFACE_HEADING,
+        JOURNEY_HEADERS,
+        JOURNEY_HEADING,
+        LAYER_BOUNDARY_HEADERS as LAYER_BOUNDARY_HEADERS,
+        LAYER_BOUNDARY_HEADING as LAYER_BOUNDARY_HEADING,
+        MATERIAL_AWS_EVIDENCE_HEADING as MATERIAL_AWS_EVIDENCE_HEADING,
+        PROPERTY_EXECUTION_HEADERS,
+        PROPERTY_EXECUTION_HEADING as PROPERTY_EXECUTION_HEADING,
+        PROPERTY_ID,
+        PROPERTY_TEST_EVIDENCE_DESTINATION,
+        RICH_TO_STATE_TRIGGER as RICH_TO_STATE_TRIGGER,
+        SPIKE_HEADING as SPIKE_HEADING,
+        STATE_APPLICABILITY_HEADERS as STATE_APPLICABILITY_HEADERS,
+        STATE_APPLICABILITY_HEADING as STATE_APPLICABILITY_HEADING,
+        STATE_REGISTER_HEADERS as STATE_REGISTER_HEADERS,
+        STATE_REGISTER_HEADING as STATE_REGISTER_HEADING,
+        TECHNOLOGY_DECISION_ID,
+        TECHNOLOGY_DECISION_HEADERS as TECHNOLOGY_DECISION_HEADERS,
+        TECHNOLOGY_DECISION_HEADING as TECHNOLOGY_DECISION_HEADING,
+        ApplicationSourceDisposition,
+        ArchitectureContract,
+        DesignContract,
+        HarnessContract,
+        HarnessRow as HarnessRow,
+        PropertyExecution,
+        ProjectDesignContract,
+        TechnologyDecision,
+        _derive_architecture_contract as _derive_architecture_contract_core,
+        canonical_envelope_sha256,
+        command_matches_prefix,
+        current_prd_basis_ids as _current_prd_basis_ids_core,
+        derive_design_contract as _derive_design_contract_core,
+        derive_diagram_contract as derive_diagram_contract,
+        derive_harness_contract as derive_harness_contract,
+        derive_project_design_contract as _derive_project_design_contract_core,
+        parse_application_source_disposition as parse_application_source_disposition,
+        parse_authorized_ids,
+        parse_aws_environment,
+        parse_command_prefixes,
+        parse_envelope_paths,
+        parse_envelope_targets,
+        parse_future_expiry_at,
+        parse_github_constraints,
+        parse_property_run_target,
+        parse_task_boundary,
+        parsed_numeric_version,
+        required_diagram_kinds,
+        technology_contract_value_is_unresolved,
+        technology_reasoning_parts,
+        machine_comparable_property_version_policy as machine_comparable_property_version_policy,
+        valid_property_execution_command,
+        valid_technology_selection as valid_technology_selection,
+        valid_technology_version_policy as valid_technology_version_policy,
+        validate_application_source_disposition as validate_application_source_disposition,
+        validate_application_source_root,
+        validate_application_source_write_set,
+        validate_aws_artifact,
+        validation_commands,
+    )
 else:  # Executed directly from scripts/.
     from fastlane_engine.core.contracts import (
         ContractTable,
-        _heading_section_lines,
-        _heading_section_offsets,
         _parse_contract_table_lines,
         contract_table_after_heading,
-        contract_table_in_section,
         markdown_tables,
         split_table_row,
         table_after_heading,
@@ -138,7 +214,6 @@ else:  # Executed directly from scripts/.
         validate_state_schema as validate_package_state_schema,
     )
     from fastlane_engine.define.coverage import (
-        _none_with_reason,
         derive_change_impact_contract,
         derive_coverage_contract,
     )
@@ -148,7 +223,6 @@ else:  # Executed directly from scripts/.
     )
     from fastlane_engine.define.models import (
         AssumptionLifecycleRecord,
-        ChangeImpactContract,
         ChangeImpactRow,
         CoverageContract,
         CoverageOmission,
@@ -165,8 +239,6 @@ else:  # Executed directly from scripts/.
         gate_a_readiness_card_issues,
     )
     from fastlane_engine.define.requirements import (
-        _contract_ids,
-        _contract_table_or_issue,
         _schema_13_requirement_rows,
         _state_trigger_map,
         authoritative_requirement_ids,
@@ -178,6 +250,229 @@ else:  # Executed directly from scripts/.
         quality_attribute_scenario_issues,
         requirement_method_issues,
     )
+    from fastlane_engine.design import (
+        APPLICATION_SOURCE_BROWNFIELD,
+        APPLICATION_SOURCE_DIAGNOSTIC_CODES,
+        APPLICATION_SOURCE_DISPOSITION_FIELD,
+        APPLICATION_SOURCE_GREENFIELD,
+        APPLICATION_SOURCE_NOT_APPLICABLE as APPLICATION_SOURCE_NOT_APPLICABLE,
+        ARCHITECTURE_CANDIDATE_HEADING as ARCHITECTURE_CANDIDATE_HEADING,
+        ARCHITECTURE_DRIVER_HEADING as ARCHITECTURE_DRIVER_HEADING,
+        ARCHITECTURE_SELECTION_HEADING as ARCHITECTURE_SELECTION_HEADING,
+        ARCHITECTURE_TRACEABILITY_HEADERS as ARCHITECTURE_TRACEABILITY_HEADERS,
+        ARCHITECTURE_TRACEABILITY_HEADING as ARCHITECTURE_TRACEABILITY_HEADING,
+        AWS_SERVICE_DECISION_HEADERS as AWS_SERVICE_DECISION_HEADERS,
+        AWS_SERVICE_DECISION_HEADING as AWS_SERVICE_DECISION_HEADING,
+        AWS_DERIVED_ARTIFACT,
+        AWS_DISCOVERY_ID,
+        AWS_EXACT_ARTIFACT,
+        DIAGRAM_CONTRACT_HEADERS,
+        DIAGRAM_CONTRACT_HEADING,
+        ERROR_HANDLING_HEADERS as ERROR_HANDLING_HEADERS,
+        ERROR_HANDLING_HEADING as ERROR_HANDLING_HEADING,
+        FIRST_WAVE_HEADERS as FIRST_WAVE_HEADERS,
+        FIRST_WAVE_HEADING as FIRST_WAVE_HEADING,
+        HARNESS_HEADING as HARNESS_HEADING,
+        IAC_VALIDATION_EVIDENCE_DESTINATION as IAC_VALIDATION_EVIDENCE_DESTINATION,
+        IAC_VALIDATION_HEADERS as IAC_VALIDATION_HEADERS,
+        IAC_VALIDATION_HEADING as IAC_VALIDATION_HEADING,
+        INTERFACE_HEADERS as INTERFACE_HEADERS,
+        INTERFACE_HEADING as INTERFACE_HEADING,
+        JOURNEY_HEADERS,
+        JOURNEY_HEADING,
+        LAYER_BOUNDARY_HEADERS as LAYER_BOUNDARY_HEADERS,
+        LAYER_BOUNDARY_HEADING as LAYER_BOUNDARY_HEADING,
+        MATERIAL_AWS_EVIDENCE_HEADING as MATERIAL_AWS_EVIDENCE_HEADING,
+        PROPERTY_EXECUTION_HEADERS,
+        PROPERTY_EXECUTION_HEADING as PROPERTY_EXECUTION_HEADING,
+        PROPERTY_ID,
+        PROPERTY_TEST_EVIDENCE_DESTINATION,
+        RICH_TO_STATE_TRIGGER as RICH_TO_STATE_TRIGGER,
+        SPIKE_HEADING as SPIKE_HEADING,
+        STATE_APPLICABILITY_HEADERS as STATE_APPLICABILITY_HEADERS,
+        STATE_APPLICABILITY_HEADING as STATE_APPLICABILITY_HEADING,
+        STATE_REGISTER_HEADERS as STATE_REGISTER_HEADERS,
+        STATE_REGISTER_HEADING as STATE_REGISTER_HEADING,
+        TECHNOLOGY_DECISION_ID,
+        TECHNOLOGY_DECISION_HEADERS as TECHNOLOGY_DECISION_HEADERS,
+        TECHNOLOGY_DECISION_HEADING as TECHNOLOGY_DECISION_HEADING,
+        ApplicationSourceDisposition,
+        ArchitectureContract,
+        DesignContract,
+        HarnessContract,
+        HarnessRow as HarnessRow,
+        PropertyExecution,
+        ProjectDesignContract,
+        TechnologyDecision,
+        _derive_architecture_contract as _derive_architecture_contract_core,
+        canonical_envelope_sha256,
+        command_matches_prefix,
+        current_prd_basis_ids as _current_prd_basis_ids_core,
+        derive_design_contract as _derive_design_contract_core,
+        derive_diagram_contract as derive_diagram_contract,
+        derive_harness_contract as derive_harness_contract,
+        derive_project_design_contract as _derive_project_design_contract_core,
+        parse_application_source_disposition as parse_application_source_disposition,
+        parse_authorized_ids,
+        parse_aws_environment,
+        parse_command_prefixes,
+        parse_envelope_paths,
+        parse_envelope_targets,
+        parse_future_expiry_at,
+        parse_github_constraints,
+        parse_property_run_target,
+        parse_task_boundary,
+        parsed_numeric_version,
+        required_diagram_kinds,
+        technology_contract_value_is_unresolved,
+        technology_reasoning_parts,
+        machine_comparable_property_version_policy as machine_comparable_property_version_policy,
+        valid_property_execution_command,
+        valid_technology_selection as valid_technology_selection,
+        valid_technology_version_policy as valid_technology_version_policy,
+        validate_application_source_disposition as validate_application_source_disposition,
+        validate_application_source_root,
+        validate_application_source_write_set,
+        validate_aws_artifact,
+        validation_commands,
+    )
+
+
+def current_prd_basis_ids(text: str, design_revision: str | None) -> set[str]:
+    """COMPATIBILITY: retain the doctor helper over the pure Design evaluator."""
+
+    return _current_prd_basis_ids_core(
+        text, design_revision, authoritative_requirement_ids(text)
+    )
+
+
+def _derive_architecture_contract(
+    text: str,
+    design_revision: str | None,
+    technology_ids: set[str],
+    *,
+    required: bool,
+    architecture_disposition: str | None = None,
+    grandfather_approved_v1: bool = False,
+) -> tuple[ArchitectureContract, list[str]]:
+    """COMPATIBILITY: supply current Define IDs to pure architecture validation."""
+
+    return _derive_architecture_contract_core(
+        text,
+        design_revision,
+        technology_ids,
+        authoritative_requirement_ids(text),
+        required=required,
+        architecture_disposition=architecture_disposition,
+        grandfather_approved_v1=grandfather_approved_v1,
+    )
+
+
+def derive_project_design_contract(
+    text: str,
+    requirements_contract: RequirementsContract,
+    coverage_contract: CoverageContract,
+    allowed_basis_ids: set[str],
+    harness: HarnessContract,
+    legacy_design_ids: set[str],
+    *,
+    required: bool,
+    grandfather_approved_v4: bool,
+) -> tuple[ProjectDesignContract, list[str]]:
+    """COMPATIBILITY: preserve the historical doctor signature."""
+
+    return _derive_project_design_contract_core(
+        text,
+        requirements_contract,
+        coverage_contract,
+        authoritative_requirement_ids(text),
+        allowed_basis_ids,
+        harness,
+        legacy_design_ids,
+        _state_trigger_map,
+        required=required,
+        grandfather_approved_v4=grandfather_approved_v4,
+    )
+
+
+def derive_design_contract(
+    text: str,
+    design_revision: str | None,
+    *,
+    required: bool = False,
+    grandfather_approved_v1: bool = False,
+    coverage_contract: CoverageContract | None = None,
+    requirements_contract: RequirementsContract | None = None,
+) -> tuple[DesignContract, list[str]]:
+    """COMPATIBILITY: preserve Design derivation while orchestration is extracted."""
+
+    initial_issues: list[str] = []
+    if coverage_contract is None:
+        try:
+            document = table_after_heading(text, "## Document status")
+        except ValueError:
+            document = {}
+        repository_mode = clean_cell(document.get("Project mode", "")).lower()
+        coverage_intake_contract, _coverage_intake_issues = (
+            derive_intake_foundation_contract(
+                text,
+                repository_mode if repository_mode in PROJECT_MODES else None,
+                grandfather_current_gate_a=grandfather_approved_v1,
+            )
+        )
+        coverage_contract, coverage_issues = derive_coverage_contract(
+            text,
+            clean_cell(document.get("Current requirements revision", "")) or None,
+            clean_cell(document.get("Delivery profile", "")) or None,
+            clean_cell(document.get("Effective risk", "")) or None,
+            clean_cell(document.get("AWS lane", "")) or None,
+            required=required,
+            grandfather_current_gate_a=grandfather_approved_v1,
+            owner_work_context=coverage_intake_contract.owner_work_context,
+        )
+        if required:
+            initial_issues.extend(coverage_issues)
+    if requirements_contract is None:
+        try:
+            requirements_document = table_after_heading(text, "## Document status")
+        except ValueError:
+            requirements_document = {}
+        repository_mode = clean_cell(
+            requirements_document.get("Project mode", "")
+        ).lower()
+        intake_contract, _intake_issues = derive_intake_foundation_contract(
+            text,
+            repository_mode if repository_mode in PROJECT_MODES else None,
+            grandfather_current_gate_a=grandfather_approved_v1,
+        )
+        requirements_contract, requirement_issues = derive_requirements_contract(
+            text,
+            clean_cell(requirements_document.get("Effective risk", "")) or None,
+            intake_contract,
+            required=required,
+            grandfather_current_gate_a=grandfather_approved_v1,
+        )
+        if required:
+            initial_issues.extend(issue for _code, issue in requirement_issues)
+    return _derive_design_contract_core(
+        text,
+        design_revision,
+        required=required,
+        grandfather_approved_v1=grandfather_approved_v1,
+        coverage_contract=coverage_contract,
+        requirements_contract=requirements_contract,
+        authoritative_requirement_ids=authoritative_requirement_ids(text),
+        change_impact_deriver=derive_change_impact_contract,
+        state_trigger_mapper=_state_trigger_map,
+        initial_issues=initial_issues,
+    )
+
+
+def parse_future_expiry(value: str) -> datetime:
+    """COMPATIBILITY: evaluate expiry against one façade-observed UTC clock."""
+
+    return parse_future_expiry_at(value, datetime.now(timezone.utc))
+
 
 try:
     from fastlane_adr import derive_adr_rationale, empty_adr_rationale
@@ -350,6 +645,16 @@ ENGINE_RUNTIME_CONTROL_FILES = {
     "scripts/fastlane_engine/define/models.py",
     "scripts/fastlane_engine/define/project.py",
     "scripts/fastlane_engine/define/requirements.py",
+    "scripts/fastlane_engine/design/__init__.py",
+    "scripts/fastlane_engine/design/adr.py",
+    "scripts/fastlane_engine/design/architecture.py",
+    "scripts/fastlane_engine/design/diagrams.py",
+    "scripts/fastlane_engine/design/envelope.py",
+    "scripts/fastlane_engine/design/harness.py",
+    "scripts/fastlane_engine/design/models.py",
+    "scripts/fastlane_engine/design/project.py",
+    "scripts/fastlane_engine/design/source.py",
+    "scripts/fastlane_engine/design/support.py",
     "scripts/fastlane_engine/package/__init__.py",
     "scripts/fastlane_engine/package/manifest.py",
     "scripts/fastlane_engine/package/state.py",
@@ -523,140 +828,9 @@ INTAKE_RESPONSE_REGISTER_HEADERS = (
     "Selection detail",
     "Basis IDs",
 )
-TECHNOLOGY_DECISION_HEADING = "### Technology and toolchain decision register"
-TECHNOLOGY_DECISION_HEADERS = (
-    "Decision ID",
-    "Concern",
-    "Selection",
-    "Version policy",
-    "Source",
-    "Basis IDs",
-    "Alternatives and rationale",
-    "Compatibility/migration",
-    "Validation",
-)
-LEGACY_REQUIRED_TECHNOLOGY_CONCERNS = (
-    "APPLICATION_RUNTIME",
-    "APPLICATION_FRAMEWORK",
-    "FRONTEND_FRAMEWORK",
-    "INFRASTRUCTURE_AS_CODE",
-    "PACKAGE_BUILD_TOOLING",
-    "TEST_TOOLING",
-    "PROPERTY_TESTING",
-    "SECURITY_VALIDATION",
-    "DEPLOYMENT_TOOLING",
-)
-REQUIRED_TECHNOLOGY_CONCERNS = (
-    *LEGACY_REQUIRED_TECHNOLOGY_CONCERNS,
-    "IDENTITY_AUTHORIZATION",
-    "DATA_STORAGE",
-    "MESSAGING_RETRIES",
-    "EDGE_NETWORKING",
-    "OBSERVABILITY_INCIDENT_RESPONSE",
-    "RELIABILITY_RECOVERY",
-)
-TECHNOLOGY_DECISION_ID = re.compile(r"TECH-\d{4}")
-TECHNOLOGY_CONCERN = re.compile(r"[A-Z][A-Z0-9_]*")
 STABLE_CONTRACT_ID = re.compile(r"[A-Z][A-Z0-9_]*(?:-[A-Z][A-Z0-9_]*)*-\d{3,}")
-TECHNOLOGY_SOURCES = {
-    "OWNER_CONSTRAINT",
-    "REPOSITORY_FACT",
-    "AGENT_RECOMMENDATION",
-}
-ARCHITECTURE_DRIVER_HEADING = "### Architecture drivers"
-ARCHITECTURE_DRIVER_HEADERS = (
-    "Driver ID",
-    "Requirement basis",
-    "Class",
-    "Decision implication",
-    "Validation",
-)
-ARCHITECTURE_CANDIDATE_HEADING = "### Whole-system candidates"
-ARCHITECTURE_CANDIDATE_HEADERS = (
-    "Candidate ID",
-    "Architecture summary",
-    "Requirement coverage",
-    "AWS evidence",
-    "Eligibility",
-    "Failed constraints",
-    "Tradeoffs",
-)
-ARCHITECTURE_SELECTION_HEADERS_V2 = (
-    "Architecture ID",
-    "Selected candidate",
-    "Requirement and driver basis",
-    "Rationale",
-    "Rejected alternatives",
-    "Risks",
-    "Mitigations",
-    "Cost effect",
-    "Breakpoints",
-    "Revisit triggers",
-    "Validation",
-)
-ARCHITECTURE_SELECTION_HEADING = "### Selected architecture"
-ARCHITECTURE_SELECTION_HEADERS = (
-    "Architecture ID",
-    "Selected candidate",
-    "Requirement and driver basis",
-    "Rationale",
-    "Rejected alternatives",
-    "Risks",
-    "Mitigations",
-    "Security impact",
-    "Reliability impact",
-    "Operational burden",
-    "Cost effect",
-    "Breakpoints",
-    "Migration path",
-    "Revisit triggers",
-    "Validation",
-)
-ARCHITECTURE_TRACEABILITY_HEADING = "### Architecture traceability"
-ARCHITECTURE_TRACEABILITY_HEADERS_V4 = (
-    "Requirement ID",
-    "ARCH / COMP / API / EVENT / CLI / FILE / DATA / CTRL / BOUNDARY / STATE IDs",
-    "Property/test IDs",
-    "Evidence IDs",
-)
-ARCHITECTURE_TRACEABILITY_HEADERS = (
-    "Requirement ID",
-    "ARCH / API / EVENT / CLI / FILE / BOUNDARY / STATE IDs",
-    "Property/test IDs",
-    "Evidence IDs",
-)
-MATERIAL_AWS_EVIDENCE_HEADING = "### Material AWS evidence"
-MATERIAL_AWS_EVIDENCE_HEADERS_V1 = (
-    "Evidence ID",
-    "Design IDs",
-    "Material claim",
-    "AWS Core capability",
-    "Official reference",
-    "Observed date",
-)
-MATERIAL_AWS_EVIDENCE_HEADERS = (
-    "Evidence ID",
-    "Discovery ID",
-    "Design IDs",
-    "Material claim",
-    "AWS Core capability",
-    "Official reference",
-    "Observed date",
-)
-ARCHITECTURE_DRIVER_ID = re.compile(r"DRV-\d{4,}")
-ARCHITECTURE_CANDIDATE_ID = re.compile(r"CAND-\d{4,}")
-ARCHITECTURE_ID = re.compile(r"ARCH-\d{4,}")
-ARCHITECTURE_DESIGN_ID = re.compile(
-    r"(?:ARCH|COMP|API|EVENT|CLI|FILE|DATA|CTRL|BOUNDARY|STATE)-\d{3,}"
-)
-ARCHITECTURE_TEST_ID = re.compile(r"(?:PROP|EX|TEST)-\d{3,}")
-AWS_MATERIAL_EVIDENCE_ID = re.compile(r"AWS-EV-\d{4,}")
-AWS_DISCOVERY_ID = re.compile(r"AWS-DISC-\d{4,}")
 AWS_READ_AUTHORIZATION_ID = re.compile(r"AWS-READ-AUTH-\d{4,}")
 AWS_PREFLIGHT_ID = re.compile(r"AWS-PREFLIGHT-\d{4,}")
-ARCHITECTURE_DRIVER_CLASSES = {"HARD_CONSTRAINT", "PREFERENCE", "REVISIT_TRIGGER"}
-ARCHITECTURE_ELIGIBILITY = {"ELIGIBLE", "INELIGIBLE"}
-AWS_DOCUMENTATION_CAPABILITIES = {"retrieve_skill", "search_documentation"}
 NORMATIVE_REQUIREMENT_HEADERS = (
     "ID",
     "Requirement",
@@ -674,20 +848,6 @@ LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
 PROJECT_CONTRACT_SCHEMA = "1.4"
-PROJECT_DESIGN_CONTRACT_SCHEMA = "7"
-APPLICATION_SOURCE_DISPOSITION_FIELD = "Application source disposition"
-APPLICATION_SOURCE_GREENFIELD = "GREENFIELD_APP_ROOT"
-APPLICATION_SOURCE_BROWNFIELD = "BROWNFIELD_PRESERVE"
-APPLICATION_SOURCE_NOT_APPLICABLE = "NOT_APPLICABLE"
-APPLICATION_SOURCE_INFRASTRUCTURE_ONLY = "NOT_APPLICABLE — INFRASTRUCTURE_ONLY"
-APPLICATION_SOURCE_DIAGNOSTIC_CODES = frozenset(
-    {
-        "APPLICATION_SOURCE_DISPOSITION_MISSING",
-        "APPLICATION_SOURCE_DISPOSITION_INVALID",
-        "APPLICATION_SOURCE_DISPOSITION_CONFLICT",
-        "APPLICATION_SOURCE_PARALLEL_ROOT",
-    }
-)
 REQUIREMENTS_CHANGE_LINEAGE_HEADING = "### Requirements change lineage"
 REQUIREMENTS_CHANGE_LINEAGE_HEADERS = (
     "Current revision",
@@ -717,34 +877,6 @@ ASSUMPTION_STATUSES = {
 }
 REQUIREMENTS_REVISION_ID = re.compile(r"REQ-\d{4,}")
 ASSUMPTION_ID = re.compile(r"ASM-\d{3,}")
-DIAGRAM_CONTRACT_HEADING = "### Project diagram contract"
-DIAGRAM_CONTRACT_HEADERS = (
-    "Diagram ID",
-    "Kind",
-    "Applicability",
-    "Status",
-    "Anchor",
-    "Basis IDs",
-    "Referenced IDs",
-)
-DIAGRAM_ID = re.compile(r"DIAGRAM-\d{4,}")
-DIAGRAM_KINDS = {
-    "SYSTEM_CONTEXT",
-    "PRIMARY_OUTCOME",
-    "DATA_LIFECYCLE",
-    "FAILURE_RECOVERY",
-    "MIGRATION",
-    "JOURNEY",
-    "STATE",
-}
-DIAGRAM_APPLICABILITY = {"REQUIRED", "CONDITIONAL", "NOT_APPLICABLE"}
-DIAGRAM_STATUSES = {"NOT_YET_CREATED", "CURRENT", "STALE", "NOT_APPLICABLE"}
-DIAGRAM_REQUIRED_KINDS = {"SYSTEM_CONTEXT", "PRIMARY_OUTCOME"}
-DIAGRAM_RELATIONSHIP = re.compile(
-    r"^\s*(?P<from>[A-Z][A-Z0-9_]*-\d{3,})\s*"
-    r"-->\|(?P<relation>[^|\r\n]+)\|\s*"
-    r"(?P<to>[A-Z][A-Z0-9_]*-\d{3,})\s*$"
-)
 ACTOR_HEADING = "## 4. Users and outcomes"
 ACTOR_HEADERS = (
     "Actor ID",
@@ -758,18 +890,6 @@ ACTOR_KINDS = {"PRIMARY_USER", "SECONDARY_USER", "OPERATOR", "EXTERNAL_SYSTEM"}
 ACTOR_ID = re.compile(r"ACT-\d{3,}")
 ACCEPTANCE_ID = re.compile(r"AC-[A-Z][A-Z0-9_]*(?:-[A-Z][A-Z0-9_]*)*-\d{3,}")
 ACCEPTANCE_TEST_BINDING_ID = re.compile(r"\b(?:TEST|PROP|EV)-\d{3,}\b")
-JOURNEY_HEADING = "### Journey register"
-JOURNEY_HEADERS = (
-    "Journey ID",
-    "Actor IDs",
-    "Goal",
-    "Trigger",
-    "Main success outcome",
-    "Alternate/failure behavior",
-    "Requirement IDs",
-    "Rich-use-case triggers",
-)
-JOURNEY_ID = re.compile(r"JOURNEY-\d{3,}")
 RICH_USE_CASE_TRIGGERS = {
     "DISTINCT_PERMISSIONED_ACTORS",
     "CONFIDENTIAL_OR_REGULATED_MUTATION",
@@ -813,70 +933,6 @@ REQUIREMENT_COVERAGE_HEADERS = (
     "Approved success measure ID",
 )
 INTAKE_FOUNDATION_IDS = {f"INTAKE-{index:04d}" for index in range(1, 11)}
-INTERFACE_HEADING = "## 16. Interfaces and contracts"
-INTERFACE_HEADERS = (
-    "Contract ID",
-    "Kind",
-    "Requirement basis",
-    "Producer",
-    "Consumer",
-    "Schema or protocol",
-    "Authentication",
-    "Authorization",
-    "Input validation",
-    "Success output/status",
-    "Error and recovery behavior",
-    "Compatibility/versioning",
-    "Idempotency/concurrency",
-    "Timeout bound",
-    "Rate bound",
-    "Performance bound",
-)
-LEGACY_INTERFACE_HEADERS_V4 = (
-    "Contract ID",
-    "Producer",
-    "Consumer",
-    "Schema or protocol",
-    "Authentication",
-    "Versioning",
-    "Idempotency",
-)
-INTERFACE_ID = re.compile(r"(?:API|EVENT|CLI|FILE)-\d{3,}")
-INTERFACE_KINDS = {"API", "EVENT", "CLI", "FILE"}
-LAYER_BOUNDARY_HEADING = "### Layer boundaries"
-LAYER_BOUNDARY_HEADERS = (
-    "Boundary ID",
-    "Outer adapter/layer",
-    "Inner domain layer",
-    "Boundary DTO/schema",
-    "Explicit mapping",
-    "Dependency direction",
-    "Authorization enforcement",
-    "External anti-corruption adapter",
-    "Requirement IDs",
-    "Validation IDs",
-)
-BOUNDARY_ID = re.compile(r"BOUNDARY-\d{3,}")
-STATE_APPLICABILITY_HEADING = "### State-model applicability"
-STATE_APPLICABILITY_HEADERS = (
-    "Subject ID",
-    "Applicability",
-    "Trigger basis IDs",
-    "State model IDs",
-)
-STATE_REGISTER_HEADING = "### State register"
-STATE_REGISTER_HEADERS = (
-    "State model ID",
-    "Subject ID",
-    "States",
-    "Initial state",
-    "Allowed transitions",
-    "Terminal states",
-    "Invalid-transition behavior",
-    "Requirement IDs",
-    "Validation IDs",
-)
-STATE_ID = re.compile(r"STATE-\d{3,}")
 STATE_MODEL_TRIGGERS = (
     "LIFECYCLE_RESOURCE",
     "ASYNCHRONOUS_WORK",
@@ -884,42 +940,6 @@ STATE_MODEL_TRIGGERS = (
     "APPROVAL_FLOW",
     "MIGRATION_OR_CUTOVER",
     "OTHER_MEANINGFUL_TRANSITION",
-)
-RICH_TO_STATE_TRIGGER = {
-    "ASYNCHRONOUS_WORK": "ASYNCHRONOUS_WORK",
-    "MIGRATION_OR_CUTOVER": "MIGRATION_OR_CUTOVER",
-    "PARTIAL_FAILURE": "RETRY_OR_RESUME",
-}
-FIRST_WAVE_HEADING = "### First construction wave"
-FIRST_WAVE_HEADERS = (
-    "Wave contract ID",
-    "Work kind",
-    "Walking-skeleton journey ID",
-    "Requirement IDs",
-    "Acceptance/test IDs",
-    "End-to-end Harness ID",
-    "Blocking spike ID",
-)
-WAVE_ID = re.compile(r"WAVE-\d{3,}")
-SPIKE_HEADING = "### Blocking spike"
-SPIKE_HEADERS = (
-    "Spike ID",
-    "Blocking technical unknown",
-    "Time box",
-    "Disposable output boundary",
-    "Exit criterion",
-    "Required next action",
-)
-SPIKE_ID = re.compile(r"SPIKE-\d{3,}")
-MEASURABLE_INTERFACE_BOUND = re.compile(
-    r"(?:\b\d+(?:\.\d+)?\s*(?:ns|nanoseconds?|us|microseconds?|ms|"
-    r"milliseconds?|s|secs?|seconds?|minutes?|hours?|days?|weeks?|bytes?|"
-    r"kib|mib|gib|kb|mb|gb|tb|requests?|operations?|events?|items?|records?|"
-    r"users?|transactions?|messages?|files?|rps|qps|tps|percent)\b|"
-    r"\b\d+(?:\.\d+)?\s*%|\b\d+(?:\.\d+)?\s*/\s*(?:s|sec(?:ond)?s?|"
-    r"m|min(?:ute)?s?|h|hours?)\b|\b\d+(?:\.\d+)?\s+per\s+"
-    r"(?:second|minute|hour|day)\b)",
-    re.IGNORECASE,
 )
 EARS_FORMS = {
     "UBIQUITOUS",
@@ -987,10 +1007,6 @@ MEASURABLE_BINDING = re.compile(
     r"\d+(?:\.\d+)?\s*(?:%|ms|s|seconds?|minutes?|hours?|requests?/s)?",
     re.IGNORECASE,
 )
-UNDEFINED_QUALITY_TERM = re.compile(
-    r"\b(?:fast|secure|scalable|user[- ]friendly|appropriate)\b",
-    re.IGNORECASE,
-)
 QAS_HEADERS = (
     "QAS ID",
     "Requirement IDs",
@@ -1002,121 +1018,6 @@ QAS_HEADERS = (
     "Response measure",
 )
 QAS_ID = re.compile(r"QAS-\d{3,}")
-HARNESS_HEADING = "### Gate B Harness Profile"
-HARNESS_HEADERS = (
-    "Harness ID",
-    "Layer",
-    "Selected check or tool",
-    "Trigger",
-    "Basis IDs",
-    "Exact command or API",
-    "Evidence destination",
-    "Required or conditional status",
-)
-HARNESS_ID = re.compile(r"HARNESS-\d{3,}")
-HARNESS_LAYERS = {
-    "Static",
-    "Unit",
-    "Integration",
-    "End-to-end",
-    "Property",
-    "Security and privacy",
-    "Reliability and recovery",
-    "Performance and scalability",
-    "IaC and policy",
-    "AWS environment and operations",
-}
-EXAMPLE_SCENARIO_HEADING = "## 23. Example-based scenarios"
-EXAMPLE_SCENARIO_HEADERS = (
-    "Test ID",
-    "Scenario",
-    "Expected result",
-    "Layer",
-)
-EXAMPLE_SCENARIO_ID = re.compile(r"EX-\d{3,}")
-HARNESS_EVIDENCE_DESTINATION = "docs/project/VERIFY.md#harness-execution-evidence"
-MANAGED_SERVERLESS_MARKER = "MANAGED_SERVERLESS_BASELINE:"
-ERROR_HANDLING_HEADING = "## 19. Error handling strategy"
-ERROR_HANDLING_HEADERS = (
-    "Error class",
-    "Example",
-    "Retry?",
-    "User-visible behavior",
-    "Logging or metric",
-    "Recovery",
-)
-REQUIRED_ERROR_CLASSES = (
-    "Validation",
-    "Transient dependency",
-    "Permanent dependency",
-    "Concurrency conflict",
-    "Internal defect",
-)
-AWS_SERVICE_DECISION_HEADING = "## 20. AWS implementation approach"
-AWS_SERVICE_DECISION_HEADERS = (
-    "Concern",
-    "Decision IDs",
-    "AWS service or mechanism",
-    "Rationale",
-    "Tradeoff",
-)
-AWS_SERVICE_TECH_CONCERNS = {
-    "Compute": {"APPLICATION_RUNTIME", "APPLICATION_FRAMEWORK"},
-    "API and edge": {"APPLICATION_FRAMEWORK", "EDGE_NETWORKING"},
-    "Identity": {"IDENTITY_AUTHORIZATION"},
-    "Data": {"DATA_STORAGE"},
-    "Messaging": {"MESSAGING_RETRIES"},
-    "Observability": {"OBSERVABILITY_INCIDENT_RESPONSE"},
-    "Deployment": {"INFRASTRUCTURE_AS_CODE", "DEPLOYMENT_TOOLING"},
-    "Secrets and encryption": {"SECURITY_VALIDATION", "IDENTITY_AUTHORIZATION"},
-}
-IAC_VALIDATION_HEADING = "### IaC and delivery validation contract"
-IAC_VALIDATION_HEADERS = (
-    "Validation path",
-    "Applicability",
-    "TECH binding",
-    "Required local/static validation",
-    "AWS planning validation",
-    "Evidence destination",
-)
-IAC_VALIDATION_PATHS = (
-    "CloudFormation / SAM / CDK",
-    "Terraform",
-    "Container delivery",
-    "Other approved delivery path",
-)
-IAC_VALIDATION_TECH_CONCERNS = {
-    "INFRASTRUCTURE_AS_CODE",
-    "SECURITY_VALIDATION",
-    "DEPLOYMENT_TOOLING",
-}
-IAC_VALIDATION_EVIDENCE_DESTINATION = "docs/project/VERIFY.md#iac-validation-evidence"
-PROPERTY_EXECUTION_HEADING = "### Property execution contract"
-PROPERTY_EXECUTION_HEADERS = (
-    "Property ID",
-    "Framework TECH ID",
-    "Exact command",
-    "Run target/time bound",
-    "Seed or reproduction format",
-    "Evidence destination",
-)
-PROPERTY_APPLICABILITY_HEADERS = (
-    "Requirement ID",
-    "Applicability",
-    "Reason or property IDs",
-)
-PROPERTY_DEFINITION_HEADERS = (
-    "Property ID",
-    "Requirement IDs",
-    "Invariant",
-    "Generated inputs or state",
-    "Preconditions",
-    "Oracle",
-    "Boundary or shrink focus",
-    "Layer",
-)
-PROPERTY_SPECIFICATION_HEADING = "## 24. Property-based testing specification"
-PROPERTY_ID = re.compile(r"PROP-\d{3,}")
 PROPERTY_TEST_EVIDENCE_HEADING = "## Property-based test evidence"
 PROPERTY_TEST_EVIDENCE_HEADERS = (
     "Evidence ID",
@@ -1136,28 +1037,12 @@ PROPERTY_TEST_EVIDENCE_HEADERS = (
     "Commit / worktree / artifact",
     "Durable source",
 )
-PROPERTY_TEST_EVIDENCE_DESTINATION = (
-    "docs/project/VERIFY.md#property-based-test-evidence"
-)
 PROPERTY_TEST_RESULTS = {"NOT_STARTED", "PASS", "FAIL"}
 PROPERTY_TEST_FAILURE_CLASSES = {
     "IMPLEMENTATION_DEFECT",
     "SPECIFICATION_AMBIGUITY_OR_DEFECT",
     "GENERATOR_OR_ORACLE_DEFECT",
     "ENVIRONMENT_DEFECT",
-}
-PROPERTY_COMMAND_EXECUTABLE = re.compile(
-    r"(?:[a-z0-9][a-z0-9_.+-]*|\.{0,2}/[A-Za-z0-9_./+-]+|/[A-Za-z0-9_./+-]+)"
-)
-PROPERTY_COMMAND_PROSE_VERBS = {
-    "check",
-    "execute",
-    "record",
-    "run",
-    "test",
-    "use",
-    "validate",
-    "verify",
 }
 GATE_A_STATES = {
     "BLOCKED",
@@ -1356,427 +1241,6 @@ class TaskRequirementCoverageResult:
     missing_requirement_ids: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
-class TechnologyDecision:
-    decision_id: str
-    concern: str
-    selection: str
-    version_policy: str
-    source: str
-    basis_ids: str
-    alternatives_and_rationale: str
-    compatibility_migration: str
-    validation: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "decision_id": self.decision_id,
-            "concern": self.concern,
-            "selection": self.selection,
-            "version_policy": self.version_policy,
-            "source": self.source,
-            "basis_ids": self.basis_ids,
-            "alternatives_and_rationale": self.alternatives_and_rationale,
-            "compatibility_migration": self.compatibility_migration,
-            "validation": self.validation,
-        }
-
-
-@dataclass(frozen=True)
-class PropertyExecution:
-    property_id: str
-    framework_tech_id: str
-    exact_command: str
-    run_target_time_bound: str
-    seed_or_reproduction_format: str
-    evidence_destination: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "property_id": self.property_id,
-            "framework_tech_id": self.framework_tech_id,
-            "exact_command": self.exact_command,
-            "run_target_time_bound": self.run_target_time_bound,
-            "seed_or_reproduction_format": self.seed_or_reproduction_format,
-            "evidence_destination": self.evidence_destination,
-        }
-
-
-@dataclass(frozen=True)
-class ArchitectureDriver:
-    driver_id: str
-    requirement_basis: str
-    driver_class: str
-    decision_implication: str
-    validation: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "driver_id": self.driver_id,
-            "requirement_basis": self.requirement_basis,
-            "class": self.driver_class,
-            "decision_implication": self.decision_implication,
-            "validation": self.validation,
-        }
-
-
-@dataclass(frozen=True)
-class ArchitectureCandidate:
-    candidate_id: str
-    architecture_summary: str
-    requirement_coverage: str
-    aws_evidence: str
-    eligibility: str
-    failed_constraints: str
-    tradeoffs: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "candidate_id": self.candidate_id,
-            "architecture_summary": self.architecture_summary,
-            "requirement_coverage": self.requirement_coverage,
-            "aws_evidence": self.aws_evidence,
-            "eligibility": self.eligibility,
-            "failed_constraints": self.failed_constraints,
-            "tradeoffs": self.tradeoffs,
-        }
-
-
-@dataclass(frozen=True)
-class ArchitectureSelection:
-    architecture_id: str
-    selected_candidate: str
-    requirement_and_driver_basis: str
-    rationale: str
-    rejected_alternatives: str
-    risks: str
-    mitigations: str
-    security_impact: str
-    reliability_impact: str
-    operational_burden: str
-    cost_effect: str
-    breakpoints: str
-    migration_path: str
-    revisit_triggers: str
-    validation: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "architecture_id": self.architecture_id,
-            "selected_candidate": self.selected_candidate,
-            "requirement_and_driver_basis": self.requirement_and_driver_basis,
-            "rationale": self.rationale,
-            "rejected_alternatives": self.rejected_alternatives,
-            "risks": self.risks,
-            "mitigations": self.mitigations,
-            "security_impact": self.security_impact,
-            "reliability_impact": self.reliability_impact,
-            "operational_burden": self.operational_burden,
-            "cost_effect": self.cost_effect,
-            "breakpoints": self.breakpoints,
-            "migration_path": self.migration_path,
-            "revisit_triggers": self.revisit_triggers,
-            "validation": self.validation,
-        }
-
-
-@dataclass(frozen=True)
-class ArchitectureTrace:
-    requirement_id: str
-    design_ids: str
-    property_test_ids: str
-    evidence_ids: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "requirement_id": self.requirement_id,
-            "design_ids": self.design_ids,
-            "property_test_ids": self.property_test_ids,
-            "evidence_ids": self.evidence_ids,
-        }
-
-
-@dataclass(frozen=True)
-class MaterialAwsEvidence:
-    evidence_id: str
-    discovery_id: str
-    design_ids: str
-    material_claim: str
-    capability: str
-    official_reference: str
-    observed_date: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "evidence_id": self.evidence_id,
-            "discovery_id": self.discovery_id,
-            "design_ids": self.design_ids,
-            "material_claim": self.material_claim,
-            "capability": self.capability,
-            "official_reference": self.official_reference,
-            "observed_date": self.observed_date,
-        }
-
-
-@dataclass(frozen=True)
-class HarnessRow:
-    harness_id: str
-    layer: str
-    selected_check: str
-    trigger: str
-    basis_ids: str
-    exact_command: str
-    evidence_destination: str
-    requirement_status: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "harness_id": self.harness_id,
-            "layer": self.layer,
-            "selected_check": self.selected_check,
-            "trigger": self.trigger,
-            "basis_ids": self.basis_ids,
-            "exact_command": self.exact_command,
-            "evidence_destination": self.evidence_destination,
-            "requirement_status": self.requirement_status,
-        }
-
-
-@dataclass(frozen=True)
-class HarnessContract:
-    schema_version: int = 1
-    status: str = "UNINITIALIZED"
-    rows: tuple[HarnessRow, ...] = ()
-    required_ids: tuple[str, ...] = ()
-    canonical_sha256: str | None = None
-    grandfathered_v1: bool = False
-    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": self.schema_version,
-            "status": self.status,
-            "rows": [row.to_dict() for row in self.rows],
-            "required_ids": list(self.required_ids),
-            "canonical_sha256": self.canonical_sha256,
-            "grandfathered_v1": self.grandfathered_v1,
-        }
-
-
-@dataclass(frozen=True)
-class ArchitectureContract:
-    schema_version: int = 1
-    status: str = "UNINITIALIZED"
-    drivers: tuple[ArchitectureDriver, ...] = ()
-    candidates: tuple[ArchitectureCandidate, ...] = ()
-    selection: ArchitectureSelection | None = None
-    traceability: tuple[ArchitectureTrace, ...] = ()
-    aws_evidence: tuple[MaterialAwsEvidence, ...] = ()
-    canonical_sha256: str | None = None
-    grandfathered_v1: bool = False
-    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": self.schema_version,
-            "status": self.status,
-            "drivers": [item.to_dict() for item in self.drivers],
-            "candidates": [item.to_dict() for item in self.candidates],
-            "selection": self.selection.to_dict() if self.selection else None,
-            "traceability": [item.to_dict() for item in self.traceability],
-            "aws_evidence": [item.to_dict() for item in self.aws_evidence],
-            "canonical_sha256": self.canonical_sha256,
-            "grandfathered_v1": self.grandfathered_v1,
-        }
-
-
-@dataclass(frozen=True)
-class FirstWaveContract:
-    wave_contract_id: str
-    work_kind: str
-    journey_id: str | None
-    requirement_ids: tuple[str, ...]
-    acceptance_test_ids: tuple[str, ...]
-    harness_id: str
-    blocking_spike_id: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "wave_contract_id": self.wave_contract_id,
-            "work_kind": self.work_kind,
-            "journey_id": self.journey_id,
-            "requirement_ids": list(self.requirement_ids),
-            "acceptance_test_ids": list(self.acceptance_test_ids),
-            "harness_id": self.harness_id,
-            "blocking_spike_id": self.blocking_spike_id,
-        }
-
-
-@dataclass(frozen=True)
-class SpikeContract:
-    spike_id: str
-    technical_unknown: str
-    time_box: str
-    disposable_boundary: str
-    exit_criterion: str
-    required_next_action: str
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "spike_id": self.spike_id,
-            "technical_unknown": self.technical_unknown,
-            "time_box": self.time_box,
-            "disposable_boundary": self.disposable_boundary,
-            "exit_criterion": self.exit_criterion,
-            "required_next_action": self.required_next_action,
-        }
-
-
-@dataclass(frozen=True)
-class DiagramRecord:
-    diagram_id: str
-    kind: str
-    applicability: str
-    status: str
-    anchor: str
-    basis_ids: tuple[str, ...]
-    referenced_ids: tuple[str, ...]
-    relationships: tuple[tuple[str, str, str], ...]
-    semantic_sha256: str | None
-    rendered_sha256: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "diagram_id": self.diagram_id,
-            "kind": self.kind,
-            "applicability": self.applicability,
-            "status": self.status,
-            "anchor": self.anchor,
-            "basis_ids": list(self.basis_ids),
-            "referenced_ids": list(self.referenced_ids),
-            "relationships": [
-                {"from_id": source, "relation": relation, "to_id": target}
-                for source, relation, target in self.relationships
-            ],
-            "semantic_sha256": self.semantic_sha256,
-            "rendered_sha256": self.rendered_sha256,
-        }
-
-
-@dataclass(frozen=True)
-class DiagramContract:
-    schema_version: int = 1
-    status: str = "TEMPLATE"
-    architecture_basis_id: str | None = None
-    records: tuple[DiagramRecord, ...] = ()
-    canonical_sha256: str | None = None
-    grandfathered_schema5: bool = False
-    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": self.schema_version,
-            "status": self.status,
-            "architecture_basis_id": self.architecture_basis_id,
-            "records": [item.to_dict() for item in self.records],
-            "canonical_sha256": self.canonical_sha256,
-            "grandfathered_schema5": self.grandfathered_schema5,
-        }
-
-
-@dataclass(frozen=True)
-class ApplicationSourceDisposition:
-    kind: str
-    paths: tuple[str, ...] = ()
-
-    @property
-    def canonical_value(self) -> str:
-        if self.kind == APPLICATION_SOURCE_NOT_APPLICABLE:
-            return APPLICATION_SOURCE_INFRASTRUCTURE_ONLY
-        return f"{self.kind}: {'; '.join(self.paths)}"
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"kind": self.kind, "paths": list(self.paths)}
-
-
-@dataclass(frozen=True)
-class ProjectDesignContract:
-    schema_version: int = 7
-    status: str = "UNINITIALIZED"
-    application_source_disposition: ApplicationSourceDisposition | None = None
-    interface_ids: tuple[str, ...] = ()
-    boundary_ids: tuple[str, ...] = ()
-    state_ids: tuple[str, ...] = ()
-    first_wave: FirstWaveContract | None = None
-    spike: SpikeContract | None = None
-    missing_records: tuple[str, ...] = ()
-    canonical_sha256: str | None = None
-    grandfathered_v4: bool = False
-    grandfathered_v5: bool = False
-    grandfathered_v6: bool = False
-    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": self.schema_version,
-            "status": self.status,
-            "application_source_disposition": (
-                self.application_source_disposition.to_dict()
-                if self.application_source_disposition is not None
-                else None
-            ),
-            "interface_ids": list(self.interface_ids),
-            "boundary_ids": list(self.boundary_ids),
-            "state_ids": list(self.state_ids),
-            "first_wave": self.first_wave.to_dict() if self.first_wave else None,
-            "spike": self.spike.to_dict() if self.spike else None,
-            "missing_records": list(self.missing_records),
-            "canonical_sha256": self.canonical_sha256,
-            "grandfathered_v4": self.grandfathered_v4,
-            "grandfathered_v5": self.grandfathered_v5,
-            "grandfathered_v6": self.grandfathered_v6,
-        }
-
-
-@dataclass(frozen=True)
-class DesignContract:
-    schema_version: int = 1
-    status: str = "UNINITIALIZED"
-    design_revision: str | None = None
-    technology_decisions: tuple[TechnologyDecision, ...] = ()
-    property_execution: tuple[PropertyExecution, ...] = ()
-    architecture: ArchitectureContract = field(default_factory=ArchitectureContract)
-    harness: HarnessContract = field(default_factory=HarnessContract)
-    change_impact: ChangeImpactContract = field(default_factory=ChangeImpactContract)
-    diagram_contract: DiagramContract = field(default_factory=DiagramContract)
-    canonical_sha256: str | None = None
-    project_contract: ProjectDesignContract = field(
-        default_factory=ProjectDesignContract
-    )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": self.schema_version,
-            "status": self.status,
-            "design_revision": self.design_revision,
-            "technology_decisions": [
-                item.to_dict() for item in self.technology_decisions
-            ],
-            "property_execution": [item.to_dict() for item in self.property_execution],
-            "architecture": self.architecture.to_dict(),
-            "harness": self.harness.to_dict(),
-            "change_impact": self.change_impact.to_dict(),
-            "diagram_contract": self.diagram_contract.to_dict(),
-            "canonical_sha256": self.canonical_sha256,
-            "project_contract": self.project_contract.to_dict(),
-            "application_source_disposition": (
-                self.project_contract.application_source_disposition.to_dict()
-                if self.project_contract.application_source_disposition is not None
-                else None
-            ),
-        }
-
-
 TASK_METADATA_KEYS = (
     "Status",
     "Requirements",
@@ -1877,21 +1341,10 @@ CONTROL_HASH_FILES = {
     "scripts/task_waves.py",
 } | ENGINE_RUNTIME_CONTROL_FILES
 COORDINATOR_LEDGER_PATHS = {TASKS_FILE, VERIFY_FILE, STATE_FILE}
-AUTHORIZED_ID = re.compile(r"[A-Z][A-Z0-9_]*-\d+")
 ID_LIKE = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*-\d+\b")
-GITHUB_CONSTRAINT = re.compile(
-    r"REPO: (?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+); "
-    r"BRANCH: (?P<branch>[A-Za-z0-9._/-]+); MERGE: (?P<merge>ALLOWED|PROHIBITED)"
-)
 GITHUB_ISSUE_URL = re.compile(
     r"https://github\.com/(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/[1-9]\d*"
 )
-AWS_ENVIRONMENT = re.compile(
-    r"ENVIRONMENT: (?P<name>[^;\r\n]+); CLASS: (?P<class>NON_PRODUCTION|PRODUCTION)"
-)
-AWS_EXACT_ARTIFACT = re.compile(r"EXACT_DIGEST: sha256:[0-9a-f]{64}")
-AWS_DERIVED_ARTIFACT = re.compile(r"DERIVED_FROM_AUTHORIZED_SOURCE: (?P<rule>[^\r\n]+)")
-TASK_BOUNDARY_DERIVED = "DERIVED_FROM_AUTHORIZED_IDS_AND_WRITE_SET"
 SHELL_CONTROL = re.compile(r"[;&|><`$()\\\r\n]")
 NON_HUMAN_APPROVER = re.compile(
     r"(?:^|[^a-z0-9])(?:ai|agent|assistant|automated|automation|bot|chatbot|"
@@ -4060,31 +3513,6 @@ def parse_property_test_evidence(text: str) -> list[PropertyTestEvidenceRow]:
     return rows
 
 
-def parse_property_run_target(value: str) -> tuple[int | None, Decimal | None]:
-    """Parse the canonical minimum-case and/or maximum-duration execution target."""
-
-    cleaned = clean_cell(value)
-    match = re.fullmatch(
-        r"(?:MIN_CASES: (?P<cases>[1-9]\d*)"
-        r"(?:; MAX_SECONDS: (?P<case_seconds>[1-9]\d*))?"
-        r"|MAX_SECONDS: (?P<seconds>[1-9]\d*))",
-        cleaned,
-    )
-    if match is None:
-        raise ValueError(
-            "run target/time bound must be MIN_CASES: <positive integer>, "
-            "MAX_SECONDS: <positive number>, or both in that order"
-        )
-    minimum_cases = int(match.group("cases")) if match.group("cases") else None
-    seconds_text = match.group("case_seconds") or match.group("seconds")
-    maximum_seconds = Decimal(seconds_text) if seconds_text is not None else None
-    if maximum_seconds is not None and (
-        not maximum_seconds.is_finite() or maximum_seconds <= 0
-    ):
-        raise ValueError("MAX_SECONDS must be finite and greater than zero")
-    return minimum_cases, maximum_seconds
-
-
 def parse_observed_property_run(value: str) -> tuple[int, Decimal]:
     """Parse one exact observed case count and elapsed duration."""
 
@@ -4102,16 +3530,6 @@ def parse_observed_property_run(value: str) -> tuple[int, Decimal]:
     if not elapsed.is_finite() or elapsed < 0:
         raise ValueError("ELAPSED_SECONDS must be finite and nonnegative")
     return int(match.group("cases")), elapsed
-
-
-def parsed_numeric_version(value: str) -> tuple[int, ...] | None:
-    """Return the numeric release tuple for one exact package version."""
-
-    cleaned = clean_cell(value)
-    match = re.fullmatch(r"v?(?P<numeric>\d+(?:\.\d+)*)", cleaned)
-    if match is None:
-        return None
-    return tuple(int(part) for part in match.group("numeric").split("."))
 
 
 def technology_version_policy_allows(policy: str, observed: str) -> bool:
@@ -4177,34 +3595,6 @@ def replay_evidence_matches_contract(
     if "command" in lowered_approved:
         return observed == exact_command
     return observed == approved
-
-
-def valid_replay_format_contract(value: str) -> bool:
-    """Require a property plan to declare a machine-checkable replay mode."""
-
-    cleaned = clean_cell(value)
-    if unresolved(cleaned):
-        return False
-    lowered = cleaned.casefold()
-    return "seed" in lowered or "command" in lowered
-
-
-def valid_property_execution_command(value: str) -> bool:
-    """Recognize one explicit local command rather than prose or a sentinel."""
-
-    cleaned = clean_cell(value)
-    if (
-        unresolved(cleaned)
-        or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
-        or SHELL_CONTROL.search(cleaned) is not None
-        or cleaned.startswith(("-", "#"))
-    ):
-        return False
-    executable = cleaned.split(maxsplit=1)[0].strip("'\"")
-    return bool(
-        PROPERTY_COMMAND_EXECUTABLE.fullmatch(executable)
-        and executable.casefold() not in PROPERTY_COMMAND_PROSE_VERBS
-    )
 
 
 def evidence_timestamp(value: str, label: str) -> datetime:
@@ -4406,3223 +3796,6 @@ def validate_done_property_evidence(
         raise ValueError(
             f"{task_id}: DONE {expected.property_id} requires the latest observed "
             "property-test result to be PASS"
-        )
-
-
-def valid_technology_version_policy(value: str) -> bool:
-    cleaned = clean_cell(value)
-    if technology_contract_value_is_unresolved(cleaned):
-        return False
-    if cleaned.startswith("COMPATIBLE_MAJOR: "):
-        return re.fullmatch(r"COMPATIBLE_MAJOR: [1-9]\d*", cleaned) is not None
-    if cleaned.startswith("CURRENT_LTS_AS_OF: "):
-        match = re.fullmatch(r"CURRENT_LTS_AS_OF: (\d{4}-\d{2}-\d{2})", cleaned)
-        if match is None:
-            return False
-        try:
-            datetime.strptime(match.group(1), "%Y-%m-%d")
-        except ValueError:
-            return False
-        return True
-    if cleaned.startswith("EXACT: "):
-        return explicit_value(cleaned.removeprefix("EXACT: "), allow_none=False)
-    if cleaned.startswith("MINIMUM: "):
-        minimum = cleaned.removeprefix("MINIMUM: ")
-        return (
-            explicit_value(minimum, allow_none=False)
-            and parsed_numeric_version(minimum) is not None
-        )
-    if cleaned.startswith("ORG_MANAGED: "):
-        return explicit_value(cleaned.removeprefix("ORG_MANAGED: "), allow_none=False)
-    prefix = "NOT_APPLICABLE — "
-    return cleaned.startswith(prefix) and explicit_value(
-        cleaned[len(prefix) :], allow_none=False
-    )
-
-
-def machine_comparable_property_version_policy(value: str) -> bool:
-    """Require an active property framework policy with deterministic comparison."""
-
-    cleaned = clean_cell(value)
-    if not valid_technology_version_policy(cleaned):
-        return False
-    if cleaned.startswith("EXACT: "):
-        return explicit_value(cleaned.removeprefix("EXACT: "), allow_none=False)
-    if cleaned.startswith("COMPATIBLE_MAJOR: "):
-        return re.fullmatch(r"COMPATIBLE_MAJOR: [1-9]\d*", cleaned) is not None
-    if cleaned.startswith("MINIMUM: "):
-        return parsed_numeric_version(cleaned.removeprefix("MINIMUM: ")) is not None
-    return False
-
-
-def technology_value_is_not_applicable(value: str) -> bool:
-    return clean_cell(value).startswith("NOT_APPLICABLE — ")
-
-
-def technology_contract_value_is_unresolved(value: str) -> bool:
-    """Reject the complete contract sentinel vocabulary in technology cells."""
-
-    cleaned = clean_cell(value)
-    return (
-        unresolved(cleaned) or EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is not None
-    )
-
-
-def technology_reasoning_parts(value: str) -> tuple[str, str]:
-    """Split the canonical reasoning cell without duplicating its prose."""
-
-    cleaned = clean_cell(value)
-    prefix = "RATIONALE: "
-    separator = "; REJECTED: "
-    if not cleaned.startswith(prefix) or separator not in cleaned:
-        raise ValueError(
-            "Alternatives and rationale must use "
-            "RATIONALE: <selection reason>; REJECTED: <alternatives and reasons>"
-        )
-    rationale, rejected = cleaned[len(prefix) :].split(separator, 1)
-    if not explicit_value(rationale, allow_none=False) or not explicit_value(
-        rejected, allow_none=False
-    ):
-        raise ValueError(
-            "Technology rationale and rejected alternatives must be concrete"
-        )
-    return rationale, rejected
-
-
-def valid_technology_selection(value: str) -> bool:
-    """Accept one concrete selection or the one canonical non-applicable form."""
-
-    cleaned = clean_cell(value)
-    if technology_contract_value_is_unresolved(cleaned):
-        return False
-    if technology_value_is_not_applicable(cleaned):
-        reason = cleaned.removeprefix("NOT_APPLICABLE — ")
-        return (
-            explicit_value(reason, allow_none=False)
-            and EVIDENCE_PLACEHOLDER_PATTERN.search(reason) is None
-        )
-    normalized = re.sub(r"[\s_-]+", "_", cleaned.upper())
-    if cleaned.startswith("NOT_APPLICABLE") or normalized in {
-        "N/A",
-        "NA",
-        "NONE",
-        "NOT_APPLICABLE",
-        "DOES_NOT_APPLY",
-    }:
-        return False
-    return explicit_value(cleaned, allow_none=False)
-
-
-def valid_technology_basis_ids(value: str) -> bool:
-    """Require a canonical, duplicate-free comma-space stable-ID list."""
-
-    cleaned = clean_cell(value)
-    if unresolved(cleaned):
-        return False
-    identifiers = cleaned.split(", ")
-    return (
-        bool(identifiers)
-        and all(
-            STABLE_CONTRACT_ID.fullmatch(identifier) is not None
-            for identifier in identifiers
-        )
-        and len(identifiers) == len(set(identifiers))
-    )
-
-
-def current_prd_basis_ids(
-    text: str,
-    design_revision: str | None,
-) -> set[str]:
-    """Return stable IDs actually declared outside the technology register."""
-
-    identifiers = authoritative_requirement_ids(text)
-    if design_revision is not None:
-        identifiers.add(design_revision)
-    try:
-        document = table_after_heading(text, "## Document status")
-    except ValueError:
-        document = {}
-    for field_name in (
-        "Current requirements revision",
-        "Current design revision",
-        "Current construction authorization ID",
-    ):
-        value = clean_cell(document.get(field_name, ""))
-        if STABLE_CONTRACT_ID.fullmatch(value) is not None:
-            identifiers.add(value)
-    technology_headers = list(TECHNOLOGY_DECISION_HEADERS)
-    for table in markdown_tables(text):
-        if not table or table[0] == technology_headers:
-            continue
-        for row in table[2:]:
-            if row and STABLE_CONTRACT_ID.fullmatch(row[0]) is not None:
-                identifiers.add(row[0])
-    return identifiers
-
-
-def _exact_property_ids(value: str) -> list[str]:
-    cleaned = clean_cell(value)
-    if unresolved(cleaned):
-        raise ValueError("property IDs are unresolved")
-    identifiers = [item.strip() for item in cleaned.split(",")]
-    if not identifiers or any(
-        PROPERTY_ID.fullmatch(item) is None for item in identifiers
-    ):
-        raise ValueError("property IDs must be comma-separated PROP-nnn IDs")
-    if len(identifiers) != len(set(identifiers)):
-        raise ValueError("property ID list contains duplicates")
-    return identifiers
-
-
-def derive_example_scenario_contract(
-    text: str,
-) -> tuple[ContractTable | None, set[str], list[str]]:
-    """Parse the authoritative example-scenario declarations."""
-
-    issues: list[str] = []
-    try:
-        table = contract_table_after_heading(
-            text, EXAMPLE_SCENARIO_HEADING, EXAMPLE_SCENARIO_HEADERS
-        )
-    except ValueError as exc:
-        return None, set(), [f"{EXAMPLE_SCENARIO_HEADING}: {exc}"]
-    if table is None:
-        return None, set(), [f"Missing {EXAMPLE_SCENARIO_HEADING}"]
-    if not table.rows:
-        issues.append("Example-based scenarios has no stored rows")
-    identifiers: set[str] = set()
-    for test_id, scenario, expected_result, layer in table.rows:
-        if EXAMPLE_SCENARIO_ID.fullmatch(test_id) is None:
-            issues.append(f"Invalid example scenario ID {test_id!r}")
-        elif test_id in identifiers:
-            issues.append(f"Duplicate example scenario ID {test_id}")
-        identifiers.add(test_id)
-        if not explicit_value(scenario, allow_none=False):
-            issues.append(f"{test_id}: Scenario must be concrete")
-        if not explicit_value(expected_result, allow_none=False):
-            issues.append(f"{test_id}: Expected result must be concrete")
-        if layer not in HARNESS_LAYERS:
-            issues.append(f"{test_id}: invalid Harness layer {layer!r}")
-    return table, identifiers, issues
-
-
-def _support_value_is_concrete(value: str) -> bool:
-    cleaned = clean_cell(value)
-    return (
-        explicit_value(cleaned, allow_none=False)
-        and EVIDENCE_PLACEHOLDER_PATTERN.search(cleaned) is None
-    )
-
-
-def _not_applicable_reason(value: str) -> str | None:
-    match = re.fullmatch(r"NOT_APPLICABLE (?:\u2014|-) (.+)", clean_cell(value))
-    if match is None or not _support_value_is_concrete(match.group(1)):
-        return None
-    return match.group(1)
-
-
-def design_support_record_issues(
-    text: str,
-    technology_by_id: Mapping[str, TechnologyDecision],
-) -> list[str]:
-    """Validate design support records that block modern Gate B readiness."""
-
-    issues: list[str] = []
-    try:
-        error_table = contract_table_after_heading(
-            text, ERROR_HANDLING_HEADING, ERROR_HANDLING_HEADERS
-        )
-    except ValueError as exc:
-        error_table = None
-        issues.append(f"Error handling contract: {exc}")
-    if error_table is None:
-        issues.append(f"Missing {ERROR_HANDLING_HEADING}")
-    else:
-        counts: dict[str, int] = {}
-        for row in error_table.rows:
-            error_class, _example, retry, *_remainder = row
-            counts[error_class] = counts.get(error_class, 0) + 1
-            if any(not _support_value_is_concrete(cell) for cell in row):
-                issues.append(
-                    f"{error_class or 'Error handling row'}: every error-handling "
-                    "field must be concrete"
-                )
-            retry_value = clean_cell(retry)
-            if not re.search(
-                r"\b(?:no|bounded|fresh state|max(?:imum)?)\b", retry_value, re.I
-            ):
-                issues.append(
-                    f"{error_class or 'Error handling row'}: retry posture must "
-                    "explicitly deny or bound retry"
-                )
-            if re.search(r"\b(?:unbounded|unlimited|forever)\b", retry_value, re.I):
-                issues.append(
-                    f"{error_class or 'Error handling row'}: retry posture is unbounded"
-                )
-        for error_class in REQUIRED_ERROR_CLASSES:
-            count = counts.get(error_class, 0)
-            if count != 1:
-                issues.append(
-                    f"Error class {error_class} must appear exactly once; found {count}"
-                )
-        unexpected = sorted(set(counts) - set(REQUIRED_ERROR_CLASSES))
-        if unexpected:
-            issues.append("Unexpected error classes: " + ", ".join(unexpected))
-
-    try:
-        aws_table = contract_table_after_heading(
-            text, AWS_SERVICE_DECISION_HEADING, AWS_SERVICE_DECISION_HEADERS
-        )
-    except ValueError as exc:
-        aws_table = None
-        issues.append(f"AWS service decision contract: {exc}")
-    if aws_table is None:
-        issues.append(f"Missing {AWS_SERVICE_DECISION_HEADING}")
-    else:
-        counts: dict[str, int] = {}
-        for concern, decision_ids, mechanism, rationale, tradeoff in aws_table.rows:
-            counts[concern] = counts.get(concern, 0) + 1
-            for label, value in (
-                ("AWS service or mechanism", mechanism),
-                ("Rationale", rationale),
-                ("Tradeoff", tradeoff),
-            ):
-                if not _support_value_is_concrete(value):
-                    issues.append(
-                        f"{concern or 'AWS decision row'}: {label} is unresolved"
-                    )
-            try:
-                identifiers = _canonical_id_list(
-                    decision_ids,
-                    TECHNOLOGY_DECISION_ID,
-                    f"{concern} AWS decision IDs",
-                )
-            except ValueError as exc:
-                issues.append(str(exc))
-                identifiers = []
-            decisions = [technology_by_id.get(identifier) for identifier in identifiers]
-            unknown = [
-                identifier
-                for identifier, decision in zip(identifiers, decisions)
-                if decision is None
-            ]
-            if unknown:
-                issues.append(
-                    f"{concern}: AWS decision IDs are not current technology IDs: "
-                    + ", ".join(unknown)
-                )
-            allowed_concerns = AWS_SERVICE_TECH_CONCERNS.get(concern, set())
-            if decisions and not any(
-                decision is not None and decision.concern in allowed_concerns
-                for decision in decisions
-            ):
-                issues.append(
-                    f"{concern}: AWS decision IDs do not bind the relevant "
-                    "technology concern"
-                )
-        for concern in AWS_SERVICE_TECH_CONCERNS:
-            count = counts.get(concern, 0)
-            if count != 1:
-                issues.append(
-                    f"AWS concern {concern} must appear exactly once; found {count}"
-                )
-        unexpected = sorted(set(counts) - set(AWS_SERVICE_TECH_CONCERNS))
-        if unexpected:
-            issues.append("Unexpected AWS decision concerns: " + ", ".join(unexpected))
-
-    try:
-        iac_table = contract_table_after_heading(
-            text, IAC_VALIDATION_HEADING, IAC_VALIDATION_HEADERS
-        )
-    except ValueError as exc:
-        iac_table = None
-        issues.append(f"IaC and delivery validation contract: {exc}")
-    if iac_table is None:
-        issues.append(f"Missing {IAC_VALIDATION_HEADING}")
-    else:
-        counts: dict[str, int] = {}
-        for row in iac_table.rows:
-            (
-                path,
-                applicability,
-                tech_binding,
-                local_check,
-                planning_check,
-                destination,
-            ) = row
-            counts[path] = counts.get(path, 0) + 1
-            for label, value in (
-                ("TECH binding", tech_binding),
-                ("Required local/static validation", local_check),
-                ("AWS planning validation", planning_check),
-            ):
-                if not _support_value_is_concrete(value):
-                    issues.append(
-                        f"{path or 'IaC validation row'}: {label} is unresolved"
-                    )
-            if destination != IAC_VALIDATION_EVIDENCE_DESTINATION:
-                issues.append(
-                    f"{path}: Evidence destination must be exactly "
-                    f"{IAC_VALIDATION_EVIDENCE_DESTINATION}"
-                )
-            if applicability == "APPLICABLE":
-                try:
-                    identifiers = _canonical_id_list(
-                        tech_binding,
-                        TECHNOLOGY_DECISION_ID,
-                        f"{path} TECH binding",
-                    )
-                except ValueError as exc:
-                    issues.append(str(exc))
-                    identifiers = []
-                decisions = [
-                    technology_by_id.get(identifier) for identifier in identifiers
-                ]
-                unknown = [
-                    identifier
-                    for identifier, decision in zip(identifiers, decisions)
-                    if decision is None
-                ]
-                if unknown:
-                    issues.append(
-                        f"{path}: TECH binding references unknown IDs: "
-                        + ", ".join(unknown)
-                    )
-                invalid_concerns = sorted(
-                    {
-                        decision.concern
-                        for decision in decisions
-                        if decision is not None
-                        and decision.concern not in IAC_VALIDATION_TECH_CONCERNS
-                    }
-                )
-                if invalid_concerns:
-                    issues.append(
-                        f"{path}: TECH binding uses unrelated concerns: "
-                        + ", ".join(invalid_concerns)
-                    )
-                if decisions and not any(
-                    decision is not None
-                    and decision.concern
-                    in {"INFRASTRUCTURE_AS_CODE", "DEPLOYMENT_TOOLING"}
-                    for decision in decisions
-                ):
-                    issues.append(
-                        f"{path}: TECH binding needs an infrastructure or deployment decision"
-                    )
-                for decision in decisions:
-                    if decision is not None and technology_value_is_not_applicable(
-                        decision.selection
-                    ):
-                        issues.append(
-                            f"{path}: applicable validation cannot bind non-applicable "
-                            f"technology decision {decision.decision_id}"
-                        )
-            elif _not_applicable_reason(applicability) is None:
-                issues.append(
-                    f"{path}: Applicability must be APPLICABLE or "
-                    "NOT_APPLICABLE - <concrete reason>"
-                )
-        for path in IAC_VALIDATION_PATHS:
-            count = counts.get(path, 0)
-            if count != 1:
-                issues.append(
-                    f"IaC validation path {path} must appear exactly once; found {count}"
-                )
-        unexpected = sorted(set(counts) - set(IAC_VALIDATION_PATHS))
-        if unexpected:
-            issues.append("Unexpected IaC validation paths: " + ", ".join(unexpected))
-    return issues
-
-
-def architecture_trace_declaration_issues(
-    architecture: ArchitectureContract,
-    project_contract: ProjectDesignContract,
-    declared_property_test_ids: set[str],
-) -> list[str]:
-    """Require every architecture trace ID to resolve to a current declaration."""
-
-    declared_design_ids = set(project_contract.interface_ids)
-    declared_design_ids.update(project_contract.boundary_ids)
-    declared_design_ids.update(project_contract.state_ids)
-    if architecture.selection is not None:
-        declared_design_ids.add(architecture.selection.architecture_id)
-
-    issues: list[str] = []
-    for trace in architecture.traceability:
-        try:
-            design_ids = _canonical_id_list(
-                trace.design_ids,
-                ARCHITECTURE_DESIGN_ID,
-                f"{trace.requirement_id} architecture traceability design IDs",
-            )
-        except ValueError:
-            pass
-        else:
-            undeclared_design_ids = sorted(set(design_ids) - declared_design_ids)
-            if undeclared_design_ids:
-                issues.append(
-                    f"{trace.requirement_id}: architecture traceability references "
-                    "undeclared design IDs: " + ", ".join(undeclared_design_ids)
-                )
-
-        if _none_with_reason(trace.property_test_ids):
-            continue
-        try:
-            property_test_ids = _canonical_id_list(
-                trace.property_test_ids,
-                ARCHITECTURE_TEST_ID,
-                f"{trace.requirement_id} property/test IDs",
-            )
-        except ValueError:
-            continue
-        undeclared_property_test_ids = sorted(
-            set(property_test_ids) - declared_property_test_ids
-        )
-        if undeclared_property_test_ids:
-            issues.append(
-                f"{trace.requirement_id}: architecture traceability references "
-                "undeclared property/test IDs: "
-                + ", ".join(undeclared_property_test_ids)
-            )
-    return issues
-
-
-def _derive_architecture_contract(
-    text: str,
-    design_revision: str | None,
-    technology_ids: set[str],
-    *,
-    required: bool,
-    architecture_disposition: str | None = None,
-    grandfather_approved_v1: bool = False,
-) -> tuple[ArchitectureContract, list[str]]:
-    issues: list[str] = []
-    specifications = (
-        ("drivers", ARCHITECTURE_DRIVER_HEADING, ARCHITECTURE_DRIVER_HEADERS),
-        ("candidates", ARCHITECTURE_CANDIDATE_HEADING, ARCHITECTURE_CANDIDATE_HEADERS),
-        ("selection", ARCHITECTURE_SELECTION_HEADING, ARCHITECTURE_SELECTION_HEADERS),
-        (
-            "traceability",
-            ARCHITECTURE_TRACEABILITY_HEADING,
-            ARCHITECTURE_TRACEABILITY_HEADERS,
-        ),
-        ("evidence", MATERIAL_AWS_EVIDENCE_HEADING, MATERIAL_AWS_EVIDENCE_HEADERS),
-    )
-    tables: dict[str, ContractTable | None] = {}
-    parse_issues: list[str] = []
-    selection_schema_version = 3
-    evidence_schema_version = 2
-    for key, heading, headers in specifications:
-        try:
-            tables[key] = contract_table_after_heading(text, heading, headers)
-        except ValueError as exc:
-            current_message = str(exc)
-            if key == "selection" and grandfather_approved_v1:
-                try:
-                    tables[key] = contract_table_after_heading(
-                        text, heading, ARCHITECTURE_SELECTION_HEADERS_V2
-                    )
-                    selection_schema_version = 2
-                    continue
-                except ValueError as legacy_exc:
-                    current_message = str(legacy_exc)
-            if key == "evidence" and grandfather_approved_v1:
-                try:
-                    tables[key] = contract_table_after_heading(
-                        text, heading, MATERIAL_AWS_EVIDENCE_HEADERS_V1
-                    )
-                    evidence_schema_version = 1
-                    continue
-                except ValueError as legacy_exc:
-                    current_message = str(legacy_exc)
-            tables[key] = None
-            if key == "traceability" and grandfather_approved_v1:
-                try:
-                    tables[key] = contract_table_after_heading(
-                        text, heading, ARCHITECTURE_TRACEABILITY_HEADERS_V4
-                    )
-                    continue
-                except ValueError as legacy_exc:
-                    current_message = str(legacy_exc)
-            parse_issues.append(f"{heading}: {current_message}")
-    issues.extend(parse_issues)
-
-    all_missing = all(tables[key] is None for key, _, _ in specifications)
-    gate_b_state = ""
-    try:
-        gate_b_state = table_after_heading(text, "## Document status").get(
-            "Gate B derived status", ""
-        )
-    except ValueError:
-        pass
-    grandfathered = all_missing and (
-        grandfather_approved_v1 or gate_b_state == "APPROVED_FOR_CONSTRUCTION"
-    )
-    if all_missing:
-        if required and not grandfathered:
-            issues.extend(f"Missing {heading}" for _, heading, _ in specifications)
-        return (
-            ArchitectureContract(
-                schema_version=1,
-                status="READY"
-                if grandfathered and not issues
-                else "UNINITIALIZED"
-                if not required
-                else "BLOCKED",
-                grandfathered_v1=grandfathered,
-            ),
-            issues,
-        )
-    for key, heading, _ in specifications:
-        if tables[key] is None:
-            issues.append(f"Missing {heading}")
-
-    drivers: list[ArchitectureDriver] = []
-    candidates: list[ArchitectureCandidate] = []
-    selection: ArchitectureSelection | None = None
-    traces: list[ArchitectureTrace] = []
-    evidence: list[MaterialAwsEvidence] = []
-    requirements = authoritative_requirement_ids(text)
-    expected_requirement_order = sorted(requirements)
-
-    driver_table = tables["drivers"]
-    seen_driver_ids: set[str] = set()
-    hard_constraint_ids: set[str] = set()
-    if driver_table is not None:
-        if not driver_table.rows:
-            issues.append("Architecture drivers has no stored rows")
-        for row in driver_table.rows:
-            driver = ArchitectureDriver(*row)
-            drivers.append(driver)
-            if ARCHITECTURE_DRIVER_ID.fullmatch(driver.driver_id) is None:
-                issues.append(f"Invalid architecture driver ID {driver.driver_id!r}")
-            elif driver.driver_id in seen_driver_ids:
-                issues.append(f"Duplicate architecture driver ID {driver.driver_id}")
-            seen_driver_ids.add(driver.driver_id)
-            if driver.driver_class not in ARCHITECTURE_DRIVER_CLASSES:
-                issues.append(
-                    f"{driver.driver_id}: invalid driver class {driver.driver_class!r}"
-                )
-            elif driver.driver_class == "HARD_CONSTRAINT":
-                hard_constraint_ids.add(driver.driver_id)
-            try:
-                basis = _canonical_id_list(
-                    driver.requirement_basis,
-                    STABLE_CONTRACT_ID,
-                    f"{driver.driver_id} requirement basis",
-                )
-                unknown = sorted(set(basis) - requirements)
-                if unknown:
-                    issues.append(
-                        f"{driver.driver_id}: requirement basis is not Gate A requirement IDs: "
-                        + ", ".join(unknown)
-                    )
-            except ValueError as exc:
-                issues.append(str(exc))
-            for label, value in (
-                ("Decision implication", driver.decision_implication),
-                ("Validation", driver.validation),
-            ):
-                if not explicit_value(value, allow_none=False):
-                    issues.append(f"{driver.driver_id}: {label} must be concrete")
-
-    candidate_table = tables["candidates"]
-    seen_candidate_ids: set[str] = set()
-    if candidate_table is not None:
-        if not candidate_table.rows:
-            issues.append("Whole-system candidates has no stored rows")
-        for row in candidate_table.rows:
-            candidate = ArchitectureCandidate(*row)
-            candidates.append(candidate)
-            if ARCHITECTURE_CANDIDATE_ID.fullmatch(candidate.candidate_id) is None:
-                issues.append(
-                    f"Invalid architecture candidate ID {candidate.candidate_id!r}"
-                )
-            elif candidate.candidate_id in seen_candidate_ids:
-                issues.append(
-                    f"Duplicate architecture candidate ID {candidate.candidate_id}"
-                )
-            seen_candidate_ids.add(candidate.candidate_id)
-            if not explicit_value(candidate.architecture_summary, allow_none=False):
-                issues.append(
-                    f"{candidate.candidate_id}: architecture summary must be concrete"
-                )
-            try:
-                coverage = _canonical_id_list(
-                    candidate.requirement_coverage,
-                    STABLE_CONTRACT_ID,
-                    f"{candidate.candidate_id} requirement coverage",
-                )
-                if coverage != expected_requirement_order:
-                    issues.append(
-                        f"{candidate.candidate_id}: requirement coverage must exactly enumerate current requirement IDs: "
-                        + ", ".join(expected_requirement_order)
-                    )
-            except ValueError as exc:
-                issues.append(str(exc))
-            if candidate.eligibility not in ARCHITECTURE_ELIGIBILITY:
-                issues.append(
-                    f"{candidate.candidate_id}: invalid eligibility {candidate.eligibility!r}"
-                )
-            if candidate.eligibility == "ELIGIBLE":
-                if candidate.failed_constraints != "NONE":
-                    issues.append(
-                        f"{candidate.candidate_id}: an eligible candidate must have Failed constraints NONE"
-                    )
-            elif candidate.eligibility == "INELIGIBLE":
-                try:
-                    failed = _canonical_id_list(
-                        candidate.failed_constraints,
-                        ARCHITECTURE_DRIVER_ID,
-                        f"{candidate.candidate_id} failed constraints",
-                    )
-                    non_hard = sorted(set(failed) - hard_constraint_ids)
-                    if non_hard:
-                        issues.append(
-                            f"{candidate.candidate_id}: failed constraints must reference HARD_CONSTRAINT drivers: "
-                            + ", ".join(non_hard)
-                        )
-                except ValueError as exc:
-                    issues.append(str(exc))
-            if not explicit_value(candidate.tradeoffs, allow_none=False):
-                issues.append(f"{candidate.candidate_id}: tradeoffs must be concrete")
-    if (
-        required
-        and architecture_disposition == "SELECT"
-        and not grandfather_approved_v1
-        and len(seen_candidate_ids) < 2
-    ):
-        issues.append(
-            "SELECT requires at least two complete non-straw whole-system candidates"
-        )
-
-    selection_table = tables["selection"]
-    if selection_table is not None:
-        if len(selection_table.rows) != 1:
-            issues.append("Selected architecture must contain exactly one row")
-        elif selection_table.rows:
-            if selection_schema_version == 3:
-                selection = ArchitectureSelection(*selection_table.rows[0])
-            else:
-                legacy = selection_table.rows[0]
-                selection = ArchitectureSelection(
-                    architecture_id=legacy[0],
-                    selected_candidate=legacy[1],
-                    requirement_and_driver_basis=legacy[2],
-                    rationale=legacy[3],
-                    rejected_alternatives=legacy[4],
-                    risks=legacy[5],
-                    mitigations=legacy[6],
-                    security_impact="",
-                    reliability_impact="",
-                    operational_burden="",
-                    cost_effect=legacy[7],
-                    breakpoints=legacy[8],
-                    migration_path="",
-                    revisit_triggers=legacy[9],
-                    validation=legacy[10],
-                )
-            if ARCHITECTURE_ID.fullmatch(selection.architecture_id) is None:
-                issues.append(
-                    f"Invalid selected architecture ID {selection.architecture_id!r}"
-                )
-            if selection.selected_candidate not in seen_candidate_ids:
-                issues.append(
-                    "Selected architecture must reference a current candidate"
-                )
-            selected = next(
-                (
-                    item
-                    for item in candidates
-                    if item.candidate_id == selection.selected_candidate
-                ),
-                None,
-            )
-            if selected is not None and selected.eligibility != "ELIGIBLE":
-                issues.append("A hard-constraint-failing candidate cannot be selected")
-            expected_basis = [
-                *expected_requirement_order,
-                *(item.driver_id for item in drivers),
-            ]
-            try:
-                basis = _canonical_id_list(
-                    selection.requirement_and_driver_basis,
-                    STABLE_CONTRACT_ID,
-                    f"{selection.architecture_id} requirement and driver basis",
-                )
-                if basis != expected_basis:
-                    issues.append(
-                        f"{selection.architecture_id}: basis must exactly enumerate current requirements and drivers: "
-                        + ", ".join(expected_basis)
-                    )
-            except ValueError as exc:
-                issues.append(str(exc))
-            nonselected = [
-                item.candidate_id
-                for item in candidates
-                if item.candidate_id != selection.selected_candidate
-            ]
-            eligible = [item for item in candidates if item.eligibility == "ELIGIBLE"]
-            if selection.rejected_alternatives == "NO_VIABLE_ALTERNATIVE":
-                if len(eligible) != 1 or any(
-                    item.eligibility != "INELIGIBLE"
-                    for item in candidates
-                    if item.candidate_id != selection.selected_candidate
-                ):
-                    issues.append(
-                        "NO_VIABLE_ALTERNATIVE is valid only when exactly one candidate is eligible"
-                    )
-            else:
-                try:
-                    rejected = _canonical_id_list(
-                        selection.rejected_alternatives,
-                        ARCHITECTURE_CANDIDATE_ID,
-                        f"{selection.architecture_id} rejected alternatives",
-                    )
-                    if rejected != nonselected:
-                        issues.append(
-                            f"{selection.architecture_id}: rejected alternatives must enumerate every nonselected candidate in table order"
-                        )
-                except ValueError as exc:
-                    issues.append(str(exc))
-            dossier_fields = (
-                ("Rationale", selection.rationale),
-                ("Risks", selection.risks),
-                ("Mitigations", selection.mitigations),
-            )
-            if selection_schema_version == 3:
-                dossier_fields += (
-                    ("Security impact", selection.security_impact),
-                    ("Reliability impact", selection.reliability_impact),
-                    ("Operational burden", selection.operational_burden),
-                )
-            dossier_fields += (
-                ("Cost effect", selection.cost_effect),
-                ("Breakpoints", selection.breakpoints),
-            )
-            if selection_schema_version == 3:
-                dossier_fields += (("Migration path", selection.migration_path),)
-            dossier_fields += (
-                ("Revisit triggers", selection.revisit_triggers),
-                ("Validation", selection.validation),
-            )
-            for label, value in dossier_fields:
-                if not explicit_value(value, allow_none=False):
-                    issues.append(
-                        f"{selection.architecture_id}: {label} must be concrete"
-                    )
-
-    trace_table = tables["traceability"]
-    seen_trace_requirements: set[str] = set()
-    if trace_table is not None:
-        for row in trace_table.rows:
-            trace = ArchitectureTrace(*row)
-            traces.append(trace)
-            if trace.requirement_id in seen_trace_requirements:
-                issues.append(
-                    f"Duplicate architecture traceability requirement {trace.requirement_id}"
-                )
-            seen_trace_requirements.add(trace.requirement_id)
-            if trace.requirement_id not in requirements:
-                issues.append(
-                    f"Architecture traceability references non-requirement ID {trace.requirement_id}"
-                )
-            try:
-                design_ids = _canonical_id_list(
-                    trace.design_ids,
-                    ARCHITECTURE_DESIGN_ID,
-                    f"{trace.requirement_id} architecture traceability design IDs",
-                )
-                if (
-                    selection is not None
-                    and selection.architecture_id not in design_ids
-                ):
-                    issues.append(
-                        f"{trace.requirement_id}: traceability must include {selection.architecture_id}"
-                    )
-                if not any(
-                    identifier != (selection.architecture_id if selection else "")
-                    for identifier in design_ids
-                ):
-                    issues.append(
-                        f"{trace.requirement_id}: traceability must include at least one additional design ID"
-                    )
-            except ValueError as exc:
-                issues.append(str(exc))
-            if not _none_with_reason(trace.property_test_ids):
-                try:
-                    _canonical_id_list(
-                        trace.property_test_ids,
-                        ARCHITECTURE_TEST_ID,
-                        f"{trace.requirement_id} property/test IDs",
-                    )
-                except ValueError as exc:
-                    issues.append(str(exc))
-        missing_traces = sorted(requirements - seen_trace_requirements)
-        extra_traces = sorted(seen_trace_requirements - requirements)
-        if missing_traces:
-            issues.append(
-                "Architecture traceability is missing requirement IDs: "
-                + ", ".join(missing_traces)
-            )
-        if extra_traces:
-            issues.append(
-                "Architecture traceability has unknown requirement IDs: "
-                + ", ".join(extra_traces)
-            )
-
-    evidence_table = tables["evidence"]
-    seen_evidence_ids: set[str] = set()
-    seen_capabilities: set[str] = set()
-    evidence_design_ids: dict[str, set[str]] = {}
-    declared_design_ids = {
-        *(item.driver_id for item in drivers),
-        *(item.candidate_id for item in candidates),
-        *(technology_ids),
-    }
-    if selection is not None:
-        declared_design_ids.add(selection.architecture_id)
-    if evidence_table is not None:
-        if not evidence_table.rows:
-            issues.append("Material AWS evidence has no stored rows")
-        for row in evidence_table.rows:
-            item = (
-                MaterialAwsEvidence(*row)
-                if evidence_schema_version == 2
-                else MaterialAwsEvidence(row[0], "", *row[1:])
-            )
-            evidence.append(item)
-            if (
-                evidence_schema_version == 2
-                and AWS_DISCOVERY_ID.fullmatch(item.discovery_id) is None
-            ):
-                issues.append(
-                    f"{item.evidence_id}: invalid Discovery ID {item.discovery_id!r}"
-                )
-            if AWS_MATERIAL_EVIDENCE_ID.fullmatch(item.evidence_id) is None:
-                issues.append(f"Invalid material AWS evidence ID {item.evidence_id!r}")
-            elif item.evidence_id in seen_evidence_ids:
-                issues.append(f"Duplicate material AWS evidence ID {item.evidence_id}")
-            seen_evidence_ids.add(item.evidence_id)
-            try:
-                bound_ids = _canonical_id_list(
-                    item.design_ids,
-                    STABLE_CONTRACT_ID,
-                    f"{item.evidence_id} design IDs",
-                )
-                evidence_design_ids[item.evidence_id] = set(bound_ids)
-                unknown = sorted(set(bound_ids) - declared_design_ids)
-                if unknown:
-                    issues.append(
-                        f"{item.evidence_id}: unknown design IDs: " + ", ".join(unknown)
-                    )
-            except ValueError as exc:
-                issues.append(str(exc))
-            if not explicit_value(item.material_claim, allow_none=False):
-                issues.append(f"{item.evidence_id}: material claim must be concrete")
-            if item.capability not in AWS_DOCUMENTATION_CAPABILITIES:
-                issues.append(
-                    f"{item.evidence_id}: invalid AWS Core capability {item.capability!r}"
-                )
-            else:
-                seen_capabilities.add(item.capability)
-            if (
-                re.fullmatch(
-                    r"https://(?:docs\.)?aws\.amazon\.com/\S+", item.official_reference
-                )
-                is None
-            ):
-                issues.append(
-                    f"{item.evidence_id}: Official reference must be an AWS HTTPS URL"
-                )
-            try:
-                datetime.strptime(item.observed_date, "%Y-%m-%d")
-            except ValueError:
-                issues.append(f"{item.evidence_id}: Observed date must use YYYY-MM-DD")
-        missing_capabilities = sorted(
-            AWS_DOCUMENTATION_CAPABILITIES - seen_capabilities
-        )
-        if missing_capabilities:
-            issues.append(
-                "Material AWS evidence is missing AWS Core capabilities: "
-                + ", ".join(missing_capabilities)
-            )
-
-    for candidate in candidates:
-        try:
-            evidence_ids = _canonical_id_list(
-                candidate.aws_evidence,
-                AWS_MATERIAL_EVIDENCE_ID,
-                f"{candidate.candidate_id} AWS evidence",
-            )
-            unknown = sorted(set(evidence_ids) - seen_evidence_ids)
-            if unknown:
-                issues.append(
-                    f"{candidate.candidate_id}: unknown AWS evidence IDs: "
-                    + ", ".join(unknown)
-                )
-            unbound = sorted(
-                evidence_id
-                for evidence_id in evidence_ids
-                if candidate.candidate_id
-                not in evidence_design_ids.get(evidence_id, set())
-            )
-            if unbound:
-                issues.append(
-                    f"{candidate.candidate_id}: AWS evidence rows are not bound to this candidate: "
-                    + ", ".join(unbound)
-                )
-        except ValueError as exc:
-            issues.append(str(exc))
-    if selection is not None and not any(
-        selection.architecture_id in bound_ids
-        for bound_ids in evidence_design_ids.values()
-    ):
-        issues.append("Selected architecture has no bound material AWS evidence")
-    for trace in traces:
-        if _none_with_reason(trace.evidence_ids):
-            continue
-        try:
-            evidence_ids = _canonical_id_list(
-                trace.evidence_ids,
-                AWS_MATERIAL_EVIDENCE_ID,
-                f"{trace.requirement_id} evidence IDs",
-            )
-            unknown = sorted(set(evidence_ids) - seen_evidence_ids)
-            if unknown:
-                issues.append(
-                    f"{trace.requirement_id}: unknown AWS evidence IDs: "
-                    + ", ".join(unknown)
-                )
-        except ValueError as exc:
-            issues.append(str(exc))
-
-    try:
-        project_mode = table_after_heading(text, "## Document status").get(
-            "Project mode", ""
-        )
-    except ValueError:
-        project_mode = ""
-    if project_mode == "greenfield" and not any(
-        item.architecture_summary.startswith(MANAGED_SERVERLESS_MARKER)
-        for item in candidates
-    ):
-        issues.append(
-            "Greenfield architecture candidates must evaluate the managed-serverless baseline"
-        )
-
-    canonical_bytes: bytes | None = None
-    canonical_sha256: str | None = None
-    if all(tables[key] is not None for key, _, _ in specifications):
-        canonical_bytes = b"".join(
-            tables[key].canonical_bytes  # type: ignore[union-attr]
-            for key, _, _ in specifications
-        )
-        canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
-    return (
-        ArchitectureContract(
-            schema_version=(
-                selection_schema_version
-                if grandfather_approved_v1 and selection_schema_version < 3
-                else (4 if evidence_schema_version == 2 else selection_schema_version)
-            ),
-            status="READY" if not issues else "BLOCKED",
-            drivers=tuple(drivers),
-            candidates=tuple(candidates),
-            selection=selection,
-            traceability=tuple(traces),
-            aws_evidence=tuple(evidence),
-            canonical_sha256=canonical_sha256,
-            canonical_bytes=canonical_bytes,
-        ),
-        issues,
-    )
-
-
-def harness_status_parts(value: str) -> tuple[str, str | None]:
-    cleaned = clean_cell(value)
-    if cleaned == "REQUIRED":
-        return "REQUIRED", None
-    for prefix in ("CONDITIONAL", "NOT_APPLICABLE"):
-        if not cleaned.startswith(prefix):
-            continue
-        suffix = cleaned[len(prefix) :].strip()
-        if suffix.startswith("—"):
-            suffix = suffix[1:].strip()
-        elif suffix.startswith("-"):
-            suffix = suffix[1:].strip()
-        if suffix and not unresolved(suffix):
-            return prefix, suffix
-    return "INVALID", None
-
-
-def derive_harness_contract(
-    text: str,
-    allowed_basis_ids: set[str],
-    *,
-    required: bool,
-    grandfather_approved_v1: bool,
-) -> tuple[HarnessContract, list[str]]:
-    """Parse and validate the Gate B Harness Profile as design-controlled data."""
-
-    issues: list[str] = []
-    try:
-        table = contract_table_after_heading(text, HARNESS_HEADING, HARNESS_HEADERS)
-    except ValueError as exc:
-        table = None
-        issues.append(f"Harness Profile: {exc}")
-    if table is None:
-        if grandfather_approved_v1:
-            return (
-                HarnessContract(
-                    status="GRANDFATHERED_V1",
-                    grandfathered_v1=True,
-                ),
-                [],
-            )
-        return HarnessContract(), [f"Missing {HARNESS_HEADING}"]
-
-    rows: list[HarnessRow] = []
-    required_ids: list[str] = []
-    seen: set[str] = set()
-    for raw in table.rows:
-        row = HarnessRow(*raw)
-        rows.append(row)
-        if HARNESS_ID.fullmatch(row.harness_id) is None:
-            issues.append(f"{row.harness_id}: invalid Harness ID")
-        elif row.harness_id in seen:
-            issues.append(f"{row.harness_id}: duplicate Harness ID")
-        seen.add(row.harness_id)
-        if row.layer not in HARNESS_LAYERS:
-            issues.append(f"{row.harness_id}: invalid Harness layer {row.layer!r}")
-        if unresolved(row.trigger):
-            issues.append(f"{row.harness_id}: Trigger is unresolved")
-        try:
-            basis = _canonical_id_list(
-                row.basis_ids,
-                STABLE_CONTRACT_ID,
-                f"{row.harness_id} Basis IDs",
-            )
-        except ValueError as exc:
-            issues.append(str(exc))
-            basis = []
-        unknown = sorted(set(basis) - allowed_basis_ids)
-        if unknown:
-            issues.append(
-                f"{row.harness_id}: Basis IDs are not current design IDs: "
-                + ", ".join(unknown)
-            )
-
-        status, reason = harness_status_parts(row.requirement_status)
-        if status == "INVALID":
-            issues.append(
-                f"{row.harness_id}: status must be REQUIRED, CONDITIONAL — "
-                "<trigger>, or NOT_APPLICABLE — <reason>"
-            )
-            continue
-        if status == "NOT_APPLICABLE":
-            if any(
-                clean_cell(value) != "NOT_APPLICABLE"
-                for value in (
-                    row.selected_check,
-                    row.exact_command,
-                    row.evidence_destination,
-                )
-            ):
-                issues.append(
-                    f"{row.harness_id}: NOT_APPLICABLE rows must use "
-                    "NOT_APPLICABLE for check, command/API, and evidence destination"
-                )
-            if reason is None:
-                issues.append(
-                    f"{row.harness_id}: NOT_APPLICABLE requires a concrete reason"
-                )
-            continue
-
-        if unresolved(row.selected_check):
-            issues.append(f"{row.harness_id}: Selected check or tool is unresolved")
-        if not valid_property_execution_command(row.exact_command):
-            issues.append(
-                f"{row.harness_id}: Exact command or API must be one concrete command"
-            )
-        if row.evidence_destination != HARNESS_EVIDENCE_DESTINATION:
-            issues.append(
-                f"{row.harness_id}: Evidence destination must be exactly "
-                f"{HARNESS_EVIDENCE_DESTINATION}"
-            )
-        if status == "CONDITIONAL":
-            if reason is None:
-                issues.append(
-                    f"{row.harness_id}: CONDITIONAL requires a concrete trigger"
-                )
-            if required:
-                issues.append(
-                    f"{row.harness_id}: CONDITIONAL must resolve to REQUIRED or "
-                    "NOT_APPLICABLE before Gate B"
-                )
-        else:
-            required_ids.append(row.harness_id)
-
-    canonical = table.canonical_bytes
-    digest = "sha256:" + hashlib.sha256(canonical).hexdigest()
-    return (
-        HarnessContract(
-            schema_version=2,
-            status="READY" if not issues else "BLOCKED",
-            rows=tuple(rows),
-            required_ids=tuple(required_ids),
-            canonical_sha256=digest,
-            canonical_bytes=canonical,
-        ),
-        issues,
-    )
-
-
-def _explicit_not_applicable_section(text: str, heading: str) -> bytes | None:
-    section = _heading_section_lines(text, heading)
-    if section is None:
-        return None
-    lines, structural_lines = section
-    visible_lines = [
-        line.strip()
-        for line, structural in zip(lines, structural_lines)
-        if structural.strip() and not structural.strip().startswith("|")
-    ]
-    for line in visible_lines:
-        match = re.fullmatch(
-            r"NOT_APPLICABLE\s+(?:\u2014|-)\s+(?P<reason>[^\r\n]+)",
-            line,
-        )
-        if match is None:
-            continue
-        if explicit_value(match.group("reason"), allow_none=False):
-            return (
-                f"{heading}\nNOT_APPLICABLE - {match.group('reason').strip()}\n"
-            ).encode("utf-8")
-    return None
-
-
-def _explicit_not_applicable_value(value: str) -> bool:
-    match = re.fullmatch(
-        r"NOT_APPLICABLE\s+(?:\u2014|-)\s+(?P<reason>.+)", clean_cell(value)
-    )
-    return bool(match and explicit_value(match.group("reason"), allow_none=False))
-
-
-def _server_side_authorization_or_not_applicable(value: str) -> bool:
-    cleaned = clean_cell(value)
-    if _explicit_not_applicable_value(cleaned):
-        return True
-    normalized = re.sub(r"[\s-]+", "_", cleaned.upper())
-    return "SERVER_SIDE" in normalized or bool(
-        re.search(
-            r"\bserver(?:-side)?\b.*\b(?:authoriz\w*|enforc\w*|verif\w*|den\w*|reject\w*)\b",
-            cleaned,
-            re.IGNORECASE,
-        )
-    )
-
-
-def _measurable_interface_bound_or_not_applicable(value: str) -> bool:
-    cleaned = clean_cell(value)
-    return _explicit_not_applicable_value(cleaned) or bool(
-        explicit_value(cleaned, allow_none=False)
-        and UNDEFINED_QUALITY_TERM.search(cleaned) is None
-        and MEASURABLE_INTERFACE_BOUND.search(cleaned)
-    )
-
-
-def _design_reference_issues(
-    identifier: str,
-    requirement_value: str,
-    validation_value: str,
-    requirement_ids: set[str],
-    validation_ids: set[str],
-) -> list[str]:
-    issues: list[str] = []
-    try:
-        refs = set(
-            _contract_ids(
-                requirement_value, STABLE_CONTRACT_ID, f"{identifier} Requirement IDs"
-            )
-        )
-        unknown = sorted(refs - requirement_ids)
-        if unknown:
-            issues.append(
-                f"{identifier}: unknown requirement IDs: " + ", ".join(unknown)
-            )
-        refs = set(
-            _contract_ids(
-                validation_value, STABLE_CONTRACT_ID, f"{identifier} Validation IDs"
-            )
-        )
-        unknown = sorted(refs - validation_ids)
-        if unknown:
-            issues.append(
-                f"{identifier}: unknown Validation IDs: " + ", ".join(unknown)
-            )
-    except ValueError as exc:
-        issues.append(str(exc))
-    return issues
-
-
-def parse_application_source_disposition(
-    value: str,
-) -> ApplicationSourceDisposition:
-    """Parse the exact schema-7 application-source decision grammar."""
-
-    normalized = clean_cell(value)
-    if normalized == APPLICATION_SOURCE_INFRASTRUCTURE_ONLY:
-        return ApplicationSourceDisposition(APPLICATION_SOURCE_NOT_APPLICABLE)
-    for kind in (APPLICATION_SOURCE_GREENFIELD, APPLICATION_SOURCE_BROWNFIELD):
-        prefix = f"{kind}: "
-        if not normalized.startswith(prefix):
-            continue
-        raw_paths = [item.strip() for item in normalized[len(prefix) :].split(";")]
-        try:
-            paths = tuple(
-                parse_task_write_set(
-                    ",".join(raw_paths), APPLICATION_SOURCE_DISPOSITION_FIELD
-                )
-            )
-        except ValueError as exc:
-            raise ValueError(str(exc)) from exc
-        if not paths:
-            raise ValueError("Application source disposition has no source paths")
-        if kind == APPLICATION_SOURCE_GREENFIELD and paths != ("app/**",):
-            raise ValueError(
-                "GREENFIELD_APP_ROOT must be exactly GREENFIELD_APP_ROOT: app/**"
-            )
-        return ApplicationSourceDisposition(kind, paths)
-    raise ValueError(
-        "Application source disposition must use GREENFIELD_APP_ROOT: app/**, "
-        "BROWNFIELD_PRESERVE: path/**; another/path/**, or "
-        "NOT_APPLICABLE — INFRASTRUCTURE_ONLY"
-    )
-
-
-def _brownfield_source_contract_section(text: str) -> str:
-    heading = "### 1.2 Brownfield baseline and preservation contract"
-    structural = without_fenced_code(text)
-    matches = list(re.finditer(rf"^{re.escape(heading)}\s*$", structural, re.MULTILINE))
-    if len(matches) != 1:
-        return ""
-    following = structural[matches[0].end() :]
-    next_heading = re.search(r"^##\s+2\.", following, re.MULTILINE)
-    end = matches[0].end() + (next_heading.start() if next_heading else len(following))
-    return text[matches[0].end() : end]
-
-
-def _contains_exact_source_path(value: str, path: str) -> bool:
-    """Match one recorded source path without accepting a longer lookalike."""
-
-    return (
-        re.search(
-            rf"(?<![A-Za-z0-9._/*-]){re.escape(path)}(?![A-Za-z0-9._/*-])",
-            value,
-            re.IGNORECASE,
-        )
-        is not None
-    )
-
-
-def validate_application_source_disposition(
-    disposition: ApplicationSourceDisposition,
-    *,
-    project_mode: str | None,
-    work_kind: str | None,
-    prd_text: str,
-) -> list[str]:
-    """Return stable schema-7 source-disposition diagnostics."""
-
-    issues: list[str] = []
-    if disposition.kind == APPLICATION_SOURCE_NOT_APPLICABLE:
-        if work_kind != "INFRASTRUCTURE":
-            issues.append(
-                "APPLICATION_SOURCE_DISPOSITION_INVALID: "
-                "NOT_APPLICABLE — INFRASTRUCTURE_ONLY requires Work kind INFRASTRUCTURE"
-            )
-        return issues
-    if disposition.kind == APPLICATION_SOURCE_GREENFIELD:
-        if project_mode != "greenfield":
-            issues.append(
-                "APPLICATION_SOURCE_DISPOSITION_INVALID: GREENFIELD_APP_ROOT "
-                "requires greenfield project mode"
-            )
-        if work_kind == "INFRASTRUCTURE":
-            issues.append(
-                "APPLICATION_SOURCE_DISPOSITION_INVALID: infrastructure-only work "
-                "must use NOT_APPLICABLE — INFRASTRUCTURE_ONLY"
-            )
-        return issues
-    if disposition.kind != APPLICATION_SOURCE_BROWNFIELD:
-        issues.append(
-            "APPLICATION_SOURCE_DISPOSITION_INVALID: unknown application source disposition kind"
-        )
-        return issues
-    if project_mode != "brownfield":
-        issues.append(
-            "APPLICATION_SOURCE_DISPOSITION_INVALID: BROWNFIELD_PRESERVE requires brownfield project mode"
-        )
-        return issues
-    preserved_section = _brownfield_source_contract_section(prd_text)
-    tables = markdown_tables(preserved_section)
-    protected_paths = ""
-    preservation_rows: list[list[str]] = []
-    for table in tables:
-        headers = table[0]
-        if headers == ["Field", "Brownfield baseline"]:
-            protected_paths = next(
-                (
-                    row[1]
-                    for row in table[2:]
-                    if len(row) == 2 and row[0] == "Protected files and components"
-                ),
-                "",
-            )
-        elif headers == [
-            "Preservation ID",
-            "Behavior, asset, or constraint to preserve",
-            "How it is verified before change",
-            "Allowed change",
-            "Explicitly prohibited or approval-required change",
-        ]:
-            preservation_rows = table[2:]
-
-    missing_baseline = [
-        path
-        for path in disposition.paths
-        if not _contains_exact_source_path(protected_paths, path)
-    ]
-    missing_preservation = [
-        path
-        for path in disposition.paths
-        if not any(
-            _contains_exact_source_path(" | ".join(row[1:]), path)
-            for row in preservation_rows
-        )
-    ]
-    if missing_baseline or missing_preservation:
-        details: list[str] = []
-        if missing_baseline:
-            details.append(
-                "Protected files and components: " + ", ".join(missing_baseline)
-            )
-        if missing_preservation:
-            details.append("matching PRES record: " + ", ".join(missing_preservation))
-        issues.append(
-            "APPLICATION_SOURCE_DISPOSITION_CONFLICT: brownfield source roots must "
-            "appear unchanged in both Gate A brownfield records; missing from "
-            + "; ".join(details)
-        )
-    return issues
-
-
-def derive_project_design_contract(
-    text: str,
-    requirements_contract: RequirementsContract,
-    coverage_contract: CoverageContract,
-    allowed_basis_ids: set[str],
-    harness: HarnessContract,
-    legacy_design_ids: set[str],
-    *,
-    required: bool,
-    grandfather_approved_v4: bool,
-) -> tuple[ProjectDesignContract, list[str]]:
-    """Validate the current interface, source, boundary, state, and delivery contract."""
-
-    issues: list[str] = []
-    add = issues.append
-    missing_records: list[str] = []
-    try:
-        document = table_after_heading(text, "## Document status")
-    except ValueError as exc:
-        document = {}
-        if required:
-            issues.append(str(exc))
-    design_schema = clean_cell(document.get("Project design contract schema", ""))
-    grandfather_schema_6 = bool(design_schema == "6" and grandfather_approved_v4)
-    grandfather_schema_5 = bool(
-        design_schema == "5"
-        and grandfather_approved_v4
-        and DIAGRAM_CONTRACT_HEADING not in without_fenced_code(text)
-    )
-    if (
-        design_schema != PROJECT_DESIGN_CONTRACT_SCHEMA
-        and not grandfather_schema_6
-        and not grandfather_schema_5
-    ):
-        observed_tables = [table for table in markdown_tables(text) if table]
-        observed_headers = {tuple(table[0]) for table in observed_tables}
-        current_headers = {
-            INTERFACE_HEADERS,
-            LAYER_BOUNDARY_HEADERS,
-            STATE_APPLICABILITY_HEADERS,
-            STATE_REGISTER_HEADERS,
-            FIRST_WAVE_HEADERS,
-            SPIKE_HEADERS,
-            DIAGRAM_CONTRACT_HEADERS,
-        }
-        legacy_interface_tables = [
-            table
-            for table in observed_tables
-            if tuple(table[0]) == LEGACY_INTERFACE_HEADERS_V4
-        ]
-        legacy_interface_ids = [
-            clean_cell(row[0])
-            for table in legacy_interface_tables
-            for row in table[2:]
-            if len(row) == len(LEGACY_INTERFACE_HEADERS_V4)
-        ]
-        structural_text = without_fenced_code(text)
-        schema_five_only_headings = (
-            LAYER_BOUNDARY_HEADING,
-            STATE_APPLICABILITY_HEADING,
-            STATE_REGISTER_HEADING,
-            FIRST_WAVE_HEADING,
-            SPIKE_HEADING,
-        )
-        exact_legacy_shape = bool(
-            not design_schema
-            and len(legacy_interface_tables) == 1
-            and legacy_interface_ids
-            and all(INTERFACE_ID.fullmatch(item) for item in legacy_interface_ids)
-            and not (observed_headers & current_headers)
-            and not any(
-                re.search(
-                    rf"^{re.escape(heading)}[ \t]*$", structural_text, re.MULTILINE
-                )
-                for heading in schema_five_only_headings
-            )
-            and any(ARCHITECTURE_ID.fullmatch(item) for item in legacy_design_ids)
-            and any(
-                TECHNOLOGY_DECISION_ID.fullmatch(item) for item in legacy_design_ids
-            )
-            and any(PROPERTY_ID.fullmatch(item) for item in legacy_design_ids)
-            and any(HARNESS_ID.fullmatch(item) for item in legacy_design_ids)
-        )
-        if grandfather_approved_v4 and exact_legacy_shape:
-            return (
-                ProjectDesignContract(
-                    schema_version=4, status="GRANDFATHERED", grandfathered_v4=True
-                ),
-                [],
-            )
-        if not required:
-            return ProjectDesignContract(status="UNINITIALIZED"), []
-        return (
-            ProjectDesignContract(
-                status="MIGRATION_REQUIRED",
-                missing_records=(
-                    "Project design contract schema 7",
-                    APPLICATION_SOURCE_DISPOSITION_FIELD,
-                    INTERFACE_HEADING,
-                    LAYER_BOUNDARY_HEADING,
-                    STATE_APPLICABILITY_HEADING,
-                    STATE_REGISTER_HEADING,
-                    FIRST_WAVE_HEADING,
-                    SPIKE_HEADING,
-                    DIAGRAM_CONTRACT_HEADING,
-                ),
-            ),
-            [
-                "Project design contract schema 7 requires an application source "
-                "disposition plus current interface, layer-boundary, state-applicability, "
-                "first-wave, spike, and diagram records"
-            ],
-        )
-
-    source_disposition: ApplicationSourceDisposition | None = None
-    if not (grandfather_schema_5 or grandfather_schema_6):
-        try:
-            envelope = table_after_heading(text, "## 28. Construction envelope")
-        except ValueError as exc:
-            envelope = {}
-            if required:
-                add(
-                    "APPLICATION_SOURCE_DISPOSITION_MISSING: unable to read the "
-                    f"construction envelope: {exc}"
-                )
-        raw_disposition = clean_cell(
-            envelope.get(APPLICATION_SOURCE_DISPOSITION_FIELD, "")
-        )
-        if not raw_disposition or unresolved(raw_disposition):
-            if required:
-                add(
-                    "APPLICATION_SOURCE_DISPOSITION_MISSING: schema 7 requires "
-                    "Application source disposition before Gate B"
-                )
-                missing_records.append(APPLICATION_SOURCE_DISPOSITION_FIELD)
-        else:
-            try:
-                source_disposition = parse_application_source_disposition(
-                    raw_disposition
-                )
-            except ValueError as exc:
-                add(f"APPLICATION_SOURCE_DISPOSITION_INVALID: {exc}")
-            if source_disposition is not None:
-                issues.extend(
-                    validate_application_source_disposition(
-                        source_disposition,
-                        project_mode=clean_cell(
-                            document.get("Project mode", "")
-                        ).lower()
-                        or None,
-                        work_kind=coverage_contract.work_kind,
-                        prd_text=text,
-                    )
-                )
-
-    interfaces, boundaries, state_applicability, states = (
-        _contract_table_or_issue(text, heading, headers, issues, missing_records)
-        for heading, headers in (
-            (INTERFACE_HEADING, INTERFACE_HEADERS),
-            (LAYER_BOUNDARY_HEADING, LAYER_BOUNDARY_HEADERS),
-            (STATE_APPLICABILITY_HEADING, STATE_APPLICABILITY_HEADERS),
-            (STATE_REGISTER_HEADING, STATE_REGISTER_HEADERS),
-        )
-    )
-
-    requirement_ids = set(
-        requirements_contract.requirement_ids
-    ) or authoritative_requirement_ids(text)
-    current_validation_ids = (
-        set(allowed_basis_ids)
-        | set(requirements_contract.acceptance_ids)
-        | set(harness.required_ids)
-    )
-    journey_requirement_ids: dict[str, set[str]] = {}
-    try:
-        journey_table = contract_table_after_heading(
-            text, JOURNEY_HEADING, JOURNEY_HEADERS
-        )
-    except ValueError:
-        journey_table = None
-    if journey_table is not None:
-        for journey_row in journey_table.rows:
-            journey_id = journey_row[0]
-            if JOURNEY_ID.fullmatch(journey_id) is None:
-                continue
-            try:
-                journey_requirement_ids[journey_id] = set(
-                    _contract_ids(
-                        journey_row[6],
-                        STABLE_CONTRACT_ID,
-                        f"{journey_id} Requirement IDs",
-                    )
-                )
-            except ValueError:
-                continue
-    interface_ids: list[str] = []
-    if interfaces is not None:
-        if not interfaces.rows and coverage_contract.work_kind == "NEW_BUILD":
-            add("NEW_BUILD requires at least one material interface contract")
-        for row in interfaces.rows:
-            contract_id, kind, requirement_value, *details = row
-            if INTERFACE_ID.fullmatch(contract_id) is None:
-                add(f"Invalid material interface ID {contract_id!r}")
-                continue
-            if contract_id in interface_ids:
-                add(f"Duplicate material interface ID {contract_id}")
-            interface_ids.append(contract_id)
-            if kind not in INTERFACE_KINDS or not contract_id.startswith(kind + "-"):
-                add(f"{contract_id}: Kind must match its API/EVENT/CLI/FILE prefix")
-            try:
-                refs = set(
-                    _contract_ids(
-                        requirement_value,
-                        STABLE_CONTRACT_ID,
-                        f"{contract_id} Requirement basis",
-                    )
-                )
-                unknown = sorted(refs - requirement_ids)
-                if unknown:
-                    add(
-                        f"{contract_id}: unknown requirement basis IDs: "
-                        + ", ".join(unknown)
-                    )
-            except ValueError as exc:
-                add(str(exc))
-            for header, value in zip(INTERFACE_HEADERS[3:], details):
-                if not explicit_value(value, allow_none=False):
-                    add(f"{contract_id}: {header} must be concrete")
-            detail_values = dict(zip(INTERFACE_HEADERS[3:], details))
-            if not _server_side_authorization_or_not_applicable(
-                detail_values["Authorization"]
-            ):
-                add(
-                    f"{contract_id}: Authorization must be server-side or use "
-                    "NOT_APPLICABLE - <reason>"
-                )
-            for header in ("Timeout bound", "Rate bound", "Performance bound"):
-                if not _measurable_interface_bound_or_not_applicable(
-                    detail_values[header]
-                ):
-                    add(
-                        f"{contract_id}: {header} must contain a numeric measurable "
-                        "bound or use NOT_APPLICABLE - <reason>"
-                    )
-
-    boundary_ids: list[str] = []
-    if boundaries is not None:
-        if not boundaries.rows and coverage_contract.work_kind == "NEW_BUILD":
-            add("NEW_BUILD requires at least one explicit layer boundary")
-        for row in boundaries.rows:
-            (
-                boundary_id,
-                outer,
-                inner,
-                dto,
-                mapping,
-                direction,
-                authorization,
-                adapter,
-                requirement_value,
-                validation_value,
-            ) = row
-            if BOUNDARY_ID.fullmatch(boundary_id) is None:
-                add(f"Invalid boundary ID {boundary_id!r}")
-                continue
-            if boundary_id in boundary_ids:
-                add(f"Duplicate boundary ID {boundary_id}")
-            boundary_ids.append(boundary_id)
-            for header, value in zip(
-                LAYER_BOUNDARY_HEADERS[1:8],
-                (outer, inner, dto, mapping, direction, authorization, adapter),
-            ):
-                if not explicit_value(value, allow_none=False):
-                    add(f"{boundary_id}: {header} must be concrete")
-            if "INWARD" not in direction.upper():
-                add(f"{boundary_id}: Dependency direction must explicitly point inward")
-            normalized_authorization = authorization.upper().replace("-", "_")
-            if "SERVER_SIDE" not in normalized_authorization:
-                add(f"{boundary_id}: Authorization enforcement must be server-side")
-            issues.extend(
-                _design_reference_issues(
-                    boundary_id,
-                    requirement_value,
-                    validation_value,
-                    requirement_ids,
-                    current_validation_ids,
-                )
-            )
-
-    applicable_state_ids: set[str] = set()
-    state_subjects: dict[str, str] = {}
-    declared_state_triggers: set[str] = set()
-    required_state_triggers = {
-        RICH_TO_STATE_TRIGGER[item]
-        for item in requirements_contract.rich_use_case_triggers
-        if item in RICH_TO_STATE_TRIGGER
-    }
-    if state_applicability is not None:
-        if not state_applicability.rows:
-            add("State-model applicability requires at least one row")
-        for (
-            subject_id,
-            applicability,
-            trigger_basis,
-            state_value,
-        ) in state_applicability.rows:
-            if STABLE_CONTRACT_ID.fullmatch(subject_id) is None:
-                add(f"Invalid state subject ID {subject_id!r}")
-            if applicability == "APPLICABLE":
-                try:
-                    refs = _contract_ids(
-                        state_value, STATE_ID, f"{subject_id} State model IDs"
-                    )
-                    for state_id in refs:
-                        applicable_state_ids.add(state_id)
-                        state_subjects[state_id] = subject_id
-                    trigger_map = _state_trigger_map(trigger_basis, subject_id)
-                    declared_state_triggers.update(trigger_map)
-                    trigger_refs = {
-                        item for values in trigger_map.values() for item in values
-                    }
-                    unknown_trigger = sorted(
-                        trigger_refs - current_validation_ids - requirement_ids
-                    )
-                    if unknown_trigger:
-                        add(
-                            f"{subject_id}: unknown State trigger basis IDs: "
-                            + ", ".join(unknown_trigger)
-                        )
-                except ValueError as exc:
-                    add(str(exc))
-            elif applicability == "NOT_APPLICABLE":
-                if (
-                    not trigger_basis.startswith("NOT_APPLICABLE")
-                    or not explicit_value(trigger_basis, allow_none=False)
-                    or state_value != "NONE"
-                ):
-                    add(
-                        f"{subject_id}: NOT_APPLICABLE requires a concrete reason and State model IDs NONE"
-                    )
-            else:
-                add(
-                    f"{subject_id}: State applicability must be APPLICABLE or NOT_APPLICABLE"
-                )
-    missing_state_triggers = sorted(required_state_triggers - declared_state_triggers)
-    if missing_state_triggers:
-        add(
-            "Journey triggers require applicable state categories: "
-            + ", ".join(missing_state_triggers)
-        )
-    if requirements_contract.grandfathered_approved_gate_a and not applicable_state_ids:
-        add("A grandfathered Gate A design requires an applicable state model")
-
-    state_ids: list[str] = []
-    if states is not None:
-        for row in states.rows:
-            (
-                state_id,
-                subject_id,
-                state_value,
-                initial_state,
-                transitions,
-                terminal_value,
-                invalid_behavior,
-                requirement_value,
-                validation_value,
-            ) = row
-            if STATE_ID.fullmatch(state_id) is None:
-                add(f"Invalid state model ID {state_id!r}")
-                continue
-            if state_id in state_ids:
-                add(f"Duplicate state model ID {state_id}")
-            state_ids.append(state_id)
-            if state_id not in applicable_state_ids:
-                add(f"{state_id}: state row is not declared APPLICABLE")
-            if state_subjects.get(state_id) != subject_id:
-                add(f"{state_id}: Subject ID does not match state applicability")
-            declared_states = [
-                item.strip() for item in state_value.split(",") if item.strip()
-            ]
-            if (
-                not declared_states
-                or state_value != ", ".join(declared_states)
-                or initial_state not in declared_states
-            ):
-                add(
-                    f"{state_id}: States must be canonical and contain the initial state"
-                )
-            if terminal_value != "NONE":
-                terminal_states = [
-                    item.strip() for item in terminal_value.split(",") if item.strip()
-                ]
-                if not set(terminal_states) <= set(declared_states):
-                    add(f"{state_id}: Terminal states must be declared states or NONE")
-            for label, value in (
-                ("Allowed transitions", transitions),
-                ("Invalid-transition behavior", invalid_behavior),
-            ):
-                if not explicit_value(value, allow_none=False):
-                    add(f"{state_id}: {label} must be concrete")
-            issues.extend(
-                _design_reference_issues(
-                    state_id,
-                    requirement_value,
-                    validation_value,
-                    requirement_ids,
-                    current_validation_ids,
-                )
-            )
-        missing_states = sorted(applicable_state_ids - set(state_ids))
-        if missing_states:
-            add(
-                "Applicable state models have no state row: "
-                + ", ".join(missing_states)
-            )
-
-    first_wave_table: ContractTable | None = None
-    first_wave_sentinel = _explicit_not_applicable_section(text, FIRST_WAVE_HEADING)
-    try:
-        first_wave_table = contract_table_after_heading(
-            text, FIRST_WAVE_HEADING, FIRST_WAVE_HEADERS
-        )
-    except ValueError as exc:
-        if first_wave_sentinel is None:
-            add(f"{FIRST_WAVE_HEADING}: {exc}")
-            missing_records.append(FIRST_WAVE_HEADING)
-    first_wave: FirstWaveContract | None = None
-    work_kind = coverage_contract.work_kind
-    if work_kind == "NEW_BUILD":
-        if first_wave_table is None or len(first_wave_table.rows) != 1:
-            add("NEW_BUILD requires exactly one first construction wave row")
-        else:
-            (
-                wave_id,
-                row_work_kind,
-                journey_id,
-                requirement_value,
-                acceptance_value,
-                harness_id,
-                spike_value,
-            ) = first_wave_table.rows[0]
-            if WAVE_ID.fullmatch(wave_id) is None:
-                add(f"Invalid first-wave ID {wave_id!r}")
-            if row_work_kind != "NEW_BUILD":
-                add("First-wave Work kind must exactly match NEW_BUILD")
-            legacy_bridge = requirements_contract.grandfathered_approved_gate_a
-            journey_reference: str | None = None if legacy_bridge else journey_id
-            if legacy_bridge and journey_id != "NONE":
-                add(
-                    f"{wave_id}: grandfathered Gate A walking-skeleton journey must be NONE"
-                )
-            elif not legacy_bridge and journey_id not in set(
-                requirements_contract.journey_ids
-            ):
-                add(f"{wave_id}: walking-skeleton journey is not a current JOURNEY ID")
-            try:
-                wave_requirements = tuple(
-                    _contract_ids(
-                        requirement_value,
-                        STABLE_CONTRACT_ID,
-                        f"{wave_id} Requirement IDs",
-                    )
-                )
-                unknown = sorted(set(wave_requirements) - requirement_ids)
-                if unknown:
-                    add(f"{wave_id}: unknown requirement IDs: " + ", ".join(unknown))
-                selected_journey_requirements = journey_requirement_ids.get(
-                    journey_reference or ""
-                )
-                if selected_journey_requirements is not None:
-                    outside_journey = sorted(
-                        set(wave_requirements) - selected_journey_requirements
-                    )
-                    if outside_journey:
-                        add(
-                            f"{wave_id}: first-wave requirement IDs are not owned by {journey_reference}: "
-                            + ", ".join(outside_journey)
-                        )
-                acceptance_ids = tuple(
-                    _contract_ids(
-                        acceptance_value,
-                        STABLE_CONTRACT_ID,
-                        f"{wave_id} Acceptance/test IDs",
-                    )
-                )
-                expected_acceptance = {f"AC-{item}" for item in wave_requirements}
-                missing_acceptance = sorted(expected_acceptance - set(acceptance_ids))
-                if missing_acceptance:
-                    add(
-                        f"{wave_id}: missing acceptance IDs: "
-                        + ", ".join(missing_acceptance)
-                    )
-                unknown_acceptance = sorted(
-                    set(acceptance_ids) - current_validation_ids
-                )
-                if unknown_acceptance:
-                    add(
-                        f"{wave_id}: unknown acceptance/test IDs: "
-                        + ", ".join(unknown_acceptance)
-                    )
-            except ValueError as exc:
-                wave_requirements = ()
-                acceptance_ids = ()
-                add(str(exc))
-            harness_row = next(
-                (row for row in harness.rows if row.harness_id == harness_id), None
-            )
-            if (
-                harness_row is None
-                or harness_row.layer != "End-to-end"
-                or harness_id not in set(harness.required_ids)
-            ):
-                add(
-                    f"{wave_id}: End-to-end Harness ID must reference a current required end-to-end check"
-                )
-            else:
-                harness_basis = set(
-                    _canonical_id_list(
-                        harness_row.basis_ids,
-                        STABLE_CONTRACT_ID,
-                        f"{harness_id} Basis IDs",
-                    )
-                )
-                required_harness_basis = (
-                    {wave_id, *wave_requirements}
-                    if legacy_bridge
-                    else {wave_id, journey_id}
-                )
-                if not required_harness_basis <= harness_basis:
-                    message = (
-                        "include the wave and every selected requirement"
-                        if legacy_bridge
-                        else f"include both {journey_id} and {wave_id}"
-                    )
-                    add(f"{wave_id}: {harness_id} Basis IDs must {message}")
-            spike_id: str | None
-            if spike_value == "NONE":
-                spike_id = None
-            elif SPIKE_ID.fullmatch(spike_value) is None:
-                spike_id = None
-                add(f"{wave_id}: invalid Blocking spike ID {spike_value!r}")
-            else:
-                spike_id = spike_value
-            first_wave = FirstWaveContract(
-                wave_contract_id=wave_id,
-                work_kind=row_work_kind,
-                journey_id=journey_reference,
-                requirement_ids=wave_requirements,
-                acceptance_test_ids=acceptance_ids,
-                harness_id=harness_id,
-                blocking_spike_id=spike_id,
-            )
-    elif first_wave_sentinel is None:
-        add("Non-NEW_BUILD work requires an explicit NOT_APPLICABLE first-wave reason")
-
-    spike_table: ContractTable | None = None
-    spike_sentinel = _explicit_not_applicable_section(text, SPIKE_HEADING)
-    try:
-        spike_table = contract_table_after_heading(text, SPIKE_HEADING, SPIKE_HEADERS)
-    except ValueError as exc:
-        if spike_sentinel is None:
-            issues.append(f"{SPIKE_HEADING}: {exc}")
-            missing_records.append(SPIKE_HEADING)
-    spike: SpikeContract | None = None
-    expected_spike_id = first_wave.blocking_spike_id if first_wave is not None else None
-    if expected_spike_id is None:
-        if spike_sentinel is None:
-            add(
-                "A first wave without a blocking spike requires an explicit NOT_APPLICABLE spike reason"
-            )
-    elif spike_table is None or len(spike_table.rows) != 1:
-        add("A referenced blocking spike requires exactly one spike row")
-    else:
-        spike_id, unknown, time_box, disposable, exit_criterion, next_action = (
-            spike_table.rows[0]
-        )
-        if spike_id != expected_spike_id:
-            add("Blocking spike row must exactly match the first-wave spike ID")
-        if not explicit_value(unknown, allow_none=False):
-            add(f"{spike_id}: Blocking technical unknown must be concrete")
-        if re.fullmatch(r"MAX_ATTEMPTS: [1-9]\d*", time_box) is None:
-            add(f"{spike_id}: Time box must use MAX_ATTEMPTS: <positive integer>")
-        for label, value in (
-            ("Disposable output boundary", disposable),
-            ("Exit criterion", exit_criterion),
-        ):
-            if not explicit_value(value, allow_none=False):
-                add(f"{spike_id}: {label} must be concrete")
-        if not valid_property_execution_command(exit_criterion):
-            add(
-                f"{spike_id}: Exit criterion must be one explicit local command, "
-                "not prose, shell control, or placeholder content"
-            )
-        if next_action != "DISCARD_AND_BUILD_WALKING_SKELETON":
-            add(
-                f"{spike_id}: Required next action must be DISCARD_AND_BUILD_WALKING_SKELETON"
-            )
-        spike = SpikeContract(
-            spike_id=spike_id,
-            technical_unknown=unknown,
-            time_box=time_box,
-            disposable_boundary=disposable,
-            exit_criterion=exit_criterion,
-            required_next_action=next_action,
-        )
-
-    canonical_parts: list[bytes] = [
-        f"PROJECT_DESIGN_CONTRACT_SCHEMA: "
-        f"{'5' if grandfather_schema_5 else '6' if grandfather_schema_6 else PROJECT_DESIGN_CONTRACT_SCHEMA}\n".encode(
-            "utf-8"
-        )
-    ]
-    if source_disposition is not None:
-        canonical_parts.append(
-            (
-                "APPLICATION_SOURCE_DISPOSITION: "
-                + source_disposition.canonical_value
-                + "\n"
-            ).encode("utf-8")
-        )
-    if (
-        requirements_contract.grandfathered_approved_gate_a
-        and requirements_contract.canonical_sha256 is None
-    ):
-        add(
-            "Grandfathered Gate A design requires a canonical legacy requirements projection"
-        )
-    elif requirements_contract.grandfathered_approved_gate_a:
-        canonical_parts.append(
-            f"LEGACY_GATE_A_BRIDGE: {requirements_contract.canonical_sha256}\n".encode(
-                "utf-8"
-            )
-        )
-    for table in (interfaces, boundaries, state_applicability, states):
-        if table is not None:
-            canonical_parts.append(table.canonical_bytes)
-    if first_wave_table is not None:
-        canonical_parts.append(first_wave_table.canonical_bytes)
-    elif first_wave_sentinel is not None:
-        canonical_parts.append(first_wave_sentinel)
-    if spike_table is not None and expected_spike_id is not None:
-        canonical_parts.append(spike_table.canonical_bytes)
-    elif spike_sentinel is not None:
-        canonical_parts.append(spike_sentinel)
-    canonical_bytes = b"".join(canonical_parts)
-    canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
-    if not required and any(
-        unresolved(cell)
-        for table in (interfaces, boundaries, state_applicability, states)
-        if table is not None
-        for row in table.rows
-        for cell in row
-    ):
-        return ProjectDesignContract(status="UNINITIALIZED"), []
-    return (
-        ProjectDesignContract(
-            schema_version=(
-                5 if grandfather_schema_5 else 6 if grandfather_schema_6 else 7
-            ),
-            status=(
-                "GRANDFATHERED"
-                if (grandfather_schema_5 or grandfather_schema_6) and not issues
-                else "READY"
-                if not issues
-                else "BLOCKED"
-            ),
-            application_source_disposition=source_disposition,
-            interface_ids=tuple(interface_ids),
-            boundary_ids=tuple(boundary_ids),
-            state_ids=tuple(state_ids),
-            first_wave=first_wave,
-            spike=spike,
-            missing_records=tuple(dict.fromkeys(missing_records)),
-            canonical_sha256=canonical_sha256,
-            grandfathered_v5=grandfather_schema_5,
-            grandfathered_v6=grandfather_schema_6,
-            canonical_bytes=canonical_bytes,
-        ),
-        issues,
-    )
-
-
-def required_diagram_kinds(
-    text: str,
-    requirement_ids: Iterable[str],
-    work_kind: str | None,
-) -> set[str]:
-    """Return diagram kinds required by the current canonical project records."""
-
-    required = set(DIAGRAM_REQUIRED_KINDS)
-    identifiers = set(requirement_ids)
-    if any(identifier.startswith("DATA-") for identifier in identifiers):
-        required.add("DATA_LIFECYCLE")
-    if any(identifier.startswith("REL-") for identifier in identifiers):
-        required.add("FAILURE_RECOVERY")
-    try:
-        document = table_after_heading(text, "## Document status")
-    except ValueError:
-        document = {}
-    if (
-        work_kind == "MIGRATION"
-        or clean_cell(document.get("Project mode", "")).lower() == "brownfield"
-    ):
-        required.add("MIGRATION")
-    return required
-
-
-def _diagram_heading_for_anchor(text: str, anchor: str) -> str:
-    """Resolve one stable Markdown anchor through the shared fenced-code rules."""
-
-    structural = without_fenced_code(text)
-    matches: list[str] = []
-    for match in re.finditer(
-        r"^(#{1,6})[ \t]+(.+?)[ \t]*\r?$", structural, re.MULTILINE
-    ):
-        title = re.sub(r"^\d+(?:\.\d+)*\.?[ \t]+", "", match.group(2)).strip()
-        candidate = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-        if candidate == anchor:
-            matches.append(match.group(0).rstrip("\r"))
-    if len(matches) != 1:
-        raise ValueError(
-            f"diagram anchor {anchor!r} must resolve to exactly one heading; found {len(matches)}"
-        )
-    return matches[0]
-
-
-def _canonical_mermaid_block(text: str, anchor: str) -> tuple[bytes, str]:
-    heading = _diagram_heading_for_anchor(text, anchor)
-    offsets = _heading_section_offsets(text, heading)
-    if offsets is None:
-        raise ValueError(f"diagram anchor {anchor!r} has no source section")
-    _, body_start, end = offsets
-    section = text[body_start:end]
-    matches = list(
-        re.finditer(r"(?ms)^```mermaid[ \t]*\r?\n.*?^```[ \t]*\r?$", section)
-    )
-    if len(matches) != 1:
-        raise ValueError(
-            f"diagram anchor {anchor!r} requires exactly one Mermaid block; found {len(matches)}"
-        )
-    block = matches[0].group(0).replace("\r\n", "\n").replace("\r", "\n")
-    canonical = block.rstrip("\n") + "\n"
-    return canonical.encode("utf-8"), canonical
-
-
-def derive_diagram_contract(
-    text: str,
-    architecture: ArchitectureContract,
-    requirements: RequirementsContract,
-    coverage: CoverageContract,
-    *,
-    required: bool,
-    grandfathered_schema5: bool,
-) -> tuple[DiagramContract, list[str]]:
-    """Validate project-specific Mermaid views without making them authority."""
-
-    if grandfathered_schema5:
-        return (
-            DiagramContract(status="CURRENT", grandfathered_schema5=True),
-            [],
-        )
-    issues: list[str] = []
-    try:
-        table = contract_table_after_heading(
-            text, DIAGRAM_CONTRACT_HEADING, DIAGRAM_CONTRACT_HEADERS
-        )
-    except ValueError as exc:
-        table = None
-        issues.append(str(exc))
-    if table is None:
-        if not required:
-            return DiagramContract(status="TEMPLATE"), []
-        return DiagramContract(status="INVALID"), [
-            f"Missing {DIAGRAM_CONTRACT_HEADING}"
-        ]
-    if not required and (
-        any(unresolved(cell) for row in table.rows for cell in row)
-        or all(row[3] in {"NOT_YET_CREATED", "NOT_APPLICABLE"} for row in table.rows)
-    ):
-        return DiagramContract(status="TEMPLATE"), []
-
-    architecture_id = (
-        architecture.selection.architecture_id
-        if architecture.selection is not None
-        else None
-    )
-    expected_required = required_diagram_kinds(
-        text,
-        requirements.requirement_ids,
-        coverage.work_kind,
-    )
-
-    records: list[DiagramRecord] = []
-    seen_ids: set[str] = set()
-    seen_kinds: set[str] = set()
-    semantic_rows: list[tuple[str, str]] = []
-    stale = False
-    incomplete = False
-    for raw in table.rows:
-        (
-            diagram_id,
-            kind,
-            applicability,
-            status,
-            anchor,
-            basis_value,
-            referenced_value,
-        ) = raw
-        if DIAGRAM_ID.fullmatch(diagram_id) is None or diagram_id in seen_ids:
-            issues.append(f"Invalid or duplicate diagram ID {diagram_id!r}")
-        seen_ids.add(diagram_id)
-        if kind not in DIAGRAM_KINDS or kind in seen_kinds:
-            issues.append(f"Invalid or duplicate diagram kind {kind!r}")
-        seen_kinds.add(kind)
-        if applicability not in DIAGRAM_APPLICABILITY:
-            issues.append(f"{diagram_id}: invalid applicability {applicability!r}")
-        if status not in DIAGRAM_STATUSES:
-            issues.append(f"{diagram_id}: invalid status {status!r}")
-        if re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", anchor) is None:
-            issues.append(f"{diagram_id}: invalid stable anchor {anchor!r}")
-        try:
-            basis_ids = parse_exact_id_list(
-                basis_value, STABLE_CONTRACT_ID, f"{diagram_id} Basis IDs"
-            )
-        except ValueError as exc:
-            issues.append(str(exc))
-            basis_ids = []
-        try:
-            referenced_ids = parse_exact_id_list(
-                referenced_value, STABLE_CONTRACT_ID, f"{diagram_id} Referenced IDs"
-            )
-        except ValueError as exc:
-            issues.append(str(exc))
-            referenced_ids = []
-        must_be_current = kind in expected_required or status == "CURRENT"
-        if kind in expected_required and applicability == "NOT_APPLICABLE":
-            issues.append(
-                f"{diagram_id}: {kind} is required by current canonical records"
-            )
-        if kind in expected_required and status != "CURRENT":
-            incomplete = True
-            issues.append(f"{diagram_id}: required {kind} diagram is not CURRENT")
-        if status == "STALE":
-            stale = True
-            issues.append(f"{diagram_id}: rendered project diagram is STALE")
-
-        relationships: tuple[tuple[str, str, str], ...] = ()
-        semantic_sha256: str | None = None
-        rendered_sha256: str | None = None
-        if must_be_current and status == "CURRENT":
-            if architecture_id is None or architecture_id not in basis_ids:
-                issues.append(
-                    f"{diagram_id}: CURRENT diagram must cite the selected ARCH-* basis"
-                )
-            if not referenced_ids:
-                issues.append(f"{diagram_id}: CURRENT diagram requires referenced IDs")
-            try:
-                rendered_bytes, rendered_text = _canonical_mermaid_block(text, anchor)
-                rendered_sha256 = "sha256:" + hashlib.sha256(rendered_bytes).hexdigest()
-                body = rendered_text.split("\n", 1)[1].rsplit("\n```", 1)[0]
-                if re.search(r"\b(?:TODO|PLACEHOLDER|GENERIC)\b", body, re.IGNORECASE):
-                    issues.append(
-                        f"{diagram_id}: Mermaid block contains generic placeholder content"
-                    )
-                parsed_relationships = sorted(
-                    {
-                        (
-                            match.group("from"),
-                            clean_cell(match.group("relation")),
-                            match.group("to"),
-                        )
-                        for line in body.splitlines()
-                        if (match := DIAGRAM_RELATIONSHIP.fullmatch(line)) is not None
-                    }
-                )
-                relationships = tuple(parsed_relationships)
-                if not relationships:
-                    issues.append(
-                        f"{diagram_id}: Mermaid block has no canonical relationships"
-                    )
-                endpoint_ids = {
-                    identifier
-                    for source, _relation, target in relationships
-                    for identifier in (source, target)
-                }
-                if endpoint_ids != set(referenced_ids):
-                    issues.append(
-                        f"{diagram_id}: Referenced IDs must exactly match Mermaid relationship endpoints"
-                    )
-                for identifier in referenced_ids:
-                    if (
-                        re.search(
-                            rf"(?<![A-Z0-9-]){re.escape(identifier)}(?![A-Z0-9-])",
-                            body,
-                        )
-                        is None
-                    ):
-                        issues.append(
-                            f"{diagram_id}: referenced ID {identifier} is absent from Mermaid"
-                        )
-                semantic_payload = {
-                    "kind": kind,
-                    "basis_ids": sorted(basis_ids),
-                    "referenced_ids": sorted(referenced_ids),
-                    "relationships": [
-                        {"from_id": source, "relation": relation, "to_id": target}
-                        for source, relation, target in relationships
-                    ],
-                }
-                semantic_bytes = (
-                    json.dumps(
-                        semantic_payload,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    + b"\n"
-                )
-                semantic_sha256 = "sha256:" + hashlib.sha256(semantic_bytes).hexdigest()
-                semantic_rows.append((diagram_id, semantic_sha256))
-            except ValueError as exc:
-                issues.append(f"{diagram_id}: {exc}")
-        records.append(
-            DiagramRecord(
-                diagram_id=diagram_id,
-                kind=kind,
-                applicability=applicability,
-                status=status,
-                anchor=anchor,
-                basis_ids=tuple(basis_ids),
-                referenced_ids=tuple(referenced_ids),
-                relationships=relationships,
-                semantic_sha256=semantic_sha256,
-                rendered_sha256=rendered_sha256,
-            )
-        )
-
-    missing_kinds = sorted(expected_required - seen_kinds)
-    if missing_kinds:
-        incomplete = True
-        issues.append("Missing required diagram kinds: " + ", ".join(missing_kinds))
-    canonical_bytes: bytes | None = None
-    canonical_sha256: str | None = None
-    if not issues or all(
-        issue.endswith("rendered project diagram is STALE") for issue in issues
-    ):
-        canonical_bytes = (
-            json.dumps(
-                semantic_rows,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ).encode("utf-8")
-            + b"\n"
-        )
-        canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
-    status_value = (
-        "STALE"
-        if stale
-        else "INVALID"
-        if issues and not incomplete
-        else "INCOMPLETE"
-        if issues
-        else "CURRENT"
-    )
-    return (
-        DiagramContract(
-            status=status_value,
-            architecture_basis_id=architecture_id,
-            records=tuple(records),
-            canonical_sha256=canonical_sha256,
-            canonical_bytes=canonical_bytes,
-        ),
-        issues,
-    )
-
-
-def derive_design_contract(
-    text: str,
-    design_revision: str | None,
-    *,
-    required: bool = False,
-    grandfather_approved_v1: bool = False,
-    coverage_contract: CoverageContract | None = None,
-    requirements_contract: RequirementsContract | None = None,
-) -> tuple[DesignContract, list[str]]:
-    issues: list[str] = []
-    if coverage_contract is None:
-        try:
-            document = table_after_heading(text, "## Document status")
-        except ValueError:
-            document = {}
-        repository_mode = clean_cell(document.get("Project mode", "")).lower()
-        coverage_intake_contract, _coverage_intake_issues = (
-            derive_intake_foundation_contract(
-                text,
-                repository_mode if repository_mode in PROJECT_MODES else None,
-                grandfather_current_gate_a=grandfather_approved_v1,
-            )
-        )
-        coverage_contract, coverage_issues = derive_coverage_contract(
-            text,
-            clean_cell(document.get("Current requirements revision", "")) or None,
-            clean_cell(document.get("Delivery profile", "")) or None,
-            clean_cell(document.get("Effective risk", "")) or None,
-            clean_cell(document.get("AWS lane", "")) or None,
-            required=required,
-            grandfather_current_gate_a=grandfather_approved_v1,
-            owner_work_context=coverage_intake_contract.owner_work_context,
-        )
-        if required:
-            issues.extend(coverage_issues)
-    if requirements_contract is None:
-        try:
-            requirements_document = table_after_heading(text, "## Document status")
-        except ValueError:
-            requirements_document = {}
-        repository_mode = clean_cell(
-            requirements_document.get("Project mode", "")
-        ).lower()
-        intake_contract, _intake_issues = derive_intake_foundation_contract(
-            text,
-            repository_mode if repository_mode in PROJECT_MODES else None,
-            grandfather_current_gate_a=grandfather_approved_v1,
-        )
-        requirements_contract, requirement_issues = derive_requirements_contract(
-            text,
-            clean_cell(requirements_document.get("Effective risk", "")) or None,
-            intake_contract,
-            required=required,
-            grandfather_current_gate_a=grandfather_approved_v1,
-        )
-        if required:
-            issues.extend(issue for _code, issue in requirement_issues)
-    try:
-        technology_table = contract_table_after_heading(
-            text, TECHNOLOGY_DECISION_HEADING, TECHNOLOGY_DECISION_HEADERS
-        )
-    except ValueError as exc:
-        technology_table = None
-        issues.append(f"Technology decision register: {exc}")
-    try:
-        execution_table = contract_table_after_heading(
-            text, PROPERTY_EXECUTION_HEADING, PROPERTY_EXECUTION_HEADERS
-        )
-    except ValueError as exc:
-        execution_table = None
-        issues.append(f"Property execution contract: {exc}")
-    example_table, example_ids, example_issues = derive_example_scenario_contract(text)
-
-    both_missing = technology_table is None and execution_table is None and not issues
-    if technology_table is None:
-        issues.append(f"Missing {TECHNOLOGY_DECISION_HEADING}")
-    if execution_table is None:
-        issues.append(f"Missing {PROPERTY_EXECUTION_HEADING}")
-
-    technologies: list[TechnologyDecision] = []
-    seen_technology_ids: set[str] = set()
-    concern_counts: dict[str, int] = {}
-    allowed_basis_ids = current_prd_basis_ids(text, design_revision) | set(
-        requirements_contract.actor_ids
-        + requirements_contract.journey_ids
-        + requirements_contract.acceptance_ids
-    )
-    if technology_table is not None:
-        if not technology_table.rows:
-            issues.append("Technology decision register has no stored rows")
-        for row in technology_table.rows:
-            decision = TechnologyDecision(*row)
-            technologies.append(decision)
-            if TECHNOLOGY_DECISION_ID.fullmatch(decision.decision_id) is None:
-                issues.append(
-                    f"Invalid technology decision ID {decision.decision_id!r}"
-                )
-            elif decision.decision_id in seen_technology_ids:
-                issues.append(
-                    f"Duplicate technology decision ID {decision.decision_id}"
-                )
-            seen_technology_ids.add(decision.decision_id)
-            if TECHNOLOGY_CONCERN.fullmatch(decision.concern) is None:
-                issues.append(
-                    f"{decision.decision_id}: invalid technology concern {decision.concern!r}"
-                )
-            concern_counts[decision.concern] = (
-                concern_counts.get(decision.concern, 0) + 1
-            )
-            if any(technology_contract_value_is_unresolved(cell) for cell in row):
-                issues.append(
-                    f"{decision.decision_id}: unresolved technology decision cell"
-                )
-            elif not grandfather_approved_v1:
-                try:
-                    technology_reasoning_parts(decision.alternatives_and_rationale)
-                except ValueError as exc:
-                    issues.append(f"{decision.decision_id}: {exc}")
-            if not unresolved(decision.selection) and not valid_technology_selection(
-                decision.selection
-            ):
-                issues.append(
-                    f"{decision.decision_id}: invalid selection {decision.selection!r}; "
-                    "use NOT_APPLICABLE — <reason> when the concern does not apply"
-                )
-            if not unresolved(
-                decision.version_policy
-            ) and not valid_technology_version_policy(decision.version_policy):
-                issues.append(
-                    f"{decision.decision_id}: invalid version policy {decision.version_policy!r}"
-                )
-            if (
-                not unresolved(decision.selection)
-                and not unresolved(decision.version_policy)
-                and technology_value_is_not_applicable(decision.selection)
-                != technology_value_is_not_applicable(decision.version_policy)
-            ):
-                issues.append(
-                    f"{decision.decision_id}: Selection and Version policy must both "
-                    "use NOT_APPLICABLE — <reason>, or both be applicable"
-                )
-            if (
-                not unresolved(decision.source)
-                and decision.source not in TECHNOLOGY_SOURCES
-            ):
-                issues.append(
-                    f"{decision.decision_id}: invalid source {decision.source!r}"
-                )
-            if not unresolved(decision.basis_ids):
-                if not valid_technology_basis_ids(decision.basis_ids):
-                    issues.append(
-                        f"{decision.decision_id}: Basis IDs must be exact comma-separated "
-                        "stable IDs without prose or duplicates"
-                    )
-                else:
-                    basis_ids = decision.basis_ids.split(", ")
-                    unknown_basis_ids = [
-                        identifier
-                        for identifier in basis_ids
-                        if identifier not in allowed_basis_ids
-                    ]
-                    if unknown_basis_ids:
-                        issues.append(
-                            f"{decision.decision_id}: Basis IDs are not current PRD IDs: "
-                            + ", ".join(unknown_basis_ids)
-                        )
-                    if design_revision is not None and design_revision not in basis_ids:
-                        issues.append(
-                            f"{decision.decision_id}: Basis IDs must include current "
-                            f"design revision {design_revision}"
-                        )
-        required_concerns = (
-            LEGACY_REQUIRED_TECHNOLOGY_CONCERNS
-            if grandfather_approved_v1
-            else REQUIRED_TECHNOLOGY_CONCERNS
-        )
-        for concern in required_concerns:
-            count = concern_counts.get(concern, 0)
-            if count != 1:
-                issues.append(
-                    f"Technology concern {concern} must appear exactly once; found {count}"
-                )
-
-    executions: list[PropertyExecution] = []
-    seen_execution_ids: set[str] = set()
-    if execution_table is not None:
-        for row in execution_table.rows:
-            execution = PropertyExecution(*row)
-            executions.append(execution)
-            if PROPERTY_ID.fullmatch(execution.property_id) is None:
-                issues.append(
-                    f"Invalid property execution ID {execution.property_id!r}"
-                )
-            elif execution.property_id in seen_execution_ids:
-                issues.append(
-                    f"Duplicate property execution ID {execution.property_id}"
-                )
-            seen_execution_ids.add(execution.property_id)
-            if TECHNOLOGY_DECISION_ID.fullmatch(execution.framework_tech_id) is None:
-                issues.append(
-                    f"{execution.property_id}: invalid Framework TECH ID {execution.framework_tech_id!r}"
-                )
-            if any(unresolved(cell) for cell in row):
-                issues.append(
-                    f"{execution.property_id}: unresolved property execution cell"
-                )
-            if not valid_property_execution_command(execution.exact_command):
-                issues.append(
-                    f"{execution.property_id}: Exact command must be one explicit "
-                    "local command, not prose or placeholder content"
-                )
-            if not unresolved(execution.run_target_time_bound):
-                try:
-                    parse_property_run_target(execution.run_target_time_bound)
-                except ValueError as exc:
-                    issues.append(f"{execution.property_id}: {exc}")
-            if not unresolved(
-                execution.seed_or_reproduction_format
-            ) and not valid_replay_format_contract(
-                execution.seed_or_reproduction_format
-            ):
-                issues.append(
-                    f"{execution.property_id}: Seed or reproduction format must "
-                    "declare a seed or exact-command replay mode"
-                )
-            if execution.evidence_destination != PROPERTY_TEST_EVIDENCE_DESTINATION:
-                issues.append(
-                    f"{execution.property_id}: Evidence destination must be exactly "
-                    f"{PROPERTY_TEST_EVIDENCE_DESTINATION}"
-                )
-
-    technology_by_id = {decision.decision_id: decision for decision in technologies}
-    if required and not grandfather_approved_v1:
-        issues.extend(design_support_record_issues(text, technology_by_id))
-    for execution in executions:
-        property_technology = technology_by_id.get(execution.framework_tech_id)
-        if (
-            property_technology is None
-            or property_technology.concern != "PROPERTY_TESTING"
-        ):
-            issues.append(
-                f"{execution.property_id}: Framework TECH ID must reference the PROPERTY_TESTING decision"
-            )
-            continue
-        if technology_value_is_not_applicable(
-            property_technology.selection
-        ) or technology_value_is_not_applicable(property_technology.version_policy):
-            issues.append(
-                f"{property_technology.decision_id}: active property execution cannot "
-                "use a NOT_APPLICABLE PROPERTY_TESTING selection or version policy"
-            )
-        elif not machine_comparable_property_version_policy(
-            property_technology.version_policy
-        ):
-            issues.append(
-                f"{property_technology.decision_id}: active property execution "
-                "requires an EXACT, COMPATIBLE_MAJOR, or numeric MINIMUM version policy"
-            )
-
-    try:
-        applicability_table = contract_table_in_section(
-            text, PROPERTY_SPECIFICATION_HEADING, PROPERTY_APPLICABILITY_HEADERS
-        )
-        definition_table = contract_table_in_section(
-            text, PROPERTY_SPECIFICATION_HEADING, PROPERTY_DEFINITION_HEADERS
-        )
-    except ValueError as exc:
-        applicability_table = definition_table = None
-        issues.append(f"Property-based testing specification: {exc}")
-    if applicability_table is None:
-        issues.append("Missing exact property applicability table")
-    if definition_table is None:
-        issues.append("Missing exact property definition table")
-
-    applicable_property_ids: set[str] = set()
-    applicable_requirements_by_property: dict[str, set[str]] = {}
-    classified_requirement_ids: set[str] = set()
-    if applicability_table is not None:
-        seen_requirements: set[str] = set()
-        for requirement_id, applicability, reason_or_ids in applicability_table.rows:
-            if (
-                unresolved(requirement_id)
-                or unresolved(applicability)
-                or unresolved(reason_or_ids)
-            ):
-                issues.append("Property applicability row contains unresolved cells")
-                continue
-            if requirement_id in seen_requirements:
-                issues.append(
-                    f"Duplicate property applicability requirement {requirement_id}"
-                )
-            seen_requirements.add(requirement_id)
-            if STABLE_CONTRACT_ID.fullmatch(requirement_id) is None:
-                issues.append(
-                    f"Invalid property applicability requirement ID {requirement_id!r}"
-                )
-                continue
-            classified_requirement_ids.add(requirement_id)
-            if applicability == "APPLICABLE":
-                try:
-                    property_ids = _exact_property_ids(reason_or_ids)
-                    applicable_property_ids.update(property_ids)
-                    for property_id in property_ids:
-                        applicable_requirements_by_property.setdefault(
-                            property_id, set()
-                        ).add(requirement_id)
-                except ValueError as exc:
-                    issues.append(f"{requirement_id}: {exc}")
-            elif applicability == "NOT_APPLICABLE":
-                if (
-                    not explicit_value(reason_or_ids, allow_none=False)
-                    or EVIDENCE_PLACEHOLDER_PATTERN.search(reason_or_ids) is not None
-                ):
-                    issues.append(
-                        f"{requirement_id}: NOT_APPLICABLE requires a concrete reason"
-                    )
-            else:
-                issues.append(
-                    f"{requirement_id}: applicability must be APPLICABLE or NOT_APPLICABLE"
-                )
-        required_classifications = authoritative_requirement_ids(text)
-        missing_classifications = sorted(
-            required_classifications - classified_requirement_ids
-        )
-        unknown_classifications = sorted(
-            classified_requirement_ids - required_classifications
-        )
-        if missing_classifications:
-            issues.append(
-                "Property applicability is missing current requirement IDs: "
-                + ", ".join(missing_classifications)
-            )
-        if unknown_classifications:
-            issues.append(
-                "Property applicability references non-requirement IDs: "
-                + ", ".join(unknown_classifications)
-            )
-
-    definitions: dict[str, tuple[str, ...]] = {}
-    if definition_table is not None:
-        for row in definition_table.rows:
-            property_id = row[0]
-            if PROPERTY_ID.fullmatch(property_id) is None:
-                issues.append(f"Invalid property definition ID {property_id!r}")
-                continue
-            if property_id in definitions:
-                issues.append(f"Duplicate property definition ID {property_id}")
-            definitions[property_id] = row
-            for header, value in zip(PROPERTY_DEFINITION_HEADERS[2:], row[2:]):
-                if (
-                    not explicit_value(value, allow_none=False)
-                    or EVIDENCE_PLACEHOLDER_PATTERN.search(value) is not None
-                ):
-                    issues.append(
-                        f"{property_id}: {header} must be concrete semantic content, "
-                        "not a placeholder or sentinel"
-                    )
-    extra_definition_ids = sorted(set(definitions) - applicable_property_ids)
-    if extra_definition_ids:
-        issues.append(
-            "Property definitions are not referenced as APPLICABLE: "
-            + ", ".join(extra_definition_ids)
-        )
-    for property_id in sorted(applicable_property_ids):
-        definition = definitions.get(property_id)
-        if definition is None:
-            issues.append(f"{property_id}: applicable property has no definition")
-        elif any(unresolved(cell) for cell in definition):
-            issues.append(
-                f"{property_id}: applicable property definition is unresolved"
-            )
-        else:
-            expected_requirement_ids = sorted(
-                applicable_requirements_by_property.get(property_id, set())
-            )
-            expected_requirement_value = ", ".join(expected_requirement_ids)
-            if definition[1] != expected_requirement_value:
-                issues.append(
-                    f"{property_id}: Requirement IDs must exactly match the "
-                    "applicability table's current inverse mapping: "
-                    f"{expected_requirement_value}"
-                )
-
-    execution_ids = {execution.property_id for execution in executions}
-    for property_id in sorted(applicable_property_ids - execution_ids):
-        issues.append(f"{property_id}: applicable property has no execution row")
-    for property_id in sorted(execution_ids - applicable_property_ids):
-        issues.append(f"{property_id}: execution row is not referenced as APPLICABLE")
-
-    declared_property_ids = applicable_property_ids & set(definitions) & execution_ids
-    declared_property_test_ids = declared_property_ids | example_ids
-
-    architecture, architecture_issues = _derive_architecture_contract(
-        text,
-        design_revision,
-        set(technology_by_id),
-        required=required,
-        grandfather_approved_v1=grandfather_approved_v1,
-        architecture_disposition=coverage_contract.architecture_disposition,
-    )
-    issues.extend(architecture_issues)
-    harness, harness_issues = derive_harness_contract(
-        text,
-        allowed_basis_ids | set(technology_by_id),
-        required=required,
-        grandfather_approved_v1=(
-            grandfather_approved_v1 or architecture.grandfathered_v1
-        ),
-    )
-    issues.extend(harness_issues)
-    change_impact, change_impact_issues = derive_change_impact_contract(
-        text,
-        coverage_contract,
-        allowed_basis_ids | set(technology_by_id),
-        required=required and not grandfather_approved_v1,
-    )
-    if required:
-        issues.extend(change_impact_issues)
-    project_contract, project_contract_issues = derive_project_design_contract(
-        text,
-        requirements_contract,
-        coverage_contract,
-        allowed_basis_ids | set(technology_by_id),
-        harness,
-        (
-            set(technology_by_id)
-            | {execution.property_id for execution in executions}
-            | {row.harness_id for row in harness.rows}
-            | (
-                {architecture.selection.architecture_id}
-                if architecture.selection is not None
-                else set()
-            )
-        ),
-        required=required,
-        grandfather_approved_v4=grandfather_approved_v1,
-    )
-    if required:
-        issues.extend(project_contract_issues)
-    diagram_contract, diagram_issues = derive_diagram_contract(
-        text,
-        architecture,
-        requirements_contract,
-        coverage_contract,
-        required=required,
-        grandfathered_schema5=(
-            project_contract.grandfathered_v4 or project_contract.grandfathered_v5
-        ),
-    )
-    if required:
-        issues.extend(diagram_issues)
-
-    if not project_contract.grandfathered_v4:
-        issues.extend(example_issues)
-        trace_issues = architecture_trace_declaration_issues(
-            architecture,
-            project_contract,
-            declared_property_test_ids,
-        )
-        issues.extend(trace_issues)
-        if trace_issues:
-            architecture = replace(architecture, status="BLOCKED")
-
-    canonical_sha256: str | None = None
-    if (
-        technology_table is not None
-        and applicability_table is not None
-        and definition_table is not None
-        and execution_table is not None
-        and (harness.canonical_bytes is not None or harness.grandfathered_v1)
-        and (change_impact.canonical_bytes is not None or grandfather_approved_v1)
-        and (
-            project_contract.canonical_bytes is not None
-            or project_contract.grandfathered_v4
-        )
-        and (example_table is not None or project_contract.grandfathered_v4)
-        and (
-            diagram_contract.canonical_bytes is not None
-            or project_contract.grandfathered_v4
-            or project_contract.grandfathered_v5
-        )
-    ):
-        architecture_bytes = architecture.canonical_bytes or b""
-        harness_bytes = harness.canonical_bytes or b""
-        change_impact_bytes = change_impact.canonical_bytes or b""
-        project_contract_bytes = project_contract.canonical_bytes or b""
-        diagram_contract_bytes = diagram_contract.canonical_bytes or b""
-        canonical_sha256 = (
-            "sha256:"
-            + hashlib.sha256(
-                architecture_bytes
-                + harness_bytes
-                + change_impact_bytes
-                + project_contract_bytes
-                + diagram_contract_bytes
-                + technology_table.canonical_bytes
-                + (example_table.canonical_bytes if example_table is not None else b"")
-                + applicability_table.canonical_bytes
-                + definition_table.canonical_bytes
-                + execution_table.canonical_bytes
-            ).hexdigest()
-        )
-    status = (
-        "UNINITIALIZED"
-        if both_missing and not required
-        else "READY"
-        if not issues
-        else "BLOCKED"
-    )
-    return (
-        DesignContract(
-            schema_version=(
-                max(4, architecture.schema_version)
-                if project_contract.grandfathered_v4
-                else 5
-                if project_contract.grandfathered_v5
-                else 6
-                if project_contract.grandfathered_v6
-                else 7
-            ),
-            status=status,
-            design_revision=design_revision,
-            technology_decisions=tuple(technologies),
-            property_execution=tuple(executions),
-            architecture=architecture,
-            harness=harness,
-            canonical_sha256=canonical_sha256,
-            change_impact=change_impact,
-            diagram_contract=diagram_contract,
-            project_contract=project_contract,
-        ),
-        issues,
-    )
-
-
-def canonical_envelope_sha256(prd_text: str) -> str:
-    heading = "## 28. Construction envelope"
-    structural = without_fenced_code(prd_text)
-    matches = list(
-        re.finditer(rf"^{re.escape(heading)}[ \t]*$", structural, re.MULTILINE)
-    )
-    if len(matches) != 1:
-        raise ValueError(f"Expected exactly one heading {heading!r}")
-    lines = prd_text[matches[0].end() :].splitlines()
-    structural_lines = structural[matches[0].end() :].splitlines()
-    start = next(
-        (index for index, line in enumerate(structural_lines) if line.startswith("|")),
-        None,
-    )
-    if start is None:
-        raise ValueError("Construction envelope Markdown table is missing")
-    table_lines: list[str] = []
-    for line, structural_line in zip(lines[start:], structural_lines[start:]):
-        if not structural_line.startswith("|"):
-            break
-        table_lines.append(line.rstrip())
-    if len(table_lines) < 3:
-        raise ValueError("Construction envelope Markdown table is malformed")
-    payload = ("\n".join(table_lines) + "\n").encode("utf-8")
-    return "sha256:" + hashlib.sha256(payload).hexdigest()
-
-
-def parse_authorized_ids(value: str) -> list[str]:
-    cleaned = clean_cell(value)
-    match = re.fullmatch(
-        r"REQ: (?P<req>REQ-\d{4,}); DES: (?P<des>DES-\d{4,}); SCOPE_IDS: (?P<scope>.+)",
-        cleaned,
-    )
-    if match is None:
-        raise ValueError(
-            "Authorized requirement and design IDs must use "
-            "REQ: REQ-0001; DES: DES-0001; SCOPE_IDS: FR-001, SEC-001"
-        )
-    scope = parse_exact_id_list(
-        match.group("scope"), AUTHORIZED_ID, "Authorized SCOPE_IDS"
-    )
-    if not scope:
-        raise ValueError("Authorized SCOPE_IDS cannot be NONE")
-    ids = [match.group("req"), match.group("des"), *scope]
-    if len(ids) != len(set(ids)):
-        raise ValueError("Authorized requirement and design IDs contain duplicates")
-    return ids
-
-
-def parse_envelope_paths(value: str, label: str, *, allow_none: bool) -> list[str]:
-    cleaned = clean_cell(value)
-    if allow_none and cleaned == "NONE":
-        return []
-    prefix = "PATHS: "
-    if not cleaned.startswith(prefix):
-        raise ValueError(
-            f"{label} must use PATHS: path; path" + (" or NONE" if allow_none else "")
-        )
-    items = [item.strip() for item in cleaned[len(prefix) :].split(";")]
-    return parse_task_write_set(",".join(items), label)
-
-
-def validate_application_source_root(
-    paths: list[str], project_mode: str | None
-) -> None:
-    """Compatibility validator for the legacy inferred greenfield source root."""
-
-    if project_mode != "greenfield":
-        return
-    top_level = {path.split("/", 1)[0].casefold() for path in paths}
-    if top_level & {"apps", "src"}:
-        raise ValueError(
-            "Greenfield application source must use singular app/**; "
-            "apps/** and src/** are not allowed"
-        )
-    if "app" not in top_level:
-        raise ValueError(
-            "Greenfield Allowed repository write set must include application source under app/**"
-        )
-
-
-def validate_application_source_write_set(
-    disposition: ApplicationSourceDisposition,
-    paths: list[str],
-) -> None:
-    """Bind the Gate B source decision to the construction write set."""
-
-    top_level = {path.split("/", 1)[0].casefold() for path in paths}
-    if disposition.kind == APPLICATION_SOURCE_NOT_APPLICABLE:
-        if top_level & {"app", "apps", "src"}:
-            raise ValueError(
-                "APPLICATION_SOURCE_PARALLEL_ROOT: infrastructure-only work "
-                "cannot authorize app/**, apps/**, or src/**"
-            )
-        return
-    if disposition.kind == APPLICATION_SOURCE_GREENFIELD:
-        if top_level & {"apps", "src"}:
-            raise ValueError(
-                "APPLICATION_SOURCE_PARALLEL_ROOT: greenfield work cannot "
-                "authorize apps/** or src/** alongside app/**"
-            )
-        if not any(
-            path_boundary_contains("app/**", path)
-            or path_boundary_contains(path, "app/**")
-            for path in paths
-        ):
-            raise ValueError(
-                "APPLICATION_SOURCE_DISPOSITION_INVALID: greenfield Allowed "
-                "repository write set must include application source under app/**"
-            )
-        return
-    missing = [
-        source
-        for source in disposition.paths
-        if not any(path_boundaries_overlap(source, path) for path in paths)
-    ]
-    if missing:
-        raise ValueError(
-            "APPLICATION_SOURCE_DISPOSITION_INVALID: Allowed repository write "
-            "set does not cover approved brownfield source roots: " + ", ".join(missing)
-        )
-    for path in paths:
-        if path.split("/", 1)[0].casefold() not in {"app", "apps", "src"}:
-            continue
-        if not any(
-            path_boundaries_overlap(source, path) for source in disposition.paths
-        ):
-            raise ValueError(
-                "APPLICATION_SOURCE_PARALLEL_ROOT: brownfield write set adds "
-                "an unapproved parallel application root: " + path
-            )
-
-
-def parse_envelope_targets(value: str) -> list[str]:
-    cleaned = clean_cell(value)
-    if cleaned == "NONE":
-        return []
-    prefix = "TARGETS: "
-    if not cleaned.startswith(prefix):
-        raise ValueError(
-            "Allowed external-state targets must use TARGETS: target; target or NONE"
-        )
-    items = [item.strip() for item in cleaned[len(prefix) :].split(";")]
-    return parse_task_external_state(",".join(items), "Gate B envelope")
-
-
-def parse_task_boundary(value: str) -> tuple[str, set[str]]:
-    cleaned = clean_cell(value)
-    if cleaned == TASK_BOUNDARY_DERIVED:
-        return "DERIVED", set()
-    prefix = "TASK_IDS: "
-    if not cleaned.startswith(prefix):
-        raise ValueError(
-            "Task boundary must be exactly DERIVED_FROM_AUTHORIZED_IDS_AND_WRITE_SET "
-            "or TASK_IDS: TASK-001, TASK-002"
-        )
-    values = [item.strip() for item in cleaned[len(prefix) :].split(",")]
-    if not values or any(TASK_ID.fullmatch(item) is None for item in values):
-        raise ValueError("TASK_IDS must contain only comma-separated TASK IDs")
-    if len(values) != len(set(values)):
-        raise ValueError("TASK_IDS contains duplicates")
-    return "EXPLICIT", set(values)
-
-
-def parse_command_prefixes(value: str) -> list[str]:
-    cleaned = clean_cell(value)
-    prefix = "ALLOW_PREFIXES: "
-    if not cleaned.startswith(prefix):
-        raise ValueError(
-            "Local command boundary must use ALLOW_PREFIXES: prefix; prefix"
-        )
-    values = [item.strip() for item in cleaned[len(prefix) :].split(";")]
-    if not values or any(not item for item in values):
-        raise ValueError("Local command boundary contains an empty prefix")
-    if any(
-        SHELL_CONTROL.search(item) or item.startswith(("-", "#")) for item in values
-    ):
-        raise ValueError("Local command prefixes cannot contain shell-control syntax")
-    if len(values) != len(set(values)):
-        raise ValueError("Local command boundary contains duplicate prefixes")
-    return values
-
-
-def validation_commands(section: str, task_id: str) -> list[str]:
-    fences = re.findall(
-        r"^```[^\r\n]*\r?\n(.*?)^```\s*$", section, re.MULTILINE | re.DOTALL
-    )
-    commands: list[str] = []
-    for body in fences:
-        for raw_line in body.splitlines():
-            command = raw_line.strip()
-            if not command or command.startswith("#"):
-                continue
-            if command.startswith("$ "):
-                command = command[2:].strip()
-            if SHELL_CONTROL.search(command):
-                raise ValueError(
-                    f"{task_id}: Validation command contains shell-control syntax"
-                )
-            commands.append(command)
-    if not commands:
-        raise ValueError(f"{task_id}: Validation requires at least one fenced command")
-    return commands
-
-
-def command_matches_prefix(command: str, prefix: str) -> bool:
-    return command == prefix or command.startswith(prefix + " ")
-
-
-def parse_github_constraints(value: str, boundary: str) -> str | None:
-    cleaned = clean_cell(value)
-    if boundary in {"NONE", "READ_ONLY"}:
-        if cleaned != "NONE":
-            raise ValueError(f"GitHub boundary {boundary} requires constraints NONE")
-        return None
-    match = GITHUB_CONSTRAINT.fullmatch(cleaned)
-    if match is None:
-        raise ValueError(
-            "GitHub write constraints must be exactly "
-            "REPO: owner/name; BRANCH: branch; MERGE: ALLOWED|PROHIBITED"
-        )
-    branch = match.group("branch")
-    if (
-        branch.startswith(("/", "-"))
-        or branch.endswith("/")
-        or "//" in branch
-        or ".." in branch
-        or "@{" in branch
-    ):
-        raise ValueError("GitHub branch constraint is unsafe")
-    merge = match.group("merge")
-    expected_merge = "ALLOWED" if boundary == "MERGE_WHEN_GREEN" else "PROHIBITED"
-    if merge != expected_merge:
-        raise ValueError(f"GitHub boundary {boundary} requires MERGE: {expected_merge}")
-    return match.group("repo")
-
-
-def parse_future_expiry(value: str) -> datetime:
-    cleaned = clean_cell(value)
-    match = re.fullmatch(
-        r"Expires at (?P<timestamp>[^\s;]+); earlier completion: (?P<condition>[^\r\n]+)",
-        cleaned,
-    )
-    if match is None:
-        raise ValueError(
-            "Authorization expiry must use Expires at <ISO8601>; earlier completion: <exact condition>"
-        )
-    if not explicit_value(match.group("condition"), allow_none=False):
-        raise ValueError("Authorization earlier-completion condition must be explicit")
-    candidate = match.group("timestamp")
-    normalized = candidate[:-1] + "+00:00" if candidate.endswith("Z") else candidate
-    try:
-        expires_at = datetime.fromisoformat(normalized)
-    except ValueError as exc:
-        raise ValueError("Authorization expiry timestamp is not ISO 8601") from exc
-    if expires_at.tzinfo is None or expires_at.utcoffset() is None:
-        raise ValueError("Authorization expiry timestamp must include a timezone")
-    if expires_at <= datetime.now(timezone.utc):
-        raise ValueError("Construction authorization is expired")
-    return expires_at
-
-
-def parse_aws_environment(value: str) -> tuple[str, str]:
-    cleaned = clean_cell(value)
-    match = AWS_ENVIRONMENT.fullmatch(cleaned)
-    if match is None or not explicit_value(match.group("name")):
-        raise ValueError(
-            "AWS environment must use "
-            "ENVIRONMENT: <exact>; CLASS: NON_PRODUCTION|PRODUCTION"
-        )
-    return match.group("name"), match.group("class")
-
-
-def validate_aws_artifact(value: str, baseline: str) -> None:
-    cleaned = clean_cell(value)
-    if AWS_EXACT_ARTIFACT.fullmatch(cleaned) is not None:
-        return
-    match = AWS_DERIVED_ARTIFACT.fullmatch(cleaned)
-    if match is None:
-        raise ValueError(
-            "AWS artifact authorization must use EXACT_DIGEST: sha256:<64 lowercase> "
-            "or DERIVED_FROM_AUTHORIZED_SOURCE: <deterministic rule>"
-        )
-    rule = match.group("rule")
-    if (
-        not explicit_value(rule)
-        or baseline not in rule
-        or "sha256" not in rule.casefold()
-    ):
-        raise ValueError(
-            "Derived AWS artifact authorization must bind the authorized baseline "
-            "commit and an exact SHA-256 derivation rule"
         )
 
 

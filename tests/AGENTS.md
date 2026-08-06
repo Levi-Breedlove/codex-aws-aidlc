@@ -43,3 +43,7 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
 - Domain extraction tests must prove the public doctor and Engine API resolve
   to the same pure implementation, and that domain modules cannot observe or
   mutate repositories, Git, GitHub, AWS, clocks, or external processes.
+- Design extraction must preserve every Gate B decision, diagram semantic and
+  rendered digest, source-disposition rule, Harness binding, AWS evidence
+  requirement, and exact receipt. Moving an unchanged diagram or evaluating an
+  ADR may not stale Gate B or grant authority.

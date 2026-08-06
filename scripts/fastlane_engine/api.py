@@ -1,8 +1,8 @@
 """Supported read-only entry points for the Fastlane Engine foundation.
 
 Inputs are repository-relative paths and caller-supplied observation policy.
-Outputs are immutable snapshots or Define projections. Snapshot capture may
-read bounded regular files; Define evaluators consume caller-supplied text and
+Outputs are immutable snapshots, Define projections, or Design projections.
+Snapshot capture may read bounded regular files; domain evaluators consume caller-supplied text and
 perform no I/O. The API never writes, runs Git, invokes AWS, approves a gate, or
 grants authority.
 """
@@ -21,6 +21,11 @@ from .define import (
     derive_intake_foundation_contract,
     derive_req_aws_materiality,
     derive_requirements_contract,
+)
+from .design import (
+    DesignContract,
+    derive_design_contract,
+    evaluate_adr_rationale,
 )
 
 
@@ -50,12 +55,15 @@ def capture_project_snapshot(
 
 __all__ = (
     "IntakeFoundationContract",
+    "DesignContract",
     "ProjectSnapshot",
     "RequirementsContract",
     "capture_project_snapshot",
     "derive_change_impact_contract",
     "derive_coverage_contract",
+    "derive_design_contract",
     "derive_intake_foundation_contract",
     "derive_req_aws_materiality",
     "derive_requirements_contract",
+    "evaluate_adr_rationale",
 )

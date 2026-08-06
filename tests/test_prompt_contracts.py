@@ -131,7 +131,11 @@ class PromptPackContractTests(unittest.TestCase):
         cls.maintain_fastlane = read(".agents/skills/maintain-fastlane/SKILL.md")
         cls.adr_template = read("docs/adr/0000-template.md")
         cls.infrastructure_readme = read("infrastructure/README.md")
-        cls.engine_source = read("scripts/bootstrap_doctor.py")
+        engine_paths = [
+            Path("scripts/bootstrap_doctor.py"),
+            *sorted(Path("scripts/fastlane_engine").rglob("*.py")),
+        ]
+        cls.engine_source = "\n".join(read(path.as_posix()) for path in engine_paths)
         cls.task_engine_source = read("scripts/task_waves.py")
         cls.manifest = json.loads(read("bootstrap.manifest.json"))
 
@@ -609,9 +613,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.13")
-        self.assertIn("**Pack version:** 1.2.13", self.prompts)
-        self.assertIn("Current customer build: **1.2.13**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.14")
+        self.assertIn("**Pack version:** 1.2.14", self.prompts)
+        self.assertIn("Current customer build: **1.2.14**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,
