@@ -40,9 +40,9 @@ inspectable, and deterministic.
 flowchart TD
     OWNER["Owner<br/>Outcome, constraints, budget, and approvals"]
     DEFINE["Define<br/>Focused questions and a canonical Product Agreement"]
-    GATEA{"Gate A<br/>Approve what should be built"}
+    GATEA{"Gate A<br/> Approve what should be built"}
     DESIGN["Design<br/>Compare complete technical solutions"]
-    GATEB{"Gate B<br/>Approve the design and local construction boundary"}
+    GATEB{"Gate B<br/> Approve the design and local construction boundary"}
     PLAN["Plan<br/>Create bounded tasks and validation targets"]
     BUILD["Build locally<br/>Implement, test, and correct safe in-scope defects"]
     EVIDENCE["Verify<br/>Record what passed, failed, is stale, or remains unobserved"]
