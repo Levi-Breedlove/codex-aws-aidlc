@@ -750,21 +750,33 @@ sequenceDiagram
         ):
             self.assertNotIn(internal_term, owner_workflow)
 
-    def test_readme_is_short_human_onboarding(self) -> None:
+    def test_readme_is_a_compact_governance_platform_landing_page(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(readme.splitlines()), 90)
+        self.assertLessEqual(len(readme.splitlines()), 180)
+        self.assertLessEqual(len(readme.encode("utf-8")), 16_000)
         for heading in (
-            "## Start",
-            "## What to expect",
-            "## Repository map",
-            "## AWS Core and AWS changes",
-            "## Learn more",
+            "## Why Fastlane",
+            "## How Fastlane governs delivery",
+            "## One platform, four clear roles",
+            "## What Fastlane governs",
+            "## Start in minutes",
+            "## Durable project records",
+            "## Trust boundaries",
+            "## Explore Fastlane",
         ):
             self.assertIn(heading, readme)
-        self.assertIn(
-            "Gate A — approve requirements → Gate B — approve the PRD and construction boundary → Codex builds autonomously inside that boundary.",
-            readme,
-        )
+        for product_claim in (
+            "repository-native governance platform",
+            "flowchart TD",
+            "Gate A<br/>Approve what should be built",
+            "Gate B<br/>Approve the design and local construction boundary",
+            "Fastlane Engine<br/>Validates state, routing, evidence, and authority",
+            "Separate AWS authorization",
+            "Neither gate authorizes AWS access",
+            "Human-readable summaries and Owner Briefs are derived views.",
+        ):
+            self.assertIn(product_claim, readme)
+        self.assertNotIn("flowchart LR", readme)
 
 
 if __name__ == "__main__":
