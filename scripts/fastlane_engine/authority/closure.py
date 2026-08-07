@@ -7,6 +7,7 @@ prohibited and no projection grants or executes AWS authority.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping
 
 from ..aws import (
@@ -34,13 +35,14 @@ def derive_deployment_sequence_state(
     gate_b_authorized_at: str = "",
     cost_posture: str = "",
     restricted_closure: bool = False,
+    observed_at: datetime | None = None,
 ) -> dict[str, Any]:
     """COMPATIBILITY: evaluate deployment through the modular AWS domain."""
 
     return _derive_deployment_sequence_state_core(
         verify_text,
         read_authority,
-        policy=build_aws_authority_policy(),
+        policy=build_aws_authority_policy(observed_at),
         requirements_revision=requirements_revision,
         design_revision=design_revision,
         construction_authorization=construction_authorization,
@@ -67,13 +69,14 @@ def derive_teardown_sequence_state(
     restricted_closure: bool = False,
     cost_posture: str = "",
     active_artifact: str = "",
+    observed_at: datetime | None = None,
 ) -> dict[str, Any]:
     """COMPATIBILITY: evaluate teardown through the modular AWS domain."""
 
     return _derive_teardown_sequence_state_core(
         verify_text,
         read_authority,
-        policy=build_aws_authority_policy(),
+        policy=build_aws_authority_policy(observed_at),
         requirements_revision=requirements_revision,
         design_revision=design_revision,
         construction_authorization=construction_authorization,
@@ -92,13 +95,14 @@ def derive_read_preflight_state(
     design_revision: str,
     construction_authorization: str,
     artifact_binding: str,
+    observed_at: datetime | None = None,
 ) -> dict[str, Any]:
     """COMPATIBILITY: evaluate preflight through the modular AWS domain."""
 
     return _derive_read_preflight_state_core(
         verify_text,
         authority,
-        policy=build_aws_authority_policy(),
+        policy=build_aws_authority_policy(observed_at),
         requirements_revision=requirements_revision,
         design_revision=design_revision,
         construction_authorization=construction_authorization,

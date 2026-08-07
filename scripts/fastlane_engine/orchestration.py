@@ -45,6 +45,7 @@ from .project_inspection import (
     STATE_FILE,
     VERIFY_FILE,
     Context,
+    capture_engine_snapshot,
     load_json_document,
     require_aws_core_phase_evidence,
     safe_read_text,
@@ -66,9 +67,9 @@ from .routing import (
 )
 
 try:
-    from fastlane_adr import derive_adr_rationale
+    from fastlane_adr import derive_adr_rationale_from_snapshot
 except ModuleNotFoundError:
-    from scripts.fastlane_adr import derive_adr_rationale
+    from scripts.fastlane_adr import derive_adr_rationale_from_snapshot
 
 
 def _preserve_expired_authority_for_deployment_closure(
@@ -102,9 +103,11 @@ def inspect_project(
     """SAFETY: observe once and compose domains in historical order."""
 
     root = root.resolve()
+    snapshot = capture_engine_snapshot(root)
     ctx = Context(
         root=root,
         template_source=template_source,
+        observed_snapshot=snapshot,
         prior_remediation_fingerprint=prior_remediation_fingerprint,
     )
     if not root.is_dir():
@@ -151,10 +154,12 @@ def inspect_project(
         intake_contract,
         requirements_contract,
     ) = validate_prd(ctx, state)
-    adr_rationale, adr_rationale_issues, adr_sources = derive_adr_rationale(
-        root,
-        design_contract.to_dict(),
-        ctx.texts.get(PRD_FILE, ""),
+    adr_rationale, adr_rationale_issues, adr_sources = (
+        derive_adr_rationale_from_snapshot(
+            snapshot,
+            design_contract.to_dict(),
+            ctx.texts.get(PRD_FILE, ""),
+        )
     )
     for issue in adr_rationale_issues:
         ctx.error(
@@ -373,6 +378,7 @@ def inspect_project(
             str(state.get("project", {}).get("cost_posture", "")),
             envelope,
             artifact_binding,
+            observed_at=ctx.observed_at,
         )
         if construction_authorization != "NONE"
         else None
@@ -384,6 +390,7 @@ def inspect_project(
         design_revision=str(prd_fields.get("design_revision", "")),
         construction_authorization=construction_authorization,
         artifact_binding=artifact_binding,
+        observed_at=ctx.observed_at,
     )
     deployment_sequence = derive_deployment_sequence_state(
         verify_text or "",
@@ -403,6 +410,7 @@ def inspect_project(
             gate_b != "APPROVED_FOR_CONSTRUCTION"
             or any(item.code == "GATE_B_AUTHORITY_EXPIRED" for item in ctx.diagnostics)
         ),
+        observed_at=ctx.observed_at,
     )
     _preserve_expired_authority_for_deployment_closure(
         ctx, deployment_sequence, release_decision
@@ -420,6 +428,7 @@ def inspect_project(
         ),
         cost_posture=str(state.get("project", {}).get("cost_posture", "")),
         active_artifact=artifact_binding,
+        observed_at=ctx.observed_at,
     )
     _preserve_expired_authority_for_teardown_closure(ctx, teardown_sequence)
     aws_sequence_conflict = aws_deployment_teardown_sequence_conflict(

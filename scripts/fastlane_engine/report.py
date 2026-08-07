@@ -64,7 +64,6 @@ from .project_inspection import (
     VERIFY_FILE,
     Context,
     _heading_title_span,
-    inspect_git_baseline,
     safe_read_text,
 )
 from .remediation import (
@@ -1562,7 +1561,7 @@ def build_report(
             "mode": project.get("mode"),
             "delivery_profile": project.get("delivery_profile"),
         },
-        "git_baseline": inspect_git_baseline(ctx.root),
+        "git_baseline": ctx.git_baseline(),
         "aws_access": aws_access,
         "aws_mode_boundary": aws_mode_boundary,
         "gates": {

@@ -26,6 +26,72 @@ def module_imports(path: Path) -> list[tuple[int, str]]:
     return imports
 
 
+def engine_module_graph() -> dict[str, set[str]]:
+    """Resolve the complete Engine AST import graph, including local imports."""
+
+    paths = sorted(ENGINE_ROOT.rglob("*.py"))
+    modules: dict[str, Path] = {}
+    for path in paths:
+        relative = path.relative_to(ROOT).with_suffix("")
+        parts = list(relative.parts)
+        if parts[-1] == "__init__":
+            parts.pop()
+        modules[".".join(parts)] = path
+
+    graph = {name: set() for name in modules}
+    for module_name, path in modules.items():
+        package = (
+            module_name
+            if path.name == "__init__.py"
+            else module_name.rpartition(".")[0]
+        )
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            candidates: list[str] = []
+            if isinstance(node, ast.Import):
+                candidates.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                reference = "." * node.level + (node.module or "")
+                candidates.append(
+                    importlib.util.resolve_name(reference, package)
+                    if node.level
+                    else reference
+                )
+            for candidate in candidates:
+                if candidate in graph:
+                    graph[module_name].add(candidate)
+    return graph
+
+
+def import_cycle(graph: dict[str, set[str]]) -> tuple[str, ...]:
+    visited: set[str] = set()
+    active: list[str] = []
+    active_set: set[str] = set()
+
+    def visit(module: str) -> tuple[str, ...]:
+        if module in active_set:
+            start = active.index(module)
+            return (*active[start:], module)
+        if module in visited:
+            return ()
+        active.append(module)
+        active_set.add(module)
+        for dependency in sorted(graph[module]):
+            cycle = visit(dependency)
+            if cycle:
+                return cycle
+        active.pop()
+        active_set.remove(module)
+        visited.add(module)
+        return ()
+
+    for module in sorted(graph):
+        cycle = visit(module)
+        if cycle:
+            return cycle
+    return ()
+
+
 class EngineRoutingTests(unittest.TestCase):
     def test_doctor_is_a_bounded_compatibility_facade(self) -> None:
         source = DOCTOR_PATH.read_text(encoding="utf-8")
@@ -137,6 +203,34 @@ class EngineRoutingTests(unittest.TestCase):
     def test_public_engine_import_has_no_cycle(self) -> None:
         module = importlib.import_module("scripts.fastlane_engine")
         self.assertIs(module.inspect_project, api.inspect_project)
+
+    def test_full_engine_ast_import_graph_has_no_cycle(self) -> None:
+        cycle = import_cycle(engine_module_graph())
+        self.assertEqual(cycle, (), " -> ".join(cycle))
+
+    def test_evaluation_modules_do_not_observe_git_after_snapshot_capture(
+        self,
+    ) -> None:
+        prohibited = {"git_read", "inspect_git_baseline"}
+        for relative in (
+            "project_delivery.py",
+            "project_validation.py",
+            "report.py",
+        ):
+            path = ENGINE_ROOT / relative
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+            calls = {
+                node.func.id
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            }
+            self.assertEqual(calls & prohibited, set(), relative)
+
+        delivery_imports = {
+            module
+            for _level, module in module_imports(ENGINE_ROOT / "project_delivery.py")
+        }
+        self.assertNotIn("api", delivery_imports)
 
 
 if __name__ == "__main__":

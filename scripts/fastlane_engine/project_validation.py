@@ -21,7 +21,7 @@ from .core.ids import (
     parse_exact_id_list,
     unresolved,
 )
-from .core.snapshot import GitObservationError, git_read, has_symlink_component
+from .core.snapshot import GitObservationError, has_symlink_component
 from .define.coverage import derive_change_impact_contract, derive_coverage_contract
 from .define.intake import derive_intake_foundation_contract
 from .define.models import (
@@ -511,7 +511,8 @@ def validate_construction_envelope(
             envelope.get("GitHub boundary", ""),
         )
         parse_future_expiry(
-            envelope.get("Authorization expiry or completion condition", "")
+            envelope.get("Authorization expiry or completion condition", ""),
+            observed_at=ctx.observed_at,
         )
     except ValueError as exc:
         code = (
@@ -597,7 +598,10 @@ def validate_construction_envelope(
                 )
         try:
             parse_aws_environment(envelope.get("AWS environment", ""))
-            parse_future_expiry(envelope.get("AWS authorization validity", ""))
+            parse_future_expiry(
+                envelope.get("AWS authorization validity", ""),
+                observed_at=ctx.observed_at,
+            )
         except ValueError as exc:
             code = (
                 "GATE_B_AUTHORITY_EXPIRED"
@@ -636,7 +640,10 @@ def validate_construction_envelope(
                 envelope.get("AWS cost ceiling", ""),
                 cost_posture,
             )
-            parse_future_expiry(envelope.get("AWS authorization validity", ""))
+            parse_future_expiry(
+                envelope.get("AWS authorization validity", ""),
+                observed_at=ctx.observed_at,
+            )
         except ValueError as exc:
             code = (
                 "GATE_B_AUTHORITY_EXPIRED"
@@ -1339,9 +1346,9 @@ def validate_authorized_baseline_repository(ctx: Context, baseline: str) -> None
     if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", baseline) is None:
         return
     try:
-        inside = git_read(ctx.root, "rev-parse", "--is-inside-work-tree")
-        bare = git_read(ctx.root, "rev-parse", "--is-bare-repository")
-        resolved = git_read(ctx.root, "rev-parse", "--verify", f"{baseline}^{{commit}}")
+        inside = ctx.git_result("rev-parse", "--is-inside-work-tree")
+        bare = ctx.git_result("rev-parse", "--is-bare-repository")
+        resolved = ctx.git_result("rev-parse", "--verify", f"{baseline}^{{commit}}")
     except GitObservationError as exc:
         ctx.error(
             "GATE_B_GIT_UNVERIFIED",

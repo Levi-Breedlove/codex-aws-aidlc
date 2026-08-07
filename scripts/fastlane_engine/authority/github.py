@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping
 
@@ -187,7 +186,7 @@ def _reviewed_script_contract(
     if (
         valid_until is None
         or authority_expiry is None
-        or valid_until <= datetime.now(timezone.utc)
+        or valid_until <= ctx.observed_at
         or valid_until > authority_expiry
     ):
         issues.append("Valid until is expired or exceeds current authority")
