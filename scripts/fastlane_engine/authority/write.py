@@ -1,8 +1,9 @@
 """Deterministic repository-ledger write authority projections.
 
-Canonical inputs are current routes, task state, external authority, and AWS journal
-projections. Returns exact repository write allowances only. Side effects are
-prohibited; this module never writes a ledger or executes an external action.
+Canonical inputs are immutable normalized task, lifecycle, and journal facts.
+Returns exact repository write allowances only. Side effects are prohibited;
+this module never parses a lifecycle-domain record, writes a ledger, or executes
+an external action.
 """
 
 from __future__ import annotations
@@ -10,26 +11,24 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from ..aws import (
-    AWS_DEPLOYMENT_ATTEMPT_ID,
-    AWS_DEPLOYMENT_EVIDENCE_HEADING,
-    AWS_TEARDOWN_ATTEMPT_ID,
-    AWS_TEARDOWN_EVIDENCE_HEADING,
-    release_lifecycle_intent_boundary_is_settled,
-)
 from ..core.ids import clean_cell
-from ..deliver.models import TaskSummary
-from ..design import parse_envelope_paths
-from ..project_inspection import Context, VERIFY_FILE
+from .models import (
+    AWS_DEPLOYMENT_ATTEMPT_ID,
+    AWS_TEARDOWN_ATTEMPT_ID,
+    ConstructionWriteInput,
+    LifecycleIntentWriteInput,
+)
+
+VERIFY_FILE = "docs/project/VERIFY.md"
+AWS_DEPLOYMENT_EVIDENCE_HEADING = "## AWS deployment action and reconciliation evidence"
+AWS_TEARDOWN_EVIDENCE_HEADING = "## Teardown reconciliation evidence"
 
 
 def derive_write_authority(
-    ctx: Context,
-    envelope: dict[str, str],
-    tasks: TaskSummary,
+    write_input: ConstructionWriteInput,
     construction_authorization: str,
 ) -> dict[str, Any]:
-    """Project the current Gate B and active-task write boundaries for hooks."""
+    """Project current Gate B and active-task write boundaries for hooks."""
 
     result: dict[str, Any] = {
         "valid": False,
@@ -40,38 +39,17 @@ def derive_write_authority(
         "active_task": "NONE",
         "active_task_write_set": [],
     }
-    if ctx.has_errors or construction_authorization == "NONE":
+    if write_input.has_errors or construction_authorization == "NONE":
         return result
-    try:
-        roots = parse_envelope_paths(
-            envelope.get("Allowed repository write set", ""),
-            "Allowed repository write set",
-            allow_none=False,
-        )
-        exclusions = parse_envelope_paths(
-            envelope.get("Excluded or owner-only write set", ""),
-            "Excluded or owner-only write set",
-            allow_none=True,
-        )
-        protected = parse_envelope_paths(
-            envelope.get("Protected dirty paths", ""),
-            "Protected dirty paths",
-            allow_none=True,
-        )
-    except ValueError:
-        return result
-    active_task = tasks.active[0] if len(tasks.active) == 1 else "NONE"
-    active_write_set = (
-        tasks.write_sets.get(active_task, []) if active_task != "NONE" else []
-    )
     return {
+        **result,
         "valid": True,
         "authorization_id": construction_authorization,
-        "approved_write_roots": roots,
-        "exclusions": exclusions,
-        "protected_paths": protected,
-        "active_task": active_task,
-        "active_task_write_set": active_write_set,
+        "approved_write_roots": list(write_input.approved_write_roots),
+        "exclusions": list(write_input.exclusions),
+        "protected_paths": list(write_input.protected_paths),
+        "active_task": write_input.active_task or "NONE",
+        "active_task_write_set": list(write_input.active_task_write_set),
     }
 
 
@@ -205,22 +183,14 @@ def derive_teardown_journal_closure_authority(
 
 
 def lifecycle_intent_record_boundary_is_settled(
-    tasks: TaskSummary,
-    release_decision: str,
-    deployment_sequence: Mapping[str, Any],
-    teardown_sequence: Mapping[str, Any],
+    write_input: LifecycleIntentWriteInput,
 ) -> bool:
     """Return whether one local owner-intent record may be updated."""
 
     return bool(
-        (
-            tasks.terminal
-            or clean_cell(deployment_sequence.get("status", "")) == "CONSUMED"
-        )
-        and release_lifecycle_intent_boundary_is_settled(
-            release_decision, deployment_sequence
-        )
-        and clean_cell(teardown_sequence.get("status", ""))
+        (write_input.tasks_terminal or write_input.deployment_status == "CONSUMED")
+        and write_input.deployment_boundary_settled
+        and write_input.teardown_status
         in {
             "NOT_ACTIVE",
             "STALE",
@@ -228,19 +198,12 @@ def lifecycle_intent_record_boundary_is_settled(
             "VERIFIED_CLEAN",
             "RESIDUALS_REMAIN",
         }
-        and not teardown_sequence.get("issues")
+        and not write_input.teardown_has_issues
     )
 
 
 def derive_aws_lifecycle_intent_write_authority(
-    ctx: Context,
-    tasks: TaskSummary,
-    release_decision: str,
-    deployment_sequence: Mapping[str, Any],
-    teardown_sequence: Mapping[str, Any],
-    external_authority: Mapping[str, Any],
-    *,
-    lifecycle_intent: Mapping[str, Any] | None = None,
+    write_input: LifecycleIntentWriteInput,
 ) -> dict[str, Any]:
     """Expose one exact local owner-intent update and no AWS authority."""
 
@@ -256,27 +219,20 @@ def derive_aws_lifecycle_intent_write_authority(
         "construction_authorization": "NONE",
         "aws_mutation_authority": "NONE",
     }
-    intent_value = clean_cell((lifecycle_intent or {}).get("value", "NONE"))
-    teardown_status = clean_cell(teardown_sequence.get("status", "NOT_ACTIVE"))
     allowed_values = (
         ["RETAIN", "RESIDUAL_REVIEW", "TEARDOWN"]
-        if teardown_status in {"READY_FOR_TEARDOWN", "RESIDUALS_REMAIN"}
+        if write_input.teardown_status in {"READY_FOR_TEARDOWN", "RESIDUALS_REMAIN"}
         else ["NONE", "RESIDUAL_REVIEW", "TEARDOWN"]
     )
     intent_route_active = bool(
-        intent_value in {"RESIDUAL_REVIEW", "TEARDOWN"}
-        and teardown_status in {"NOT_ACTIVE", "STALE"}
+        write_input.intent_value in {"RESIDUAL_REVIEW", "TEARDOWN"}
+        and write_input.teardown_status in {"NOT_ACTIVE", "STALE"}
     )
     if (
-        ctx.has_errors
+        write_input.has_errors
         or intent_route_active
-        or not lifecycle_intent_record_boundary_is_settled(
-            tasks,
-            release_decision,
-            deployment_sequence,
-            teardown_sequence,
-        )
-        or clean_cell(external_authority.get("validity", "NONE")) == "CURRENT"
+        or not lifecycle_intent_record_boundary_is_settled(write_input)
+        or write_input.external_authority_current
     ):
         return empty
     return {

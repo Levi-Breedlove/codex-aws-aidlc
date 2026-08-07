@@ -14,7 +14,7 @@ from scripts.fastlane_engine import api
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE_ROOT = ROOT / "scripts" / "fastlane_engine"
 DOCTOR_PATH = ROOT / "scripts" / "bootstrap_doctor.py"
-LIFECYCLE_DOMAINS = {"define", "design", "deliver", "aws"}
+LIFECYCLE_DOMAINS = {"authority", "aws", "define", "deliver", "design"}
 
 
 def module_imports(path: Path) -> list[tuple[int, str]]:

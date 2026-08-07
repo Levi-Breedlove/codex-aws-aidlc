@@ -1,6 +1,6 @@
 # AWS Codex Fastlane 1.2
 
-Current customer build: **1.2.21**.
+Current customer build: **1.2.22**.
 
 Fastlane turns an AWS application idea into an approved product agreement, an AWS-informed
 technical plan, and a tested local build. You describe the outcome in plain language; Codex

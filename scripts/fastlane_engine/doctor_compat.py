@@ -220,8 +220,6 @@ def install_legacy_doctor_exports(namespace: dict[str, object]) -> None:
     namespace["safe_read_text"] = safe_read_text
     namespace["bounded_prd_snapshot"] = bounded_prd_snapshot
 
-    authority = import_module(f"{__package__}.authority.aws")
-
     def derive_external_authority(
         ctx: Any,
         envelope: dict[str, str],
@@ -238,7 +236,7 @@ def install_legacy_doctor_exports(namespace: dict[str, object]) -> None:
     ) -> dict[str, Any]:
         """COMPATIBILITY: preserve doctor monkeypatch seams over authority."""
 
-        return authority.derive_external_authority(
+        return namespace["_derive_external_authority_core"](
             ctx,
             envelope,
             lane,

@@ -13,11 +13,15 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping
 
-from ..aws import AWS_DEPLOYMENT_ATTEMPT_ID, AWS_TEARDOWN_ATTEMPT_ID
 from ..core.contracts import markdown_tables
 from ..core.ids import clean_cell, explicit_value, unresolved
 from ..project_inspection import AWS_BOUNDARIES, AWS_LANES, VERIFY_FILE, Context
-from .models import _iso_datetime, _split_authority_values
+from .models import (
+    AWS_DEPLOYMENT_ATTEMPT_ID,
+    AWS_TEARDOWN_ATTEMPT_ID,
+    _iso_datetime,
+    _split_authority_values,
+)
 
 AWS_EXECUTION_CONTRACT_HEADERS = (
     "Execution ID",
