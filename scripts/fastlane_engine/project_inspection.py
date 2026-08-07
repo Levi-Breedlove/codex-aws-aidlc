@@ -23,13 +23,17 @@ from .aws import (
     aws_core_phase_evidence_issues,
 )
 from .core.diagnostics import Diagnostic, DiagnosticCollector
+from .core.contracts import table_after_heading
 from .core.ids import (
     canonical_id_list,
     clean_cell,
     explicit_value,
 )
 from .core.snapshot import (
+    GitObserver,
     GitObservationError,  # noqa: F401 - stable compatibility re-export
+    GitQueryKey,
+    GitQueryResult,
     ObservationError,
     ProjectSnapshot,
     SnapshotObserver,
@@ -53,6 +57,8 @@ from .define.requirements import (
     requirement_method_issues,
 )
 from .design import parse_future_expiry_at
+from .design.adr import ADR_DIRECTORY, MAX_ADR_BYTES, MAX_ADR_FILES
+from .deliver import parse_checkpoint_git_receipt
 from .package.manifest import ManifestPolicy
 from .package.state import StatePolicy
 
@@ -646,6 +652,7 @@ MANDATORY_REQUIRED_FILES = (
 class Context:
     root: Path
     template_source: bool = False
+    observed_snapshot: ProjectSnapshot | None = None
     diagnostics: list[Diagnostic] = field(default_factory=list)
     texts: dict[str, str] = field(default_factory=dict)
     presentation_texts: dict[str, str] = field(default_factory=dict)
@@ -658,9 +665,20 @@ class Context:
     _diagnostic_collector: DiagnosticCollector = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        self.root = self.root.resolve()
+        if (
+            self.observed_snapshot is not None
+            and self.observed_snapshot.root != self.root
+        ):
+            raise ValueError("ProjectSnapshot root does not match Context root")
         self._diagnostic_collector = DiagnosticCollector(backing=self.diagnostics)
         self._observer = SnapshotObserver(
             self.root,
+            observed_at=(
+                self.observed_snapshot.observed_at
+                if self.observed_snapshot is not None
+                else None
+            ),
             canonicalize_text=lambda relative, text: (
                 strip_generated_summary(text)
                 if relative in DOCUMENT_SUMMARY_FILES
@@ -685,6 +703,9 @@ class Context:
     def snapshot(self) -> ProjectSnapshot:
         """Freeze the files and Markdown indexes observed by this invocation."""
 
+        if self.observed_snapshot is not None:
+            return self.observed_snapshot
+
         project = self.bootstrap_state_document.get("project", {})
         project_identity = (
             {key: str(project[key]) for key in ("name", "region") if key in project}
@@ -696,6 +717,32 @@ class Context:
             bootstrap_state=self.bootstrap_state_document,
             manifest=self.manifest_document,
         )
+
+    @property
+    def observed_at(self) -> datetime:
+        """Return the one invocation clock captured by the snapshot boundary."""
+
+        return self.snapshot.observed_at
+
+    def git_result(self, *arguments: str) -> GitQueryResult:
+        """Return a captured Git fact, never running Git during normal evaluation."""
+
+        if self.observed_snapshot is not None:
+            return self.observed_snapshot.git.result(*arguments)
+        completed = git_read(self.root, *arguments)
+        return GitQueryResult(
+            key=GitQueryKey.from_arguments(tuple(arguments)),
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
+
+    def git_baseline(self) -> str:
+        """Return the captured HEAD or the historical PENDING sentinel."""
+
+        if self.observed_snapshot is not None:
+            return self.observed_snapshot.git.head_sha or "PENDING"
+        return inspect_git_baseline(self.root)
 
 
 TASK_METADATA_KEYS = (
@@ -1093,6 +1140,227 @@ STATE_POLICY = StatePolicy(
 )
 
 
+_SNAPSHOT_PRIMARY_TEXT_PATHS = (
+    MANIFEST_FILE,
+    STATE_FILE,
+    PROMPT_FILE,
+    PROJECT_README_FILE,
+    PRD_FILE,
+    TASKS_FILE,
+    VERIFY_FILE,
+    RUNBOOK_FILE,
+    BUGFIX_FILE,
+)
+
+
+def capture_engine_snapshot(
+    root: Path,
+    *,
+    observed_at: datetime | None = None,
+) -> ProjectSnapshot:
+    """SAFETY: complete bounded observation before lifecycle evaluation."""
+
+    observer = SnapshotObserver(
+        root,
+        observed_at=observed_at,
+        canonicalize_text=lambda relative, text: (
+            strip_generated_summary(text)
+            if relative in DOCUMENT_SUMMARY_FILES
+            else text
+        ),
+        max_files=MAX_REQUIRED_FILES + MAX_ADR_FILES,
+        max_file_bytes=MAX_REQUIRED_FILE_BYTES,
+        max_source_bytes=MAX_PROJECT_SOURCE_BYTES,
+    )
+    observer.capture_text(MANIFEST_FILE)
+    observer.capture_text(STATE_FILE)
+    manifest = _captured_json(observer, MANIFEST_FILE)
+    state = _captured_json(observer, STATE_FILE)
+    requested: list[str] = [
+        *_SNAPSHOT_PRIMARY_TEXT_PATHS,
+        *sorted(MANDATORY_REQUIRED_FILES),
+    ]
+    required_files = manifest.get("required_files")
+    if isinstance(required_files, list):
+        requested.extend(
+            item
+            for item in required_files[:MAX_REQUIRED_FILES]
+            if isinstance(item, str)
+        )
+    seen: set[str] = set()
+    for relative in requested:
+        if relative in seen:
+            continue
+        seen.add(relative)
+        if PurePosixPath(relative).suffix.casefold() in BINARY_REQUIRED_SUFFIXES:
+            observer.capture_binary(relative)
+        else:
+            observer.capture_text(relative)
+
+    adr_directory = observer.observe_directory(
+        ADR_DIRECTORY, maximum_entries=MAX_ADR_FILES + 2
+    )
+    adr_entries = tuple(
+        entry for entry in adr_directory.entries if entry.name != "0000-template.md"
+    )
+    if len(adr_entries) <= MAX_ADR_FILES:
+        for entry in adr_entries:
+            if entry.is_file and entry.byte_size <= MAX_ADR_BYTES:
+                observer.capture_text(entry.path)
+
+    git_observer = GitObserver(root)
+    git_observer.observe_repository_state()
+    queries, baseline_sha, protected_paths = _planned_git_queries(observer, state)
+    for arguments in queries:
+        git_observer.query(*arguments)
+    git_snapshot = git_observer.freeze(
+        baseline_sha=baseline_sha,
+        protected_dirty_paths=protected_paths,
+    )
+    project = state.get("project")
+    identity = (
+        {key: str(project[key]) for key in ("name", "region") if key in project}
+        if isinstance(project, dict)
+        else {}
+    )
+    return observer.freeze(
+        project_identity=identity,
+        git=git_snapshot,
+        bootstrap_state=state,
+        manifest=manifest,
+    )
+
+
+def _captured_json(observer: SnapshotObserver, relative: str) -> dict[str, Any]:
+    captured = observer.file(relative)
+    if captured is None or captured.canonical_text is None:
+        return {}
+    try:
+        value = json.loads(captured.canonical_text)
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _planned_git_queries(
+    observer: SnapshotObserver,
+    state: dict[str, Any],
+) -> tuple[list[tuple[str, ...]], str | None, tuple[str, ...]]:
+    """SAFETY: derive only the canonical Git facts required by current records."""
+
+    prd = observer.file(PRD_FILE)
+    tasks = observer.file(TASKS_FILE)
+    prd_text = prd.canonical_text if prd and prd.canonical_text else ""
+    tasks_text = tasks.canonical_text if tasks and tasks.canonical_text else ""
+    try:
+        envelope = table_after_heading(prd_text, "## 28. Construction envelope")
+    except ValueError:
+        envelope = {}
+    try:
+        document = table_after_heading(prd_text, "## Document status")
+    except ValueError:
+        document = {}
+    try:
+        task_snapshot = table_after_heading(tasks_text, "## Active execution snapshot")
+    except ValueError:
+        task_snapshot = {}
+
+    full_commit = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+    queries: list[tuple[str, ...]] = []
+    envelope_baseline = clean_cell(envelope.get("Authorized baseline commit", ""))
+    if full_commit.fullmatch(envelope_baseline):
+        queries.append(("rev-parse", "--verify", f"{envelope_baseline}^{{commit}}"))
+
+    task_baseline = clean_cell(task_snapshot.get("Baseline commit", ""))
+    known_green = clean_cell(task_snapshot.get("Last known-green commit", ""))
+    has_task_records = TASK_HEADER_PATTERN.search(tasks_text) is not None
+    construction_active = (
+        clean_cell(document.get("Gate B derived status", ""))
+        == "APPROVED_FOR_CONSTRUCTION"
+        or has_task_records
+    )
+    baseline_sha = (
+        task_baseline
+        if full_commit.fullmatch(task_baseline)
+        else (envelope_baseline if full_commit.fullmatch(envelope_baseline) else None)
+    )
+    execution = state.get("execution")
+    execution_state = (
+        clean_cell(execution.get("state", "")) if isinstance(execution, dict) else ""
+    )
+    reconcile = execution_state in {"CHECKPOINTED", "BLOCKED", "COMPLETE"}
+    if (
+        construction_active
+        and full_commit.fullmatch(task_baseline)
+        and full_commit.fullmatch(known_green)
+    ):
+        queries.extend(
+            (
+                ("rev-parse", "--verify", f"{task_baseline}^{{commit}}"),
+                ("rev-parse", "--verify", f"{known_green}^{{commit}}"),
+                ("merge-base", "--is-ancestor", task_baseline, known_green),
+                ("merge-base", "--is-ancestor", known_green, "HEAD"),
+                (
+                    "diff",
+                    "--name-only",
+                    "-z",
+                    "--relative",
+                    f"{known_green}..HEAD",
+                    "--",
+                    ".",
+                ),
+            )
+        )
+        if reconcile:
+            checkpoint_id = clean_cell(task_snapshot.get("Last checkpoint", ""))
+            if CHECKPOINT_ID.fullmatch(checkpoint_id):
+                try:
+                    checkpoint_commit, _dirty = parse_checkpoint_git_receipt(
+                        tasks_text, checkpoint_id
+                    )
+                except ValueError:
+                    checkpoint_commit = None
+                if checkpoint_commit is not None:
+                    queries.append(
+                        (
+                            "rev-parse",
+                            "--verify",
+                            f"{checkpoint_commit}^{{commit}}",
+                        )
+                    )
+            queries.extend(
+                (
+                    (
+                        "diff",
+                        "--name-only",
+                        "-z",
+                        "--relative",
+                        "HEAD",
+                        "--",
+                        ".",
+                    ),
+                    (
+                        "ls-files",
+                        "--others",
+                        "--exclude-standard",
+                        "-z",
+                        "--",
+                        ".",
+                    ),
+                )
+            )
+    protected: tuple[str, ...] = ()
+    protected_value = clean_cell(task_snapshot.get("Protected dirty paths", ""))
+    if protected_value and protected_value != "NONE":
+        try:
+            protected = tuple(
+                parse_task_write_set(protected_value, "Protected dirty paths")
+            )
+        except ValueError:
+            protected = ()
+    return queries, baseline_sha, protected
+
+
 def safe_read_required_binary(
     ctx: Context, relative: str, *, required: bool = True
 ) -> bytes | None:
@@ -1101,6 +1369,20 @@ def safe_read_required_binary(
     cached = ctx.source_file_bytes.get(relative)
     if cached is not None:
         return cached
+    if ctx.observed_snapshot is not None:
+        error = ctx.observed_snapshot.file_errors.get(relative)
+        snapshot = ctx.observed_snapshot.file(relative)
+        if error is not None:
+            if required or error.code != "REQUIRED_FILE_MISSING":
+                ctx.error(error.code, error.message, error.path)
+            return None
+        if snapshot is None:
+            if required:
+                ctx.error("REQUIRED_FILE_MISSING", "Required file is missing", relative)
+            return None
+        ctx.source_bytes_read = ctx.observed_snapshot.observation_metrics.bytes_observed
+        ctx.source_file_bytes[relative] = snapshot.raw_bytes
+        return snapshot.raw_bytes
     try:
         snapshot = ctx._observer.observe_binary(relative)
     except ObservationError as exc:
@@ -1113,9 +1395,38 @@ def safe_read_required_binary(
 
 
 def safe_read_text(ctx: Context, relative: str, *, required: bool = True) -> str | None:
+    """SAFETY: replay one bounded snapshot text observation without rereading."""
+
     cached = ctx.texts.get(relative)
     if cached is not None:
         return cached
+    if ctx.observed_snapshot is not None:
+        error = ctx.observed_snapshot.text_errors.get(
+            relative
+        ) or ctx.observed_snapshot.file_errors.get(relative)
+        snapshot = ctx.observed_snapshot.file(relative)
+        if error is not None:
+            if required or error.code != "REQUIRED_FILE_MISSING":
+                ctx.error(error.code, error.message, error.path)
+            return None
+        if snapshot is None:
+            if required:
+                ctx.error("REQUIRED_FILE_MISSING", "Required file is missing", relative)
+            return None
+        presentation_text = snapshot.presentation_text
+        canonical_text = snapshot.canonical_text
+        if presentation_text is None or canonical_text is None:
+            ctx.error(
+                "REQUIRED_FILE_UNREADABLE",
+                "Unable to read UTF-8 text: snapshot did not contain text",
+                relative,
+            )
+            return None
+        ctx.source_file_bytes[relative] = snapshot.raw_bytes
+        ctx.source_bytes_read = ctx.observed_snapshot.observation_metrics.bytes_observed
+        ctx.presentation_texts[relative] = presentation_text
+        ctx.texts[relative] = canonical_text
+        return canonical_text
     try:
         snapshot = ctx._observer.observe_text(relative)
     except ObservationError as exc:
@@ -1345,7 +1656,9 @@ def install_compatibility_exports(namespace: dict[str, object]) -> None:
     namespace.update({name: globals()[name] for name in COMPATIBILITY_EXPORTS})
 
 
-def parse_future_expiry(value: str) -> datetime:
+def parse_future_expiry(value: str, *, observed_at: datetime | None = None) -> datetime:
     """COMPATIBILITY: evaluate expiry against one observed UTC clock."""
 
-    return parse_future_expiry_at(value, datetime.now(timezone.utc))
+    return parse_future_expiry_at(
+        value, observed_at if observed_at is not None else datetime.now(timezone.utc)
+    )

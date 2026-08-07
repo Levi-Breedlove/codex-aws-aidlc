@@ -8,7 +8,7 @@ never read files, execute external actions, or broaden authority.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 from typing import Mapping
 
@@ -104,7 +104,11 @@ def _receipt_fields(receipt: str, expected_title: str) -> dict[str, str] | None:
 
 
 def _authorization_valid_until(
-    value: str, result: str, *, allow_expired: bool = False
+    value: str,
+    result: str,
+    *,
+    observed_at: datetime,
+    allow_expired: bool = False,
 ) -> str | None:
     cleaned = clean_cell(value)
     normalized = cleaned[:-1] + "+00:00" if cleaned.endswith("Z") else cleaned
@@ -116,7 +120,7 @@ def _authorization_valid_until(
         return cleaned if explicit_value(cleaned) and result == "NOT_STARTED" else None
     if expires.tzinfo is None or expires.utcoffset() is None:
         return None
-    return cleaned if allow_expired or expires > datetime.now(timezone.utc) else None
+    return cleaned if allow_expired or expires > observed_at else None
 
 
 def _parse_cost_ceiling(value: str) -> tuple[str, Decimal] | None:
@@ -248,9 +252,11 @@ def _receipt_artifact_matches_gate_b(
     return AWS_DERIVED_ARTIFACT.fullmatch(approved) is not None
 
 
-def _authorization_expiry_ceiling(value: str, *, allow_expired: bool) -> datetime:
+def _authorization_expiry_ceiling(
+    value: str, *, observed_at: datetime, allow_expired: bool
+) -> datetime:
     if not allow_expired:
-        return parse_future_expiry(value)
+        return parse_future_expiry(value, observed_at=observed_at)
     cleaned = clean_cell(value)
     match = re.fullmatch(
         r"Expires at (?P<timestamp>[^\s;]+); earlier completion: (?P<condition>[^\r\n]+)",
@@ -269,10 +275,14 @@ def _receipt_validity_within_gate_b(
     result: str,
     envelope: Mapping[str, str],
     *,
+    observed_at: datetime,
     allow_expired: bool = False,
 ) -> str | None:
     current = _authorization_valid_until(
-        valid_until, result, allow_expired=allow_expired
+        valid_until,
+        result,
+        observed_at=observed_at,
+        allow_expired=allow_expired,
     )
     if current is None:
         return None
@@ -280,6 +290,7 @@ def _receipt_validity_within_gate_b(
         ceilings = [
             _authorization_expiry_ceiling(
                 envelope.get("Authorization expiry or completion condition", ""),
+                observed_at=observed_at,
                 allow_expired=allow_expired,
             )
         ]
@@ -289,7 +300,11 @@ def _receipt_validity_within_gate_b(
     if not aws_validity.startswith("NOT_APPLICABLE"):
         try:
             ceilings.append(
-                _authorization_expiry_ceiling(aws_validity, allow_expired=allow_expired)
+                _authorization_expiry_ceiling(
+                    aws_validity,
+                    observed_at=observed_at,
+                    allow_expired=allow_expired,
+                )
             )
         except ValueError:
             return None

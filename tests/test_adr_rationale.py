@@ -4,8 +4,14 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from scripts.fastlane_adr import ADR_AUTHORITY, derive_adr_rationale
+from scripts.fastlane_adr import (
+    ADR_AUTHORITY,
+    derive_adr_rationale,
+    derive_adr_rationale_from_snapshot,
+)
+from scripts.fastlane_engine.core.snapshot import SnapshotObserver
 
 
 def design_contract(
@@ -142,6 +148,22 @@ class AdrRationaleTests(unittest.TestCase):
         self.assertEqual(projection["records"][0]["primary_decision"], "TECH-0001")
         self.assertEqual(projection["records"][0]["evidence_ids"], ["AWS-EV-0001"])
         self.assertIn("docs/adr/0001-runtime.md", sources)
+
+    def test_snapshot_backed_adr_evaluation_matches_the_public_facade(self) -> None:
+        self.write("0001-runtime.md", adr_text())
+        expected = self.derive()
+        observer = SnapshotObserver(self.root)
+        observer.observe_directory("docs/adr")
+        observer.observe_text("docs/adr/0001-runtime.md")
+        snapshot = observer.freeze()
+
+        with mock.patch.object(
+            Path, "read_bytes", side_effect=AssertionError("ADR was reread")
+        ):
+            observed = derive_adr_rationale_from_snapshot(
+                snapshot, design_contract(), ""
+            )
+        self.assertEqual(observed, expected)
 
     def test_architecture_adr_matches_the_selected_canonical_candidate(self) -> None:
         design = design_contract()

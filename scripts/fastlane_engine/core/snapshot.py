@@ -9,8 +9,9 @@ network, validates lifecycle state, or grants authority.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import heapq
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -58,16 +59,102 @@ class FileSnapshot:
 
 
 @dataclass(frozen=True)
+class DirectoryEntrySnapshot:
+    path: str
+    name: str
+    byte_size: int
+    is_file: bool
+    is_directory: bool
+    is_symlink: bool
+
+
+@dataclass(frozen=True)
+class DirectorySnapshot:
+    path: str
+    exists: bool
+    is_directory: bool
+    is_symlink: bool
+    entries: tuple[DirectoryEntrySnapshot, ...] = ()
+    observation_error: str | None = None
+
+
+@dataclass(frozen=True, order=True)
+class GitQueryKey:
+    operation: str
+    arguments: tuple[str, ...] = ()
+
+    @classmethod
+    def from_arguments(cls, arguments: tuple[str, ...]) -> "GitQueryKey":
+        """CANONICALIZATION: normalize equivalent query identities once."""
+
+        if arguments[:2] == ("merge-base", "--is-ancestor"):
+            return cls("merge-base-is-ancestor", arguments[2:])
+        if arguments[:2] == ("rev-parse", "--verify"):
+            return cls("resolve-commit", arguments[2:])
+        if arguments == ("rev-parse", "--is-inside-work-tree"):
+            return cls("repository-is-worktree")
+        if arguments == ("rev-parse", "--is-bare-repository"):
+            return cls("repository-is-bare")
+        if arguments and arguments[0] == "diff":
+            return cls("diff-name-only", arguments[1:])
+        if arguments and arguments[0] == "ls-files":
+            return cls("ls-files", arguments[1:])
+        return cls(arguments[0] if arguments else "git", arguments[1:])
+
+
+@dataclass(frozen=True)
+class GitQueryResult:
+    key: GitQueryKey
+    returncode: int
+    stdout: bytes = b""
+    stderr: bytes = b""
+    observation_error: str | None = None
+
+
+@dataclass(frozen=True)
 class GitSnapshot:
     executable: str | None = None
     root: str | None = None
     branch: str | None = None
-    head: str | None = None
-    baseline: str | None = None
+    head_sha: str | None = None
+    baseline_sha: str | None = None
+    inside_work_tree: bool | None = None
+    bare: bool | None = None
+    working_tree_state: str = "UNKNOWN"
+    dirty_paths: tuple[str, ...] = ()
     tracked_changes: tuple[str, ...] = ()
     staged_changes: tuple[str, ...] = ()
     untracked_paths: tuple[str, ...] = ()
     protected_dirty_paths: tuple[str, ...] = ()
+    query_results: Mapping[GitQueryKey, GitQueryResult] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    process_count: int = 0
+    duplicate_processes: int = 0
+
+    @property
+    def head(self) -> str | None:
+        """COMPATIBILITY: retain the foundation snapshot attribute."""
+
+        return self.head_sha
+
+    @property
+    def baseline(self) -> str | None:
+        """COMPATIBILITY: retain the foundation snapshot attribute."""
+
+        return self.baseline_sha
+
+    def result(self, *arguments: str) -> GitQueryResult:
+        key = GitQueryKey.from_arguments(tuple(arguments))
+        result = self.query_results.get(key)
+        if result is None:
+            raise GitObservationError(
+                "Required Git query was not captured in the project snapshot: "
+                + " ".join(arguments)
+            )
+        if result.observation_error is not None:
+            raise GitObservationError(result.observation_error)
+        return result
 
 
 @dataclass(frozen=True)
@@ -75,6 +162,8 @@ class ObservationMetrics:
     files_opened: int
     bytes_observed: int
     markdown_indexes: int
+    git_processes: int = 0
+    duplicate_git_processes: int = 0
 
 
 @dataclass(frozen=True)
@@ -84,6 +173,9 @@ class ProjectSnapshot:
     project_identity: Mapping[str, str]
     files: Mapping[str, FileSnapshot]
     markdown: Mapping[str, MarkdownDocumentIndex]
+    directories: Mapping[str, DirectorySnapshot]
+    file_errors: Mapping[str, ObservationError]
+    text_errors: Mapping[str, ObservationError]
     git: GitSnapshot
     bootstrap_state: Mapping[str, object]
     manifest: Mapping[str, object]
@@ -114,6 +206,9 @@ class SnapshotObserver:
         self.max_source_bytes = max_source_bytes
         self._files: dict[str, FileSnapshot] = {}
         self._markdown: dict[str, MarkdownDocumentIndex] = {}
+        self._directories: dict[str, DirectorySnapshot] = {}
+        self._file_errors: dict[str, ObservationError] = {}
+        self._text_errors: dict[str, ObservationError] = {}
         self._bytes_observed = 0
 
     def _validate(self, relative: str) -> Path:
@@ -207,6 +302,15 @@ class SnapshotObserver:
         self._read(relative)
         return self._files[relative]
 
+    def capture_binary(self, relative: str) -> FileSnapshot | None:
+        """Capture a binary file while retaining a deferred observation error."""
+
+        try:
+            return self.observe_binary(relative)
+        except ObservationError as exc:
+            self._file_errors.setdefault(relative, exc)
+            return None
+
     def observe_text(
         self, relative: str, *, markdown: bool | None = None
     ) -> FileSnapshot:
@@ -244,6 +348,86 @@ class SnapshotObserver:
             self._markdown[relative] = MarkdownDocumentIndex.build(canonical)
         return snapshot
 
+    def capture_text(
+        self, relative: str, *, markdown: bool | None = None
+    ) -> FileSnapshot | None:
+        """Capture UTF-8 text while retaining errors for deterministic replay."""
+
+        try:
+            return self.observe_text(relative, markdown=markdown)
+        except ObservationError as exc:
+            if relative not in self._files:
+                self._file_errors.setdefault(relative, exc)
+            self._text_errors.setdefault(relative, exc)
+            return None
+
+    def observe_directory(
+        self,
+        relative: str,
+        *,
+        maximum_entries: int = MAX_REQUIRED_FILES,
+    ) -> DirectorySnapshot:
+        """Observe one bounded directory inventory without following symlinks."""
+
+        existing = self._directories.get(relative)
+        if existing is not None:
+            return existing
+        if validate_relative_path(relative) is None:
+            snapshot = DirectorySnapshot(
+                path=relative,
+                exists=False,
+                is_directory=False,
+                is_symlink=False,
+                observation_error=f"Unsafe project-relative path: {relative!r}",
+            )
+            self._directories[relative] = snapshot
+            return snapshot
+        path = self.root.joinpath(*PurePosixPath(relative).parts)
+        try:
+            ancestor_symlink = has_symlink_component(self.root, relative)
+            exists = path.exists() or path.is_symlink()
+            is_symlink = ancestor_symlink or path.is_symlink()
+            is_directory = bool(exists and not is_symlink and path.is_dir())
+            entries: list[DirectoryEntrySnapshot] = []
+            if is_directory:
+                for entry in heapq.nsmallest(
+                    maximum_entries, path.iterdir(), key=lambda item: item.name
+                ):
+                    entry_is_symlink = entry.is_symlink()
+                    stat = entry.lstat()
+                    entries.append(
+                        DirectoryEntrySnapshot(
+                            path=PurePosixPath(relative, entry.name).as_posix(),
+                            name=entry.name,
+                            byte_size=stat.st_size,
+                            is_file=bool(not entry_is_symlink and entry.is_file()),
+                            is_directory=bool(not entry_is_symlink and entry.is_dir()),
+                            is_symlink=entry_is_symlink,
+                        )
+                    )
+            snapshot = DirectorySnapshot(
+                path=relative,
+                exists=exists,
+                is_directory=is_directory,
+                is_symlink=is_symlink,
+                entries=tuple(entries),
+            )
+        except OSError as exc:
+            snapshot = DirectorySnapshot(
+                path=relative,
+                exists=False,
+                is_directory=False,
+                is_symlink=False,
+                observation_error=str(exc),
+            )
+        self._directories[relative] = snapshot
+        return snapshot
+
+    def file(self, relative: str) -> FileSnapshot | None:
+        """Return an already observed file without performing another read."""
+
+        return self._files.get(relative)
+
     @property
     def bytes_observed(self) -> int:
         return self._bytes_observed
@@ -266,6 +450,9 @@ class SnapshotObserver:
             project_identity=MappingProxyType(dict(project_identity or {})),
             files=MappingProxyType(dict(self._files)),
             markdown=MappingProxyType(dict(self._markdown)),
+            directories=MappingProxyType(dict(self._directories)),
+            file_errors=MappingProxyType(dict(self._file_errors)),
+            text_errors=MappingProxyType(dict(self._text_errors)),
             git=git or GitSnapshot(root=str(self.root)),
             bootstrap_state=_freeze_mapping(bootstrap_state or {}),
             manifest=_freeze_mapping(manifest or {}),
@@ -273,8 +460,321 @@ class SnapshotObserver:
                 files_opened=len(self._files),
                 bytes_observed=self._bytes_observed,
                 markdown_indexes=len(self._markdown),
+                git_processes=(git.process_count if git is not None else 0),
+                duplicate_git_processes=(
+                    git.duplicate_processes if git is not None else 0
+                ),
             ),
         )
+
+
+class GitObserver:
+    """Capture canonical, memoized read-only Git facts for one invocation."""
+
+    def __init__(
+        self,
+        root: Path,
+        *,
+        resolve_git: Callable[[Path], str] | None = None,
+        run: Callable[..., subprocess.CompletedProcess[bytes]] | None = None,
+    ) -> None:
+        self.root = root.resolve()
+        self._resolve_git = resolve_git or resolve_trusted_git
+        self._run = run or subprocess.run
+        self._executable: str | None = None
+        self._results: dict[GitQueryKey, GitQueryResult] = {}
+        self._process_count = 0
+        self._duplicate_requests = 0
+        self._branch: str | None = None
+        self._head_sha: str | None = None
+        self._inside_work_tree: bool | None = None
+        self._bare: bool | None = None
+        self._tracked_changes: tuple[str, ...] = ()
+        self._staged_changes: tuple[str, ...] = ()
+        self._untracked_paths: tuple[str, ...] = ()
+
+    def _execute(
+        self, key: GitQueryKey, command_arguments: tuple[str, ...]
+    ) -> GitQueryResult:
+        existing = self._results.get(key)
+        if existing is not None:
+            self._duplicate_requests += 1
+            return existing
+        try:
+            if self._executable is None:
+                self._executable = self._resolve_git(self.root)
+            self._process_count += 1
+            completed = git_read(
+                self.root,
+                *command_arguments,
+                resolve_git=lambda _root: str(self._executable),
+                run=self._run,
+            )
+        except (GitObservationError, OSError, ValueError) as exc:
+            result = GitQueryResult(
+                key=key,
+                returncode=-1,
+                observation_error=str(exc),
+            )
+        else:
+            stdout = completed.stdout
+            stderr = completed.stderr
+            result = GitQueryResult(
+                key=key,
+                returncode=completed.returncode,
+                stdout=(
+                    stdout
+                    if isinstance(stdout, bytes)
+                    else stdout.encode("utf-8", errors="surrogateescape")
+                ),
+                stderr=(
+                    stderr
+                    if isinstance(stderr, bytes)
+                    else stderr.encode("utf-8", errors="surrogateescape")
+                ),
+            )
+        self._results[key] = result
+        return result
+
+    def _record_synthetic(
+        self,
+        arguments: tuple[str, ...],
+        *,
+        returncode: int = 0,
+        stdout: bytes = b"",
+        stderr: bytes = b"",
+        observation_error: str | None = None,
+    ) -> GitQueryResult:
+        key = GitQueryKey.from_arguments(arguments)
+        existing = self._results.get(key)
+        if existing is not None:
+            return existing
+        result = GitQueryResult(
+            key=key,
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+            observation_error=observation_error,
+        )
+        self._results[key] = result
+        return result
+
+    def observe_repository_state(self) -> None:
+        """Observe identity and dirty state in one lock-free Git process."""
+
+        key = GitQueryKey("repository-status-v2")
+        status = self._execute(
+            key,
+            ("status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"),
+        )
+        if status.observation_error is not None:
+            for arguments in (
+                ("rev-parse", "--is-inside-work-tree"),
+                ("rev-parse", "--is-bare-repository"),
+                ("rev-parse", "--verify", "HEAD"),
+                ("rev-parse", "--verify", "HEAD^{commit}"),
+            ):
+                self._record_synthetic(
+                    arguments,
+                    returncode=-1,
+                    observation_error=status.observation_error,
+                )
+            return
+        if status.returncode != 0:
+            for arguments in (
+                ("rev-parse", "--is-inside-work-tree"),
+                ("rev-parse", "--is-bare-repository"),
+                ("rev-parse", "--verify", "HEAD"),
+                ("rev-parse", "--verify", "HEAD^{commit}"),
+            ):
+                self._record_synthetic(
+                    arguments,
+                    returncode=status.returncode,
+                    stderr=status.stderr,
+                )
+            return
+        (
+            self._branch,
+            self._head_sha,
+            tracked,
+            staged,
+            untracked,
+        ) = _parse_porcelain_v2(status.stdout)
+        self._inside_work_tree = True
+        self._bare = False
+        self._tracked_changes = tuple(sorted(tracked))
+        self._staged_changes = tuple(sorted(staged))
+        self._untracked_paths = tuple(sorted(untracked))
+        self._record_synthetic(("rev-parse", "--is-inside-work-tree"), stdout=b"true\n")
+        self._record_synthetic(("rev-parse", "--is-bare-repository"), stdout=b"false\n")
+        if self._head_sha is not None:
+            payload = self._head_sha.encode("ascii") + b"\n"
+            self._record_synthetic(("rev-parse", "--verify", "HEAD"), stdout=payload)
+            self._record_synthetic(
+                ("rev-parse", "--verify", "HEAD^{commit}"), stdout=payload
+            )
+        tracked_payload = b"\0".join(
+            path.encode("utf-8", errors="surrogateescape")
+            for path in self._tracked_changes
+        )
+        if tracked_payload:
+            tracked_payload += b"\0"
+        untracked_payload = b"\0".join(
+            path.encode("utf-8", errors="surrogateescape")
+            for path in self._untracked_paths
+        )
+        if untracked_payload:
+            untracked_payload += b"\0"
+        self._record_synthetic(
+            ("diff", "--name-only", "-z", "--relative", "HEAD", "--", "."),
+            stdout=tracked_payload,
+        )
+        self._record_synthetic(
+            ("ls-files", "--others", "--exclude-standard", "-z", "--", "."),
+            stdout=untracked_payload,
+        )
+
+    def query(self, *arguments: str) -> GitQueryResult:
+        """Return one canonical query result, executing it at most once."""
+
+        normalized = tuple(arguments)
+        key = GitQueryKey.from_arguments(normalized)
+        existing = self._results.get(key)
+        if existing is not None:
+            self._duplicate_requests += 1
+            return existing
+        synthetic = self._synthetic_result(normalized)
+        if synthetic is not None:
+            return synthetic
+        return self._execute(key, normalized)
+
+    def _synthetic_result(self, arguments: tuple[str, ...]) -> GitQueryResult | None:
+        """SAFETY: reuse only facts already proven by this immutable observation."""
+
+        if arguments[:2] == ("rev-parse", "--verify") and len(arguments) == 3:
+            reference = arguments[2].removesuffix("^{commit}")
+            if reference == "HEAD" or reference == self._head_sha:
+                if self._head_sha is None:
+                    return None
+                return self._record_synthetic(
+                    arguments, stdout=self._head_sha.encode("ascii") + b"\n"
+                )
+        if arguments[:2] == ("merge-base", "--is-ancestor") and len(arguments) == 4:
+            left = self._known_commit(arguments[2])
+            right = self._known_commit(arguments[3])
+            if left is not None and left == right:
+                return self._record_synthetic(arguments)
+        if arguments and arguments[0] == "diff":
+            revision_range = next(
+                (
+                    item
+                    for item in arguments
+                    if ".." in item and not item.startswith("--")
+                ),
+                None,
+            )
+            if revision_range is not None:
+                left_value, right_value = revision_range.split("..", 1)
+                left = self._known_commit(left_value)
+                right = self._known_commit(right_value)
+                if left is not None and left == right:
+                    return self._record_synthetic(arguments)
+        return None
+
+    def _known_commit(self, value: str) -> str | None:
+        if value == "HEAD":
+            return self._head_sha
+        cleaned = value.removesuffix("^{commit}")
+        if cleaned == self._head_sha:
+            return self._head_sha
+        result = self._results.get(GitQueryKey("resolve-commit", (value,)))
+        if result is None:
+            result = self._results.get(
+                GitQueryKey("resolve-commit", (f"{cleaned}^{{commit}}",))
+            )
+        if result is None or result.returncode != 0 or result.observation_error:
+            return None
+        candidate = result.stdout.decode("ascii", errors="replace").strip()
+        return candidate if re.fullmatch(r"[0-9a-fA-F]{40,64}", candidate) else None
+
+    def freeze(
+        self,
+        *,
+        baseline_sha: str | None = None,
+        protected_dirty_paths: tuple[str, ...] = (),
+    ) -> GitSnapshot:
+        dirty = tuple(sorted(set(self._tracked_changes) | set(self._untracked_paths)))
+        state = (
+            "UNKNOWN"
+            if self._inside_work_tree is None
+            else ("DIRTY" if dirty else "CLEAN")
+        )
+        return GitSnapshot(
+            executable=self._executable,
+            root=str(self.root),
+            branch=self._branch,
+            head_sha=self._head_sha,
+            baseline_sha=baseline_sha,
+            inside_work_tree=self._inside_work_tree,
+            bare=self._bare,
+            working_tree_state=state,
+            dirty_paths=dirty,
+            tracked_changes=self._tracked_changes,
+            staged_changes=self._staged_changes,
+            untracked_paths=self._untracked_paths,
+            protected_dirty_paths=protected_dirty_paths,
+            query_results=MappingProxyType(dict(self._results)),
+            process_count=self._process_count,
+            duplicate_processes=0,
+        )
+
+
+def _parse_porcelain_v2(
+    payload: bytes,
+) -> tuple[str | None, str | None, set[str], set[str], set[str]]:
+    branch: str | None = None
+    head: str | None = None
+    tracked: set[str] = set()
+    staged: set[str] = set()
+    untracked: set[str] = set()
+    records = payload.split(b"\0")
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if not record:
+            continue
+        if record.startswith(b"# branch.oid "):
+            candidate = record.removeprefix(b"# branch.oid ").decode(
+                "ascii", errors="replace"
+            )
+            if re.fullmatch(r"[0-9a-fA-F]{40,64}", candidate):
+                head = candidate.lower()
+            continue
+        if record.startswith(b"# branch.head "):
+            candidate = record.removeprefix(b"# branch.head ").decode(
+                "utf-8", errors="replace"
+            )
+            branch = None if candidate == "(detached)" else candidate
+            continue
+        kind = record[:1]
+        if kind == b"?" and record.startswith(b"? "):
+            untracked.add(record[2:].decode("utf-8", errors="surrogateescape"))
+            continue
+        if kind not in {b"1", b"2", b"u"}:
+            continue
+        maximum = {b"1": 8, b"2": 9, b"u": 10}[kind]
+        parts = record.split(b" ", maximum)
+        if len(parts) <= maximum:
+            continue
+        xy = parts[1]
+        path = parts[-1].decode("utf-8", errors="surrogateescape")
+        tracked.add(path)
+        if xy[:1] not in {b".", b" "}:
+            staged.add(path)
+        if kind == b"2" and index < len(records):
+            index += 1
+    return branch, head, tracked, staged, untracked
 
 
 def has_symlink_component(root: Path, relative: str) -> bool:

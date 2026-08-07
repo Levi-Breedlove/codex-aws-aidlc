@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import ast
+from datetime import datetime, timezone
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import bootstrap
 from scripts import bootstrap_doctor as doctor
 from scripts import fastlane_contracts
 from scripts import package_release, update_manifest
+from scripts.fastlane_engine import api
 from scripts.fastlane_engine.core import contracts
 from scripts.fastlane_engine.core.diagnostics import (
     Diagnostic,
@@ -17,7 +21,18 @@ from scripts.fastlane_engine.core.diagnostics import (
     DiagnosticDefinition,
 )
 from scripts.fastlane_engine.core.markdown_index import MarkdownDocumentIndex
-from scripts.fastlane_engine.core.snapshot import ObservationError, SnapshotObserver
+from scripts.fastlane_engine.core.snapshot import (
+    GitObserver,
+    GitQueryKey,
+    ObservationError,
+    SnapshotObserver,
+)
+from scripts.fastlane_engine.project_inspection import (
+    Context,
+    PRD_FILE,
+    capture_engine_snapshot,
+    safe_read_text,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +54,12 @@ class EngineFoundationTests(unittest.TestCase):
         )
         for name in names:
             self.assertIs(getattr(fastlane_contracts, name), getattr(contracts, name))
+
+        from scripts.fastlane_engine.project_delivery import (
+            DELIVERY_VALIDATION_POLICY,
+        )
+
+        self.assertIs(api.DELIVERY_VALIDATION_POLICY, DELIVERY_VALIDATION_POLICY)
 
     def test_diagnostic_shape_and_order_remain_report_compatible(self) -> None:
         definitions = {
@@ -104,6 +125,162 @@ class EngineFoundationTests(unittest.TestCase):
             with self.assertRaises(TypeError):
                 snapshot.bootstrap_state["project"]["name"] = "Changed"  # type: ignore[index]
             self.assertEqual(snapshot.manifest["required_files"], ("record.md",))
+
+    def test_engine_snapshot_is_complete_immutable_and_reuses_observed_text(
+        self,
+    ) -> None:
+        observed_at = datetime(2030, 1, 2, 3, 4, tzinfo=timezone.utc)
+        original_open = Path.open
+        opens: dict[str, int] = {}
+        resolved_root = ROOT.resolve()
+
+        def counted_open(path: Path, *args, **kwargs):
+            try:
+                relative = path.resolve().relative_to(resolved_root).as_posix()
+            except ValueError:
+                pass
+            else:
+                opens[relative] = opens.get(relative, 0) + 1
+            return original_open(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "open", counted_open):
+            snapshot = capture_engine_snapshot(ROOT, observed_at=observed_at)
+
+        required = set(snapshot.manifest["required_files"])
+        self.assertEqual(required, set(snapshot.files))
+        self.assertEqual(snapshot.observed_at, observed_at)
+        self.assertEqual(snapshot.observation_metrics.files_opened, len(required))
+        self.assertEqual(
+            snapshot.observation_metrics.markdown_indexes,
+            sum(path.endswith(".md") for path in required),
+        )
+        self.assertEqual(snapshot.observation_metrics.git_processes, 1)
+        self.assertEqual(snapshot.observation_metrics.duplicate_git_processes, 0)
+        self.assertEqual(
+            {path: opens[path] for path in required}, dict.fromkeys(required, 1)
+        )
+
+        context = Context(ROOT, template_source=True, observed_snapshot=snapshot)
+        with mock.patch.object(
+            Path, "open", side_effect=AssertionError("snapshot text was reread")
+        ):
+            self.assertEqual(
+                safe_read_text(context, PRD_FILE),
+                snapshot.files[PRD_FILE].canonical_text,
+            )
+        with self.assertRaises(TypeError):
+            snapshot.files["new"] = snapshot.files[PRD_FILE]  # type: ignore[index]
+        with self.assertRaises(TypeError):
+            snapshot.git.query_results[GitQueryKey("new")] = next(  # type: ignore[index]
+                iter(snapshot.git.query_results.values())
+            )
+
+    def test_git_observer_memoizes_exact_canonical_queries(self) -> None:
+        head = "a" * 40
+        other = "b" * 40
+        calls: list[tuple[str, ...]] = []
+
+        def run(command, **_kwargs):
+            calls.append(tuple(command))
+            if "status" in command:
+                stdout = (
+                    f"# branch.oid {head}\0"
+                    "# branch.head fast-lane\0"
+                    f"1 M. N... 100644 100644 100644 {head} {head} "
+                    "docs/project/PRD.md\0"
+                    "? notes.txt\0"
+                ).encode()
+            else:
+                stdout = b""
+            return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr=b"")
+
+        observer = GitObserver(ROOT, resolve_git=lambda _root: "git", run=run)
+        observer.observe_repository_state()
+        first = observer.query("merge-base", "--is-ancestor", head, other)
+        second = observer.query("merge-base", "--is-ancestor", head, other)
+        snapshot = observer.freeze()
+
+        self.assertIs(first, second)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(snapshot.process_count, 2)
+        self.assertEqual(snapshot.duplicate_processes, 0)
+        self.assertEqual(snapshot.branch, "fast-lane")
+        self.assertEqual(snapshot.head_sha, head)
+        self.assertEqual(snapshot.tracked_changes, ("docs/project/PRD.md",))
+        self.assertEqual(snapshot.staged_changes, ("docs/project/PRD.md",))
+        self.assertEqual(snapshot.untracked_paths, ("notes.txt",))
+        self.assertIs(
+            snapshot.result("merge-base", "--is-ancestor", head, other), first
+        )
+
+    def test_complete_engine_evaluation_never_reopens_snapshot_files(self) -> None:
+        required = set(
+            json.loads((ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8"))[
+                "required_files"
+            ]
+        )
+        original_open = Path.open
+        opens: dict[str, int] = {}
+        resolved_root = ROOT.resolve()
+
+        def counted_open(path: Path, *args, **kwargs):
+            try:
+                relative = path.resolve().relative_to(resolved_root).as_posix()
+            except ValueError:
+                pass
+            else:
+                opens[relative] = opens.get(relative, 0) + 1
+            return original_open(path, *args, **kwargs)
+
+        with (
+            mock.patch.object(Path, "open", counted_open),
+            mock.patch(
+                "scripts.fastlane_engine.core.snapshot.subprocess.run",
+                wraps=subprocess.run,
+            ) as git_run,
+        ):
+            report = api.inspect_project(ROOT, template_source=True)
+
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(
+            {path: opens[path] for path in required}, dict.fromkeys(required, 1)
+        )
+        self.assertLessEqual(git_run.call_count, 2)
+
+    def test_populated_project_stays_within_the_git_observation_budget(self) -> None:
+        from tests import test_bootstrap_doctor as fixture_module
+
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = fixture_module.BootstrapDoctorTests(methodName="runTest")
+            project = fixture.copy_project(Path(temporary))
+            fixture.approve_project(project)
+            with mock.patch(
+                "scripts.fastlane_engine.core.snapshot.subprocess.run",
+                wraps=subprocess.run,
+            ) as git_run:
+                report = api.inspect_project(project)
+            snapshot = capture_engine_snapshot(project)
+
+        self.assertEqual(report["schema_version"], 2)
+        self.assertLessEqual(git_run.call_count, 6)
+        self.assertLessEqual(snapshot.git.process_count, 6)
+        self.assertEqual(snapshot.git.duplicate_processes, 0)
+        self.assertIsNotNone(snapshot.git.head_sha)
+
+    def test_normal_evaluation_uses_only_the_snapshot_clock(self) -> None:
+        class DeniedClock:
+            @classmethod
+            def now(cls, *_args, **_kwargs):
+                raise AssertionError("lifecycle evaluation requested a second clock")
+
+        with (
+            mock.patch("scripts.fastlane_engine.authority.aws.datetime", DeniedClock),
+            mock.patch(
+                "scripts.fastlane_engine.project_inspection.datetime", DeniedClock
+            ),
+        ):
+            report = api.inspect_project(ROOT, template_source=True)
+        self.assertEqual(report["schema_version"], 2)
 
     def test_markdown_index_ignores_fenced_headings_and_tables(self) -> None:
         text = (

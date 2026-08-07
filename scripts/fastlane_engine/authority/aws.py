@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import re
+from datetime import datetime, timezone
+from functools import partial
 from typing import Any, Callable, Mapping
 
 from ..aws import (
@@ -60,11 +62,13 @@ def _read_preflight_receipt_authority(
     envelope: Mapping[str, str],
     active_artifact: str,
     *,
+    observed_at: datetime | None = None,
     allow_one_operation: bool = True,
     allow_expired: bool = False,
 ) -> dict[str, Any] | None:
     """SAFETY: project one exact owner-authored read-only preflight scope."""
 
+    evaluation_time = observed_at or datetime.now(timezone.utc)
     try:
         receipt = marked_receipt(verify_text, "aws-read-preflight")
     except ValueError:
@@ -84,6 +88,7 @@ def _read_preflight_receipt_authority(
         fields["Valid until"],
         result,
         envelope,
+        observed_at=evaluation_time,
         allow_expired=allow_expired,
     )
     if valid_until == "ONE_OPERATION" and not allow_one_operation:
@@ -179,11 +184,20 @@ def _read_preflight_receipt_authority(
     }
 
 
-def _deployment_values(value: str, label: str, *, allow_none: bool) -> list[str]:
+def _deployment_values(
+    value: str,
+    label: str,
+    *,
+    allow_none: bool,
+    observed_at: datetime | None = None,
+) -> list[str]:
     """COMPATIBILITY: retain the authority-layer list parser during PR 6."""
 
     return _deployment_values_core(
-        build_aws_authority_policy(), value, label, allow_none=allow_none
+        build_aws_authority_policy(observed_at),
+        value,
+        label,
+        allow_none=allow_none,
     )
 
 
@@ -192,11 +206,13 @@ def _deployment_reconciliation_read_authority(
     cost_posture: str,
     group: list[dict[str, str]],
     *,
+    observed_at: datetime | None = None,
     allow_expired: bool = False,
     require_post_action_freshness: bool = False,
 ) -> dict[str, Any] | None:
     """SAFETY: project exact read-only scope for current or restricted reconciliation."""
 
+    evaluation_time = observed_at or datetime.now(timezone.utc)
     if not group:
         return None
     first = group[0]
@@ -225,7 +241,10 @@ def _deployment_reconciliation_read_authority(
         return None
     try:
         attempted_resources = _deployment_values(
-            first.get("Resources", ""), "Resources", allow_none=False
+            first.get("Resources", ""),
+            "Resources",
+            allow_none=False,
+            observed_at=evaluation_time,
         )
         receipt = marked_receipt(verify_text, "aws-read-preflight")
     except ValueError:
@@ -242,7 +261,10 @@ def _deployment_reconciliation_read_authority(
     digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
     result = clean_cell(row.get("Result", ""))
     valid_until = _authorization_valid_until(
-        fields["Valid until"], result, allow_expired=allow_expired
+        fields["Valid until"],
+        result,
+        observed_at=evaluation_time,
+        allow_expired=allow_expired,
     )
     if valid_until in {None, "ONE_OPERATION"}:
         return None
@@ -376,6 +398,7 @@ def _teardown_reconciliation_read_authority(
     group: list[dict[str, str]],
     attempt_id: str,
     *,
+    observed_at: datetime | None = None,
     restricted_closure: bool,
 ) -> dict[str, Any] | None:
     """Project current read authority for one immutable teardown attempt."""
@@ -405,6 +428,7 @@ def _teardown_reconciliation_read_authority(
         verify_text,
         cost_posture,
         synthetic_group,
+        observed_at=observed_at,
         allow_expired=False,
         require_post_action_freshness=restricted_closure,
     )
@@ -417,9 +441,12 @@ def _teardown_reconciliation_read_authority(
     }
 
 
-def build_aws_authority_policy() -> AwsAuthorityPolicy:
+def build_aws_authority_policy(
+    observed_at: datetime | None = None,
+) -> AwsAuthorityPolicy:
     """COMPATIBILITY: bind PR 6 AWS evaluators to the current authority layer."""
 
+    evaluation_time = observed_at or datetime.now(timezone.utc)
     return AwsAuthorityPolicy(
         split_authority_values=_split_authority_values,
         action_authorization_rows=_action_authorization_rows,
@@ -430,10 +457,14 @@ def build_aws_authority_policy() -> AwsAuthorityPolicy:
         receipt_scope_within_gate_b=_receipt_scope_within_gate_b,
         receipt_artifact_matches_gate_b=_receipt_artifact_matches_gate_b,
         gate_b_rollback_value=_gate_b_rollback_value,
-        deployment_reconciliation_read_authority=(
-            _deployment_reconciliation_read_authority
+        deployment_reconciliation_read_authority=partial(
+            _deployment_reconciliation_read_authority,
+            observed_at=evaluation_time,
         ),
-        teardown_reconciliation_read_authority=_teardown_reconciliation_read_authority,
+        teardown_reconciliation_read_authority=partial(
+            _teardown_reconciliation_read_authority,
+            observed_at=evaluation_time,
+        ),
         parse_verification_matrix=parse_verification_matrix,
         explicit_human_approver=explicit_human_approver,
         marked_receipt=marked_receipt,
@@ -446,6 +477,7 @@ def _receipt_external_authority(
     action: str,
     construction_authorization: str,
     *,
+    observed_at: datetime | None = None,
     envelope: Mapping[str, str],
     cost_posture: str,
     active_artifact: str,
@@ -454,6 +486,7 @@ def _receipt_external_authority(
 ) -> dict[str, Any] | None:
     """SAFETY: intersect one exact mutation receipt with the Gate B envelope."""
 
+    evaluation_time = observed_at or datetime.now(timezone.utc)
     if action not in {"Deployment", "Teardown"}:
         return None
     deployment = action == "Deployment"
@@ -486,7 +519,10 @@ def _receipt_external_authority(
     digest = "sha256:" + hashlib.sha256(receipt.encode("utf-8")).hexdigest()
     result = clean_cell(row.get("Result", ""))
     valid_until = _receipt_validity_within_gate_b(
-        fields.get("Valid until", ""), result, envelope
+        fields.get("Valid until", ""),
+        result,
+        envelope,
+        observed_at=evaluation_time,
     )
     expected_scope = (
         f"ACCOUNT: {fields['Account']}; REGION: {fields['Region']}; "
@@ -691,8 +727,22 @@ def derive_external_authority(
 ) -> dict[str, Any]:
     """SAFETY: project exact current AWS authority without creating authority."""
 
-    read_authority_fn = read_authority_deriver or _read_preflight_receipt_authority
-    action_authority = action_authority_deriver or _receipt_external_authority
+    if read_authority_deriver is None:
+
+        def read_authority_fn(*args: Any, **kwargs: Any) -> dict[str, Any] | None:
+            return _read_preflight_receipt_authority(
+                *args, observed_at=ctx.observed_at, **kwargs
+            )
+    else:
+        read_authority_fn = read_authority_deriver
+    if action_authority_deriver is None:
+
+        def action_authority(*args: Any, **kwargs: Any) -> dict[str, Any] | None:
+            return _receipt_external_authority(
+                *args, observed_at=ctx.observed_at, **kwargs
+            )
+    else:
+        action_authority = action_authority_deriver
     empty: dict[str, Any] = {
         "kind": "NONE",
         "validity": "NONE",
@@ -886,7 +936,10 @@ def derive_external_authority(
     if aws_progress_state != "AWS_PREFLIGHT_READY" or not preflight_ready:
         return empty
     try:
-        expiration = parse_future_expiry(envelope.get("AWS authorization validity", ""))
+        expiration = parse_future_expiry(
+            envelope.get("AWS authorization validity", ""),
+            observed_at=ctx.observed_at,
+        )
     except ValueError:
         return empty
     environment = envelope.get("AWS environment", "")

@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, Sequence
 
-from .api import DELIVERY_VALIDATION_POLICY
 from .aws import (
     parse_aws_lifecycle_intent_record as _parse_aws_lifecycle_intent_record_core,
 )
@@ -20,18 +19,24 @@ from .core.ids import clean_cell, explicit_timestamp, explicit_value
 from .define.models import RequirementsContract
 from .define.requirements import _schema_13_requirement_rows
 from .design import (
+    PROPERTY_ID,
     TECHNOLOGY_DECISION_ID,
     command_matches_prefix,
+    parse_property_run_target,
+    parsed_numeric_version,
     parse_authorized_ids,
     parse_command_prefixes,
     parse_envelope_paths,
     parse_envelope_targets,
     parse_github_constraints,
     parse_task_boundary,
+    technology_contract_value_is_unresolved,
+    valid_property_execution_command,
     validation_commands,
 )
 from .design.models import DesignContract, PropertyExecution, TechnologyDecision
 from .deliver import (
+    DeliveryValidationPolicy,
     InspectedTask,
     PropertyTestEvidenceRow,
     TaskCompletionEvidenceRow,
@@ -52,7 +57,7 @@ from .deliver import (
     validate_task_property_execution_projection as _validate_property_projection_core,
     validate_task_records as _validate_task_records_core,
 )
-from .core.snapshot import GitObservationError, git_read
+from .core.snapshot import GitObservationError
 from .project_inspection import (
     CHECKPOINT_ID,
     COORDINATOR_LEDGER_PATHS,
@@ -88,6 +93,19 @@ except ModuleNotFoundError:
         path_boundary_contains,
         without_fenced_code,
     )
+
+
+# CANONICALIZATION: Delivery validates evidence using the exact Design grammar,
+# but the composed policy lives outside the public API so domains never import
+# the orchestration facade back into themselves.
+DELIVERY_VALIDATION_POLICY = DeliveryValidationPolicy(
+    property_id=PROPERTY_ID,
+    valid_property_execution_command=valid_property_execution_command,
+    validation_commands=validation_commands,
+    parse_property_run_target=parse_property_run_target,
+    parsed_numeric_version=parsed_numeric_version,
+    technology_contract_value_is_unresolved=technology_contract_value_is_unresolved,
+)
 
 
 def validate_task_property_execution_projection(
@@ -247,7 +265,8 @@ def validate_tasks_against_envelope(
             envelope.get("GitHub boundary", ""),
         )
         parse_future_expiry(
-            envelope.get("Authorization expiry or completion condition", "")
+            envelope.get("Authorization expiry or completion condition", ""),
+            observed_at=ctx.observed_at,
         )
     except (ValueError, TypeError) as exc:
         if str(exc) == "Construction authorization is expired":
@@ -665,19 +684,17 @@ def validate_construction_repository(
             return
 
     try:
-        inside = git_read(ctx.root, "rev-parse", "--is-inside-work-tree")
-        bare = git_read(ctx.root, "rev-parse", "--is-bare-repository")
-        head_result = git_read(ctx.root, "rev-parse", "--verify", "HEAD^{commit}")
-        baseline_result = git_read(
-            ctx.root, "rev-parse", "--verify", f"{baseline}^{{commit}}"
+        inside = ctx.git_result("rev-parse", "--is-inside-work-tree")
+        bare = ctx.git_result("rev-parse", "--is-bare-repository")
+        head_result = ctx.git_result("rev-parse", "--verify", "HEAD^{commit}")
+        baseline_result = ctx.git_result(
+            "rev-parse", "--verify", f"{baseline}^{{commit}}"
         )
-        green_result = git_read(
-            ctx.root, "rev-parse", "--verify", f"{known_green}^{{commit}}"
+        green_result = ctx.git_result(
+            "rev-parse", "--verify", f"{known_green}^{{commit}}"
         )
         checkpoint_result = (
-            git_read(
-                ctx.root, "rev-parse", "--verify", f"{checkpoint_commit}^{{commit}}"
-            )
+            ctx.git_result("rev-parse", "--verify", f"{checkpoint_commit}^{{commit}}")
             if checkpoint_commit is not None
             else None
         )
@@ -731,14 +748,13 @@ def validate_construction_repository(
         return
 
     try:
-        baseline_ancestor = git_read(
-            ctx.root, "merge-base", "--is-ancestor", baseline, known_green
+        baseline_ancestor = ctx.git_result(
+            "merge-base", "--is-ancestor", baseline, known_green
         )
-        green_ancestor = git_read(
-            ctx.root, "merge-base", "--is-ancestor", known_green, "HEAD"
+        green_ancestor = ctx.git_result(
+            "merge-base", "--is-ancestor", known_green, "HEAD"
         )
-        committed = git_read(
-            ctx.root,
+        committed = ctx.git_result(
             "diff",
             "--name-only",
             "-z",
@@ -790,11 +806,11 @@ def validate_construction_repository(
     if not reconcile_worktree:
         return
     try:
-        tracked = git_read(
-            ctx.root, "diff", "--name-only", "-z", "--relative", "HEAD", "--", "."
+        tracked = ctx.git_result(
+            "diff", "--name-only", "-z", "--relative", "HEAD", "--", "."
         )
-        untracked = git_read(
-            ctx.root, "ls-files", "--others", "--exclude-standard", "-z", "--", "."
+        untracked = ctx.git_result(
+            "ls-files", "--others", "--exclude-standard", "-z", "--", "."
         )
     except GitObservationError as exc:
         ctx.error(

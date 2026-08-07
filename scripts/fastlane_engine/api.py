@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .aws import (
     AwsAuthorityPolicy,
@@ -53,11 +53,7 @@ from .design import (
     canonical_envelope_sha256,
     derive_design_contract,
     evaluate_adr_rationale,
-    parse_property_run_target,
-    parsed_numeric_version,
-    technology_contract_value_is_unresolved,
     valid_property_execution_command,
-    validation_commands,
 )
 from .define.intake import PROJECT_MODES
 from .define.requirements import _schema_13_requirement_rows, _state_trigger_map
@@ -66,7 +62,6 @@ from .deliver import (
     ApprovedDeliveryContract,
     ApprovedSpikeContract,
     ApprovedTaskContract,
-    DeliveryValidationPolicy,
     HarnessExecutionRow,
     InspectedTask,
     PropertyExecutionRow,
@@ -79,15 +74,8 @@ from .deliver import (
     validate_gate_b_execution_binding,
 )
 
-
-DELIVERY_VALIDATION_POLICY = DeliveryValidationPolicy(
-    property_id=PROPERTY_ID,
-    valid_property_execution_command=valid_property_execution_command,
-    validation_commands=validation_commands,
-    parse_property_run_target=parse_property_run_target,
-    parsed_numeric_version=parsed_numeric_version,
-    technology_contract_value_is_unresolved=technology_contract_value_is_unresolved,
-)
+if TYPE_CHECKING:
+    from .project_delivery import DELIVERY_VALIDATION_POLICY
 
 
 def capture_project_snapshot(
@@ -112,6 +100,22 @@ def capture_project_snapshot(
         else:
             observer.observe_binary(relative)
     return observer.freeze()
+
+
+def _delivery_validation_policy():
+    """Return the composed Delivery policy without an import-time API cycle."""
+
+    from .project_delivery import DELIVERY_VALIDATION_POLICY
+
+    return DELIVERY_VALIDATION_POLICY
+
+
+def __getattr__(name: str):
+    """COMPATIBILITY: lazily retain the former public policy export."""
+
+    if name == "DELIVERY_VALIDATION_POLICY":
+        return _delivery_validation_policy()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def inspect_project(
@@ -458,7 +462,8 @@ def validate_approved_property_evidence(
     property_ids = PROPERTY_ID.findall(clean_cell(metadata.get("Requirements", "")))
     if not property_ids:
         return
-    rows = parse_property_test_evidence(verify_text, DELIVERY_VALIDATION_POLICY)
+    policy = _delivery_validation_policy()
+    rows = parse_property_test_evidence(verify_text, policy)
     completion_rows = parse_task_completion_evidence(verify_text)
     task = InspectedTask(task_id, title, block, metadata, duplicate_metadata)
     for property_id in property_ids:
@@ -500,7 +505,7 @@ def validate_approved_property_evidence(
             expected,
             technology,
             completion_rows,
-            DELIVERY_VALIDATION_POLICY,
+            policy,
         )
 
 
