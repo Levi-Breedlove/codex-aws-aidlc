@@ -33,6 +33,8 @@ from .aws import (
 )
 from .core.contracts import table_after_heading
 from .core.ids import clean_cell, explicit_value
+from .composition import build_evaluation
+from .evaluation import EngineEvaluation
 from .project_delivery import (
     validate_aws_lifecycle_intent_record,
     validate_release_decision_record,
@@ -58,7 +60,7 @@ from .project_validation import (
     validate_state_schema,
 )
 from .remediation import _owner_stage_for_aws_core_phases, _owner_stage_from_gates
-from .report import build_report
+from .report import serialize_evaluation
 from .routing import (
     derive_route,
     preserve_expired_authority_for_deployment_closure as _preserve_deployment_closure,
@@ -94,13 +96,13 @@ def _preserve_specialized_teardown_block(ctx: Context, lifecycle_state: str) -> 
     return _preserve_teardown_block(ctx.diagnostics, lifecycle_state)
 
 
-def inspect_project(
+def evaluate_project(
     root: Path,
     *,
     template_source: bool = False,
     prior_remediation_fingerprint: str | None = None,
-) -> dict[str, Any]:
-    """SAFETY: observe once and compose domains in historical order."""
+) -> EngineEvaluation:
+    """SAFETY: observe once and compose immutable domains in historical order."""
 
     root = root.resolve()
     snapshot = capture_engine_snapshot(root)
@@ -112,12 +114,12 @@ def inspect_project(
     )
     if not root.is_dir():
         ctx.error("PROJECT_ROOT", "Project root is not a directory", str(root))
-        return build_report(ctx, "BLOCKED", "STOP", {}, TaskSummary())
+        return build_evaluation(ctx, "BLOCKED", "STOP", {}, TaskSummary())
 
     manifest = load_json_document(ctx, MANIFEST_FILE, "MANIFEST_PARSE")
     state = load_json_document(ctx, STATE_FILE, "STATE_PARSE")
     if manifest is None or state is None:
-        return build_report(
+        return build_evaluation(
             ctx,
             "BLOCKED",
             "STOP",
@@ -135,7 +137,7 @@ def inspect_project(
     validate_prompt_pack(ctx, manifest, state)
     if not state_sections_valid:
         validate_placeholders(ctx)
-        return build_report(
+        return build_evaluation(
             ctx,
             "BLOCKED",
             "STOP",
@@ -579,7 +581,7 @@ def inspect_project(
         for item in ctx.diagnostics
     ):
         owner_stage_hint = "DEFINE"
-    return build_report(
+    return build_evaluation(
         ctx,
         lifecycle_state,
         next_prompt,
@@ -606,4 +608,21 @@ def inspect_project(
         req_aws_core_ready=req_aws_core_ready,
         aws_lifecycle_intent_record=aws_lifecycle_intent_record,
         release_evidence_cutoff=release_evidence_cutoff,
+    )
+
+
+def inspect_project(
+    root: Path,
+    *,
+    template_source: bool = False,
+    prior_remediation_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Return the stable schema-2 serialization of one complete evaluation."""
+
+    return serialize_evaluation(
+        evaluate_project(
+            root,
+            template_source=template_source,
+            prior_remediation_fingerprint=prior_remediation_fingerprint,
+        )
     )
