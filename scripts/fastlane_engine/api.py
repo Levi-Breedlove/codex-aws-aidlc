@@ -73,6 +73,7 @@ from .deliver import (
     validate_done_property_evidence,
     validate_gate_b_execution_binding,
 )
+from .evaluation import EngineEvaluation
 
 if TYPE_CHECKING:
     from .project_delivery import DELIVERY_VALIDATION_POLICY
@@ -116,6 +117,23 @@ def __getattr__(name: str):
     if name == "DELIVERY_VALIDATION_POLICY":
         return _delivery_validation_policy()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def evaluate_project(
+    root: Path,
+    *,
+    template_source: bool = False,
+    prior_remediation_fingerprint: str | None = None,
+) -> EngineEvaluation:
+    """Return one immutable whole-project evaluation without serializing it."""
+
+    from .orchestration import evaluate_project as _evaluate_project
+
+    return _evaluate_project(
+        root,
+        template_source=template_source,
+        prior_remediation_fingerprint=prior_remediation_fingerprint,
+    )
 
 
 def inspect_project(
@@ -521,8 +539,10 @@ __all__ = (
     "HarnessExecutionRow",
     "PropertyExecutionRow",
     "ProjectSnapshot",
+    "EngineEvaluation",
     "RequirementsContract",
     "capture_project_snapshot",
+    "evaluate_project",
     "inspect_project",
     "aws_core_phase_evidence_issues",
     "derive_change_impact_contract",

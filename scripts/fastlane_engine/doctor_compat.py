@@ -48,6 +48,7 @@ _MODULE_SUFFIXES = (
     "authority.models",
     "authority.receipts",
     "authority.write",
+    "composition",
     "orchestration",
     "owner_decisions",
     "project_delivery",

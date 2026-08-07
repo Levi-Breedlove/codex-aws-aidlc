@@ -608,7 +608,7 @@ if __package__:
         _preserve_specialized_teardown_block,
         inspect_project,
     )
-    from .fastlane_engine.report import (
+    from .fastlane_engine.composition import (
         _context_selector_span,
         build_report,
         derive_context_plan,
@@ -728,7 +728,7 @@ else:
         _preserve_specialized_teardown_block,
         inspect_project,
     )
-    from fastlane_engine.report import (
+    from fastlane_engine.composition import (
         _context_selector_span,
         build_report,
         derive_context_plan,

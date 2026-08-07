@@ -213,6 +213,7 @@ class EngineRoutingTests(unittest.TestCase):
     ) -> None:
         prohibited = {"git_read", "inspect_git_baseline"}
         for relative in (
+            "composition.py",
             "project_delivery.py",
             "project_validation.py",
             "report.py",

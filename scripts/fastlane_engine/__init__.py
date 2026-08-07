@@ -13,6 +13,7 @@ from .api import (
     IntakeFoundationContract,
     RequirementsContract,
     capture_project_snapshot,
+    evaluate_project,
     inspect_project,
     aws_core_phase_evidence_issues,
     derive_change_impact_contract,
@@ -31,6 +32,7 @@ from .api import (
 )
 from .core.diagnostics import Diagnostic, DiagnosticCollector
 from .core.snapshot import ProjectSnapshot
+from .evaluation import EngineEvaluation
 
 __all__ = (
     "Diagnostic",
@@ -38,10 +40,12 @@ __all__ = (
     "AwsAuthorityPolicy",
     "AwsCoreEvidenceRow",
     "DesignContract",
+    "EngineEvaluation",
     "IntakeFoundationContract",
     "ProjectSnapshot",
     "RequirementsContract",
     "capture_project_snapshot",
+    "evaluate_project",
     "inspect_project",
     "aws_core_phase_evidence_issues",
     "derive_change_impact_contract",

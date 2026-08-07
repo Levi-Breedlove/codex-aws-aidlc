@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from scripts import bootstrap_doctor as doctor
-from scripts.fastlane_engine.report import derive_document_summary_specifications
+from scripts.fastlane_engine.composition import derive_document_summary_specifications
 from scripts.fastlane_document_summaries import (
     SUMMARY_AUTHORITY,
     SUMMARY_BEGIN,
