@@ -10,10 +10,9 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timezone
-from functools import partial
 from typing import Any, Callable, Mapping
 
-from ..aws import (
+from .models import (
     AWS_DEPLOYMENT_RECEIPT_FIELDS,
     AWS_PLAN_BINDING,
     AWS_PREFLIGHT_ID,
@@ -21,25 +20,11 @@ from ..aws import (
     AWS_READ_ONLY_OPERATION,
     AWS_READ_PREFLIGHT_RECEIPT_FIELDS,
     AWS_TEARDOWN_RECEIPT_FIELDS,
+    AuthorityEvaluationInput,
     AwsAuthorityPolicy,
-)
-from ..aws.deployment import _deployment_values as _deployment_values_core
-from ..core.ids import clean_cell, explicit_timestamp, explicit_value, unresolved
-from ..deliver import parse_verification_matrix
-from ..design import parse_aws_environment
-from ..project_inspection import (
-    AWS_COST_CEILING,
-    VERIFY_FILE,
-    Context,
-    explicit_human_approver,
-    parse_future_expiry,
-    parse_positive_cost,
-)
-from .models import (
+    GateBAuthorityBounds,
     _action_authorization_rows,
     _authorization_valid_until,
-    _envelope_scalar,
-    _envelope_values,
     _exact_receipt_fields,
     _gate_b_rollback_value,
     _iso_datetime,
@@ -51,24 +36,24 @@ from .models import (
     _receipt_scope_within_gate_b,
     _receipt_validity_within_gate_b,
     _split_authority_values,
+    explicit_human_approver,
 )
+from ..core.ids import clean_cell, explicit_timestamp, explicit_value, unresolved
 from .receipts import marked_receipt
 
 
 def _read_preflight_receipt_authority(
-    verify_text: str,
+    authority_input: AuthorityEvaluationInput,
+    bounds: GateBAuthorityBounds,
     construction_authorization: str,
-    cost_posture: str,
-    envelope: Mapping[str, str],
-    active_artifact: str,
     *,
-    observed_at: datetime | None = None,
     allow_one_operation: bool = True,
     allow_expired: bool = False,
 ) -> dict[str, Any] | None:
     """SAFETY: project one exact owner-authored read-only preflight scope."""
 
-    evaluation_time = observed_at or datetime.now(timezone.utc)
+    evaluation_time = authority_input.observed_at
+    verify_text = authority_input.verify_text
     try:
         receipt = marked_receipt(verify_text, "aws-read-preflight")
     except ValueError:
@@ -87,7 +72,7 @@ def _read_preflight_receipt_authority(
     valid_until = _receipt_validity_within_gate_b(
         fields["Valid until"],
         result,
-        envelope,
+        bounds,
         observed_at=evaluation_time,
         allow_expired=allow_expired,
     )
@@ -106,8 +91,7 @@ def _read_preflight_receipt_authority(
         and not clean_cell(cost_match.group("bound")).startswith("NOT_APPLICABLE")
         and _read_bound_honors_cost_posture(
             cost_match.group("bound"),
-            cost_posture,
-            envelope.get("AWS cost ceiling", ""),
+            bounds,
         )
         and clean_cell(cost_match.group("until")) == fields["Valid until"]
     )
@@ -154,11 +138,9 @@ def _read_preflight_receipt_authority(
         not resources
         or not operations
         or any(AWS_READ_ONLY_OPERATION.fullmatch(item) is None for item in operations)
-        or not _receipt_identity_matches_gate_b(fields, envelope)
-        or not _receipt_scope_within_gate_b(resources, operations, envelope)
-        or not _receipt_artifact_matches_gate_b(
-            fields["Artifact digest"], envelope, active_artifact
-        )
+        or not _receipt_identity_matches_gate_b(fields, bounds)
+        or not _receipt_scope_within_gate_b(resources, operations, bounds)
+        or not _receipt_artifact_matches_gate_b(fields["Artifact digest"], bounds)
     ):
         return None
     return {
@@ -189,30 +171,34 @@ def _deployment_values(
     label: str,
     *,
     allow_none: bool,
-    observed_at: datetime | None = None,
 ) -> list[str]:
-    """COMPATIBILITY: retain the authority-layer list parser during PR 6."""
+    """Return a unique wildcard-free list for historical authority checks."""
 
-    return _deployment_values_core(
-        build_aws_authority_policy(observed_at),
-        value,
-        label,
-        allow_none=allow_none,
-    )
+    cleaned = clean_cell(value)
+    if allow_none and cleaned == "NONE":
+        return []
+    values = _split_authority_values(cleaned)
+    if (
+        not values
+        or len(values) != len(set(values))
+        or any("*" in item for item in values)
+    ):
+        raise ValueError(f"{label} must be a unique wildcard-free exact list")
+    return values
 
 
 def _deployment_reconciliation_read_authority(
-    verify_text: str,
-    cost_posture: str,
+    authority_input: AuthorityEvaluationInput,
+    bounds: GateBAuthorityBounds,
     group: list[dict[str, str]],
     *,
-    observed_at: datetime | None = None,
     allow_expired: bool = False,
     require_post_action_freshness: bool = False,
 ) -> dict[str, Any] | None:
     """SAFETY: project exact read-only scope for current or restricted reconciliation."""
 
-    evaluation_time = observed_at or datetime.now(timezone.utc)
+    evaluation_time = authority_input.observed_at
+    verify_text = authority_input.verify_text
     if not group:
         return None
     first = group[0]
@@ -241,10 +227,7 @@ def _deployment_reconciliation_read_authority(
         return None
     try:
         attempted_resources = _deployment_values(
-            first.get("Resources", ""),
-            "Resources",
-            allow_none=False,
-            observed_at=evaluation_time,
+            first.get("Resources", ""), "Resources", allow_none=False
         )
         receipt = marked_receipt(verify_text, "aws-read-preflight")
     except ValueError:
@@ -281,8 +264,8 @@ def _deployment_reconciliation_read_authority(
         and not clean_cell(cost_match.group("bound")).startswith("NOT_APPLICABLE")
         and _read_bound_honors_cost_posture(
             cost_match.group("bound"),
-            cost_posture,
-            "NOT_APPLICABLE — reconciliation receipt is the read-only ceiling",
+            bounds,
+            require_gate_ceiling=False,
         )
         and clean_cell(cost_match.group("until")) == fields["Valid until"]
     )
@@ -393,12 +376,11 @@ def _deployment_reconciliation_read_authority(
 
 
 def _teardown_reconciliation_read_authority(
-    verify_text: str,
-    cost_posture: str,
+    authority_input: AuthorityEvaluationInput,
+    bounds: GateBAuthorityBounds,
     group: list[dict[str, str]],
     attempt_id: str,
     *,
-    observed_at: datetime | None = None,
     restricted_closure: bool,
 ) -> dict[str, Any] | None:
     """Project current read authority for one immutable teardown attempt."""
@@ -406,7 +388,7 @@ def _teardown_reconciliation_read_authority(
     if not group:
         return None
     try:
-        receipt = marked_receipt(verify_text, "aws-read-preflight")
+        receipt = marked_receipt(authority_input.verify_text, "aws-read-preflight")
     except ValueError:
         return None
     fields = _exact_receipt_fields(
@@ -425,10 +407,9 @@ def _teardown_reconciliation_read_authority(
         for row in group
     ]
     authority = _deployment_reconciliation_read_authority(
-        verify_text,
-        cost_posture,
+        authority_input,
+        bounds,
         synthetic_group,
-        observed_at=observed_at,
         allow_expired=False,
         require_post_action_freshness=restricted_closure,
     )
@@ -442,51 +423,105 @@ def _teardown_reconciliation_read_authority(
 
 
 def build_aws_authority_policy(
-    observed_at: datetime | None = None,
+    authority_input: AuthorityEvaluationInput | None = None,
+    bounds: GateBAuthorityBounds | None = None,
+    *,
+    parse_verification_matrix: Callable[[str], list[dict[str, str]]] | None = None,
 ) -> AwsAuthorityPolicy:
-    """COMPATIBILITY: bind PR 6 AWS evaluators to the current authority layer."""
+    """Bind AWS evaluators to one immutable normalized authority basis."""
 
-    evaluation_time = observed_at or datetime.now(timezone.utc)
+    if authority_input is None:
+        authority_input = AuthorityEvaluationInput(
+            has_errors=False,
+            observed_at=datetime.now(timezone.utc),
+            verify_text="",
+        )
+    if bounds is None:
+        bounds = GateBAuthorityBounds()
+    verification_parser = parse_verification_matrix or (lambda _text: [])
+
+    def envelope_scalar(
+        _envelope: Mapping[str, str], field: str, _label: str
+    ) -> str | None:
+        return {
+            "AWS account": bounds.account,
+            "AWS Region": bounds.region,
+            "AWS role or profile": bounds.role_or_profile,
+        }.get(field)
+
+    def envelope_values(
+        _envelope: Mapping[str, str], field: str, _label: str
+    ) -> list[str]:
+        return list(
+            {
+                "AWS resource allowlist": bounds.resources,
+                "AWS allowed operations": bounds.operations,
+            }.get(field, ())
+        )
+
+    def deployment_reconciliation(
+        _verify_text: str,
+        _cost_posture: str,
+        group: list[dict[str, str]],
+        **kwargs: Any,
+    ) -> dict[str, Any] | None:
+        return _deployment_reconciliation_read_authority(
+            authority_input, bounds, group, **kwargs
+        )
+
+    def teardown_reconciliation(
+        _verify_text: str,
+        _cost_posture: str,
+        group: list[dict[str, str]],
+        attempt_id: str,
+        **kwargs: Any,
+    ) -> dict[str, Any] | None:
+        return _teardown_reconciliation_read_authority(
+            authority_input, bounds, group, attempt_id, **kwargs
+        )
+
     return AwsAuthorityPolicy(
+        bounds=bounds,
         split_authority_values=_split_authority_values,
         action_authorization_rows=_action_authorization_rows,
         exact_receipt_fields=_exact_receipt_fields,
-        envelope_scalar=_envelope_scalar,
-        envelope_values=_envelope_values,
-        receipt_identity_matches_gate_b=_receipt_identity_matches_gate_b,
-        receipt_scope_within_gate_b=_receipt_scope_within_gate_b,
-        receipt_artifact_matches_gate_b=_receipt_artifact_matches_gate_b,
-        gate_b_rollback_value=_gate_b_rollback_value,
-        deployment_reconciliation_read_authority=partial(
-            _deployment_reconciliation_read_authority,
-            observed_at=evaluation_time,
+        envelope_scalar=envelope_scalar,
+        envelope_values=envelope_values,
+        receipt_identity_matches_gate_b=lambda fields, _envelope: (
+            _receipt_identity_matches_gate_b(fields, bounds)
         ),
-        teardown_reconciliation_read_authority=partial(
-            _teardown_reconciliation_read_authority,
-            observed_at=evaluation_time,
+        receipt_scope_within_gate_b=lambda resources, operations, _envelope: (
+            _receipt_scope_within_gate_b(resources, operations, bounds)
         ),
-        parse_verification_matrix=parse_verification_matrix,
+        receipt_artifact_matches_gate_b=lambda artifact, _envelope, _active: (
+            _receipt_artifact_matches_gate_b(artifact, bounds)
+        ),
+        gate_b_rollback_value=lambda _envelope: _gate_b_rollback_value(bounds),
+        deployment_reconciliation_read_authority=deployment_reconciliation,
+        teardown_reconciliation_read_authority=teardown_reconciliation,
+        parse_verification_matrix=verification_parser,
         explicit_human_approver=explicit_human_approver,
         marked_receipt=marked_receipt,
-        parse_aws_environment=parse_aws_environment,
+        parse_aws_environment=lambda _value: (
+            bounds.environment or "",
+            "NORMALIZED",
+        ),
     )
 
 
 def _receipt_external_authority(
-    verify_text: str,
+    authority_input: AuthorityEvaluationInput,
+    bounds: GateBAuthorityBounds,
     action: str,
     construction_authorization: str,
     *,
-    observed_at: datetime | None = None,
-    envelope: Mapping[str, str],
-    cost_posture: str,
-    active_artifact: str,
     preflight: Mapping[str, Any] | None = None,
     teardown_review: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """SAFETY: intersect one exact mutation receipt with the Gate B envelope."""
 
-    evaluation_time = observed_at or datetime.now(timezone.utc)
+    evaluation_time = authority_input.observed_at
+    verify_text = authority_input.verify_text
     if action not in {"Deployment", "Teardown"}:
         return None
     deployment = action == "Deployment"
@@ -521,7 +556,7 @@ def _receipt_external_authority(
     valid_until = _receipt_validity_within_gate_b(
         fields.get("Valid until", ""),
         result,
-        envelope,
+        bounds,
         observed_at=evaluation_time,
     )
     expected_scope = (
@@ -561,8 +596,8 @@ def _receipt_external_authority(
         or not explicit_timestamp(observed_at)
         or valid_until is None
         or result not in {"AUTHORIZED", "READY"}
-        or not _receipt_identity_matches_gate_b(fields, envelope)
-        or not _receipt_scope_within_gate_b(resources, operations, envelope)
+        or not _receipt_identity_matches_gate_b(fields, bounds)
+        or not _receipt_scope_within_gate_b(resources, operations, bounds)
     ):
         return None
     if deployment:
@@ -587,9 +622,9 @@ def _receipt_external_authority(
             or row.get("Cost ceiling and validity") != expected_cost_validity
             or row.get("Rollback boundary") != rollback
             or AWS_PLAN_BINDING.fullmatch(plan) is None
-            or not _receipt_artifact_matches_gate_b(artifact, envelope, active_artifact)
-            or not _mutation_cost_within_gate_b(cost_ceiling, envelope, cost_posture)
-            or rollback != _gate_b_rollback_value(envelope)
+            or not _receipt_artifact_matches_gate_b(artifact, bounds)
+            or not _mutation_cost_within_gate_b(cost_ceiling, bounds)
+            or rollback != _gate_b_rollback_value(bounds)
         ):
             return None
         kind = "AWS_DEPLOYMENT"
@@ -655,11 +690,15 @@ def _receipt_external_authority(
             return None
         artifact = teardown_artifact
         plan = teardown_plan
-        cost_ceiling = clean_cell(envelope.get("AWS cost ceiling", ""))
-        rollback = clean_cell(envelope.get("AWS rollback boundary", ""))
+        cost_ceiling = bounds.aws_cost_ceiling_raw
+        rollback = (
+            f"ROLLBACK: {bounds.rollback_boundary}"
+            if bounds.rollback_boundary
+            else "NONE"
+        )
         if (
             _parse_cost_ceiling(cost_ceiling) is None
-            or _gate_b_rollback_value(envelope) is None
+            or _gate_b_rollback_value(bounds) is None
         ):
             return None
         kind = "AWS_TEARDOWN"
@@ -710,14 +749,12 @@ def _receipt_external_authority(
 
 
 def derive_external_authority(
-    ctx: Context,
-    envelope: dict[str, str],
+    authority_input: AuthorityEvaluationInput,
+    bounds: GateBAuthorityBounds,
     lane: str | None,
     construction_authorization: str,
     *,
-    cost_posture: str = "",
     aws_progress_state: str | None = None,
-    active_artifact: str = "",
     preflight: Mapping[str, Any] | None = None,
     aws_action_phase: str | None = None,
     teardown_review: Mapping[str, Any] | None = None,
@@ -730,17 +767,13 @@ def derive_external_authority(
     if read_authority_deriver is None:
 
         def read_authority_fn(*args: Any, **kwargs: Any) -> dict[str, Any] | None:
-            return _read_preflight_receipt_authority(
-                *args, observed_at=ctx.observed_at, **kwargs
-            )
+            return _read_preflight_receipt_authority(*args, **kwargs)
     else:
         read_authority_fn = read_authority_deriver
     if action_authority_deriver is None:
 
         def action_authority(*args: Any, **kwargs: Any) -> dict[str, Any] | None:
-            return _receipt_external_authority(
-                *args, observed_at=ctx.observed_at, **kwargs
-            )
+            return _receipt_external_authority(*args, **kwargs)
     else:
         action_authority = action_authority_deriver
     empty: dict[str, Any] = {
@@ -759,9 +792,8 @@ def derive_external_authority(
         "rollback_boundary": "NONE",
         "expiration": "NONE",
     }
-    verify_text = ctx.texts.get(VERIFY_FILE, "")
     if aws_action_phase == "AWS-30" and deployment_sequence is not None:
-        if ctx.has_errors or deployment_sequence.get("issues"):
+        if authority_input.has_errors or deployment_sequence.get("issues"):
             return empty
         reconciliation_authority = deployment_sequence.get(
             "reconciliation_read_authority"
@@ -789,7 +821,7 @@ def derive_external_authority(
         and teardown_review is not None
         and clean_cell(teardown_review.get("status", "")) == "POST_ACTION_REVIEW"
     ):
-        if ctx.has_errors or teardown_review.get("issues"):
+        if authority_input.has_errors or teardown_review.get("issues"):
             return empty
         reconciliation_authority = teardown_review.get("reconciliation_read_authority")
         if (
@@ -805,7 +837,11 @@ def derive_external_authority(
         required["kind"] = "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
         required["validity"] = "REQUIRED"
         return required
-    if ctx.has_errors or construction_authorization == "NONE":
+    if (
+        authority_input.has_errors
+        or not bounds.valid
+        or construction_authorization == "NONE"
+    ):
         return empty
     if aws_action_phase not in {"AWS-10", "AWS-20", "AWS-30", "AWS-40", "AWS-50"}:
         return empty
@@ -816,11 +852,9 @@ def derive_external_authority(
         return required
     if aws_action_phase == "AWS-10" and aws_progress_state == "AWS_PREFLIGHT_RUNNING":
         read_authority = read_authority_fn(
-            verify_text,
+            authority_input,
+            bounds,
             construction_authorization,
-            cost_posture,
-            envelope,
-            active_artifact,
         )
         if read_authority is not None:
             return read_authority
@@ -834,20 +868,16 @@ def derive_external_authority(
         and lane == "read-only"
     ):
         read_authority = read_authority_fn(
-            verify_text,
+            authority_input,
+            bounds,
             construction_authorization,
-            cost_posture,
-            envelope,
-            active_artifact,
         )
         return read_authority if read_authority is not None else empty
     if aws_action_phase in {"AWS-30", "AWS-40"}:
         read_authority = read_authority_fn(
-            verify_text,
+            authority_input,
+            bounds,
             construction_authorization,
-            cost_posture,
-            envelope,
-            active_artifact,
             allow_one_operation=False,
         )
         if read_authority is not None:
@@ -856,7 +886,7 @@ def derive_external_authority(
         required["kind"] = "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED"
         required["validity"] = "REQUIRED"
         return required
-    boundary = envelope.get("AWS boundary", "NONE")
+    boundary = bounds.boundary
     if boundary not in {"READ_ONLY", "MUTATE_LISTED_RESOURCES"}:
         return empty
     if boundary == "READ_ONLY":
@@ -873,12 +903,10 @@ def derive_external_authority(
         }:
             return empty
         authority = action_authority(
-            verify_text,
+            authority_input,
+            bounds,
             "Teardown",
             construction_authorization,
-            envelope=envelope,
-            cost_posture=cost_posture,
-            active_artifact=active_artifact,
             teardown_review=teardown_review,
         )
         if authority is not None:
@@ -903,12 +931,10 @@ def derive_external_authority(
             item
             for item in (
                 action_authority(
-                    verify_text,
+                    authority_input,
+                    bounds,
                     "Deployment",
                     construction_authorization,
-                    envelope=envelope,
-                    cost_posture=cost_posture,
-                    active_artifact=active_artifact,
                     preflight=preflight,
                 ),
             )
@@ -935,26 +961,15 @@ def derive_external_authority(
         return empty
     if aws_progress_state != "AWS_PREFLIGHT_READY" or not preflight_ready:
         return empty
-    try:
-        expiration = parse_future_expiry(
-            envelope.get("AWS authorization validity", ""),
-            observed_at=ctx.observed_at,
-        )
-    except ValueError:
+    expiration = bounds.aws_authorization_expires_at
+    if expiration is None or expiration <= authority_input.observed_at:
         return empty
-    environment = envelope.get("AWS environment", "")
-    environment_name = environment
-    try:
-        environment_name, _environment_class = parse_aws_environment(environment)
-    except ValueError:
-        return empty
-    account = _envelope_scalar(envelope, "AWS account", "ACCOUNT")
-    region = _envelope_scalar(envelope, "AWS Region", "REGION")
-    role = _envelope_scalar(envelope, "AWS role or profile", "ROLE")
-    resources = _envelope_values(envelope, "AWS resource allowlist", "RESOURCES")
-    allowed_operations = _envelope_values(
-        envelope, "AWS allowed operations", "OPERATIONS"
-    )
+    environment_name = bounds.environment
+    account = bounds.account
+    region = bounds.region
+    role = bounds.role_or_profile
+    resources = list(bounds.resources)
+    allowed_operations = list(bounds.operations)
     operations = [
         operation
         for operation in allowed_operations
@@ -968,21 +983,18 @@ def derive_external_authority(
         or clean_cell(preflight.get("account", "")) != account
         or clean_cell(preflight.get("region", "")) != region
         or clean_cell(preflight.get("environment", "")) != environment_name
-        or not _receipt_artifact_matches_gate_b(
-            active_artifact, envelope, active_artifact
-        )
-        or not _receipt_scope_within_gate_b(resources, operations, envelope)
+        or not _receipt_artifact_matches_gate_b(bounds.active_artifact, bounds)
+        or not _receipt_scope_within_gate_b(resources, operations, bounds)
     ):
         return empty
     kind = "FAST_DEV_GATE_B"
-    cost_ceiling = envelope.get("AWS cost ceiling", "NONE")
-    if not _mutation_cost_within_gate_b(cost_ceiling, envelope, cost_posture):
+    cost_ceiling = bounds.aws_cost_ceiling_raw
+    if not _mutation_cost_within_gate_b(cost_ceiling, bounds):
         return empty
-    currency, amount = parse_positive_cost(
-        cost_ceiling,
-        AWS_COST_CEILING,
-        "AWS cost ceiling",
-    )
+    parsed_cost = _parse_cost_ceiling(cost_ceiling)
+    if parsed_cost is None:
+        return empty
+    currency, amount = parsed_cost
     cost_ceiling = f"{currency}: {amount:.2f}"
     return {
         "kind": kind,
@@ -996,10 +1008,14 @@ def derive_external_authority(
         "resources": resources,
         "operations": operations,
         "artifact_plan_binding": {
-            "artifact": active_artifact,
-            "plan": envelope.get("AWS stack or application", "NONE"),
+            "artifact": bounds.active_artifact,
+            "plan": bounds.stack_or_application,
         },
         "cost_ceiling": cost_ceiling,
-        "rollback_boundary": envelope.get("AWS rollback boundary", "NONE"),
+        "rollback_boundary": (
+            f"ROLLBACK: {bounds.rollback_boundary}"
+            if bounds.rollback_boundary
+            else "NONE"
+        ),
         "expiration": expiration.isoformat(),
     }

@@ -9,23 +9,19 @@ Receipt bytes and validation behavior remain compatible with Fastlane 1.2.16.
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 
-from ..core.contracts import table_after_heading
-from ..core.ids import clean_cell, parse_exact_id_list, unresolved
-from ..design.envelope import canonical_envelope_sha256
-from ..project_inspection import (
-    AUTH_ID,
-    DES_ID,
-    MAX_GATE_RECEIPT_CHARACTERS,
-    PRD_FILE,
-    REQ_ID,
-    Context,
-    bounded_prd_snapshot,
-    explicit_human_approver,
-    parse_cost_posture,
-)
+from ..core.ids import clean_cell, unresolved
+from .models import PendingGateReceiptInput, explicit_human_approver
+
+MAX_GATE_RECEIPT_CHARACTERS = 4096
+PRD_FILE = "docs/project/PRD.md"
+
+
+class _DiagnosticSink(Protocol):
+    """Minimum compatibility surface needed by exact selection validation."""
+
+    def error(self, code: str, message: str, path: str | None = None) -> None: ...
 
 
 def marked_receipt(text: str, gate: str) -> str:
@@ -41,85 +37,53 @@ def marked_receipt(text: str, gate: str) -> str:
 
 
 def current_gate_receipt_contract(
-    root: Path, report: Mapping[str, Any]
+    receipt_input: PendingGateReceiptInput,
 ) -> dict[str, Any]:
-    """Return the exact receipt proposal for the currently pending owner gate."""
+    """Return the exact receipt proposal from normalized current gate facts."""
 
-    lifecycle_state = str(report.get("lifecycle_state", ""))
-    next_prompt = str(report.get("next_prompt", ""))
-    if lifecycle_state == "WAITING_GATE_A" and next_prompt == "INTAKE-20":
-        gate = "GATE_A"
-        owner_action_kind = "APPROVE_GATE_A"
-    elif lifecycle_state == "WAITING_GATE_B" and next_prompt == "DESIGN-20":
-        gate = "GATE_B"
-        owner_action_kind = "APPROVE_GATE_B"
-    else:
-        raise ValueError("The project is not waiting for a Gate A or Gate B receipt")
-
-    try:
-        basis = report.get("basis")
-        if not isinstance(basis, Mapping):
-            raise ValueError("Current gate basis is missing")
-        text, _ = bounded_prd_snapshot(
-            root, clean_cell(basis.get("prd_snapshot_sha256", ""))
+    if receipt_input.gate == "GATE_A":
+        assumptions = (
+            ", ".join(receipt_input.accepted_assumptions)
+            if receipt_input.accepted_assumptions
+            else "NONE"
         )
-        requirements_revision = clean_cell(basis.get("requirements_revision", ""))
-        if REQ_ID.fullmatch(requirements_revision) is None:
-            raise ValueError("Current requirements revision is invalid")
-        if gate == "GATE_A":
-            gate_a_agent = table_after_heading(
-                text, "### Gate A — agent analysis record"
-            )
-            gate_a_card = table_after_heading(text, "### Gate A — readiness card")
-            assumption_ids = parse_exact_id_list(
-                gate_a_agent.get("Proposed assumption IDs required to proceed", ""),
-                re.compile(r"ASM-\d+"),
-                "Gate A proposed assumptions",
-            )
-            assumptions = ", ".join(assumption_ids) if assumption_ids else "NONE"
-            cost_posture = clean_cell(gate_a_card.get("Cost posture", ""))
-            parse_cost_posture(cost_posture)
-            fixed_lines = [
-                "APPROVE REQUIREMENTS GATE A",
-                f"Requirements revision: {requirements_revision}",
-                f"Cost posture: {cost_posture}",
-                f"Accepted assumptions: {assumptions}",
-            ]
-            fields = {
-                "requirements_revision": requirements_revision,
-                "cost_posture": cost_posture,
-                "accepted_assumptions": assumptions,
-            }
-        else:
-            design_revision = clean_cell(basis.get("design_revision", ""))
-            authorization_id = clean_cell(basis.get("construction_authorization", ""))
-            if DES_ID.fullmatch(design_revision) is None:
-                raise ValueError("Current design revision is invalid")
-            if AUTH_ID.fullmatch(authorization_id) is None:
-                raise ValueError("Current construction authorization is invalid")
-            envelope_digest = canonical_envelope_sha256(text)
-            fixed_lines = [
-                "APPROVE PRD AND CONSTRUCTION GATE B",
-                f"Requirements revision: {requirements_revision}",
-                f"Design revision: {design_revision}",
-                f"Construction authorization: {authorization_id}",
-                f"Construction envelope SHA-256: {envelope_digest}",
-                "Use the proposed construction envelope above.",
-            ]
-            fields = {
-                "requirements_revision": requirements_revision,
-                "design_revision": design_revision,
-                "construction_authorization": authorization_id,
-                "construction_envelope_sha256": envelope_digest,
-            }
-    except (OSError, UnicodeError, ValueError) as exc:
-        raise ValueError("The current pending gate contract is invalid") from exc
+        fixed_lines = [
+            "APPROVE REQUIREMENTS GATE A",
+            f"Requirements revision: {receipt_input.requirements_revision}",
+            f"Cost posture: {receipt_input.cost_posture}",
+            f"Accepted assumptions: {assumptions}",
+        ]
+        fields = {
+            "requirements_revision": receipt_input.requirements_revision,
+            "cost_posture": receipt_input.cost_posture,
+            "accepted_assumptions": assumptions,
+        }
+    elif receipt_input.gate == "GATE_B":
+        fixed_lines = [
+            "APPROVE PRD AND CONSTRUCTION GATE B",
+            f"Requirements revision: {receipt_input.requirements_revision}",
+            f"Design revision: {receipt_input.design_revision}",
+            f"Construction authorization: {receipt_input.construction_authorization}",
+            "Construction envelope SHA-256: "
+            f"{receipt_input.construction_envelope_sha256}",
+            "Use the proposed construction envelope above.",
+        ]
+        fields = {
+            "requirements_revision": receipt_input.requirements_revision,
+            "design_revision": receipt_input.design_revision,
+            "construction_authorization": receipt_input.construction_authorization,
+            "construction_envelope_sha256": (
+                receipt_input.construction_envelope_sha256
+            ),
+        }
+    else:
+        raise ValueError("The current pending gate contract is invalid")
 
     return {
-        "gate": gate,
-        "lifecycle_state": lifecycle_state,
-        "next_prompt": next_prompt,
-        "owner_action_kind": owner_action_kind,
+        "gate": receipt_input.gate,
+        "lifecycle_state": receipt_input.lifecycle_state,
+        "next_prompt": receipt_input.next_prompt,
+        "owner_action_kind": receipt_input.owner_action_kind,
         "fixed_lines": fixed_lines,
         "fields": fields,
         "expected_receipt": "\n".join([*fixed_lines, "Approver: <name/handle>"]),
@@ -205,7 +169,7 @@ def validate_gate_receipt_candidate(
 
 
 def exact_selection(
-    ctx: Context,
+    ctx: _DiagnosticSink,
     value: str,
     allowed: set[str],
     code: str,

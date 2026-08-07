@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from dataclasses import replace
 from typing import Any, Mapping
 
 from .authority.aws import derive_external_authority
@@ -25,11 +26,18 @@ from .authority.write import (
     derive_teardown_journal_closure_authority,
     derive_write_authority,
 )
+from .authority.models import (
+    AuthorityEvaluationInput,
+    ConstructionWriteInput,
+    GateBAuthorityBounds,
+    LifecycleIntentWriteInput,
+)
 from .aws import (
     AWS_TEARDOWN_ATTEMPT_ID,
     AWS_TEARDOWN_TERMINAL_STATUSES,
     aws_deployment_teardown_sequence_conflict,
     derive_aws_residual_disposition,
+    release_lifecycle_intent_boundary_is_settled,
 )
 from .core.contracts import contract_table_after_heading, table_after_heading
 from .core.ids import clean_cell, explicit_value, validate_relative_path
@@ -981,9 +989,9 @@ def derive_document_summary_specifications(
 def _compose_authority_state(
     ctx: Context,
     *,
-    envelope: dict[str, str],
+    authority_bounds: GateBAuthorityBounds,
+    construction_write_input: ConstructionWriteInput,
     lane: str | None,
-    project: Mapping[str, Any],
     tasks: TaskSummary,
     prd_fields: Mapping[str, str],
     lifecycle: Mapping[str, Any],
@@ -994,7 +1002,6 @@ def _compose_authority_state(
     teardown_sequence: Mapping[str, Any],
     lifecycle_intent: Mapping[str, Any],
     aws_progress_state: str | None,
-    active_artifact: str,
     next_prompt: str,
     aws_sequence_conflict: bool,
 ) -> dict[str, Any]:
@@ -1045,6 +1052,11 @@ def _compose_authority_state(
     restricted_construction = (
         "NONE" if deployment_restricted or teardown_restricted else gate_b_authorization
     )
+    authority_input = AuthorityEvaluationInput(
+        has_errors=ctx.has_errors,
+        observed_at=ctx.observed_at,
+        verify_text=ctx.texts.get(VERIFY_FILE, ""),
+    )
     deployment_closure = derive_deployment_journal_closure_authority(
         deployment_sequence,
         next_prompt,
@@ -1061,26 +1073,33 @@ def _compose_authority_state(
         else None
     )
     external_authority = derive_external_authority(
-        ctx,
-        envelope,
+        authority_input,
+        authority_bounds,
         lane,
         restricted_construction,
-        cost_posture=str(project.get("cost_posture", "")),
         aws_progress_state=aws_progress_state,
-        active_artifact=active_artifact,
         aws_action_phase=next_prompt,
         teardown_review=teardown_sequence,
         deployment_sequence=deployment_sequence,
         preflight=preflight,
     )
+    lifecycle_write_input = LifecycleIntentWriteInput(
+        has_errors=ctx.has_errors,
+        tasks_terminal=tasks.terminal,
+        release_decision=release_decision,
+        deployment_status=deployment_status,
+        deployment_boundary_settled=release_lifecycle_intent_boundary_is_settled(
+            release_decision, deployment_sequence
+        ),
+        teardown_status=teardown_status,
+        teardown_has_issues=bool(teardown_sequence.get("issues")),
+        external_authority_current=(
+            clean_cell(external_authority.get("validity", "")) == "CURRENT"
+        ),
+        intent_value=clean_cell(lifecycle_intent.get("value", "NONE")),
+    )
     lifecycle_write_authority = derive_aws_lifecycle_intent_write_authority(
-        ctx,
-        tasks,
-        release_decision,
-        deployment_sequence,
-        teardown_sequence,
-        external_authority,
-        lifecycle_intent=lifecycle_intent,
+        lifecycle_write_input
     )
     construction_authorization = (
         "NONE"
@@ -1088,7 +1107,8 @@ def _compose_authority_state(
         else restricted_construction
     )
     write_authority = derive_write_authority(
-        ctx, envelope, tasks, construction_authorization
+        replace(construction_write_input, has_errors=ctx.has_errors),
+        construction_authorization,
     )
     aws_authorization = "NONE"
     if external_authority.get("validity") == "CURRENT" and external_authority.get(
@@ -1110,13 +1130,11 @@ def _compose_authority_state(
     transition_receipt_field = ""
     if not aws_sequence_conflict and deployment_status == "ACTION_TERMINAL_REQUIRED":
         transition_authority = derive_external_authority(
-            ctx,
-            envelope,
+            authority_input,
+            authority_bounds,
             lane,
             gate_b_authorization,
-            cost_posture=str(project.get("cost_posture", "")),
             aws_progress_state=aws_progress_state,
-            active_artifact=active_artifact,
             aws_action_phase="AWS-20",
             teardown_review=teardown_sequence,
             deployment_sequence={},
@@ -1133,13 +1151,11 @@ def _compose_authority_state(
             "evidence_id": teardown_sequence.get("ready_evidence_id", "NONE"),
         }
         transition_authority = derive_external_authority(
-            ctx,
-            envelope,
+            authority_input,
+            authority_bounds,
             lane,
             gate_b_authorization,
-            cost_posture=str(project.get("cost_posture", "")),
             aws_progress_state=aws_progress_state,
-            active_artifact=active_artifact,
             aws_action_phase="AWS-50",
             teardown_review=transition_review,
             deployment_sequence=deployment_sequence,
@@ -1208,6 +1224,8 @@ def build_evaluation(
     req_aws_core_materiality: str = "OPTIONAL",
     req_aws_core_ready: bool = True,
     aws_lifecycle_intent_record: Mapping[str, Any] | None = None,
+    authority_bounds: GateBAuthorityBounds | None = None,
+    construction_write_input: ConstructionWriteInput | None = None,
 ) -> EngineEvaluation:
     """SAFETY: derive complete immutable state without changing canonical state."""
 
@@ -1294,6 +1312,10 @@ def build_evaluation(
     }.get(lane, "NOT_USED")
     gate_a = prd_fields.get("gate_a") or lifecycle.get("gate_a") or "BLOCKED"
     gate_b = prd_fields.get("gate_b") or lifecycle.get("gate_b") or "BLOCKED"
+    authority_bounds = authority_bounds or GateBAuthorityBounds()
+    construction_write_input = construction_write_input or ConstructionWriteInput(
+        has_errors=ctx.has_errors
+    )
     resolved_owner_stage = (
         owner_stage_hint
         if owner_stage_hint in {"DEFINE", "DESIGN", "DELIVER"}
@@ -1301,9 +1323,9 @@ def build_evaluation(
     )
     authority_state = _compose_authority_state(
         ctx,
-        envelope=envelope,
+        authority_bounds=authority_bounds,
+        construction_write_input=construction_write_input,
         lane=lane,
-        project=project,
         tasks=tasks,
         prd_fields=prd_fields,
         lifecycle=lifecycle,
@@ -1314,7 +1336,6 @@ def build_evaluation(
         teardown_sequence=teardown_sequence_projection,
         lifecycle_intent=lifecycle_intent_projection,
         aws_progress_state=aws_progress_state,
-        active_artifact=active_artifact,
         next_prompt=next_prompt,
         aws_sequence_conflict=aws_sequence_conflict,
     )
@@ -1408,7 +1429,9 @@ def build_evaluation(
         status = "BLOCKED"
         construction_authorization = "NONE"
         aws_authorization = "NONE"
-        write_authority = derive_write_authority(ctx, envelope, tasks, "NONE")
+        write_authority = derive_write_authority(
+            replace(construction_write_input, has_errors=ctx.has_errors), "NONE"
+        )
         deployment_journal_closure_authority = (
             derive_deployment_journal_closure_authority(
                 deployment_sequence_projection,
@@ -1422,13 +1445,15 @@ def build_evaluation(
             restricted_closure=False,
         )
         external_authority = derive_external_authority(
-            ctx,
-            envelope,
+            AuthorityEvaluationInput(
+                has_errors=ctx.has_errors,
+                observed_at=ctx.observed_at,
+                verify_text=ctx.texts.get(VERIFY_FILE, ""),
+            ),
+            authority_bounds,
             lane,
             "NONE",
-            cost_posture=str(project.get("cost_posture", "")),
             aws_progress_state=aws_progress_state,
-            active_artifact=active_artifact,
             aws_action_phase=next_prompt,
             teardown_review=teardown_sequence_projection,
             deployment_sequence=deployment_sequence_projection,
@@ -1443,13 +1468,31 @@ def build_evaluation(
         )
         aws_lifecycle_intent_write_authority = (
             derive_aws_lifecycle_intent_write_authority(
-                ctx,
-                tasks,
-                release_decision,
-                deployment_sequence_projection,
-                teardown_sequence_projection,
-                external_authority,
-                lifecycle_intent=lifecycle_intent_projection,
+                LifecycleIntentWriteInput(
+                    has_errors=ctx.has_errors,
+                    tasks_terminal=tasks.terminal,
+                    release_decision=release_decision,
+                    deployment_status=clean_cell(
+                        deployment_sequence_projection.get("status", "")
+                    ),
+                    deployment_boundary_settled=(
+                        release_lifecycle_intent_boundary_is_settled(
+                            release_decision, deployment_sequence_projection
+                        )
+                    ),
+                    teardown_status=clean_cell(
+                        teardown_sequence_projection.get("status", "")
+                    ),
+                    teardown_has_issues=bool(
+                        teardown_sequence_projection.get("issues")
+                    ),
+                    external_authority_current=(
+                        clean_cell(external_authority.get("validity", "")) == "CURRENT"
+                    ),
+                    intent_value=clean_cell(
+                        lifecycle_intent_projection.get("value", "NONE")
+                    ),
+                )
             )
         )
         (owner_decision_brief, owner_decision_inventory, _owner_brief_issues) = (

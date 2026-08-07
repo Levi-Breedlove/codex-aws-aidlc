@@ -9,15 +9,19 @@ executes AWS/GitHub actions, approves gates, or broadens authority.
 from __future__ import annotations
 
 import html
+import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
-from .authority.aws import _read_preflight_receipt_authority
-from .authority.closure import (
-    derive_aws_execution_projection,
-    derive_deployment_sequence_state,
-    derive_read_preflight_state,
-    derive_teardown_sequence_state,
+from .authority.aws import (
+    _read_preflight_receipt_authority,
+    build_aws_authority_policy,
+)
+from .authority.models import (
+    AuthorityEvaluationInput,
+    ConstructionWriteInput,
+    GateBAuthorityBounds,
 )
 from .aws import (
     AwsCoreEvidenceRow,
@@ -27,21 +31,34 @@ from .aws import (
     aws_lifecycle_intent_route_is_eligible,
     derive_aws_core_observed_usage,
     derive_aws_delivery_route,
+    derive_aws_execution_projection,
     derive_aws_residual_disposition,
+    derive_deployment_sequence_state,
+    derive_read_preflight_state,
     derive_teardown_route,
+    derive_teardown_sequence_state,
     parse_aws_core_evidence,
 )
 from .core.contracts import table_after_heading
-from .core.ids import clean_cell, explicit_value
+from .core.ids import clean_cell, explicit_value, iso_datetime
 from .composition import build_evaluation
+from .design import (
+    AWS_DERIVED_ARTIFACT,
+    AWS_EXACT_ARTIFACT,
+    parse_aws_environment,
+    parse_envelope_paths,
+    validate_aws_artifact,
+)
 from .evaluation import EngineEvaluation
 from .project_delivery import (
     validate_aws_lifecycle_intent_record,
     validate_release_decision_record,
     validate_tasks,
 )
+from .deliver import parse_verification_matrix
 from .deliver.models import TaskSummary
 from .project_inspection import (
+    AWS_COST_CEILING,
     MANIFEST_FILE,
     PRD_FILE,
     STATE_FILE,
@@ -49,6 +66,8 @@ from .project_inspection import (
     Context,
     capture_engine_snapshot,
     load_json_document,
+    parse_cost_posture,
+    parse_positive_cost,
     require_aws_core_phase_evidence,
     safe_read_text,
 )
@@ -72,6 +91,209 @@ try:
     from fastlane_adr import derive_adr_rationale_from_snapshot
 except ModuleNotFoundError:
     from scripts.fastlane_adr import derive_adr_rationale_from_snapshot
+
+
+def _normalized_envelope_scalar(
+    envelope: Mapping[str, str], field: str, label: str
+) -> str | None:
+    value = clean_cell(envelope.get(field, ""))
+    prefix = label + ":"
+    if not value.startswith(prefix):
+        return None
+    candidate = clean_cell(value[len(prefix) :])
+    return candidate if explicit_value(candidate, allow_none=False) else None
+
+
+def _normalized_envelope_values(
+    envelope: Mapping[str, str], field: str, label: str
+) -> tuple[str, ...]:
+    value = _normalized_envelope_scalar(envelope, field, label)
+    if value is None:
+        return ()
+    values = tuple(item.strip() for item in re.split(r"[,;]", value) if item.strip())
+    if (
+        not values
+        or len(values) != len(set(values))
+        or any("*" in item for item in values)
+    ):
+        return ()
+    return values
+
+
+def _normalized_authority_expiry(value: str) -> datetime | None:
+    match = re.fullmatch(
+        r"Expires at (?P<timestamp>[^\s;]+); earlier completion: (?P<condition>[^\r\n]+)",
+        clean_cell(value),
+    )
+    if match is None or not explicit_value(match.group("condition"), allow_none=False):
+        return None
+    return iso_datetime(match.group("timestamp"))
+
+
+def normalize_gate_b_authority_bounds(
+    envelope: Mapping[str, str],
+    *,
+    cost_posture: str,
+    active_artifact: str,
+) -> GateBAuthorityBounds:
+    """SAFETY: narrow validated Design fields into immutable Authority facts."""
+
+    boundary = clean_cell(envelope.get("AWS boundary", "NONE"))
+    account = _normalized_envelope_scalar(envelope, "AWS account", "ACCOUNT")
+    region = _normalized_envelope_scalar(envelope, "AWS Region", "REGION")
+    role = _normalized_envelope_scalar(envelope, "AWS role or profile", "ROLE")
+    resources = _normalized_envelope_values(
+        envelope, "AWS resource allowlist", "RESOURCES"
+    )
+    operations = _normalized_envelope_values(
+        envelope, "AWS allowed operations", "OPERATIONS"
+    )
+    try:
+        environment, _environment_class = parse_aws_environment(
+            envelope.get("AWS environment", "")
+        )
+    except ValueError:
+        environment = None
+    approved_artifact = clean_cell(
+        envelope.get("AWS artifact authorization and provenance", "")
+    )
+    normalized_artifact = clean_cell(active_artifact)
+    artifact_authorized = False
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", normalized_artifact):
+        if approved_artifact.startswith("NOT_APPLICABLE"):
+            artifact_authorized = boundary == "READ_ONLY"
+        elif AWS_EXACT_ARTIFACT.fullmatch(approved_artifact):
+            artifact_authorized = normalized_artifact == approved_artifact.removeprefix(
+                "EXACT_DIGEST: "
+            )
+        else:
+            try:
+                validate_aws_artifact(
+                    approved_artifact,
+                    clean_cell(envelope.get("Authorized baseline commit", "")),
+                )
+            except ValueError:
+                pass
+            else:
+                artifact_authorized = bool(
+                    AWS_DERIVED_ARTIFACT.fullmatch(approved_artifact)
+                )
+    try:
+        owner_cost_cap = parse_cost_posture(cost_posture)
+    except ValueError:
+        owner_cost_cap = None
+        cost_posture_valid = False
+    else:
+        cost_posture_valid = True
+    raw_cost_ceiling = clean_cell(envelope.get("AWS cost ceiling", "NONE"))
+    try:
+        aws_cost_ceiling = parse_positive_cost(
+            raw_cost_ceiling, AWS_COST_CEILING, "AWS cost ceiling"
+        )
+    except ValueError:
+        aws_cost_ceiling = None
+    rollback_value = clean_cell(envelope.get("AWS rollback boundary", ""))
+    rollback = (
+        clean_cell(rollback_value.removeprefix("ROLLBACK:"))
+        if rollback_value.startswith("ROLLBACK:")
+        else None
+    )
+    authorization_expiry = _normalized_authority_expiry(
+        envelope.get("Authorization expiry or completion condition", "")
+    )
+    aws_validity = clean_cell(envelope.get("AWS authorization validity", ""))
+    aws_authorization_expiry = (
+        None
+        if aws_validity.startswith("NOT_APPLICABLE")
+        else _normalized_authority_expiry(aws_validity)
+    )
+    valid = bool(
+        boundary in {"READ_ONLY", "MUTATE_LISTED_RESOURCES"}
+        and account
+        and region
+        and environment
+        and role
+        and resources
+        and operations
+        and artifact_authorized
+        and cost_posture_valid
+        and authorization_expiry is not None
+        and (
+            boundary == "READ_ONLY"
+            or (
+                aws_cost_ceiling is not None
+                and rollback
+                and aws_authorization_expiry is not None
+            )
+        )
+    )
+    return GateBAuthorityBounds(
+        valid=valid,
+        boundary=boundary,
+        account=account,
+        region=region,
+        environment=environment,
+        role_or_profile=role,
+        resources=resources,
+        operations=operations,
+        active_artifact=normalized_artifact,
+        artifact_authorized=artifact_authorized,
+        cost_posture=clean_cell(cost_posture),
+        owner_cost_cap=owner_cost_cap,
+        aws_cost_ceiling=aws_cost_ceiling,
+        aws_cost_ceiling_raw=raw_cost_ceiling,
+        rollback_boundary=rollback,
+        authorization_expires_at=authorization_expiry,
+        aws_authorization_expires_at=aws_authorization_expiry,
+        stack_or_application=clean_cell(
+            envelope.get("AWS stack or application", "NONE")
+        ),
+    )
+
+
+def _normalize_construction_write_input(
+    ctx: Context,
+    envelope: Mapping[str, str],
+    tasks: TaskSummary,
+) -> ConstructionWriteInput:
+    """SAFETY: narrow Design and Deliver results into immutable write facts."""
+
+    try:
+        roots = tuple(
+            parse_envelope_paths(
+                envelope.get("Allowed repository write set", ""),
+                "Allowed repository write set",
+                allow_none=False,
+            )
+        )
+        exclusions = tuple(
+            parse_envelope_paths(
+                envelope.get("Excluded or owner-only write set", ""),
+                "Excluded or owner-only write set",
+                allow_none=True,
+            )
+        )
+        protected = tuple(
+            parse_envelope_paths(
+                envelope.get("Protected dirty paths", ""),
+                "Protected dirty paths",
+                allow_none=True,
+            )
+        )
+    except ValueError:
+        return ConstructionWriteInput(has_errors=True)
+    active_task = tasks.active[0] if len(tasks.active) == 1 else None
+    active_write_set = (
+        tuple(tasks.write_sets.get(active_task, ())) if active_task else ()
+    )
+    return ConstructionWriteInput(
+        has_errors=ctx.has_errors,
+        approved_write_roots=roots,
+        exclusions=exclusions,
+        protected_paths=protected,
+        active_task=active_task,
+        active_task_write_set=active_write_set,
+    )
 
 
 def _preserve_expired_authority_for_deployment_closure(
@@ -373,14 +595,26 @@ def evaluate_project(
         if gate_b == "APPROVED_FOR_CONSTRUCTION"
         else "NONE"
     )
+    authority_bounds = normalize_gate_b_authority_bounds(
+        envelope,
+        cost_posture=str(state.get("project", {}).get("cost_posture", "")),
+        active_artifact=artifact_binding,
+    )
+    authority_input = AuthorityEvaluationInput(
+        has_errors=ctx.has_errors,
+        observed_at=ctx.observed_at,
+        verify_text=verify_text or "",
+    )
+    aws_authority_policy = build_aws_authority_policy(
+        authority_input,
+        authority_bounds,
+        parse_verification_matrix=parse_verification_matrix,
+    )
     read_authority = (
         _read_preflight_receipt_authority(
-            verify_text or "",
+            authority_input,
+            authority_bounds,
             construction_authorization,
-            str(state.get("project", {}).get("cost_posture", "")),
-            envelope,
-            artifact_binding,
-            observed_at=ctx.observed_at,
         )
         if construction_authorization != "NONE"
         else None
@@ -388,15 +622,16 @@ def evaluate_project(
     preflight = derive_read_preflight_state(
         verify_text or "",
         read_authority,
+        policy=aws_authority_policy,
         requirements_revision=str(prd_fields.get("requirements_revision", "")),
         design_revision=str(prd_fields.get("design_revision", "")),
         construction_authorization=construction_authorization,
         artifact_binding=artifact_binding,
-        observed_at=ctx.observed_at,
     )
     deployment_sequence = derive_deployment_sequence_state(
         verify_text or "",
         read_authority,
+        policy=aws_authority_policy,
         requirements_revision=str(prd_fields.get("requirements_revision", "")),
         design_revision=str(prd_fields.get("design_revision", "")),
         construction_authorization=construction_authorization,
@@ -412,7 +647,6 @@ def evaluate_project(
             gate_b != "APPROVED_FOR_CONSTRUCTION"
             or any(item.code == "GATE_B_AUTHORITY_EXPIRED" for item in ctx.diagnostics)
         ),
-        observed_at=ctx.observed_at,
     )
     _preserve_expired_authority_for_deployment_closure(
         ctx, deployment_sequence, release_decision
@@ -420,6 +654,7 @@ def evaluate_project(
     teardown_sequence = derive_teardown_sequence_state(
         verify_text or "",
         read_authority,
+        policy=aws_authority_policy,
         requirements_revision=str(prd_fields.get("requirements_revision", "")),
         design_revision=str(prd_fields.get("design_revision", "")),
         construction_authorization=construction_authorization,
@@ -430,7 +665,6 @@ def evaluate_project(
         ),
         cost_posture=str(state.get("project", {}).get("cost_posture", "")),
         active_artifact=artifact_binding,
-        observed_at=ctx.observed_at,
     )
     _preserve_expired_authority_for_teardown_closure(ctx, teardown_sequence)
     aws_sequence_conflict = aws_deployment_teardown_sequence_conflict(
@@ -608,6 +842,10 @@ def evaluate_project(
         req_aws_core_ready=req_aws_core_ready,
         aws_lifecycle_intent_record=aws_lifecycle_intent_record,
         release_evidence_cutoff=release_evidence_cutoff,
+        authority_bounds=authority_bounds,
+        construction_write_input=_normalize_construction_write_input(
+            ctx, envelope, tasks
+        ),
     )
 
 

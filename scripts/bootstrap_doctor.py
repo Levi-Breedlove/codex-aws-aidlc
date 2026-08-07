@@ -518,6 +518,7 @@ else:
         validate_advisory_design_binding,
     )
     from fastlane_engine.aws.deployment import (
+        _deployment_values as _deployment_values_core,
         _format_deployment_read_provenance,
     )
 
@@ -565,21 +566,22 @@ if __package__:
         derive_owner_answer_confirmation,
         derive_owner_decision_brief,
     )
-    from .fastlane_engine.authority.receipts import (
-        current_gate_receipt_contract,
-        validate_gate_receipt_candidate,
-    )
+    from .fastlane_engine.api import current_gate_receipt_contract
+    from .fastlane_engine.authority.receipts import validate_gate_receipt_candidate
     from .fastlane_engine.authority.aws import (
+        build_aws_authority_policy,
+    )
+    from .fastlane_engine.api import (
         _read_preflight_receipt_authority,
         _receipt_external_authority,
-        build_aws_authority_policy,
-        derive_external_authority as _derive_external_authority_core,
-    )
-    from .fastlane_engine.authority.closure import (
+        derive_aws_lifecycle_intent_write_authority,
         derive_aws_execution_projection,
         derive_deployment_sequence_state,
+        derive_external_authority as _derive_external_authority_core,
         derive_read_preflight_state,
         derive_teardown_sequence_state,
+        derive_write_authority,
+        lifecycle_intent_record_boundary_is_settled,
     )
     from .fastlane_engine.authority.github import (
         _aws_action_transition_projection,
@@ -588,10 +590,8 @@ if __package__:
         derive_request_match,
     )
     from .fastlane_engine.authority.write import (
-        derive_aws_lifecycle_intent_write_authority,
         derive_deployment_journal_closure_authority,
         derive_teardown_journal_closure_authority,
-        derive_write_authority,
     )
     from .fastlane_engine.remediation import (
         _agent_correction_is_safe,
@@ -685,21 +685,22 @@ else:
         derive_owner_answer_confirmation,
         derive_owner_decision_brief,
     )
-    from fastlane_engine.authority.receipts import (
-        current_gate_receipt_contract,
-        validate_gate_receipt_candidate,
-    )
+    from fastlane_engine.api import current_gate_receipt_contract
+    from fastlane_engine.authority.receipts import validate_gate_receipt_candidate
     from fastlane_engine.authority.aws import (
+        build_aws_authority_policy,
+    )
+    from fastlane_engine.api import (
         _read_preflight_receipt_authority,
         _receipt_external_authority,
-        build_aws_authority_policy,
-        derive_external_authority as _derive_external_authority_core,
-    )
-    from fastlane_engine.authority.closure import (
+        derive_aws_lifecycle_intent_write_authority,
         derive_aws_execution_projection,
         derive_deployment_sequence_state,
+        derive_external_authority as _derive_external_authority_core,
         derive_read_preflight_state,
         derive_teardown_sequence_state,
+        derive_write_authority,
+        lifecycle_intent_record_boundary_is_settled,
     )
     from fastlane_engine.authority.github import (
         _aws_action_transition_projection,
@@ -708,10 +709,8 @@ else:
         derive_request_match,
     )
     from fastlane_engine.authority.write import (
-        derive_aws_lifecycle_intent_write_authority,
         derive_deployment_journal_closure_authority,
         derive_teardown_journal_closure_authority,
-        derive_write_authority,
     )
     from fastlane_engine.remediation import (
         _agent_correction_is_safe,

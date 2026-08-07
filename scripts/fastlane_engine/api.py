@@ -10,7 +10,8 @@ grants authority.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -19,10 +20,10 @@ from .aws import (
     AwsCoreEvidenceRow,
     aws_core_phase_evidence_issues,
     derive_aws_core_observed_usage,
-    derive_aws_execution_projection,
-    derive_deployment_sequence_state,
-    derive_read_preflight_state,
-    derive_teardown_sequence_state,
+    derive_aws_execution_projection as _derive_aws_execution_projection_core,
+    derive_deployment_sequence_state as _derive_deployment_sequence_state_core,
+    derive_read_preflight_state as _derive_read_preflight_state_core,
+    derive_teardown_sequence_state as _derive_teardown_sequence_state_core,
     parse_aws_core_evidence,
 )
 
@@ -101,6 +102,518 @@ def capture_project_snapshot(
         else:
             observer.observe_binary(relative)
     return observer.freeze()
+
+
+def _compatibility_aws_policy(
+    verify_text: str,
+    envelope: Mapping[str, str] | None,
+    cost_posture: str,
+    active_artifact: str,
+    observed_at: datetime | None,
+):
+    """COMPATIBILITY: adapt legacy raw inputs at the public API boundary."""
+
+    from .authority.aws import build_aws_authority_policy
+    from .authority.models import AuthorityEvaluationInput
+    from .orchestration import normalize_gate_b_authority_bounds
+    from .deliver import parse_verification_matrix
+
+    evaluation_time = observed_at or datetime.now(timezone.utc)
+    return build_aws_authority_policy(
+        AuthorityEvaluationInput(
+            has_errors=False,
+            observed_at=evaluation_time,
+            verify_text=verify_text,
+        ),
+        normalize_gate_b_authority_bounds(
+            envelope or {},
+            cost_posture=cost_posture,
+            active_artifact=active_artifact,
+        ),
+        parse_verification_matrix=parse_verification_matrix,
+    )
+
+
+def derive_deployment_sequence_state(
+    verify_text: str,
+    read_authority: Mapping[str, Any] | None,
+    *,
+    requirements_revision: str,
+    design_revision: str,
+    construction_authorization: str,
+    envelope: Mapping[str, str],
+    lane: str | None,
+    artifact_binding: str,
+    release_evidence_cutoff: str = "NONE",
+    release_state: str = "READY_TO_DEPLOY",
+    gate_b_authority_source: str = "",
+    gate_b_authorized_at: str = "",
+    cost_posture: str = "",
+    restricted_closure: bool = False,
+    observed_at: datetime | None = None,
+    policy: AwsAuthorityPolicy | None = None,
+) -> dict[str, Any]:
+    """COMPATIBILITY: evaluate deployment through the pure AWS domain."""
+
+    return _derive_deployment_sequence_state_core(
+        verify_text,
+        read_authority,
+        policy=policy
+        or _compatibility_aws_policy(
+            verify_text, envelope, cost_posture, artifact_binding, observed_at
+        ),
+        requirements_revision=requirements_revision,
+        design_revision=design_revision,
+        construction_authorization=construction_authorization,
+        envelope=envelope,
+        lane=lane,
+        artifact_binding=artifact_binding,
+        release_evidence_cutoff=release_evidence_cutoff,
+        release_state=release_state,
+        gate_b_authority_source=gate_b_authority_source,
+        gate_b_authorized_at=gate_b_authorized_at,
+        cost_posture=cost_posture,
+        restricted_closure=restricted_closure,
+    )
+
+
+def derive_teardown_sequence_state(
+    verify_text: str,
+    read_authority: Mapping[str, Any] | None,
+    *,
+    requirements_revision: str,
+    design_revision: str,
+    construction_authorization: str,
+    envelope: Mapping[str, str],
+    restricted_closure: bool = False,
+    cost_posture: str = "",
+    active_artifact: str = "",
+    observed_at: datetime | None = None,
+    policy: AwsAuthorityPolicy | None = None,
+) -> dict[str, Any]:
+    """COMPATIBILITY: evaluate teardown through the pure AWS domain."""
+
+    return _derive_teardown_sequence_state_core(
+        verify_text,
+        read_authority,
+        policy=policy
+        or _compatibility_aws_policy(
+            verify_text, envelope, cost_posture, active_artifact, observed_at
+        ),
+        requirements_revision=requirements_revision,
+        design_revision=design_revision,
+        construction_authorization=construction_authorization,
+        envelope=envelope,
+        restricted_closure=restricted_closure,
+        cost_posture=cost_posture,
+        active_artifact=active_artifact,
+    )
+
+
+def derive_read_preflight_state(
+    verify_text: str,
+    authority: Mapping[str, Any] | None,
+    *,
+    requirements_revision: str,
+    design_revision: str,
+    construction_authorization: str,
+    artifact_binding: str,
+    observed_at: datetime | None = None,
+    policy: AwsAuthorityPolicy | None = None,
+) -> dict[str, Any]:
+    """COMPATIBILITY: evaluate read preflight through the pure AWS domain."""
+
+    return _derive_read_preflight_state_core(
+        verify_text,
+        authority,
+        policy=policy
+        or _compatibility_aws_policy(
+            verify_text, {}, "", artifact_binding, observed_at
+        ),
+        requirements_revision=requirements_revision,
+        design_revision=design_revision,
+        construction_authorization=construction_authorization,
+        artifact_binding=artifact_binding,
+    )
+
+
+def derive_aws_execution_projection(
+    materiality: Mapping[str, Any],
+    *,
+    release_decision: str,
+    guidance_ready: bool,
+    read_authority: Mapping[str, Any] | None,
+    preflight: Mapping[str, Any],
+    lane: str | None = None,
+) -> dict[str, Any]:
+    """COMPATIBILITY: expose the stable aggregate AWS projection."""
+
+    return _derive_aws_execution_projection_core(
+        materiality,
+        release_decision=release_decision,
+        guidance_ready=guidance_ready,
+        read_authority=read_authority,
+        preflight=preflight,
+        lane=lane,
+    )
+
+
+def derive_write_authority(
+    ctx: Any,
+    envelope: Mapping[str, str],
+    tasks: Any,
+    construction_authorization: str,
+) -> dict[str, Any]:
+    """COMPATIBILITY: normalize Design and Deliver facts before Authority."""
+
+    from .authority.write import derive_write_authority as _derive_write_authority
+    from .composition import _normalize_construction_write_input
+
+    return _derive_write_authority(
+        _normalize_construction_write_input(ctx, envelope, tasks),
+        construction_authorization,
+    )
+
+
+def _lifecycle_intent_write_input(
+    ctx: Any,
+    tasks: Any,
+    release_decision: str,
+    deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+    external_authority: Mapping[str, Any],
+    lifecycle_intent: Mapping[str, Any] | None,
+):
+    """Translate sibling-domain results into one Authority-owned input."""
+
+    from .authority.models import LifecycleIntentWriteInput
+    from .aws import release_lifecycle_intent_boundary_is_settled
+
+    return LifecycleIntentWriteInput(
+        has_errors=ctx.has_errors,
+        tasks_terminal=tasks.terminal,
+        release_decision=release_decision,
+        deployment_status=clean_cell(deployment_sequence.get("status", "")),
+        deployment_boundary_settled=release_lifecycle_intent_boundary_is_settled(
+            release_decision, deployment_sequence
+        ),
+        teardown_status=clean_cell(teardown_sequence.get("status", "")),
+        teardown_has_issues=bool(teardown_sequence.get("issues")),
+        external_authority_current=(
+            clean_cell(external_authority.get("validity", "")) == "CURRENT"
+        ),
+        intent_value=clean_cell((lifecycle_intent or {}).get("value", "NONE")),
+    )
+
+
+def lifecycle_intent_record_boundary_is_settled(
+    tasks: Any,
+    release_decision: str,
+    deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+) -> bool:
+    """COMPATIBILITY: preserve the historical normalized boundary query."""
+
+    from .authority.write import (
+        lifecycle_intent_record_boundary_is_settled as _boundary_is_settled,
+    )
+
+    class _NoErrors:
+        has_errors = False
+
+    return _boundary_is_settled(
+        _lifecycle_intent_write_input(
+            _NoErrors(),
+            tasks,
+            release_decision,
+            deployment_sequence,
+            teardown_sequence,
+            {},
+            None,
+        )
+    )
+
+
+def derive_aws_lifecycle_intent_write_authority(
+    ctx: Any,
+    tasks: Any,
+    release_decision: str,
+    deployment_sequence: Mapping[str, Any],
+    teardown_sequence: Mapping[str, Any],
+    external_authority: Mapping[str, Any],
+    *,
+    lifecycle_intent: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """COMPATIBILITY: normalize lifecycle facts before Authority evaluation."""
+
+    from .authority.write import (
+        derive_aws_lifecycle_intent_write_authority as _derive_write_authority,
+    )
+
+    return _derive_write_authority(
+        _lifecycle_intent_write_input(
+            ctx,
+            tasks,
+            release_decision,
+            deployment_sequence,
+            teardown_sequence,
+            external_authority,
+            lifecycle_intent,
+        )
+    )
+
+
+def current_gate_receipt_contract(
+    root: Path,
+    report: Mapping[str, Any],
+) -> dict[str, Any]:
+    """COMPATIBILITY: observe and normalize one pending gate before Authority."""
+
+    from .authority.models import PendingGateReceiptInput
+    from .authority.receipts import (
+        current_gate_receipt_contract as _current_gate_receipt_contract,
+    )
+    from .core.contracts import table_after_heading
+    from .core.ids import parse_exact_id_list
+    from .project_inspection import (
+        AUTH_ID,
+        DES_ID,
+        REQ_ID,
+        bounded_prd_snapshot,
+        parse_cost_posture,
+    )
+
+    lifecycle_state = str(report.get("lifecycle_state", ""))
+    next_prompt = str(report.get("next_prompt", ""))
+    if lifecycle_state == "WAITING_GATE_A" and next_prompt == "INTAKE-20":
+        gate = "GATE_A"
+        owner_action_kind = "APPROVE_GATE_A"
+    elif lifecycle_state == "WAITING_GATE_B" and next_prompt == "DESIGN-20":
+        gate = "GATE_B"
+        owner_action_kind = "APPROVE_GATE_B"
+    else:
+        raise ValueError("The project is not waiting for a Gate A or Gate B receipt")
+    try:
+        basis = report.get("basis")
+        if not isinstance(basis, Mapping):
+            raise ValueError("Current gate basis is missing")
+        text, _digest = bounded_prd_snapshot(
+            root, clean_cell(basis.get("prd_snapshot_sha256", ""))
+        )
+        requirements_revision = clean_cell(basis.get("requirements_revision", ""))
+        if REQ_ID.fullmatch(requirements_revision) is None:
+            raise ValueError("Current requirements revision is invalid")
+        if gate == "GATE_A":
+            gate_a_agent = table_after_heading(
+                text, "### Gate A — agent analysis record"
+            )
+            gate_a_card = table_after_heading(text, "### Gate A — readiness card")
+            assumption_ids = tuple(
+                parse_exact_id_list(
+                    gate_a_agent.get("Proposed assumption IDs required to proceed", ""),
+                    re.compile(r"ASM-\d+"),
+                    "Gate A proposed assumptions",
+                )
+            )
+            cost_posture = clean_cell(gate_a_card.get("Cost posture", ""))
+            parse_cost_posture(cost_posture)
+            normalized = PendingGateReceiptInput(
+                gate=gate,
+                lifecycle_state=lifecycle_state,
+                next_prompt=next_prompt,
+                owner_action_kind=owner_action_kind,
+                requirements_revision=requirements_revision,
+                cost_posture=cost_posture,
+                accepted_assumptions=assumption_ids,
+            )
+        else:
+            design_revision = clean_cell(basis.get("design_revision", ""))
+            authorization_id = clean_cell(basis.get("construction_authorization", ""))
+            if DES_ID.fullmatch(design_revision) is None:
+                raise ValueError("Current design revision is invalid")
+            if AUTH_ID.fullmatch(authorization_id) is None:
+                raise ValueError("Current construction authorization is invalid")
+            normalized = PendingGateReceiptInput(
+                gate=gate,
+                lifecycle_state=lifecycle_state,
+                next_prompt=next_prompt,
+                owner_action_kind=owner_action_kind,
+                requirements_revision=requirements_revision,
+                design_revision=design_revision,
+                construction_authorization=authorization_id,
+                construction_envelope_sha256=canonical_envelope_sha256(text),
+            )
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise ValueError("The current pending gate contract is invalid") from exc
+    return _current_gate_receipt_contract(normalized)
+
+
+def _read_preflight_receipt_authority(
+    verify_text: str,
+    construction_authorization: str,
+    cost_posture: str,
+    envelope: Mapping[str, str],
+    active_artifact: str,
+    *,
+    observed_at: datetime | None = None,
+    allow_one_operation: bool = True,
+    allow_expired: bool = False,
+) -> dict[str, Any] | None:
+    """COMPATIBILITY: normalize one legacy read receipt request."""
+
+    from .authority.aws import (
+        _read_preflight_receipt_authority as _derive_read_authority,
+    )
+    from .authority.models import AuthorityEvaluationInput
+    from .orchestration import normalize_gate_b_authority_bounds
+
+    return _derive_read_authority(
+        AuthorityEvaluationInput(
+            has_errors=False,
+            observed_at=observed_at or datetime.now(timezone.utc),
+            verify_text=verify_text,
+        ),
+        normalize_gate_b_authority_bounds(
+            envelope,
+            cost_posture=cost_posture,
+            active_artifact=active_artifact,
+        ),
+        construction_authorization,
+        allow_one_operation=allow_one_operation,
+        allow_expired=allow_expired,
+    )
+
+
+def _receipt_external_authority(
+    verify_text: str,
+    action: str,
+    construction_authorization: str,
+    *,
+    observed_at: datetime | None = None,
+    envelope: Mapping[str, str],
+    cost_posture: str,
+    active_artifact: str,
+    preflight: Mapping[str, Any] | None = None,
+    teardown_review: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """COMPATIBILITY: normalize one legacy mutation receipt request."""
+
+    from .authority.aws import _receipt_external_authority as _derive_authority
+    from .authority.models import AuthorityEvaluationInput
+    from .orchestration import normalize_gate_b_authority_bounds
+
+    return _derive_authority(
+        AuthorityEvaluationInput(
+            has_errors=False,
+            observed_at=observed_at or datetime.now(timezone.utc),
+            verify_text=verify_text,
+        ),
+        normalize_gate_b_authority_bounds(
+            envelope,
+            cost_posture=cost_posture,
+            active_artifact=active_artifact,
+        ),
+        action,
+        construction_authorization,
+        preflight=preflight,
+        teardown_review=teardown_review,
+    )
+
+
+def derive_external_authority(
+    ctx: Any,
+    envelope: Mapping[str, str],
+    lane: str | None,
+    construction_authorization: str,
+    *,
+    cost_posture: str = "",
+    aws_progress_state: str | None = None,
+    active_artifact: str = "",
+    preflight: Mapping[str, Any] | None = None,
+    aws_action_phase: str | None = None,
+    teardown_review: Mapping[str, Any] | None = None,
+    deployment_sequence: Mapping[str, Any] | None = None,
+    read_authority_deriver: Callable[..., dict[str, Any] | None] | None = None,
+    action_authority_deriver: Callable[..., dict[str, Any] | None] | None = None,
+) -> dict[str, Any]:
+    """COMPATIBILITY: adapt legacy project inputs to normalized Authority facts."""
+
+    from .authority.aws import derive_external_authority as _derive_authority
+    from .authority.models import AuthorityEvaluationInput
+    from .orchestration import normalize_gate_b_authority_bounds
+
+    authority_input = AuthorityEvaluationInput(
+        has_errors=ctx.has_errors,
+        observed_at=ctx.observed_at,
+        verify_text=ctx.texts.get("docs/project/VERIFY.md", ""),
+    )
+    bounds = normalize_gate_b_authority_bounds(
+        envelope,
+        cost_posture=cost_posture,
+        active_artifact=active_artifact,
+    )
+    if (read_authority_deriver or action_authority_deriver) and not bounds.valid:
+        # COMPATIBILITY: historical monkeypatch seams intentionally supplied the
+        # receipt decision while using only the phase boundary under test.
+        from dataclasses import replace
+
+        bounds = replace(
+            bounds,
+            valid=True,
+            boundary=clean_cell(envelope.get("AWS boundary", "NONE")),
+        )
+
+    normalized_read_deriver = None
+    if read_authority_deriver is not None:
+
+        def normalized_read_deriver(
+            _authority_input: Any,
+            _bounds: Any,
+            authorization: str,
+            **kwargs: Any,
+        ) -> dict[str, Any] | None:
+            return read_authority_deriver(
+                authority_input.verify_text,
+                authorization,
+                cost_posture,
+                envelope,
+                active_artifact,
+                **kwargs,
+            )
+
+    normalized_action_deriver = None
+    if action_authority_deriver is not None:
+
+        def normalized_action_deriver(
+            _authority_input: Any,
+            _bounds: Any,
+            action: str,
+            authorization: str,
+            **kwargs: Any,
+        ) -> dict[str, Any] | None:
+            return action_authority_deriver(
+                authority_input.verify_text,
+                action,
+                authorization,
+                envelope=envelope,
+                cost_posture=cost_posture,
+                active_artifact=active_artifact,
+                **kwargs,
+            )
+
+    return _derive_authority(
+        authority_input,
+        bounds,
+        lane,
+        construction_authorization,
+        aws_progress_state=aws_progress_state,
+        preflight=preflight,
+        aws_action_phase=aws_action_phase,
+        teardown_review=teardown_review,
+        deployment_sequence=deployment_sequence,
+        read_authority_deriver=normalized_read_deriver,
+        action_authority_deriver=normalized_action_deriver,
+    )
 
 
 def _delivery_validation_policy():
