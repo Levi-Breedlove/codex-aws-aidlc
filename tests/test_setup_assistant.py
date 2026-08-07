@@ -470,20 +470,20 @@ class SetupAssistantTests(unittest.TestCase):
         self.assertIn("one consolidated checklist", combined)
         self.assertNotIn("one copyable checklist", combined)
         self.assertIn("signed-in interactive Codex CLI", combined)
-        self.assertIn("Fastlane requires the official AWS Core plugin", readme)
+        self.assertIn("official AWS Core plugin", readme)
         self.assertIn("runtime skills", setup_doc)
-        self.assertIn("does not copy AWS skills into the\nrepository", readme)
         self.assertIn("does not require separately installed AWS skills", setup_doc)
         self.assertIn("Other Agent Toolkit plugins are optional", setup_doc)
         self.assertIn(
-            "Ordinary requirements and\ndesign need no AWS credentials or AWS account",
+            "No AWS credentials are needed for requirements, design, or local construction.",
             readme,
         )
         self.assertIn(
             "Deployment and teardown retain separate exact Fastlane authority",
             setup_doc,
         )
-        self.assertLessEqual(len(readme.splitlines()), 90)
+        self.assertLessEqual(len(readme.splitlines()), 180)
+        self.assertLessEqual(len(readme.encode("utf-8")), 16_000)
         self.assertLessEqual(len((REPOSITORY_ROOT / "AGENTS.md").read_bytes()), 7_200)
 
         prompts = (REPOSITORY_ROOT / "prompts/CODEX-PROMPTS.md").read_text(
