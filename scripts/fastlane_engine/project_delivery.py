@@ -36,7 +36,10 @@ from .design import (
 )
 from .design.models import DesignContract, PropertyExecution, TechnologyDecision
 from .deliver import (
+    ApprovedDeliveryContract,
+    ApprovedSpikeContract,
     DeliveryValidationPolicy,
+    HarnessExecutionRow,
     InspectedTask,
     PropertyTestEvidenceRow,
     TaskCompletionEvidenceRow,
@@ -172,6 +175,8 @@ def validate_task_records(
     approved_tech_ids: set[str] | None = None,
     property_execution_by_id: dict[str, PropertyExecution] | None = None,
     technology_decisions_by_id: dict[str, TechnologyDecision] | None = None,
+    approved_harness: Mapping[str, HarnessExecutionRow] | None = None,
+    approved_delivery: ApprovedDeliveryContract | None = None,
 ) -> tuple[list[InspectedTask], dict[str, InspectedTask], list[str]]:
     """COMPATIBILITY: preserve the historical task-graph validator signature."""
 
@@ -183,6 +188,62 @@ def validate_task_records(
         property_execution_by_id,
         technology_decisions_by_id,
         DELIVERY_VALIDATION_POLICY,
+        approved_harness=approved_harness,
+        approved_delivery=approved_delivery,
+    )
+
+
+def approved_delivery_contract_from_design(
+    design_contract: DesignContract,
+) -> ApprovedDeliveryContract:
+    """Normalize Design's construction-wave facts for pure Delivery validation."""
+
+    project = design_contract.project_contract
+    source = project.application_source_disposition
+    source_kind = source.kind if source is not None else None
+    source_paths = source.paths if source is not None else ()
+    if project.grandfathered_v4:
+        return ApprovedDeliveryContract(grandfathered=True)
+    if project.first_wave is None:
+        return ApprovedDeliveryContract(
+            grandfathered=False,
+            application_source_kind=source_kind,
+            application_source_paths=source_paths,
+        )
+    first_wave = project.first_wave
+    approved_spike: ApprovedSpikeContract | None = None
+    if first_wave.blocking_spike_id is not None:
+        spike = project.spike
+        if spike is None or spike.spike_id != first_wave.blocking_spike_id:
+            raise ValueError(
+                "docs/project/PRD.md approved blocking spike is unavailable"
+            )
+        match = re.fullmatch(r"MAX_ATTEMPTS: ([1-9]\d*)", spike.time_box)
+        if match is None:
+            raise ValueError(
+                f"docs/project/PRD.md {spike.spike_id} has an invalid time box"
+            )
+        approved_spike = ApprovedSpikeContract(
+            spike_id=spike.spike_id,
+            max_attempts=int(match.group(1)),
+            disposable_boundaries=tuple(
+                parse_task_write_set(
+                    spike.disposable_boundary,
+                    f"docs/project/PRD.md {spike.spike_id}",
+                )
+            ),
+            exit_criterion=spike.exit_criterion,
+        )
+    return ApprovedDeliveryContract(
+        grandfathered=False,
+        wave_contract_id=first_wave.wave_contract_id,
+        journey_id=first_wave.journey_id,
+        requirement_ids=first_wave.requirement_ids,
+        acceptance_test_ids=first_wave.acceptance_test_ids,
+        harness_id=first_wave.harness_id,
+        application_source_kind=source_kind,
+        application_source_paths=source_paths,
+        spike=approved_spike,
     )
 
 

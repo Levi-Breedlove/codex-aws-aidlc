@@ -147,7 +147,11 @@ def external_target_contains(allowed: str, requested: str) -> bool:
     )
 
 
-def parse_checkpoint_rows(tasks_text: str) -> list[CheckpointReceiptRow]:
+def parse_checkpoint_rows(
+    tasks_text: str,
+    *,
+    task_surface_compatibility: bool = False,
+) -> list[CheckpointReceiptRow]:
     """CANONICALIZATION: parse uniquely ordered checkpoint receipt rows."""
 
     try:
@@ -174,10 +178,23 @@ def parse_checkpoint_rows(tasks_text: str) -> list[CheckpointReceiptRow]:
         rows.append(CheckpointReceiptRow(*cleaned))
     identifiers = [row.checkpoint_id for row in rows]
     if len(identifiers) != len(set(identifiers)):
-        raise ValueError("Checkpoint table IDs must be unique")
+        duplicates = sorted(
+            identifier
+            for identifier in set(identifiers)
+            if identifiers.count(identifier) > 1
+        )
+        raise ValueError(
+            "Checkpoint IDs may not be reused: " + ", ".join(duplicates)
+            if task_surface_compatibility
+            else "Checkpoint table IDs must be unique"
+        )
     ordinals = [int(identifier.split("-", 1)[1]) for identifier in identifiers]
     if ordinals != sorted(ordinals) or len(ordinals) != len(set(ordinals)):
-        raise ValueError("Checkpoint table IDs must be strictly monotonic")
+        raise ValueError(
+            "Checkpoint IDs must be strictly increasing in table order"
+            if task_surface_compatibility
+            else "Checkpoint table IDs must be strictly monotonic"
+        )
     return rows
 
 
