@@ -12,6 +12,8 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from unittest import mock
 
+from scripts.fastlane_engine import api as engine_api
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
@@ -611,6 +613,173 @@ def initialize_git(root: Path) -> str:
 
 
 class TaskWaveSafetyTests(unittest.TestCase):
+    def test_public_delivery_api_and_mutator_share_independent_truth_matrix(
+        self,
+    ) -> None:
+        text = document(
+            [
+                task_block("TASK-001", "DONE"),
+                task_block("TASK-002", "READY", dependencies="TASK-001"),
+            ]
+        )
+        expected = {
+            "ready_task_ids": ("TASK-002",),
+            "waves": (("TASK-001", 1), ("TASK-002", 2)),
+            "statuses": {"TASK-001": "DONE", "TASK-002": "READY"},
+        }
+
+        engine_tasks = engine_api.parse_task_contracts(text)
+        engine_snapshot = engine_api.parse_task_execution_snapshot(text)
+        engine_waivers = engine_api.parse_task_dependency_waivers(text)
+        engine_result = engine_api.validate_task_contracts(
+            engine_tasks,
+            engine_snapshot,
+            engine_waivers,
+        )
+        mutator_tasks = task_waves.parse_tasks(text)
+        mutator_snapshot = task_waves.parse_snapshot(text)
+        mutator_waivers = task_waves.parse_waivers(text)
+        mutator_by_id = task_waves.validate(
+            mutator_tasks,
+            mutator_snapshot,
+            mutator_waivers,
+        )
+
+        self.assertEqual(engine_result.ready_task_ids, expected["ready_task_ids"])
+        self.assertEqual(engine_result.waves, expected["waves"])
+        self.assertEqual(
+            {task.task_id: task.status for task in engine_result.tasks},
+            expected["statuses"],
+        )
+        self.assertEqual(
+            tuple(
+                task.task_id
+                for task in task_waves.ready_tasks(
+                    mutator_tasks,
+                    mutator_by_id,
+                    mutator_waivers,
+                )
+            ),
+            expected["ready_task_ids"],
+        )
+        self.assertEqual(
+            tuple(
+                sorted(task_waves.compute_waves(mutator_tasks, mutator_by_id).items())
+            ),
+            expected["waves"],
+        )
+
+    def test_public_delivery_api_and_mutator_reject_same_missing_dependency(
+        self,
+    ) -> None:
+        text = document([task_block("TASK-001", "READY", dependencies="TASK-999")])
+        expected = "TASK-001: missing dependency TASK-999"
+        with self.assertRaisesRegex(ValueError, expected):
+            engine_api.validate_task_contracts(
+                engine_api.parse_task_contracts(text),
+                engine_api.parse_task_execution_snapshot(text),
+                engine_api.parse_task_dependency_waivers(text),
+            )
+        with self.assertRaisesRegex(ValueError, expected):
+            task_waves.validate(
+                task_waves.parse_tasks(text),
+                task_waves.parse_snapshot(text),
+                task_waves.parse_waivers(text),
+            )
+
+    def test_public_delivery_api_validates_before_and_after_task_claim(self) -> None:
+        tasks_text = document([task_block("TASK-001", "READY")])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tasks_path, _state_path = write_task_project(root, tasks_text)
+            write_technology_register(root, "TECH-0001")
+
+            def observed() -> tuple[tuple[str, ...], tuple[str, ...]]:
+                current = tasks_path.read_text(encoding="utf-8")
+                result = engine_api.validate_task_contracts(
+                    engine_api.parse_task_contracts(current),
+                    engine_api.parse_task_execution_snapshot(current),
+                    engine_api.parse_task_dependency_waivers(current),
+                )
+                return (
+                    tuple(task.status for task in result.tasks),
+                    result.ready_task_ids,
+                )
+
+            self.assertEqual(observed(), (("READY",), ("TASK-001",)))
+            task_waves.mutate_run_snapshot(
+                tasks_path,
+                operation="start",
+                run_id="RUN-0001",
+                coordinator="lead",
+            )
+            self.assertEqual(observed(), (("READY",), ("TASK-001",)))
+            task_waves.claim_task_file(
+                tasks_path,
+                "TASK-001",
+                owner="lead",
+                coordinator="lead",
+                run_id="RUN-0001",
+                checkpoint="CP-0000",
+            )
+            self.assertEqual(observed(), (("IN_PROGRESS",), ()))
+
+    def test_task_mutator_contains_no_competing_delivery_implementation(self) -> None:
+        source = (REPOSITORY_ROOT / "scripts" / "task_waves.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("def _legacy_", source)
+        self.assertNotIn("def parse_dependency_waivers", source)
+        self.assertNotIn("fastlane_engine.deliver", source)
+        self.assertNotIn("load_bootstrap_doctor", source)
+        self.assertIn("engine_validate_task_contracts", source)
+        self.assertIn("engine_parse_task_contracts", source)
+        self.assertIn("engine_parse_task_write_boundary", source)
+        self.assertIn("engine_parse_task_external_targets", source)
+        self.assertIn("engine_task_ready_ids", source)
+        self.assertIn("engine_validate_done_completion", source)
+
+    def test_public_delivery_api_owns_task_boundary_grammar(self) -> None:
+        expected_write = ["app/**", "tests/test_app.py"]
+        expected_external = ["GitHub issue #42", "release note"]
+        self.assertEqual(
+            engine_api.parse_task_write_boundary(
+                "app/**, tests/test_app.py", "TASK-001"
+            ),
+            expected_write,
+        )
+        self.assertEqual(
+            task_waves.validate_write_boundary("app/**, tests/test_app.py", "TASK-001"),
+            expected_write,
+        )
+        self.assertEqual(
+            engine_api.parse_task_external_targets(
+                "GitHub issue #42, release note", "TASK-001"
+            ),
+            expected_external,
+        )
+        self.assertEqual(
+            task_waves.parse_external_state(
+                "GitHub issue #42, release note", "TASK-001"
+            ),
+            expected_external,
+        )
+        for invalid, message in (
+            ("UNASSIGNED", "unresolved Write set"),
+            ("../app/**", "unsafe Write set entry"),
+        ):
+            with self.subTest(write_boundary=invalid):
+                with self.assertRaisesRegex(ValueError, message):
+                    engine_api.parse_task_write_boundary(invalid, "TASK-001")
+                with self.assertRaisesRegex(ValueError, message):
+                    task_waves.validate_write_boundary(invalid, "TASK-001")
+        for invalid in ("ALL", "queue\nother"):
+            with self.subTest(external_target=invalid):
+                with self.assertRaisesRegex(ValueError, "ambiguous External state"):
+                    engine_api.parse_task_external_targets(invalid, "TASK-001")
+                with self.assertRaisesRegex(ValueError, "ambiguous External state"):
+                    task_waves.parse_external_state(invalid, "TASK-001")
+
     def test_generated_summary_cannot_inject_task_or_snapshot_records(self) -> None:
         canonical = document([task_block("TASK-001", "READY")])
         injected = (

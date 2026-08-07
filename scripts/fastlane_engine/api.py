@@ -10,7 +10,7 @@ grants authority.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -29,7 +29,6 @@ from .aws import (
 
 from .core.contracts import (
     contract_table_after_heading,
-    parse_task_write_set,
     table_after_heading,
 )
 from .core.ids import clean_cell
@@ -63,16 +62,38 @@ from .deliver import (
     ApprovedDeliveryContract,
     ApprovedSpikeContract,
     ApprovedTaskContract,
+    HarnessEvidenceRow,
     HarnessExecutionRow,
     InspectedTask,
     PropertyExecutionRow,
+    TaskGraphValidationResult,
+    TaskSnapshot,
+    TaskWaiver,
+    compute_task_waves,
+    derive_ready_task_ids,
     derive_task_requirement_coverage,
+    inspect_task_blocks,
+    parse_checkpoint_rows as parse_delivery_checkpoint_rows,
+    parse_harness_projection_rows,
+    parse_harness_evidence,
+    parse_property_execution_rows,
+    parse_task_external_targets as parse_delivery_task_external_targets,
+    parse_task_snapshot,
+    parse_task_write_boundary as parse_delivery_task_write_boundary,
+    parse_task_waivers,
     parse_property_test_evidence,
     parse_task_completion_evidence,
     task_requirement_evidence_dispositions,
     task_requirement_rules,
+    task_dependency_satisfied as delivery_task_dependency_satisfied,
     validate_done_property_evidence,
     validate_gate_b_execution_binding,
+    validate_done_harness_evidence,
+    validate_harness_projections,
+    validate_task_graph,
+    validate_task_completion_evidence,
+    validate_task_property_projection,
+    validate_task_snapshot,
 )
 from .evaluation import EngineEvaluation
 
@@ -624,6 +645,188 @@ def _delivery_validation_policy():
     return DELIVERY_VALIDATION_POLICY
 
 
+def parse_task_contracts(text: str) -> tuple[InspectedTask, ...]:
+    """Return the canonical ordered task records without observing or writing files."""
+
+    return tuple(inspect_task_blocks(text))
+
+
+def parse_task_execution_snapshot(text: str) -> TaskSnapshot:
+    """Return the typed active execution snapshot from caller-supplied text."""
+
+    return parse_task_snapshot(text)
+
+
+def parse_task_write_boundary(value: str, task_id: str) -> list[str]:
+    """Parse a task-facing write boundary through Delivery's shared grammar."""
+
+    return parse_delivery_task_write_boundary(
+        value,
+        task_id,
+        task_surface_compatibility=True,
+    )
+
+
+def parse_task_external_targets(value: str, task_id: str) -> list[str]:
+    """Parse task-facing external targets through Delivery's shared grammar."""
+
+    return parse_delivery_task_external_targets(
+        value,
+        task_id,
+        task_surface_compatibility=True,
+    )
+
+
+def parse_task_dependency_waivers(text: str) -> dict[str, TaskWaiver]:
+    """Return the canonical dependency-waiver registry from supplied text."""
+
+    return parse_task_waivers(text)
+
+
+def parse_task_property_projection(
+    text: str,
+    label: str,
+) -> tuple[dict[str, PropertyExecutionRow], bool]:
+    """Parse a task Validation property projection through Delivery."""
+
+    return parse_property_execution_rows(text, label)
+
+
+def parse_task_harness_projection(
+    text: str,
+    label: str,
+) -> tuple[dict[str, HarnessExecutionRow], bool]:
+    """Parse a task Validation Harness projection through Delivery."""
+
+    return parse_harness_projection_rows(text, label)
+
+
+def validate_task_property_contract(
+    task: Any,
+    technology_refs: Sequence[str],
+    approved_property_execution: Mapping[str, PropertyExecutionRow] | None,
+) -> list[str]:
+    """Return task-facing property projection issues without mutation."""
+
+    return validate_task_property_projection(
+        task,
+        technology_refs,
+        approved_property_execution,
+    )
+
+
+def validate_task_harness_contracts(
+    tasks: Sequence[Any],
+    approved_harness: Mapping[str, HarnessExecutionRow] | None,
+    *,
+    current_plan: bool,
+) -> list[str]:
+    """Return Harness ownership/projection issues without mutation."""
+
+    return validate_harness_projections(
+        tasks,
+        approved_harness,
+        current_plan=current_plan,
+    )
+
+
+def validate_task_snapshot_contract(snapshot: TaskSnapshot) -> None:
+    """Validate one typed execution snapshot without observing project files."""
+
+    validate_task_snapshot(snapshot, task_surface_compatibility=True)
+
+
+def task_dependency_is_satisfied(
+    task: Any,
+    dependency: Any,
+    waivers: Mapping[str, TaskWaiver],
+) -> bool:
+    """Return whether one task dependency permits mutation now."""
+
+    return delivery_task_dependency_satisfied(task, dependency, waivers)
+
+
+def derive_task_ready_ids(
+    tasks: Sequence[Any],
+    waivers: Mapping[str, TaskWaiver] | None = None,
+) -> tuple[str, ...]:
+    """Return the shared ordered READY-task decision without mutation."""
+
+    return derive_ready_task_ids(tasks, waivers)
+
+
+def parse_task_checkpoint_records(text: str):
+    """Return canonical checkpoint rows from caller-supplied TASKS text."""
+
+    return tuple(parse_delivery_checkpoint_rows(text, task_surface_compatibility=True))
+
+
+def parse_task_completion_records(text: str):
+    """Return canonical completion evidence from caller-supplied VERIFY text."""
+
+    return tuple(parse_task_completion_evidence(text, task_surface_compatibility=True))
+
+
+def parse_task_harness_evidence(text: str) -> tuple[HarnessEvidenceRow, ...]:
+    """Return canonical Harness evidence from caller-supplied VERIFY text."""
+
+    return tuple(parse_harness_evidence(text))
+
+
+def validate_task_done_completion_evidence(text: str, task: Any) -> None:
+    """Validate task-facing DONE completion evidence without file access."""
+
+    validate_task_completion_evidence(text, task)
+
+
+def validate_task_done_harness_evidence(
+    text: str,
+    task: Any,
+    snapshot: TaskSnapshot,
+    approved_harness: Mapping[str, HarnessExecutionRow] | None,
+) -> None:
+    """Validate task-facing DONE Harness evidence without file access."""
+
+    validate_done_harness_evidence(text, task, snapshot, approved_harness)
+
+
+def validate_task_contracts(
+    tasks: Sequence[Any],
+    snapshot: TaskSnapshot | None = None,
+    waivers: Mapping[str, TaskWaiver] | None = None,
+    *,
+    approved_contract: ApprovedTaskContract | None = None,
+    technology_contract_available: bool | None = None,
+    property_contract_available: bool | None = None,
+    harness_contract_available: bool | None = None,
+    task_surface_compatibility: bool = False,
+) -> TaskGraphValidationResult:
+    """SAFETY: derive one read-only task readiness and wave decision.
+
+    This is the supported shared boundary for whole-project evaluation and the
+    sole task mutator. It performs no observation, task claim, or state write.
+    """
+
+    return validate_task_graph(
+        tasks,
+        snapshot,
+        waivers,
+        approved_contract=approved_contract,
+        technology_contract_available=technology_contract_available,
+        property_contract_available=property_contract_available,
+        harness_contract_available=harness_contract_available,
+        task_surface_compatibility=task_surface_compatibility,
+        policy=_delivery_validation_policy(),
+    )
+
+
+def compute_task_contract_waves(tasks: Sequence[Any]) -> dict[str, int]:
+    """Return deterministic task waves using the same canonical dependency graph."""
+
+    by_id = {task.task_id: task for task in tasks}
+    return compute_task_waves(tasks, by_id)
+
+
 def __getattr__(name: str):
     """COMPATIBILITY: lazily retain the former public policy export."""
 
@@ -872,54 +1075,9 @@ def derive_approved_task_contract(
         for row in design_contract.harness.rows
         if row.harness_id in design_contract.harness.required_ids
     }
-    project_contract = design_contract.project_contract
-    source_disposition = project_contract.application_source_disposition
-    source_kind = source_disposition.kind if source_disposition is not None else None
-    source_paths = source_disposition.paths if source_disposition is not None else ()
-    if project_contract.grandfathered_v4:
-        delivery = ApprovedDeliveryContract(grandfathered=True)
-    elif project_contract.first_wave is None:
-        delivery = ApprovedDeliveryContract(
-            grandfathered=False,
-            application_source_kind=source_kind,
-            application_source_paths=source_paths,
-        )
-    else:
-        first_wave = project_contract.first_wave
-        approved_spike: ApprovedSpikeContract | None = None
-        if first_wave.blocking_spike_id is not None:
-            spike = project_contract.spike
-            if spike is None or spike.spike_id != first_wave.blocking_spike_id:
-                raise ValueError(
-                    "docs/project/PRD.md approved blocking spike is unavailable"
-                )
-            match = re.fullmatch(r"MAX_ATTEMPTS: ([1-9]\d*)", spike.time_box)
-            if match is None:
-                raise ValueError(
-                    f"docs/project/PRD.md {spike.spike_id} has an invalid time box"
-                )
-            approved_spike = ApprovedSpikeContract(
-                spike_id=spike.spike_id,
-                max_attempts=int(match.group(1)),
-                disposable_boundaries=tuple(
-                    parse_task_write_set(
-                        spike.disposable_boundary,
-                        f"docs/project/PRD.md {spike.spike_id}",
-                    )
-                ),
-                exit_criterion=spike.exit_criterion,
-            )
-        delivery = ApprovedDeliveryContract(
-            grandfathered=False,
-            wave_contract_id=first_wave.wave_contract_id,
-            journey_id=first_wave.journey_id,
-            requirement_ids=first_wave.requirement_ids,
-            acceptance_test_ids=first_wave.acceptance_test_ids,
-            harness_id=first_wave.harness_id,
-            application_source_kind=source_kind,
-            application_source_paths=source_paths,
-            spike=approved_spike,
-        )
+    from .project_delivery import approved_delivery_contract_from_design
+
+    delivery = approved_delivery_contract_from_design(design_contract)
 
     document = table_after_heading(prd_text, "## Document status")
     repository_mode = clean_cell(document.get("Repository mode", "")).lower()
@@ -1050,7 +1208,11 @@ __all__ = (
     "AwsCoreEvidenceRow",
     "DELIVERY_VALIDATION_POLICY",
     "HarnessExecutionRow",
+    "HarnessEvidenceRow",
     "PropertyExecutionRow",
+    "TaskGraphValidationResult",
+    "TaskSnapshot",
+    "TaskWaiver",
     "ProjectSnapshot",
     "EngineEvaluation",
     "RequirementsContract",
@@ -1074,6 +1236,25 @@ __all__ = (
     "derive_teardown_sequence_state",
     "evaluate_adr_rationale",
     "parse_aws_core_evidence",
+    "parse_task_contracts",
+    "parse_task_checkpoint_records",
+    "parse_task_completion_records",
+    "parse_task_dependency_waivers",
+    "parse_task_execution_snapshot",
+    "parse_task_external_targets",
+    "parse_task_harness_projection",
+    "parse_task_harness_evidence",
+    "parse_task_property_projection",
+    "parse_task_write_boundary",
+    "compute_task_contract_waves",
+    "derive_task_ready_ids",
+    "task_dependency_is_satisfied",
     "validate_approved_property_evidence",
     "validate_task_execution_basis",
+    "validate_task_contracts",
+    "validate_task_harness_contracts",
+    "validate_task_done_completion_evidence",
+    "validate_task_done_harness_evidence",
+    "validate_task_property_contract",
+    "validate_task_snapshot_contract",
 )

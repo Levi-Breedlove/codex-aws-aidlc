@@ -93,6 +93,14 @@ class InspectedTask:
     block: str
     metadata: dict[str, str]
     duplicates: set[str]
+    start: int = 0
+    end: int = 0
+
+    @property
+    def duplicate_metadata(self) -> set[str]:
+        """COMPATIBILITY: retain the sole-mutator field name."""
+
+        return self.duplicates
 
     @property
     def status(self) -> str:
@@ -114,6 +122,38 @@ class InspectedTask:
     @property
     def attempt_budget(self) -> int:
         return int(clean_cell(self.metadata["Attempt budget"]))
+
+
+@dataclass(frozen=True)
+class TaskSnapshot:
+    fields: dict[str, str]
+    duplicates: set[str]
+
+    def get(self, key: str) -> str:
+        return clean_cell(self.fields.get(key, ""))
+
+
+@dataclass(frozen=True)
+class TaskWaiver:
+    waiver_id: str
+    skipped_task: str
+    applies_to: str
+    authority: str
+    rationale: str
+    recorded_at: str
+
+
+@dataclass(frozen=True)
+class TaskGraphValidationResult:
+    """Normalized pure task decision shared by evaluation and mutation."""
+
+    tasks: tuple[InspectedTask, ...]
+    ready_task_ids: tuple[str, ...]
+    waves: tuple[tuple[str, int], ...]
+
+    @property
+    def by_id(self) -> dict[str, InspectedTask]:
+        return {task.task_id: task for task in self.tasks}
 
 
 @dataclass(frozen=True)
@@ -186,6 +226,20 @@ class HarnessExecutionRow:
 
 
 @dataclass(frozen=True)
+class HarnessEvidenceRow:
+    evidence_id: str
+    harness_id: str
+    layer: str
+    basis_ids: str
+    exact_command: str
+    artifact_environment: str
+    observed_result: str
+    observed_at: str
+    durable_source: str
+    status: str
+
+
+@dataclass(frozen=True)
 class ApprovedSpikeContract:
     spike_id: str
     max_attempts: int
@@ -237,11 +291,15 @@ __all__ = (
     "TaskRequirementCoverage",
     "TaskRequirementCoverageResult",
     "InspectedTask",
+    "TaskSnapshot",
+    "TaskWaiver",
+    "TaskGraphValidationResult",
     "TaskCompletionEvidenceRow",
     "PropertyTestEvidenceRow",
     "CheckpointReceiptRow",
     "PropertyExecutionRow",
     "HarnessExecutionRow",
+    "HarnessEvidenceRow",
     "ApprovedSpikeContract",
     "ApprovedDeliveryContract",
     "ApprovedTaskContract",

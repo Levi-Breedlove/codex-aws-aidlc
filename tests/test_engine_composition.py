@@ -24,7 +24,7 @@ def synthetic_schema2_report() -> dict[str, object]:
 
     return {
         "schema_version": 2,
-        "bootstrap_version": "1.2.22",
+        "bootstrap_version": "1.2.23",
         "status": "READY",
         "classification": "ACTIVE_GREENFIELD",
         "ok": True,

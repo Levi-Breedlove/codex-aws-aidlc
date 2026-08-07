@@ -14,6 +14,7 @@ from typing import Any
 from ..core.contracts import (
     parse_task_external_state,
     parse_task_write_set,
+    path_boundary_contains,
     split_table_row,
     table_after_heading,
     without_fenced_code,
@@ -29,20 +30,30 @@ from ..core.ids import (
 from .evidence import (
     EVIDENCE_PATTERN,
     PROPERTY_TEST_EVIDENCE_HEADING,
+    fenced_command_lines,
+    parse_harness_projection_rows,
     parse_property_test_evidence,
     parse_task_completion_evidence,
     parse_verification_matrix,
     validate_done_evidence,
     validate_done_property_evidence,
+    validate_harness_projections,
+    validate_task_property_projection,
     validate_task_property_execution_projection,
 )
 from .models import (
+    ApprovedDeliveryContract,
+    ApprovedTaskContract,
     DeliveryValidationPolicy,
+    HarnessExecutionRow,
     InspectedTask,
     PropertyTestEvidenceRow,
     TaskCompletionEvidenceRow,
     TaskRequirementCoverage,
     TaskRequirementCoverageResult,
+    TaskGraphValidationResult,
+    TaskSnapshot,
+    TaskWaiver,
 )
 
 REQ_ID = re.compile(r"REQ-\d{4,}")
@@ -80,6 +91,31 @@ TASK_META_PATTERN = re.compile(
 )
 TASK_STATUSES = {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE", "SKIPPED"}
 TASK_AWS_MODES = {"NONE", "DOCS_ONLY"}
+TASK_PLAN_STATES = {"UNINITIALIZED", "CURRENT", "STALE"}
+TASK_RUN_STATES = {"NOT_STARTED", "RUNNING", "PAUSED", "BLOCKED", "COMPLETE"}
+TASK_SNAPSHOT_FIELDS = (
+    "Task-plan revision",
+    "Task-plan state",
+    "Requirements revision",
+    "Design revision",
+    "Construction authorization",
+    "Gate B state",
+    "Run state",
+    "Active run ID",
+    "Baseline commit",
+    "Protected dirty paths",
+    "Coordinator",
+    "Maximum workers",
+    "Current wave",
+    "Last checkpoint",
+    "Last known-green commit",
+    "Next safe action",
+)
+TASK_RUN_ID = re.compile(r"RUN-\d{4,}")
+TASK_PLAN_ID = re.compile(r"PLAN-\d{4,}")
+OWNER_DECISION_ID = re.compile(r"OWNER-DECISION-\d+")
+WAVE_ID = re.compile(r"(?<![A-Za-z0-9_-])WAVE-\d{3,}(?![A-Za-z0-9_-])")
+SPIKE_ID = re.compile(r"(?<![A-Za-z0-9_-])SPIKE-\d{3,}(?![A-Za-z0-9_-])")
 TASK_DESIGN_TRACE_PATTERN = re.compile(
     r"^(?P<design>DES-\d{4}); TECH: "
     r"(?:(?P<none>NONE — no technology/toolchain impact)|"
@@ -106,7 +142,13 @@ def inspect_task_blocks(text: str) -> list[InspectedTask]:
             metadata[key] = found.group("value")
         tasks.append(
             InspectedTask(
-                match.group(1), match.group(2).strip(), block, metadata, duplicates
+                match.group(1),
+                match.group(2).strip(),
+                block,
+                metadata,
+                duplicates,
+                start=match.start(),
+                end=end,
             )
         )
     return tasks
@@ -128,6 +170,177 @@ def inspect_task_sections(block: str) -> tuple[dict[str, str], set[str]]:
             duplicates.add(name)
         sections[name] = block[match.end() : end]
     return sections, duplicates
+
+
+def _document_section(text: str, heading: str) -> str:
+    match = re.search(rf"^## {re.escape(heading)}\s*$", text, re.MULTILINE)
+    if match is None:
+        return ""
+    following = re.search(r"^##\s+", text[match.end() :], re.MULTILINE)
+    end = match.end() + following.start() if following else len(text)
+    return text[match.end() : end]
+
+
+def parse_task_snapshot(text: str) -> TaskSnapshot:
+    """CANONICALIZATION: parse the exact active execution snapshot once."""
+
+    body = _document_section(without_fenced_code(text), "Active execution snapshot")
+    fields: dict[str, str] = {}
+    duplicates: set[str] = set()
+    allowed = set(TASK_SNAPSHOT_FIELDS)
+    for line in body.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 2 or cells[0] not in allowed:
+            continue
+        if cells[0] in fields:
+            duplicates.add(cells[0])
+        fields[cells[0]] = cells[1]
+    return TaskSnapshot(fields, duplicates)
+
+
+def parse_task_waivers(text: str) -> dict[str, TaskWaiver]:
+    """CANONICALIZATION: return typed dependency-waiver records."""
+
+    return {
+        waiver_id: TaskWaiver(waiver_id, *values)
+        for waiver_id, values in task_waiver_rows(text).items()
+    }
+
+
+def _parse_nonnegative_int(value: str, *, minimum: int = 0) -> int:
+    normalized = clean_cell(value)
+    if not normalized.isdigit() or int(normalized) < minimum:
+        raise ValueError(f"expected integer >= {minimum}, got {normalized!r}")
+    return int(normalized)
+
+
+def _parse_design_trace(value: str, task_id: str) -> tuple[str, list[str]]:
+    normalized = clean_cell(value)
+    match = TASK_DESIGN_TRACE_PATTERN.fullmatch(normalized)
+    if match is None:
+        raise ValueError(
+            f"{task_id}: Design must exactly match "
+            "DES-nnnn; TECH: TECH-nnnn[, TECH-nnnn...] or "
+            "DES-nnnn; TECH: NONE â€” no technology/toolchain impact"
+        )
+    technologies = match.group("technologies")
+    references = technologies.split(", ") if technologies else []
+    if len(references) != len(set(references)):
+        raise ValueError(f"{task_id}: duplicate TECH reference in Design")
+    return match.group("design"), references
+
+
+def parse_task_write_boundary(
+    value: str,
+    task_id: str,
+    *,
+    task_surface_compatibility: bool = False,
+) -> list[str]:
+    """Parse one task write boundary through the shared repository grammar."""
+
+    normalized = clean_cell(value)
+    if task_surface_compatibility and normalized.upper() == "UNASSIGNED":
+        raise ValueError(f"{task_id}: unresolved Write set")
+    return parse_task_write_set(normalized, task_id)
+
+
+def parse_task_external_targets(
+    value: str,
+    task_id: str,
+    *,
+    task_surface_compatibility: bool = False,
+) -> list[str]:
+    """Parse one task external-state boundary without granting authority."""
+
+    normalized = clean_cell(value)
+    if task_surface_compatibility and (
+        normalized.upper() == "UNASSIGNED"
+        or "\x00" in normalized
+        or "\r" in normalized
+        or "\n" in normalized
+    ):
+        raise ValueError(f"{task_id}: ambiguous External state")
+    targets = parse_task_external_state(normalized, task_id)
+    if task_surface_compatibility and any(
+        target.upper() == "ALL" for target in targets
+    ):
+        raise ValueError(f"{task_id}: ambiguous External state")
+    return targets
+
+
+def _evidence_references(value: str) -> list[str]:
+    return [match.group(0) for match in EVIDENCE_PATTERN.finditer(clean_cell(value))]
+
+
+def validate_task_snapshot(
+    snapshot: TaskSnapshot,
+    *,
+    task_surface_compatibility: bool = False,
+) -> None:
+    """SAFETY: reject incomplete or contradictory execution snapshots."""
+
+    errors = [
+        f"Execution snapshot: missing {key}"
+        for key in TASK_SNAPSHOT_FIELDS
+        if key not in snapshot.fields
+    ]
+    errors.extend(
+        f"Execution snapshot: duplicate {key}" for key in sorted(snapshot.duplicates)
+    )
+    if errors:
+        raise ValueError("\n".join(errors))
+    run_state = snapshot.get("Run state")
+    if run_state not in TASK_RUN_STATES:
+        raise ValueError(f"Execution snapshot: invalid Run state {run_state!r}")
+    plan_state = snapshot.get("Task-plan state")
+    plan_revision = snapshot.get("Task-plan revision")
+    if plan_state not in TASK_PLAN_STATES:
+        raise ValueError(f"Execution snapshot: invalid Task-plan state {plan_state!r}")
+    if plan_state == "UNINITIALIZED":
+        if plan_revision != "UNINITIALIZED":
+            raise ValueError(
+                "Execution snapshot: UNINITIALIZED state requires UNINITIALIZED revision"
+            )
+    elif TASK_PLAN_ID.fullmatch(plan_revision) is None:
+        raise ValueError(
+            "Execution snapshot: initialized plan requires a PLAN-nnnn revision"
+        )
+    maximum_workers = _parse_nonnegative_int(snapshot.get("Maximum workers"), minimum=1)
+    if maximum_workers != 1:
+        raise ValueError("Execution snapshot: Maximum workers must be exactly 1")
+    active_run = snapshot.get("Active run ID")
+    coordinator = snapshot.get("Coordinator")
+    if run_state == "NOT_STARTED":
+        if active_run != "NONE" or coordinator != "UNASSIGNED":
+            raise ValueError(
+                "Execution snapshot: NOT_STARTED requires no active run or coordinator"
+            )
+    elif TASK_RUN_ID.fullmatch(active_run) is None or coordinator in {
+        "",
+        "NONE",
+        "UNASSIGNED",
+        "TODO",
+    }:
+        raise ValueError(
+            "Execution snapshot: active state requires a RUN ID and coordinator"
+        )
+    current_wave = snapshot.get("Current wave")
+    if current_wave != "NONE":
+        _parse_nonnegative_int(current_wave, minimum=1)
+    parse_task_write_boundary(
+        snapshot.get("Protected dirty paths"),
+        "Execution snapshot Protected dirty paths",
+        task_surface_compatibility=task_surface_compatibility,
+    )
+    checkpoint = snapshot.get("Last checkpoint")
+    if checkpoint != "NONE" and CHECKPOINT_ID.fullmatch(checkpoint) is None:
+        raise ValueError(f"Execution snapshot: invalid Last checkpoint {checkpoint!r}")
+    if checkpoint == "NONE" and run_state in {"PAUSED", "BLOCKED", "COMPLETE"}:
+        raise ValueError(
+            f"Execution snapshot: {run_state} requires a valid Last checkpoint"
+        )
 
 
 def task_waiver_rows(text: str) -> dict[str, tuple[str, str, str, str, str]]:
@@ -167,215 +380,574 @@ def declared_task_waivers(task: InspectedTask) -> dict[str, str]:
     return result
 
 
-def validate_task_records(
-    text: str,
-    snapshot: dict[str, str],
-    verify_text: str | None = None,
-    approved_tech_ids: set[str] | None = None,
-    property_execution_by_id: Mapping[str, Any] | None = None,
-    technology_decisions_by_id: Mapping[str, Any] | None = None,
-    policy: DeliveryValidationPolicy | None = None,
-) -> tuple[list[InspectedTask], dict[str, InspectedTask], list[str]]:
-    """SAFETY: validate the complete task graph before exposing READY work."""
+def _task_contract_ids(task: Any) -> list[str]:
+    return STABLE_CONTRACT_ID.findall(clean_cell(task.metadata.get("Requirements", "")))
 
-    if policy is None:
-        raise ValueError("Delivery validation policy is required")
-    tasks = inspect_task_blocks(text)
-    by_id: dict[str, InspectedTask] = {}
+
+def _transitively_depends_on(
+    task: Any,
+    ancestor_id: str,
+    by_id: Mapping[str, Any],
+) -> bool:
+    pending = list(task.dependencies)
+    visited: set[str] = set()
+    while pending:
+        dependency_id = pending.pop()
+        if dependency_id == ancestor_id:
+            return True
+        if dependency_id in visited:
+            continue
+        visited.add(dependency_id)
+        dependency = by_id.get(dependency_id)
+        if dependency is not None:
+            pending.extend(dependency.dependencies)
+    return False
+
+
+def validate_new_build_delivery_order(
+    tasks: Sequence[Any],
+    by_id: Mapping[str, Any],
+    approved_delivery: ApprovedDeliveryContract | None,
+    approved_harness: Mapping[str, HarnessExecutionRow] | None,
+    *,
+    current_plan: bool,
+    task_surface_compatibility: bool = False,
+) -> list[str]:
+    """SAFETY: bind a modern new-build graph to its approved first wave."""
+
     errors: list[str] = []
-    waivers = task_waiver_rows(text)
-    current_req = snapshot.get("Requirements revision", "")
-    current_des = snapshot.get("Design revision", "")
-    current_auth = snapshot.get("Construction authorization", "")
-    done_property_ids = {
-        property_id
-        for task in tasks
-        if task.status == "DONE"
-        for property_id in policy.property_id.findall(
-            clean_cell(task.metadata.get("Requirements", ""))
-        )
-    }
-    property_evidence_rows: list[PropertyTestEvidenceRow] = []
-    completion_evidence_rows: list[TaskCompletionEvidenceRow] = []
-    property_section_present = bool(
-        verify_text is not None
-        and re.search(
-            rf"^{re.escape(PROPERTY_TEST_EVIDENCE_HEADING)}[ \t]*$",
-            without_fenced_code(verify_text),
-            re.MULTILINE,
-        )
-    )
-    if verify_text is not None and property_section_present:
-        try:
-            property_evidence_rows = parse_property_test_evidence(verify_text, policy)
-        except ValueError as exc:
-            errors.append(str(exc))
-    observed_property_evidence = any(
-        row.result in {"PASS", "FAIL"} for row in property_evidence_rows
-    )
-    if done_property_ids or observed_property_evidence:
-        if verify_text is None:
+    delivery = approved_delivery
+    if (
+        not current_plan
+        or delivery is None
+        or delivery.grandfathered
+        or delivery.wave_contract_id is None
+    ):
+        return errors
+    wave_id = delivery.wave_contract_id
+    references = {task.task_id: _task_contract_ids(task) for task in tasks}
+
+    def matching_ids(pattern: re.Pattern[str]) -> list[str]:
+        return [
+            identifier
+            for values in references.values()
+            for identifier in values
+            if pattern.fullmatch(identifier)
+        ]
+
+    def reject(condition: bool, message: str) -> bool:
+        if condition:
+            errors.append(message)
+        return condition
+
+    def sole_owner(identifier: str, noun: str, skipped: str) -> Any | None:
+        owners = [
+            task
+            for task in tasks
+            for reference in references[task.task_id]
+            if reference == identifier
+        ]
+        if len(owners) != 1:
             errors.append(
-                "DONE property tasks require VERIFY.md property-test evidence"
+                f"{identifier}: current NEW_BUILD task plan requires exactly one "
+                f"{noun} task; found {len(owners)}"
             )
-        elif not property_section_present:
-            errors.append(
-                "VERIFY.md requires exactly one Property-based test evidence section"
+            return None
+        owner = owners[0]
+        return (
+            None
+            if reject(
+                owner.status == "SKIPPED",
+                f"{owner.task_id}: {skipped} cannot be SKIPPED",
             )
-        else:
+            else owner
+        )
+
+    unexpected = sorted(set(matching_ids(WAVE_ID)) - {wave_id})
+    reject(
+        bool(unexpected),
+        "Current NEW_BUILD task plan references unapproved first-wave IDs: "
+        + ", ".join(unexpected),
+    )
+    walking_task = sole_owner(wave_id, "walking-skeleton", "walking-skeleton task")
+    if walking_task is not None:
+        required_ids = {
+            wave_id,
+            *delivery.requirement_ids,
+            *delivery.acceptance_test_ids,
+        }
+        if delivery.journey_id is not None:
+            required_ids.add(delivery.journey_id)
+        missing_ids = sorted(required_ids - set(references[walking_task.task_id]))
+        reject(
+            bool(missing_ids),
+            f"{walking_task.task_id}: walking-skeleton Requirements are missing "
+            + ", ".join(missing_ids),
+        )
+        if delivery.application_source_kind == "GREENFIELD_APP_ROOT":
             try:
-                completion_evidence_rows = parse_task_completion_evidence(verify_text)
+                walking_writes = parse_task_write_boundary(
+                    walking_task.metadata.get("Write set", ""),
+                    walking_task.task_id,
+                    task_surface_compatibility=task_surface_compatibility,
+                )
+                writes_application_source = any(
+                    path_boundary_contains(source, path)
+                    or path_boundary_contains(path, source)
+                    for source in delivery.application_source_paths
+                    for path in walking_writes
+                )
+                reject(
+                    not writes_application_source,
+                    f"{walking_task.task_id}: walking-skeleton Write set must include "
+                    "approved application source under app/**",
+                )
             except ValueError as exc:
                 errors.append(str(exc))
 
+        sections, _duplicates = inspect_task_sections(walking_task.block)
+        projected_harness: dict[str, HarnessExecutionRow] = {}
+        validation = sections.get("Validation")
+        if validation is not None:
+            try:
+                projected_harness, _present = parse_harness_projection_rows(
+                    validation, walking_task.task_id
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+        harness_id = delivery.harness_id
+        unavailable = (
+            harness_id is None
+            or approved_harness is None
+            or harness_id not in approved_harness
+        )
+        if not reject(
+            unavailable,
+            f"{wave_id}: approved end-to-end Harness contract is unavailable",
+        ):
+            reject(
+                harness_id not in projected_harness,
+                f"{walking_task.task_id}: walking-skeleton Validation must own "
+                f"approved end-to-end {harness_id}",
+            )
+
+    approved_spike = delivery.spike
+    observed_spike_ids = matching_ids(SPIKE_ID)
+    spike_task: Any | None = None
+    if approved_spike is None:
+        reject(
+            bool(observed_spike_ids),
+            "Current NEW_BUILD task plan references an unapproved blocking spike: "
+            + ", ".join(sorted(set(observed_spike_ids))),
+        )
+    else:
+        unexpected = sorted(set(observed_spike_ids) - {approved_spike.spike_id})
+        reject(
+            bool(unexpected),
+            "Current NEW_BUILD task plan references unapproved spike IDs: "
+            + ", ".join(unexpected),
+        )
+        spike_task = sole_owner(approved_spike.spike_id, "spike", "blocking spike")
+        if reject(
+            walking_task is not None
+            and spike_task is not None
+            and spike_task.task_id == walking_task.task_id,
+            f"{approved_spike.spike_id}: spike and walking skeleton must be separate tasks",
+        ):
+            spike_task = None
+    if spike_task is not None and approved_spike is not None:
+        reject(
+            spike_task.attempt_budget > approved_spike.max_attempts,
+            f"{spike_task.task_id}: Attempt budget exceeds approved "
+            f"{approved_spike.spike_id} maximum {approved_spike.max_attempts}",
+        )
+        try:
+            spike_writes = parse_task_write_boundary(
+                spike_task.metadata.get("Write set", ""),
+                spike_task.task_id,
+                task_surface_compatibility=task_surface_compatibility,
+            )
+            outside = [
+                path
+                for path in spike_writes
+                if not any(
+                    path_boundary_contains(boundary, path)
+                    for boundary in approved_spike.disposable_boundaries
+                )
+            ]
+            reject(
+                bool(outside),
+                f"{spike_task.task_id}: spike Write set exceeds the approved "
+                "disposable boundary: " + ", ".join(outside),
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        reject(
+            clean_cell(spike_task.metadata.get("External state", "")) != "NONE",
+            f"{spike_task.task_id}: blocking spike requires External state NONE",
+        )
+        reject(
+            clean_cell(spike_task.metadata.get("AWS mode", "")).upper()
+            not in {"NONE", "DOCS_ONLY"},
+            f"{spike_task.task_id}: blocking spike AWS mode must be NONE or DOCS_ONLY",
+        )
+        sections, _duplicates = inspect_task_sections(spike_task.block)
+        validation = sections.get("Validation", "")
+        exit_count = fenced_command_lines(validation).count(
+            approved_spike.exit_criterion
+        )
+        reject(
+            exit_count != 1,
+            f"{spike_task.task_id}: approved spike exit criterion must appear "
+            "unchanged exactly once in Validation code fences; "
+            f"found {exit_count}",
+        )
+
+    if walking_task is None or not all(
+        dependency in by_id and dependency != task.task_id
+        for task in tasks
+        for dependency in task.dependencies
+    ):
+        return errors
+    try:
+        waves = compute_task_waves(tasks, by_id)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return errors
+    active_tasks = [task for task in tasks if task.status != "SKIPPED"]
+
+    def tasks_in_wave(number: int) -> list[str]:
+        return sorted(
+            task.task_id for task in active_tasks if waves[task.task_id] == number
+        )
+
+    if approved_spike is None:
+        reject(
+            bool(walking_task.dependencies),
+            f"{walking_task.task_id}: walking skeleton without a spike must use "
+            "Depends on NONE",
+        )
+        reject(
+            tasks_in_wave(1) != [walking_task.task_id],
+            f"{wave_id}: walking skeleton must be the sole active structural wave 1 task",
+        )
+    elif spike_task is not None:
+        reject(
+            bool(spike_task.dependencies),
+            f"{spike_task.task_id}: blocking spike must use Depends on NONE",
+        )
+        reject(
+            walking_task.dependencies != [spike_task.task_id],
+            f"{walking_task.task_id}: walking skeleton must depend directly and only "
+            f"on {spike_task.task_id}",
+        )
+        reject(
+            tasks_in_wave(1) != [spike_task.task_id],
+            f"{approved_spike.spike_id}: spike must be the sole active structural wave 1 task",
+        )
+        reject(
+            tasks_in_wave(2) != [walking_task.task_id],
+            f"{wave_id}: walking skeleton must be the sole active structural wave 2 "
+            "task after the spike",
+        )
+
+    excluded = {
+        walking_task.task_id,
+        *(task.task_id for task in (spike_task,) if task),
+    }
+    bypassing = sorted(
+        task.task_id
+        for task in active_tasks
+        if task.task_id not in excluded
+        and not _transitively_depends_on(task, walking_task.task_id, by_id)
+    )
+    reject(
+        bool(bypassing),
+        f"{wave_id}: active tasks must be transitively downstream of the walking "
+        "skeleton: " + ", ".join(bypassing),
+    )
+    return errors
+
+
+def compute_task_waves(
+    tasks: Sequence[Any],
+    by_id: Mapping[str, Any],
+) -> dict[str, int]:
+    """CANONICALIZATION: derive deterministic structural task waves."""
+
+    waves: dict[str, int] = {}
+    visiting: set[str] = set()
+    stack: list[str] = []
+
+    def assign(task_id: str) -> int:
+        if task_id in waves:
+            return waves[task_id]
+        if task_id in visiting:
+            start = stack.index(task_id)
+            cycle = " -> ".join([*stack[start:], task_id])
+            raise ValueError(f"Dependency cycle detected: {cycle}")
+        visiting.add(task_id)
+        stack.append(task_id)
+        dependencies = by_id[task_id].dependencies
+        wave = 1 if not dependencies else 1 + max(assign(dep) for dep in dependencies)
+        stack.pop()
+        visiting.remove(task_id)
+        waves[task_id] = wave
+        return wave
+
+    for task in sorted(tasks, key=lambda item: item.task_id):
+        assign(task.task_id)
+    return waves
+
+
+def task_dependency_satisfied(
+    task: Any,
+    dependency: Any,
+    waivers: Mapping[str, TaskWaiver],
+) -> bool:
+    """Return whether one dependency permits the task to run now."""
+
+    if dependency.status == "DONE":
+        return True
+    if dependency.status != "SKIPPED":
+        return False
+    declared = declared_task_waivers(task)
+    waiver = waivers.get(declared.get(dependency.task_id, ""))
+    return bool(
+        waiver is not None
+        and waiver.skipped_task == dependency.task_id
+        and waiver.applies_to == task.task_id
+    )
+
+
+def derive_ready_task_ids(
+    tasks: Sequence[Any],
+    waivers: Mapping[str, TaskWaiver] | None = None,
+) -> tuple[str, ...]:
+    """Derive READY tasks whose declared dependencies are satisfied."""
+
+    by_id = {task.task_id: task for task in tasks}
+    waivers = waivers or {}
+    return tuple(
+        task.task_id
+        for task in tasks
+        if task.status == "READY"
+        and all(
+            dependency_id in by_id
+            and task_dependency_satisfied(task, by_id[dependency_id], waivers)
+            for dependency_id in task.dependencies
+        )
+    )
+
+
+def validate_task_graph(
+    tasks: Sequence[Any],
+    snapshot: TaskSnapshot | None = None,
+    waivers: Mapping[str, TaskWaiver] | None = None,
+    *,
+    approved_contract: ApprovedTaskContract | None = None,
+    technology_contract_available: bool | None = None,
+    property_contract_available: bool | None = None,
+    harness_contract_available: bool | None = None,
+    task_surface_compatibility: bool = False,
+    validate_snapshot_structure: bool = True,
+    enforce_plan_completeness: bool = True,
+    policy: DeliveryValidationPolicy,
+) -> TaskGraphValidationResult:
+    """SAFETY: return one pure task graph, wave, and readiness decision."""
+
+    errors: list[str] = []
+    by_id: dict[str, Any] = {}
+    waivers = waivers or {}
+    contract_supplied = approved_contract is not None
+    contract = approved_contract or ApprovedTaskContract(frozenset(), {}, {})
+    technology_contract_available = (
+        contract_supplied
+        if technology_contract_available is None
+        else technology_contract_available
+    )
+    property_contract_available = (
+        contract_supplied
+        if property_contract_available is None
+        else property_contract_available
+    )
+    harness_contract_available = (
+        contract_supplied
+        if harness_contract_available is None
+        else harness_contract_available
+    )
+    if snapshot is not None and validate_snapshot_structure:
+        validate_task_snapshot(
+            snapshot,
+            task_surface_compatibility=task_surface_compatibility,
+        )
+
     for task in tasks:
-        execution_contract_required = task.status in {
-            "READY",
-            "IN_PROGRESS",
-            "BLOCKED",
-            "DONE",
-        } or (task.status == "BACKLOG" and snapshot.get("Task-plan state") == "CURRENT")
         if task.task_id in by_id:
             errors.append(f"Duplicate task ID: {task.task_id}")
         by_id[task.task_id] = task
-        for key in sorted(task.duplicates):
+        for key in sorted(task.duplicate_metadata):
             errors.append(f"{task.task_id}: duplicate {key} metadata")
         for key in TASK_METADATA_KEYS:
             if key not in task.metadata:
                 errors.append(f"{task.task_id}: missing {key} metadata")
         if task.status not in TASK_STATUSES:
-            errors.append(f"{task.task_id}: invalid status {task.status!r}")
+            errors.append(
+                f"{task.task_id}: invalid status {task.status!r}; "
+                f"allowed={sorted(TASK_STATUSES)}"
+            )
             continue
         try:
-            budget = int(clean_cell(task.metadata.get("Attempt budget", "")))
-            used = int(clean_cell(task.metadata.get("Attempts used", "")))
-            if budget < 1 or used < 0 or used > budget:
-                raise ValueError
-        except ValueError:
-            errors.append(f"{task.task_id}: invalid attempt counters")
+            budget = _parse_nonnegative_int(
+                task.metadata.get("Attempt budget", ""), minimum=1
+            )
+            used = _parse_nonnegative_int(task.metadata.get("Attempts used", ""))
+            if used > budget:
+                errors.append(f"{task.task_id}: Attempts used exceeds Attempt budget")
+        except ValueError as exc:
+            errors.append(f"{task.task_id}: invalid attempt metadata: {exc}")
             budget = used = 0
+
         aws_mode = clean_cell(task.metadata.get("AWS mode", "")).upper()
         if aws_mode not in TASK_AWS_MODES:
             errors.append(f"{task.task_id}: invalid AWS mode {aws_mode!r}")
-        for field_name, expected, pattern in (
-            ("Requirements", current_req, REQ_ID),
-            ("Authorization", current_auth, AUTH_ID),
-        ):
-            match = pattern.search(clean_cell(task.metadata.get(field_name, "")))
-            if match is None or match.group(0) != expected:
-                errors.append(
-                    f"{task.task_id}: {field_name} does not match current execution basis"
-                )
-        design_value = clean_cell(task.metadata.get("Design", ""))
+
+        contract_bound = task.status in {
+            "READY",
+            "IN_PROGRESS",
+            "BLOCKED",
+            "DONE",
+        } or (
+            task.status == "BACKLOG"
+            and snapshot is not None
+            and snapshot.get("Task-plan state") == "CURRENT"
+        )
         technology_refs: list[str] = []
-        if execution_contract_required:
-            design_match = TASK_DESIGN_TRACE_PATTERN.fullmatch(design_value)
-            if design_match is None:
-                errors.append(
-                    f"{task.task_id}: Design must exactly match "
-                    "DES-nnnn; TECH: TECH-nnnn[, TECH-nnnn...] or "
-                    "DES-nnnn; TECH: NONE — no technology/toolchain impact"
-                )
-            else:
-                if design_match.group("design") != current_des:
-                    errors.append(
-                        f"{task.task_id}: Design does not match current execution basis"
-                    )
-                technologies = design_match.group("technologies")
-                technology_refs = technologies.split(", ") if technologies else []
-                if len(technology_refs) != len(set(technology_refs)):
-                    errors.append(f"{task.task_id}: duplicate TECH reference in Design")
-                if approved_tech_ids is not None:
-                    unknown = [
-                        tech_id
-                        for tech_id in technology_refs
-                        if tech_id not in approved_tech_ids
-                    ]
-                    if unknown:
-                        errors.append(
-                            f"{task.task_id}: Design references unapproved TECH IDs: "
-                            + ", ".join(unknown)
-                        )
-        else:
-            design_match = DES_ID.search(design_value)
-            if design_match is None or design_match.group(0) != current_des:
-                errors.append(
-                    f"{task.task_id}: Design does not match current execution basis"
-                )
-        if (
-            task.status in {"READY", "IN_PROGRESS"}
-            and snapshot.get("Gate B state") != "APPROVED_FOR_CONSTRUCTION"
-        ):
-            errors.append(f"{task.task_id}: Gate B is not approved for construction")
-        if (
-            task.status in {"READY", "IN_PROGRESS"}
-            and snapshot.get("Task-plan state") != "CURRENT"
-        ):
-            errors.append(f"{task.task_id}: task plan is not CURRENT")
-        try:
-            parse_task_write_set(task.metadata.get("Write set", ""), task.task_id)
-            parse_task_external_state(
-                task.metadata.get("External state", ""), task.task_id
+        if contract_bound:
+            requirement = REQ_ID.search(
+                clean_cell(task.metadata.get("Requirements", ""))
             )
-        except ValueError as exc:
-            errors.append(str(exc))
+            authorization = AUTH_ID.search(
+                clean_cell(task.metadata.get("Authorization", ""))
+            )
+            try:
+                design_revision, technology_refs = _parse_design_trace(
+                    task.metadata.get("Design", ""), task.task_id
+                )
+                unknown = [
+                    tech_id
+                    for tech_id in technology_refs
+                    if tech_id not in contract.technology_ids
+                ]
+                if technology_contract_available and unknown:
+                    errors.append(
+                        f"{task.task_id}: Design references unapproved TECH IDs: "
+                        + ", ".join(unknown)
+                    )
+            except ValueError as exc:
+                errors.append(str(exc))
+                design_revision = None
+            if requirement is None or authorization is None:
+                errors.append(f"{task.task_id}: unresolved REQ/DES/AUTH trace")
+            if snapshot is not None:
+                expected = (
+                    snapshot.get("Requirements revision"),
+                    snapshot.get("Design revision"),
+                    snapshot.get("Construction authorization"),
+                )
+                observed = (
+                    requirement.group(0) if requirement is not None else None,
+                    design_revision,
+                    authorization.group(0) if authorization is not None else None,
+                )
+                if design_revision is not None and observed != expected:
+                    errors.append(
+                        f"{task.task_id}: REQ/DES/AUTH trace does not match "
+                        "execution snapshot"
+                    )
+                if snapshot.get("Gate B state") != "APPROVED_FOR_CONSTRUCTION":
+                    errors.append(
+                        f"{task.task_id}: Gate B is not approved for construction"
+                    )
+                if (
+                    not task_surface_compatibility
+                    and task.status in {"READY", "IN_PROGRESS"}
+                    and snapshot.get("Task-plan state") != "CURRENT"
+                ):
+                    errors.append(f"{task.task_id}: task plan is not CURRENT")
+            try:
+                parse_task_write_boundary(
+                    task.metadata.get("Write set", ""),
+                    task.task_id,
+                    task_surface_compatibility=task_surface_compatibility,
+                )
+                parse_task_external_targets(
+                    task.metadata.get("External state", ""),
+                    task.task_id,
+                    task_surface_compatibility=task_surface_compatibility,
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+            if used >= budget and task.status == "READY":
+                errors.append(f"{task.task_id}: attempt budget exhausted")
+
         run_id = clean_cell(task.metadata.get("Run ID", "NONE"))
         if task.status == "IN_PROGRESS":
-            if (
-                run_id != snapshot.get("Active run ID")
-                or snapshot.get("Run state") != "RUNNING"
-                or clean_cell(task.metadata.get("Owner", ""))
-                in {"", "NONE", "UNASSIGNED"}
-                or used < 1
-                or CHECKPOINT_ID.fullmatch(
-                    clean_cell(task.metadata.get("Last checkpoint", ""))
+            owner = clean_cell(task.metadata.get("Owner", ""))
+            checkpoint = clean_cell(task.metadata.get("Last checkpoint", ""))
+            if unresolved(owner) or owner == "NONE":
+                errors.append(f"{task.task_id}: IN_PROGRESS requires an assigned Owner")
+            if unresolved(run_id) or run_id == "NONE":
+                errors.append(f"{task.task_id}: IN_PROGRESS requires a Run ID")
+            if CHECKPOINT_ID.fullmatch(checkpoint) is None:
+                errors.append(
+                    f"{task.task_id}: IN_PROGRESS requires a valid Last checkpoint"
                 )
-                is None
+            if used < 1:
+                errors.append(f"{task.task_id}: IN_PROGRESS requires a claimed attempt")
+            if snapshot is not None and (
+                snapshot.get("Run state") != "RUNNING"
+                or snapshot.get("Active run ID") != run_id
             ):
-                errors.append(f"{task.task_id}: invalid IN_PROGRESS claim")
-        elif run_id != "NONE":
+                errors.append(
+                    f"{task.task_id}: Run ID does not match the active RUNNING run"
+                )
+        elif run_id not in {"", "NONE"}:
             errors.append(f"{task.task_id}: non-IN_PROGRESS task must use Run ID NONE")
-        if task.status == "READY" and used >= budget:
-            errors.append(f"{task.task_id}: attempt budget exhausted")
+
         if task.status == "DONE":
             evidence = clean_cell(task.metadata.get("Evidence", ""))
-            if (
+            if task_surface_compatibility:
+                local = [
+                    reference
+                    for reference in _evidence_references(evidence)
+                    if re.fullmatch(r"EV-\d{4,}", reference) is not None
+                ]
+                if unresolved(evidence) or evidence == "NONE" or not local:
+                    errors.append(
+                        f"{task.task_id}: DONE requires an Evidence reference"
+                    )
+                elif len(local) != len(set(local)):
+                    errors.append(
+                        f"{task.task_id}: DONE has duplicate local Evidence references"
+                    )
+            elif (
                 evidence in {"", "NONE", "TODO"}
                 or EVIDENCE_PATTERN.search(evidence) is None
             ):
                 errors.append(f"{task.task_id}: DONE requires Evidence")
-            try:
-                validate_done_evidence(verify_text, task)
-            except ValueError as exc:
-                errors.append(str(exc))
-        if task.status == "BLOCKED" and clean_cell(
-            task.metadata.get("Blocker", "")
-        ) in {"", "NONE", "TODO"}:
-            errors.append(f"{task.task_id}: BLOCKED requires a blocker")
-        if task.status == "SKIPPED" and clean_cell(
-            task.metadata.get("Skip record", "")
-        ) in {"", "NONE", "TODO"}:
-            errors.append(f"{task.task_id}: SKIPPED requires a skip record")
-        updated = clean_cell(task.metadata.get("Last updated", ""))
-        if updated not in {"", "TODO"} and not explicit_timestamp(updated):
-            errors.append(
-                f"{task.task_id}: Last updated must be ISO 8601 with timezone"
-            )
-        try:
-            declared = declared_task_waivers(task)
-            for dependency_id, waiver_id in declared.items():
-                waiver = waivers.get(waiver_id)
-                if waiver is None:
-                    errors.append(
-                        f"{task.task_id}: unknown dependency waiver {waiver_id}"
-                    )
-                elif waiver[0] != dependency_id or waiver[1] != task.task_id:
-                    errors.append(
-                        f"{task.task_id}: waiver {waiver_id} does not match its task pair"
-                    )
-        except ValueError as exc:
-            errors.append(str(exc))
-        if execution_contract_required:
+        if task.status == "BLOCKED" and (
+            unresolved(clean_cell(task.metadata.get("Blocker", "")))
+            or clean_cell(task.metadata.get("Blocker", "")) == "NONE"
+        ):
+            errors.append(f"{task.task_id}: BLOCKED requires a blocker and next action")
+        if task.status == "SKIPPED" and (
+            unresolved(clean_cell(task.metadata.get("Skip record", "")))
+            or clean_cell(task.metadata.get("Skip record", "")) == "NONE"
+        ):
+            errors.append(f"{task.task_id}: SKIPPED requires a Skip record")
+
+        if contract_bound:
             sections, duplicate_sections = inspect_task_sections(task.block)
             for name in sorted(duplicate_sections):
                 errors.append(f"{task.task_id}: duplicate required section #### {name}")
@@ -390,29 +962,53 @@ def validate_task_records(
                         f"{task.task_id}: missing required section #### {name}"
                     )
             outcome = sections.get("Outcome", "")
-            if not outcome.strip() or "TODO" in outcome.upper():
+            if not outcome.strip() or any(
+                marker in outcome.upper() for marker in ("TODO", "TBD")
+            ):
                 errors.append(f"{task.task_id}: unresolved Outcome")
             acceptance = sections.get("Acceptance criteria", "")
-            if "- [" not in acceptance or "TODO" in acceptance.upper():
+            if re.search(r"^- \[[ xX]\]\s+\S", acceptance, re.MULTILINE) is None or any(
+                marker in acceptance.upper() for marker in ("TODO", "TBD")
+            ):
                 errors.append(
                     f"{task.task_id}: objective acceptance criteria are required"
                 )
+            if task.status == "DONE" and re.search(
+                r"^- \[ \]", acceptance, re.MULTILINE
+            ):
+                errors.append(
+                    f"{task.task_id}: DONE has incomplete acceptance criteria"
+                )
             validation = sections.get("Validation", "")
-            if "```" not in validation or "TODO" in validation.upper():
+            if "```" not in validation or any(
+                marker in validation.upper() for marker in ("TODO", "TBD")
+            ):
                 errors.append(
                     f"{task.task_id}: executable validation commands are required"
                 )
-            try:
-                validate_task_property_execution_projection(
-                    validation,
-                    task.task_id,
-                    task.metadata.get("Requirements", ""),
-                    technology_refs,
-                    property_execution_by_id,
-                    policy,
+            property_contract = (
+                contract.property_execution if property_contract_available else None
+            )
+            if task_surface_compatibility:
+                errors.extend(
+                    validate_task_property_projection(
+                        task,
+                        technology_refs,
+                        property_contract,
+                    )
                 )
-            except ValueError as exc:
-                errors.append(str(exc))
+            else:
+                try:
+                    validate_task_property_execution_projection(
+                        validation,
+                        task.task_id,
+                        task.metadata.get("Requirements", ""),
+                        technology_refs,
+                        property_contract,
+                        policy,
+                    )
+                except ValueError as exc:
+                    errors.append(str(exc))
             execution_log = sections.get("Execution log", "")
             normalized_log = execution_log.strip().upper().replace("_", " ")
             if not execution_log.strip() or "TODO" in execution_log.upper():
@@ -429,16 +1025,214 @@ def validate_task_records(
                 errors.append(
                     f"{task.task_id}: DONE requires an observed Execution log"
                 )
-            if task.status == "DONE" and "- [ ]" in acceptance:
-                errors.append(
-                    f"{task.task_id}: DONE has incomplete acceptance criteria"
-                )
 
-    observed_property_pairs = {
-        (row.task_id, row.property_id)
-        for row in property_evidence_rows
-        if row.result in {"PASS", "FAIL"}
-    }
+        updated = clean_cell(task.metadata.get("Last updated", ""))
+        if not unresolved(updated) and not explicit_timestamp(updated):
+            errors.append(
+                f"{task.task_id}: Last updated must be ISO 8601 with timezone"
+            )
+        try:
+            declared = declared_task_waivers(task)
+            for dependency_id, waiver_id in declared.items():
+                waiver = waivers.get(waiver_id)
+                if waiver is None:
+                    errors.append(
+                        f"{task.task_id}: unknown dependency waiver {waiver_id}"
+                    )
+                elif (
+                    waiver.skipped_task != dependency_id
+                    or waiver.applies_to != task.task_id
+                ):
+                    errors.append(
+                        f"{task.task_id}: waiver {waiver_id} does not match its task pair"
+                    )
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    for task in tasks:
+        for dependency in task.dependencies:
+            if dependency not in by_id:
+                errors.append(f"{task.task_id}: missing dependency {dependency}")
+            if dependency == task.task_id:
+                errors.append(f"{task.task_id}: cannot depend on itself")
+
+    if enforce_plan_completeness:
+        errors.extend(
+            validate_new_build_delivery_order(
+                tasks,
+                by_id,
+                contract.delivery if contract_supplied else None,
+                contract.harness if harness_contract_available else None,
+                current_plan=(
+                    snapshot is not None
+                    and snapshot.get("Task-plan state") == "CURRENT"
+                ),
+                task_surface_compatibility=task_surface_compatibility,
+            )
+        )
+
+    current_authorization = (
+        snapshot.get("Construction authorization") if snapshot is not None else ""
+    )
+    for waiver in waivers.values():
+        if waiver.skipped_task not in by_id or waiver.applies_to not in by_id:
+            errors.append(f"{waiver.waiver_id}: references an unknown task")
+            continue
+        if by_id[waiver.skipped_task].status != "SKIPPED":
+            errors.append(f"{waiver.waiver_id}: dependency is not SKIPPED")
+        if waiver.skipped_task not in by_id[waiver.applies_to].dependencies:
+            errors.append(f"{waiver.waiver_id}: skipped task is not a dependency")
+        authority_pattern = (
+            re.compile(
+                rf"{re.escape(current_authorization)}(?:\s+clause\s+[A-Za-z0-9._:-]+)?"
+            )
+            if current_authorization
+            else None
+        )
+        if not (
+            authority_pattern is not None
+            and authority_pattern.fullmatch(waiver.authority)
+            or OWNER_DECISION_ID.fullmatch(waiver.authority)
+        ):
+            errors.append(
+                f"{waiver.waiver_id}: authority is not an exact current authority"
+            )
+        if (
+            unresolved(waiver.rationale)
+            or EVIDENCE_PATTERN.search(waiver.rationale) is None
+        ):
+            errors.append(
+                f"{waiver.waiver_id}: missing rationale or preserved evidence"
+            )
+        if not explicit_timestamp(waiver.recorded_at):
+            errors.append(
+                (
+                    f"{waiver.waiver_id}: timestamp must include a UTC offset"
+                    if task_surface_compatibility
+                    else f"{waiver.waiver_id}: Recorded at must be ISO 8601 with timezone"
+                )
+            )
+
+    if (
+        enforce_plan_completeness
+        and snapshot is not None
+        and snapshot.get("Task-plan state") == "CURRENT"
+    ):
+        errors.extend(
+            validate_harness_projections(
+                tasks,
+                contract.harness if harness_contract_available else None,
+                current_plan=True,
+            )
+        )
+
+    if (
+        enforce_plan_completeness
+        and snapshot is not None
+        and snapshot.get("Task-plan state") == "CURRENT"
+        and property_contract_available
+    ):
+        referenced_property_ids = {
+            property_id
+            for task in tasks
+            if task.status in {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE"}
+            for property_id in policy.property_id.findall(
+                clean_cell(task.metadata.get("Requirements", ""))
+            )
+        }
+        missing_property_ids = sorted(
+            set(contract.property_execution) - referenced_property_ids
+        )
+        if missing_property_ids:
+            errors.append(
+                "Current task plan does not cover approved property execution IDs: "
+                + ", ".join(missing_property_ids)
+            )
+
+    if (
+        enforce_plan_completeness
+        and snapshot is not None
+        and snapshot.get("Task-plan state") == "CURRENT"
+        and contract.requirement_rules is not None
+    ):
+        requirement_coverage = derive_task_requirement_coverage(
+            tasks,
+            snapshot.get("Task-plan state"),
+            contract.requirement_rules,
+            contract.requirement_evidence or {},
+        )
+        errors.extend(requirement_coverage.trace_issues)
+        errors.extend(requirement_coverage.evidence_issues)
+        if requirement_coverage.missing_requirement_ids:
+            errors.append(
+                "Current task plan does not cover approved requirement IDs: "
+                + ", ".join(requirement_coverage.missing_requirement_ids)
+            )
+
+    if errors:
+        raise ValueError("\n".join(errors))
+    try:
+        waves = compute_task_waves(tasks, by_id)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
+    ready = derive_ready_task_ids(tasks, waivers)
+    return TaskGraphValidationResult(
+        tasks=tuple(tasks),
+        ready_task_ids=ready,
+        waves=tuple(sorted(waves.items())),
+    )
+
+
+def validate_task_records(
+    text: str,
+    snapshot: dict[str, str],
+    verify_text: str | None = None,
+    approved_tech_ids: set[str] | None = None,
+    property_execution_by_id: Mapping[str, Any] | None = None,
+    technology_decisions_by_id: Mapping[str, Any] | None = None,
+    policy: DeliveryValidationPolicy | None = None,
+    *,
+    approved_harness: Mapping[str, HarnessExecutionRow] | None = None,
+    approved_delivery: ApprovedDeliveryContract | None = None,
+    requirement_rules: Mapping[str, tuple[str, str]] | None = None,
+    requirement_evidence: Mapping[str, tuple[str, tuple[str, ...]]] | None = None,
+) -> tuple[list[InspectedTask], dict[str, InspectedTask], list[str]]:
+    """COMPATIBILITY: preserve Engine task and evidence validation semantics."""
+
+    if policy is None:
+        raise ValueError("Delivery validation policy is required")
+    tasks = inspect_task_blocks(text)
+    contract = ApprovedTaskContract(
+        frozenset(approved_tech_ids or set()),
+        dict(property_execution_by_id or {}),
+        dict(approved_harness or {}),
+        approved_delivery,
+        dict(requirement_rules) if requirement_rules is not None else None,
+        dict(requirement_evidence) if requirement_evidence is not None else None,
+    )
+    graph = validate_task_graph(
+        tasks,
+        TaskSnapshot(dict(snapshot), set()),
+        parse_task_waivers(text),
+        approved_contract=contract,
+        technology_contract_available=approved_tech_ids is not None,
+        property_contract_available=property_execution_by_id is not None,
+        harness_contract_available=approved_harness is not None,
+        # COMPATIBILITY: whole-project evaluation keeps its later domain-specific
+        # diagnostic codes, while task mutation uses the stricter complete plan.
+        validate_snapshot_structure=False,
+        enforce_plan_completeness=False,
+        policy=policy,
+    )
+    errors: list[str] = []
+    for task in tasks:
+        if task.status != "DONE":
+            continue
+        try:
+            validate_done_evidence(verify_text, task)
+        except ValueError as exc:
+            errors.append(str(exc))
+
     done_property_pairs = {
         (task.task_id, property_id)
         for task in tasks
@@ -447,6 +1241,42 @@ def validate_task_records(
             clean_cell(task.metadata.get("Requirements", ""))
         )
     }
+    property_rows: list[PropertyTestEvidenceRow] = []
+    completion_rows: list[TaskCompletionEvidenceRow] = []
+    property_section_present = bool(
+        verify_text is not None
+        and re.search(
+            rf"^{re.escape(PROPERTY_TEST_EVIDENCE_HEADING)}[ \t]*$",
+            without_fenced_code(verify_text),
+            re.MULTILINE,
+        )
+    )
+    if verify_text is not None and property_section_present:
+        try:
+            property_rows = parse_property_test_evidence(verify_text, policy)
+        except ValueError as exc:
+            errors.append(str(exc))
+    observed_property_pairs = {
+        (row.task_id, row.property_id)
+        for row in property_rows
+        if row.result in {"PASS", "FAIL"}
+    }
+    if done_property_pairs or observed_property_pairs:
+        if verify_text is None:
+            errors.append(
+                "DONE property tasks require VERIFY.md property-test evidence"
+            )
+        elif not property_section_present:
+            errors.append(
+                "VERIFY.md requires exactly one Property-based test evidence section"
+            )
+        else:
+            try:
+                completion_rows = parse_task_completion_evidence(verify_text)
+            except ValueError as exc:
+                errors.append(str(exc))
+
+    by_id = graph.by_id
     for task_id, property_id in sorted(observed_property_pairs | done_property_pairs):
         task = by_id.get(task_id)
         if task is None:
@@ -466,17 +1296,11 @@ def validate_task_records(
                 "linked by the current task Requirements"
             )
             continue
-        if property_execution_by_id is None:
+        expected = (property_execution_by_id or {}).get(property_id)
+        if expected is None:
             errors.append(
                 f"{task_id} {property_id}: current property execution contract is "
                 "unavailable"
-            )
-            continue
-        expected = property_execution_by_id.get(property_id)
-        if expected is None:
-            errors.append(
-                f"{task_id} {property_id}: observed property-test evidence "
-                "references an unknown current property contract"
             )
             continue
         technology = (technology_decisions_by_id or {}).get(expected.framework_tech_id)
@@ -488,116 +1312,20 @@ def validate_task_records(
             continue
         try:
             validate_done_property_evidence(
-                property_evidence_rows,
+                property_rows,
                 task,
                 snapshot,
                 expected,
                 technology,
-                completion_evidence_rows,
+                completion_rows,
                 policy,
                 require_done_pass=task.status == "DONE",
             )
         except ValueError as exc:
             errors.append(str(exc))
-
-    for task in tasks:
-        for dependency in task.dependencies:
-            if dependency not in by_id:
-                errors.append(f"{task.task_id}: missing dependency {dependency}")
-            elif dependency == task.task_id:
-                errors.append(f"{task.task_id}: cannot depend on itself")
-
-    visiting: set[str] = set()
-    visited: set[str] = set()
-    stack: list[str] = []
-
-    def visit(task_id: str) -> None:
-        if task_id in visited:
-            return
-        if task_id in visiting:
-            start = stack.index(task_id)
-            raise ValueError(
-                "Dependency cycle detected: " + " -> ".join([*stack[start:], task_id])
-            )
-        visiting.add(task_id)
-        stack.append(task_id)
-        for dependency in by_id[task_id].dependencies:
-            if dependency in by_id:
-                visit(dependency)
-        stack.pop()
-        visiting.remove(task_id)
-        visited.add(task_id)
-
-    try:
-        for task_id in sorted(by_id):
-            visit(task_id)
-    except ValueError as exc:
-        errors.append(str(exc))
-
-    for waiver_id, waiver in waivers.items():
-        skipped_id, applies_to, authority, rationale, recorded_at = waiver
-        if skipped_id not in by_id or applies_to not in by_id:
-            errors.append(f"{waiver_id}: references an unknown task")
-            continue
-        if by_id[skipped_id].status != "SKIPPED":
-            errors.append(f"{waiver_id}: dependency is not SKIPPED")
-        if skipped_id not in by_id[applies_to].dependencies:
-            errors.append(f"{waiver_id}: skipped task is not a dependency")
-        authority_is_current = bool(
-            re.fullmatch(
-                rf"{re.escape(current_auth)}(?:\s+clause\s+[A-Za-z0-9._:-]+)?",
-                authority,
-            )
-            or re.fullmatch(r"OWNER-DECISION-\d+", authority)
-        )
-        if not authority_is_current:
-            errors.append(f"{waiver_id}: authority is not an exact current authority")
-        if not explicit_value(rationale) or EVIDENCE_PATTERN.search(rationale) is None:
-            errors.append(f"{waiver_id}: missing rationale or preserved evidence")
-        if not explicit_timestamp(recorded_at):
-            errors.append(f"{waiver_id}: Recorded at must be ISO 8601 with timezone")
-
-    ready: list[str] = []
-    for task in tasks:
-        if task.status != "READY":
-            continue
-        declared = declared_task_waivers(task)
-        satisfied = True
-        for dependency_id in task.dependencies:
-            dependency = by_id.get(dependency_id)
-            if dependency is None:
-                satisfied = False
-            elif dependency.status == "DONE":
-                continue
-            elif dependency.status == "SKIPPED":
-                waiver_id = declared.get(dependency_id)
-                waiver = waivers.get(waiver_id or "")
-                if (
-                    waiver is None
-                    or waiver[0] != dependency_id
-                    or waiver[1] != task.task_id
-                ):
-                    satisfied = False
-                else:
-                    authority, rationale, recorded_at = waiver[2], waiver[3], waiver[4]
-                    current_auth_match = re.search(
-                        rf"(?<![A-Z0-9-]){re.escape(current_auth)}(?!\d)", authority
-                    )
-                    owner_match = re.search(r"\bOWNER-DECISION-\d+\b", authority)
-                    if (
-                        (current_auth_match is None and owner_match is None)
-                        or unresolved(rationale)
-                        or rationale == "NONE"
-                        or unresolved(recorded_at)
-                    ):
-                        satisfied = False
-            else:
-                satisfied = False
-        if satisfied:
-            ready.append(task.task_id)
     if errors:
         raise ValueError("\n".join(errors))
-    return tasks, by_id, ready
+    return list(graph.tasks), graph.by_id, list(graph.ready_task_ids)
 
 
 def missing_current_property_task_coverage(
@@ -906,13 +1634,23 @@ __all__ = (
     "TASK_AWS_MODES",
     "TASK_METADATA_KEYS",
     "TASK_STATUSES",
+    "compute_task_waves",
     "declared_task_waivers",
+    "derive_ready_task_ids",
     "derive_task_requirement_coverage",
     "inspect_task_blocks",
     "inspect_task_sections",
     "missing_current_property_task_coverage",
+    "parse_task_snapshot",
+    "parse_task_external_targets",
+    "parse_task_write_boundary",
+    "parse_task_waivers",
+    "task_dependency_satisfied",
     "task_requirement_evidence_dispositions",
     "task_requirement_rules",
     "task_waiver_rows",
+    "validate_new_build_delivery_order",
+    "validate_task_graph",
     "validate_task_records",
+    "validate_task_snapshot",
 )
