@@ -217,8 +217,10 @@ def _document_sections(
     sections: list[tuple[str, str]] = []
     headings = markdown.headings
     for index, heading in enumerate(headings):
-        end = headings[index + 1].span.start if index + 1 < len(headings) else len(
-            markdown.structural_text
+        end = (
+            headings[index + 1].span.start
+            if index + 1 < len(headings)
+            else len(markdown.structural_text)
         )
         summary = _plain_summary(markdown.structural_text[heading.span.end : end])
         if summary:
@@ -231,9 +233,7 @@ def _candidate_category(title: str, summary: str) -> tuple[str, str] | None:
     combined = f"{title_key} {summary.casefold()}"
     for category, label, keywords in _CATEGORY_RULES:
         subject = (
-            title_key
-            if any(keyword in title_key for keyword in keywords)
-            else combined
+            title_key if any(keyword in title_key for keyword in keywords) else combined
         )
         if any(keyword in subject for keyword in keywords):
             return category, label

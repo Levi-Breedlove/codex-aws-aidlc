@@ -101,9 +101,7 @@ class SourceAssistedDefineTests(unittest.TestCase):
             self.assertEqual(preview["status"], "READY_FOR_CONFIRMATION")
             self.assertEqual(preview["kind"], "SOURCE_ASSISTED_DEFINE")
             self.assertEqual(preview["source"]["type"], "OWNER_SUPPLIED_AI_DRAFT")
-            self.assertEqual(
-                preview["source"]["authority"], "NON_AUTHORITATIVE_SOURCE"
-            )
+            self.assertEqual(preview["source"]["authority"], "NON_AUTHORITATIVE_SOURCE")
             self.assertRegex(preview["source"]["digest"], r"^sha256:[0-9a-f]{64}$")
             self.assertEqual(len(source_opens), 1)
             self.assertEqual(canonical.read_bytes(), canonical_before)

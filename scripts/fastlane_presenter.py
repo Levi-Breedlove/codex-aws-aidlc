@@ -2178,18 +2178,14 @@ def render_answer_confirmation(
     return "\n".join(lines)
 
 
-def _source_brief_sequence(
-    preview: Mapping[str, Any], key: str
-) -> Sequence[Any]:
+def _source_brief_sequence(preview: Mapping[str, Any], key: str) -> Sequence[Any]:
     value = preview.get(key)
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         raise PresentationError(f"source-assisted Define {key} is invalid")
     return value
 
 
-def _source_brief_summary_lines(
-    items: Sequence[Any], kind: str
-) -> list[str]:
+def _source_brief_summary_lines(items: Sequence[Any], kind: str) -> list[str]:
     lines: list[str] = []
     for item in items:
         if not isinstance(item, Mapping) or not isinstance(item.get("summary"), str):

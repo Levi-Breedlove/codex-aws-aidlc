@@ -469,9 +469,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("Bring an existing product brief", self.workflow)
         self.assertIn("it does not become Fastlane's PRD", self.workflow)
         self.assertIn("Source-assisted Define", self.readme)
-        self.assertIn(
-            "references/source-assisted-define.md", self.fastlane_skill
-        )
+        self.assertIn("references/source-assisted-define.md", self.fastlane_skill)
         self.assertNotIn("IMPORT-10", PROMPT_IDS)
 
     def test_owner_response_procedure_owns_conversation_and_gate_presentation(
