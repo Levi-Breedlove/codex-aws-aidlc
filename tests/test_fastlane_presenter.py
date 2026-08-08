@@ -1555,14 +1555,28 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("B. A change to an existing application.", rendered)
         self.assertIn("C. A repair or migration.", rendered)
         self.assertIn("If you choose B: Name the existing application.", rendered)
+        expected_choice_block = (
+            "1. What are you starting with?\n\n"
+            "A. A new application.\n\n"
+            "B. A change to an existing application.\n"
+            "   If you choose B: Name the existing application.\n\n"
+            "C. A repair or migration.\n"
+            "   If you choose C: Name the existing application.\n\n"
+            "No recommendation—choose the option that matches your situation."
+        )
+        self.assertIn(expected_choice_block, rendered)
         self.assertIn(
             "No recommendation—choose the option that matches your situation.",
             rendered,
         )
         self.assertIn("Reply with one of:", rendered)
-        self.assertIn("- `1A`", rendered)
-        self.assertIn("- `1B: <required detail>`", rendered)
-        self.assertIn("- `1C: <required detail>`", rendered)
+        expected_reply_block = (
+            "Reply with one of:\n\n"
+            "- `A`\n\n"
+            "- `B: <required detail>`\n\n"
+            "- `C: <required detail>`"
+        )
+        self.assertIn(expected_reply_block, rendered)
         self.assertNotIn("Copyable reply:", rendered)
         self.assertNotIn("2.", rendered)
         foundation = current["intake_foundation"]
@@ -1594,7 +1608,7 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertEqual(rendered.count("Accept all recommendations."), 1)
         self.assertIn("A. Recommended \u2014 A new application.", rendered)
         self.assertIn("You may also reply `Accept all recommendations.`", rendered)
-        self.assertIn("Copyable reply:\n1A", rendered)
+        self.assertIn("Copyable reply:\nA", rendered)
         self.assertNotIn(str(card["reply_token"]), rendered)
         accepted = intake_response.parse_intake_owner_response(
             "Accept all recommendations.",
@@ -1656,7 +1670,9 @@ class FastlanePresenterTests(unittest.TestCase):
             rendered,
         )
         self.assertIn("Reply with one of:", rendered)
-        self.assertIn("- `1A`", rendered)
+        self.assertIn("- `A`", rendered)
+        self.assertIn("\n\nB. A change to an existing application.", rendered)
+        self.assertIn("\n\n- `B: <required detail>`", rendered)
         self.assertNotIn("<choose A, B, or C>", rendered)
         self.assertNotIn("2: <your answer>", rendered)
 
@@ -1740,7 +1756,9 @@ class FastlanePresenterTests(unittest.TestCase):
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(malformed_report)
 
-    def test_fact_question_requires_response_marker_and_concrete_prompt(self) -> None:
+    def test_fact_question_invites_natural_response_and_requires_concrete_prompt(
+        self,
+    ) -> None:
         foundation = factual_intake_foundation()
         card = foundation["pending_card"]
         assert isinstance(card, dict)
@@ -1751,7 +1769,9 @@ class FastlanePresenterTests(unittest.TestCase):
         rendered = presenter.render_owner_update(current)
         self.assertIn("Tell me about the app in your own words", rendered)
         self.assertIn("More detail is welcome.", rendered)
-        self.assertIn("Reply format:\n`1: <your answer>`", rendered)
+        self.assertIn("Reply in your own words—no prefix is needed.", rendered)
+        self.assertNotIn("1: <your answer>", rendered)
+        self.assertNotIn("Reply format:", rendered)
         self.assertNotIn("Copyable reply:", rendered)
 
         fact["required_detail_for"] = []

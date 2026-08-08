@@ -456,12 +456,71 @@ class SetupAssistantTests(unittest.TestCase):
         self.assertEqual(report["state"], "PREREQUISITES_READY")
         self.assertEqual(report["owner_action_id"], "ANSWER_PROJECT_SETUP_QUESTIONS")
         greeting = setup.render_setup_response(report)
-        self.assertTrue(greeting.startswith("Welcome to AWS Codex Fastlane."))
+        self.assertTrue(
+            greeting.startswith("FASTLANE · WELCOME\n\nWelcome to Fastlane.")
+        )
+        self.assertEqual(greeting.count("Need from you"), 1)
         for label in ("Project name:", "Preferred AWS Region:", "Development budget:"):
             self.assertEqual(greeting.count(label), 1)
         self.assertIn(
             "did not inspect AWS credentials or access an AWS account", greeting
         )
+
+    def test_ready_welcome_matches_the_independent_golden_transcript(self) -> None:
+        expected = """FASTLANE · WELCOME
+
+Welcome to Fastlane.
+
+You describe the application you want to build. Fastlane helps turn that idea
+into clear requirements, an AWS-informed technical plan, a bounded local build,
+and evidence you can trust. You do not need to choose AWS services now.
+
+You remain in control of the important decisions.
+
+What to expect
+
+1. Define the product
+   Fastlane asks focused questions about the people, outcome, scope, data,
+   risks, and success criteria.
+
+2. Gate A — approve the Product Agreement
+   You confirm what should be built. This does not approve an architecture,
+   local construction, AWS access, or spending.
+
+3. Design the solution
+   Codex compares complete approaches and explains the recommended AWS
+   architecture, alternatives, tradeoffs, security, reliability, recovery,
+   and cost.
+
+4. Gate B — approve the technical plan
+   You approve the design and the exact boundary in which Codex may build and
+   test locally.
+
+5. Build and verify
+   Codex creates tasks, builds locally, runs validation, safely corrects
+   in-scope defects, and records what actually happened.
+
+AWS account reads, deployment, spending, rollback, and teardown always require
+their own separate exact authorization.
+
+Describe the outcome in ordinary language. Fastlane will guide the process one
+decision at a time.
+
+Setup did not inspect AWS credentials or access an AWS account.
+Setup never authorizes AWS changes.
+
+Need from you
+
+Reply once with:
+
+Project name:
+
+Preferred AWS Region: <Region or "recommend one">
+
+Development budget: <amount or "minimize cost; no hard cap">"""
+        report = setup.reduce_prerequisites(local_ready())
+
+        self.assertEqual(setup.render_setup_response(report), expected)
 
     def test_final_onboarding_docs_and_instruction_headroom(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
@@ -666,19 +725,40 @@ class SetupAssistantTests(unittest.TestCase):
         )
         compact = " ".join(greeting.split())
         for phrase in (
-            "clear AWS application plan and a tested local build",
-            "You do not need to choose AWS services.",
-            "Gate A confirms what should be built",
-            "Gate B confirms the design and build boundaries",
-            "Setup never authorizes AWS changes",
-            "Fast Dev stays inside the exact approved non-production Gate B envelope",
-            "Explicit Gate requires its own exact action receipt",
+            "clear requirements, an AWS-informed technical plan, a bounded local build",
+            "You do not need to choose AWS services now.",
+            "Gate A — approve the Product Agreement",
+            "Gate B — approve the technical plan",
+            "Codex creates tasks, builds locally, runs validation",
+            "AWS account reads, deployment, spending, rollback, and teardown always require their own separate exact authorization.",
+            "Fastlane will guide the process one decision at a time.",
             "Setup did not inspect AWS credentials or access an AWS account.",
+            "Setup never authorizes AWS changes.",
         ):
             self.assertIn(phrase, compact)
         for label in ("Project name:", "Preferred AWS Region:", "Development budget:"):
             self.assertEqual(greeting.count(label), 1)
-        self.assertEqual(greeting.count("Welcome to AWS Codex Fastlane."), 1)
+        self.assertEqual(greeting.count("Welcome to Fastlane."), 1)
+        self.assertEqual(greeting.count("Need from you"), 1)
+        self.assertLessEqual(len(greeting.split()), 350)
+        for internal_term in (
+            "REQ-",
+            "DES-",
+            "AUTH-",
+            "schema",
+            "digest",
+            "prompt ID",
+            "AWS-10",
+        ):
+            self.assertNotIn(internal_term, greeting)
+        self.assertIn(
+            "Project name:\n\nPreferred AWS Region:",
+            greeting,
+        )
+        self.assertIn(
+            'Preferred AWS Region: <Region or "recommend one">\n\nDevelopment budget:',
+            greeting,
+        )
 
 
 if __name__ == "__main__":

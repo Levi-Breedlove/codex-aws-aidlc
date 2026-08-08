@@ -92,26 +92,36 @@ def error_codes(result: Any) -> set[str]:
 
 
 class IntakeResponseAcceptanceTests(unittest.TestCase):
-    def test_plain_and_matching_legacy_replies_use_the_same_current_card(self) -> None:
+    def test_natural_keyed_and_legacy_replies_use_the_same_current_card(self) -> None:
         card = decision_card()
-        plain = parse("1A", card)
+        natural = parse("A", card)
+        keyed = parse("1A", card)
         legacy = parse(f"{card['reply_token']}; 1A", card)
 
-        self.assertEqual(plain.status, "PASS", plain.to_dict())
+        self.assertEqual(natural.status, "PASS", natural.to_dict())
+        self.assertEqual(keyed.status, "PASS", keyed.to_dict())
         self.assertEqual(legacy.status, "PASS", legacy.to_dict())
         self.assertEqual(
-            [answer.to_dict() for answer in plain.answers],
+            [answer.to_dict() for answer in natural.answers],
+            [answer.to_dict() for answer in keyed.answers],
+        )
+        self.assertEqual(
+            [answer.to_dict() for answer in natural.answers],
             [answer.to_dict() for answer in legacy.answers],
         )
 
     def test_decision_forms_are_case_insensitive_and_normalized(self) -> None:
         cases = (
+            ("A", "A"),
+            (" a ", "A"),
             ("1A", "A"),
             ("1 a", "A"),
             ("1: a", "A"),
+            ("B", "B"),
             ("1B", "B"),
             ("1 b", "B"),
             ("1: b", "B"),
+            ("C", "C"),
             ("1C", "C"),
             ("1 c", "C"),
             ("1: c", "C"),
@@ -125,9 +135,14 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
                 self.assertIsNone(result.answers[0].detail)
                 self.assertEqual(result.unresolved_reply_keys, ())
 
-    def test_factual_reply_is_normalized_without_inference(self) -> None:
+    def test_factual_reply_accepts_natural_prose_semicolons_and_line_breaks(
+        self,
+    ) -> None:
         result = parse(
-            " \t1:\tPeople who manage   development releases \r\n",
+            (
+                "I'm building a PRD app for AWS; the difficult part is choosing "
+                "cost-efficient services,\r\nwriting them together securely."
+            ),
             fact_card(),
         )
         self.assertEqual(result.status, "PASS", result.to_dict())
@@ -138,8 +153,39 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
         self.assertEqual(answer.kind, "FACT")
         self.assertEqual(answer.basis_ids, ("INTAKE-0002", "INTAKE-0003"))
         self.assertEqual(answer.selection, "RESPONSE")
-        self.assertEqual(answer.detail, "People who manage development releases")
+        self.assertEqual(
+            answer.detail,
+            (
+                "I'm building a PRD app for AWS; the difficult part is choosing "
+                "cost-efficient services, writing them together securely."
+            ),
+        )
         self.assertEqual(result.unresolved_reply_keys, ())
+
+    def test_keyed_factual_reply_remains_compatible(self) -> None:
+        result = parse(
+            " \t1:\tPeople who manage   development releases \r\n",
+            fact_card(),
+        )
+        self.assertEqual(result.status, "PASS", result.to_dict())
+        self.assertEqual(
+            result.answers[0].detail,
+            "People who manage development releases",
+        )
+
+    def test_factual_reply_never_interprets_semicolon_text_as_another_answer(
+        self,
+    ) -> None:
+        result = parse(
+            "The first zone is 1A; 1B is a label in the source material.",
+            fact_card(),
+        )
+
+        self.assertEqual(result.status, "PASS", result.to_dict())
+        self.assertEqual(
+            result.answers[0].detail,
+            "The first zone is 1A; 1B is a label in the source material.",
+        )
 
     def test_accept_all_applies_only_to_the_current_recommendation(self) -> None:
         result = parse(
@@ -179,7 +225,7 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
 
     def test_maximum_detail_length_is_accepted(self) -> None:
         detail = "x" * intake.MAX_DETAIL_CHARACTERS
-        result = parse(f"1: {detail}", fact_card())
+        result = parse(detail, fact_card())
         self.assertEqual(result.status, "PASS", result.to_dict())
         self.assertEqual(result.answers[0].detail, detail)
 
@@ -294,9 +340,13 @@ class IntakeResponseRejectionTests(unittest.TestCase):
 
     def test_required_missing_and_unexpected_detail_are_rejected(self) -> None:
         detail_card = decision_card(required_detail_for=("C",))
-        self.assert_failed_with(parse("1C", detail_card), "INTAKE_DETAIL_REQUIRED")
+        self.assert_failed_with(parse("C", detail_card), "INTAKE_DETAIL_REQUIRED")
+        accepted = parse("C: Existing review application", detail_card)
+        self.assertEqual(accepted.status, "PASS", accepted.to_dict())
+        self.assertEqual(accepted.answers[0].selection, "C")
+        self.assertEqual(accepted.answers[0].detail, "Existing review application")
         self.assert_failed_with(
-            parse("1A: unnecessary", detail_card),
+            parse("A: unnecessary", detail_card),
             "INTAKE_DETAIL_UNEXPECTED",
         )
         self.assert_failed_with(parse("1:", fact_card()), "INTAKE_DETAIL_REQUIRED")

@@ -38,21 +38,50 @@
   does not route backward; only an independently reported material change or
   stale basis returns to requirements or design.
 
+## Technical consultant behavior
+
+Owner responses provide decision support, not a raw relay of Engine fields.
+For every owner-facing question, clarification, approval, or technical
+recommendation:
+
+1. Begin with the practical project consequence.
+2. State what Fastlane already knows from current canonical state.
+3. Identify the one decision that belongs to the owner.
+4. Recommend one option only when current evidence justifies it.
+5. Tie the recommendation to the approved outcome, constraints, risks,
+   repository facts, or current source evidence.
+6. State the principal tradeoff or limitation.
+7. Explain technical terms after their plain-language meaning.
+8. Explain how the answer changes requirements, design, cost, risk,
+   validation, or operations.
+9. Distinguish confirmed facts, repository observations, source-verified
+   guidance, local evidence, AWS evidence, plans, and unauthorized actions.
+10. End with exactly one current valid owner action.
+
+Do not merely repeat Engine field names or ask the owner to choose an
+implementation detail Codex can safely resolve from approved requirements and
+current evidence. If no recommendation is justified, say so plainly. Critical
+status, Gate, evidence, remediation, and authority facts come from the current
+Engine projection and presenter; natural explanation may clarify but never
+alter them.
+
 ## Plain-language decisions
 For guided intake, render only the current Engine-validated
-`INTAKE-CARD-*`. Use its stable reply keys, uppercase A/B/C decision choices,
-required-detail prompts, and plain `owner_reply`. Do not expose its internal
-ID, revision, digest, or legacy reply token. The parser receives the exact card
+`INTAKE-CARD-*`. Keep its stable reply key for internal parser binding, but
+present uppercase A/B/C decision choices, required-detail prompts, and natural
+factual replies without that numeric prefix. Do not expose its internal ID,
+revision, digest, or legacy reply token. The parser receives the exact card
 identity separately before any write; retain `R-*` only as an internal 1.0.x
 compatibility input for that same current card. Factual questions remain short
 free text. Recommend a choice
 only when current evidence justifies it; there is no universal default. If no
 recommendation is justified, render exactly
 `No recommendation—choose the option that matches your situation.` followed
-by `Reply with one of:` and valid examples such as `1A`, `1B: <required
-detail>`, and `1C: <required detail>`. Never label an unresolved placeholder
-as a copyable reply. Rendering a card with `turn_boundary_required` ends the
-assistant turn; only a new owner message may resolve it.
+by `Reply with one of:` and valid examples such as `A`, `B: <required detail>`,
+and `C: <required detail>`. Separate every labeled choice and reply example
+with a blank line. Never label an unresolved placeholder as a copyable reply.
+Rendering a card with `turn_boundary_required` ends the assistant turn; only a
+new owner message may resolve it.
 
 - Explain the real-world consequence before a technical name or abbreviation.
   Keep precise engineering terms in canonical records, but do not require the
@@ -68,8 +97,12 @@ assistant turn; only a new owner message may resolve it.
   label factual questions as decisions. Use `1 question remains before
   requirements analysis.` when only one question is pending.
 - End input requests with one short copyable reply only when that text is a
-  valid current-card answer. Otherwise label it `Reply format` or show valid
-  option examples. When every recommendation
+  valid current-card answer. Otherwise state one valid reply form or show
+  valid option examples. A factual response may be ordinary prose without its
+  internal numeric reply key; preserve punctuation such as semicolons as part
+  of that one answer. A decision may use `A`, `B: <required detail>`, or
+  `C: <required detail>`. Legacy keyed forms remain accepted but are not the
+  preferred owner-facing format. When every recommendation
   is independently safe and complete, allow plain
   `Accept all recommendations.` and clarify that it records
   planning decisions only, not AWS access or spending.

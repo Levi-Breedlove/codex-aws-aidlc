@@ -303,7 +303,7 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertNotIn("INTAKE-CARD", resumed)
             self.assertNotIn(str(card["reply_token"]), resumed)
             parsed = doctor.parse_intake_owner_response(
-                "1A",
+                "A",
                 card,
                 expected_card_id=str(card["card_id"]),
                 expected_revision=int(card["revision"]),
@@ -314,7 +314,8 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(parsed.unresolved_reply_keys, ())
             self.assertEqual(resumed.count("Need from you:"), 1)
             for setup_text in (
-                "Welcome to AWS Codex Fastlane",
+                "FASTLANE · WELCOME",
+                "Welcome to Fastlane.",
                 "Project name:",
                 "Preferred AWS Region:",
                 "Development budget:",
@@ -1719,13 +1720,17 @@ class ProductJourneyTests(unittest.TestCase):
             rendered,
         )
         self.assertIn("Reply with one of:", rendered)
-        self.assertIn("`1A`", rendered)
-        self.assertIn("`1B: <required detail>`", rendered)
-        self.assertIn("`1C: <required detail>`", rendered)
+        self.assertIn("Reply with one of:\n\n- `A`", rendered)
+        self.assertIn("\n\n- `B: <required detail>`", rendered)
+        self.assertIn("\n\n- `C: <required detail>`", rendered)
+        self.assertIn("\n\nA. A new application", rendered)
+        self.assertIn("\n\nB. A change to an existing application", rendered)
+        self.assertIn("\n\nC. A repair", rendered)
         self.assertNotIn("<choose A, B, or C>", rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)
-        self.assertNotIn("Welcome to AWS Codex Fastlane", rendered)
+        self.assertNotIn("FASTLANE · WELCOME", rendered)
+        self.assertNotIn("Welcome to Fastlane.", rendered)
 
 
 if __name__ == "__main__":

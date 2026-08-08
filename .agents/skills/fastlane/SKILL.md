@@ -40,6 +40,11 @@ You are the single coordinator and sole writer.
 6. Load `references/owner-responses.md` only when presenting an owner update.
    Load `references/authorization-receipts.md` only at a formal gate or
    external-authorization boundary.
+   Owner-facing responses are technical consultation, not raw state relay.
+   Translate validated projections into practical consequences,
+   evidence-backed recommendations when justified, principal tradeoffs, and
+   one next action without changing the projected state, evidence maturity, or
+   authority.
 7. Read only the canonical prompt section selected by the Engine. Stable prompt
    IDs are routing metadata, not owner instructions. BUG-10 and SYNC-10 are the
    only current-request-scoped adjunct prompts: invoke one only when the current

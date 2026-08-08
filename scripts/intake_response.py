@@ -224,7 +224,7 @@ def _ascii_strip(value: str) -> str:
 
 
 def _normalized_detail(value: str) -> str:
-    return re.sub(r"[ \t]+", " ", _ascii_strip(value))
+    return re.sub(r"[ \t\r\n]+", " ", _ascii_strip(value))
 
 
 def _contains_unsupported_whitespace(value: str) -> bool:
@@ -376,13 +376,44 @@ def _question_contracts(
     return questions, errors
 
 
+def _validate_decision_reply(
+    choice: str,
+    detail: str | None,
+    question: Mapping[str, Any],
+    key: str,
+) -> tuple[str | None, str | None, dict[str, str] | None]:
+    """Keep required-detail enforcement identical for natural and keyed forms."""
+
+    required = choice in question["required_detail_for"]
+    if required and detail is None:
+        return (
+            None,
+            None,
+            _error(
+                "INTAKE_DETAIL_REQUIRED",
+                "This choice requires supporting detail",
+                reply_key=key,
+            ),
+        )
+    if not required and detail is not None:
+        return (
+            None,
+            None,
+            _error(
+                "INTAKE_DETAIL_UNEXPECTED",
+                "This choice does not accept supporting detail",
+                reply_key=key,
+            ),
+        )
+    return choice, detail, None
+
+
 def _parse_entry(
     entry: str, question: Mapping[str, Any]
 ) -> tuple[str | None, str | None, dict[str, str] | None]:
     key = str(question["reply_key"])
     remainder = _ascii_strip(entry[len(key) :])
-    kind = question["kind"]
-    if kind == "FACT":
+    if question["kind"] == "FACT":
         if not remainder.startswith(":"):
             return (
                 None,
@@ -437,28 +468,67 @@ def _parse_entry(
                 reply_key=key,
             ),
         )
-    required = choice in question["required_detail_for"]
-    if required and detail is None:
+    return _validate_decision_reply(choice, detail, question, key)
+
+
+def _parse_single_question_reply(
+    value: str,
+    question: Mapping[str, Any],
+) -> tuple[str | None, str | None, dict[str, str] | None]:
+    """Bind one natural owner reply to the sole current question.
+
+    SAFETY: The exact card identity is validated before this function runs, so
+    accepting owner-friendly syntax cannot retarget a stale or different card.
+    """
+
+    key = str(question["reply_key"])
+    if question["kind"] == "FACT":
+        explicit_prefix = re.match(rf"{re.escape(key)}[ \t]*:", value)
+        detail_source = (
+            value[explicit_prefix.end() :] if explicit_prefix is not None else value
+        )
+        detail = _normalized_detail(detail_source)
+        if not detail:
+            return (
+                None,
+                None,
+                _error(
+                    "INTAKE_DETAIL_REQUIRED",
+                    "Factual answer is empty",
+                    reply_key=key,
+                ),
+            )
+        return "RESPONSE", detail, None
+
+    keyed = re.match(r"([0-9]+)", value)
+    if keyed is not None:
+        observed_key = keyed.group(1)
+        if observed_key != key:
+            return (
+                None,
+                None,
+                _error(
+                    "INTAKE_REPLY_KEY_UNKNOWN",
+                    "Reply key is not on the current card",
+                    reply_key=observed_key,
+                ),
+            )
+        return _parse_entry(value, question)
+
+    match = re.fullmatch(r"(?is)([ABC])(?:[ \t]*:[ \t]*(.*))?", value)
+    if match is None:
         return (
             None,
             None,
             _error(
-                "INTAKE_DETAIL_REQUIRED",
-                "This choice requires supporting detail",
+                "INTAKE_DECISION_FORMAT",
+                "Decision answers must choose A, B, or C",
                 reply_key=key,
             ),
         )
-    if not required and detail is not None:
-        return (
-            None,
-            None,
-            _error(
-                "INTAKE_DETAIL_UNEXPECTED",
-                "This choice does not accept supporting detail",
-                reply_key=key,
-            ),
-        )
-    return choice, detail, None
+    choice = match.group(1).upper()
+    detail = _normalized_detail(match.group(2) or "") or None
+    return _validate_decision_reply(choice, detail, question, key)
 
 
 def _provenance(
@@ -573,7 +643,7 @@ def parse_intake_owner_response(
     assert isinstance(reply_token, str)
     normalized = _ascii_strip(raw_response)
     token_prefix = reply_token + ";"
-    if normalized.startswith("R-"):
+    if re.match(r"R-[0-9A-F]{12};", normalized) is not None:
         if not normalized.startswith(token_prefix):
             return IntakeResponseParse(
                 status="FAIL",
@@ -624,77 +694,67 @@ def parse_intake_owner_response(
                     "Use the exact phrase 'Accept all recommendations.'",
                 )
             )
-        elif (
-            normalized.startswith(";") or normalized.endswith(";") or ";;" in normalized
-        ):
-            errors.append(
-                _error(
-                    "INTAKE_RESPONSE_FORMAT",
-                    "Reply contains an empty or trailing entry",
-                )
-            )
         else:
-            entries = re.split(r"(?:;|\r?\n)+", normalized)
-            by_key = {str(question["reply_key"]): question for question in questions}
-            for raw_entry in entries:
-                entry = _ascii_strip(raw_entry)
-                match = re.match(r"([0-9]+)", entry)
-                if match is None:
-                    errors.append(
-                        _error(
-                            "INTAKE_RESPONSE_EXTRA_TEXT", "Reply contains unparsed text"
-                        )
+            question = questions[0]
+            key = str(question["reply_key"])
+            duplicate_key = (
+                re.search(
+                    r"(?:;|\r?\n)\s*([0-9]+)\s*(?::?\s*[ABCabc])",
+                    normalized,
+                )
+                if question["kind"] == "DECISION"
+                else None
+            )
+            if duplicate_key is not None:
+                observed_key = duplicate_key.group(1)
+                errors.append(
+                    _error(
+                        "INTAKE_REPLY_KEY_DUPLICATE"
+                        if observed_key == key
+                        else "INTAKE_REPLY_KEY_UNKNOWN",
+                        "Reply key appears more than once"
+                        if observed_key == key
+                        else "Reply key is not on the current card",
+                        reply_key=observed_key,
                     )
-                    continue
-                key = match.group(1)
-                if key not in by_key:
-                    errors.append(
-                        _error(
-                            "INTAKE_REPLY_KEY_UNKNOWN",
-                            "Reply key is not on the current card",
-                            reply_key=key,
-                        )
-                    )
-                    continue
-                if key in selected:
-                    errors.append(
-                        _error(
-                            "INTAKE_REPLY_KEY_DUPLICATE",
-                            "Reply key appears more than once",
-                            reply_key=key,
-                        )
-                    )
-                    continue
-                selection, detail, entry_error = _parse_entry(entry, by_key[key])
+                )
+            else:
+                selection, detail, entry_error = _parse_single_question_reply(
+                    normalized, question
+                )
                 if entry_error is not None:
                     errors.append(entry_error)
-                    continue
-                assert selection is not None
-                if detail is not None:
-                    if len(detail) > MAX_DETAIL_CHARACTERS:
-                        errors.append(
-                            _error(
-                                "INTAKE_DETAIL_TOO_LONG",
-                                "Answer detail exceeds the bounded intake limit",
-                                reply_key=key,
+                else:
+                    assert selection is not None
+                    if detail is not None:
+                        if len(detail) > MAX_DETAIL_CHARACTERS:
+                            errors.append(
+                                _error(
+                                    "INTAKE_DETAIL_TOO_LONG",
+                                    "Answer detail exceeds the bounded intake limit",
+                                    reply_key=key,
+                                )
                             )
-                        )
-                        continue
-                    safety_code = intake_detail_safety_code(detail)
-                    if safety_code is not None:
-                        messages = {
-                            "INTAKE_DETAIL_RECORD_UNSAFE": "Answer detail contains record-unsafe Markdown syntax",
-                            "INTAKE_PLACEHOLDER": "Placeholders cannot confirm an owner answer",
-                            "INTAKE_SECRET_MATERIAL": (
-                                "Potential secret material cannot be accepted in intake; "
-                                "remove it and rotate it if real"
-                            ),
-                        }
-                        errors.append(
-                            _error(safety_code, messages[safety_code], reply_key=key)
-                        )
-                        continue
-                selected[key] = (selection, detail)
+                        else:
+                            safety_code = intake_detail_safety_code(detail)
+                            if safety_code is not None:
+                                messages = {
+                                    "INTAKE_DETAIL_RECORD_UNSAFE": "Answer detail contains record-unsafe Markdown syntax",
+                                    "INTAKE_PLACEHOLDER": "Placeholders cannot confirm an owner answer",
+                                    "INTAKE_SECRET_MATERIAL": (
+                                        "Potential secret material cannot be accepted in intake; "
+                                        "remove it and rotate it if real"
+                                    ),
+                                }
+                                errors.append(
+                                    _error(
+                                        safety_code,
+                                        messages[safety_code],
+                                        reply_key=key,
+                                    )
+                                )
+                    if not errors:
+                        selected[key] = (selection, detail)
 
     if errors:
         return IntakeResponseParse(

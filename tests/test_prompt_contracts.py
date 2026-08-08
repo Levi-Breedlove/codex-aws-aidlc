@@ -160,15 +160,17 @@ class PromptPackContractTests(unittest.TestCase):
     def test_owner_command_guide_contains_only_usable_owner_inputs(self) -> None:
         for command in (
             "`init template`",
-            "`1A`",
-            "`1B`",
-            "`1C`",
+            "`A`",
+            "`B: <requested detail>`",
+            "`C: <requested detail>`",
             "`Accept all recommendations.`",
             "`Change the requirements: <correction>.`",
             "`Change the design: <correction>.`",
             "`$operate-fastlane-aws`",
         ):
             self.assertIn(command, self.prompts)
+        self.assertIn("Reply naturally; no numeric prefix is required", self.prompts)
+        self.assertNotIn("`1A`", self.prompts)
         self.assertIn("Can you explain this question?", self.prompts)
         self.assertNotIn("<choose A, B, or C>", self.prompts)
         self.assertNotRegex(self.prompts, r"R-[A-F0-9]{8,}")
@@ -446,10 +448,21 @@ class PromptPackContractTests(unittest.TestCase):
             "Change the requirements: <correction>",
             "Change the design: <correction>",
             "Owner Decision Briefs",
+            "Technical consultant behavior",
+            "Begin with the practical project consequence",
+            "State the principal tradeoff or limitation",
+            "End with exactly one current valid owner action",
+            "A factual response may be ordinary prose without its",
+            "preserve punctuation such as semicolons",
+            "Separate every labeled choice and reply example",
             "repository-relative Markdown links",
             "receipt remains last and byte-identical",
         ):
             self.assertIn(phrase, self.owner_responses)
+        self.assertIn(
+            "Owner-facing responses are technical consultation, not raw state relay.",
+            self.fastlane_skill,
+        )
 
     def test_design_procedure_owns_architecture_and_validation_method(self) -> None:
         for phrase in (
@@ -634,9 +647,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.26")
-        self.assertIn("**Pack version:** 1.2.26", self.prompts)
-        self.assertIn("Current customer build: **1.2.26**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.27")
+        self.assertIn("**Pack version:** 1.2.27", self.prompts)
+        self.assertIn("Current customer build: **1.2.27**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,
