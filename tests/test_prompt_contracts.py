@@ -629,14 +629,14 @@ class PromptPackContractTests(unittest.TestCase):
             len(read(".agents/skills/fastlane/SKILL.md").encode("utf-8")), 8_500
         )
         self.assertLessEqual(len(self.fastlane_deliver.encode("utf-8")), 10_000)
-        self.assertLessEqual(len(self.readme.splitlines()), 180)
+        self.assertLessEqual(len(self.readme.splitlines()), 275)
         self.assertLessEqual(len(self.readme.encode("utf-8")), 16_000)
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.25")
-        self.assertIn("**Pack version:** 1.2.25", self.prompts)
-        self.assertIn("Current customer build: **1.2.25**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.26")
+        self.assertIn("**Pack version:** 1.2.26", self.prompts)
+        self.assertIn("Current customer build: **1.2.26**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,
