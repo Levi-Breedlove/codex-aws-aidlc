@@ -7,7 +7,22 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A. The Engine owns routing and vali
 - A fresh template requires ephemeral `PREREQUISITES_READY` evidence before any welcome or write. Show every missing dependency in one consolidated checklist; never install dependencies or persist client, credential, plugin, trust, path, or readiness state. Initialized projects resume without setup.
 - Ask project name, preferred Region, and optional budget once, then initialize dry-run-first with the exact ephemeral report supplied on stdin.
 - Repository mode (`GREENFIELD` or `BROWNFIELD`) never determines owner work context. Ground `INTAKE-*` facts in the owner's brief before asking anything. An empty repository does not prove a new application.
-- Ask only the next unanswered app question: starting point; users and their current problem; first useful end-to-end result; first-release inclusions and deferrals; observable success; data entered, uploaded, viewed, or generated; sensitivity and access; first audience; geography or data-location constraints; then only coverage-required reliability, recovery, legal, or operational decisions. One coherent fact question may collect closely related facts. Skip anything already stated or observed.
+- Ask the starting-point decision first because repository contents cannot prove
+  owner intent. After it is confirmed, follow the Engine's
+  `next_question_guidance`: tailor one natural consultation question to a new
+  application, an existing-application change, or a repair or migration. One
+  coherent fact question may collect its closely related target facts. Then
+  cover only the remaining first-release boundary, visible success, data and
+  sensitivity, audience, geography, and coverage-required reliability,
+  recovery, legal, or operational decisions. Skip anything already stated or
+  observed.
+- Project mode, delivery profile, effective risk, and AWS lane are internal
+  technical classifications, not owner choices. Follow the Engine's
+  `project_configuration` projection after the intake foundation is complete:
+  use its derived mode, keep the current Define lane `documentation-only`,
+  classify risk and profile from the cited confirmed facts, synchronize the PRD
+  and `bootstrap.yaml`, and rerun the Engine. A conflict is a Codex correction
+  before Gate A; never fabricate owner provenance for it.
 - Store one current `INTAKE-CARD-*` with exactly one question. Decisions use uppercase A/B/C and A is recommended only when current evidence justifies it; facts use bounded free text. Explain the real-world consequence before technical terminology, show the main tradeoff, require supporting detail when needed, and provide one exact short reply.
 - With no sound recommendation, say `No recommendation—choose the option that matches your situation.` Recommendations, examples, prior messages, ambiguous shorthand, assistant text, and an absent reply never confirm a choice.
 - Resolve only the exact current card from a new inbound owner message. Run the deterministic parser against its ID, revision, presented digest, and new `OWNER-MSG-*` identity before writing. Invalid or secret-like input changes nothing and receives an owner-safe correction. A valid reply writes normalized `OWNER_RESPONSE` provenance, reruns the Engine, and renders `owner_answer_confirmation` only for that new turn before the next question. An owner-input card ends the assistant turn.

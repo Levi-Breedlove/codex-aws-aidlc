@@ -17,8 +17,10 @@ from ..core.ids import canonical_id_list, clean_cell, explicit_value
 from .models import (
     IntakeCard,
     IntakeFoundationContract,
+    IntakeQuestionGuidance,
     IntakeQuestion,
     NormalizedOwnerResponse,
+    ProjectConfigurationGuidance,
 )
 
 try:
@@ -68,6 +70,24 @@ OWNER_WORK_CONTEXT_SELECTIONS = {
     "B": "EXISTING_APPLICATION_CHANGE",
     "C": "REPAIR_OR_MIGRATION",
 }
+OWNER_WORK_CONTEXT_PROJECT_MODES = {
+    "NEW_APPLICATION": "greenfield",
+    "EXISTING_APPLICATION_CHANGE": "brownfield",
+    "REPAIR_OR_MIGRATION": "brownfield",
+}
+INTERNAL_CONFIGURATION_PHRASES = (
+    "project configuration",
+    "project mode",
+    "delivery profile",
+    "effective risk",
+    "aws lane",
+    "greenfield",
+    "brownfield",
+    "quick-mvp",
+    "fast-dev",
+    "explicit-gate",
+    "documentation-only",
+)
 INTAKE_BASES = {
     "OWNER_FACT",
     "REPOSITORY_FACT",
@@ -160,6 +180,32 @@ def _intake_owner_reply_example(questions: list[IntakeQuestion]) -> str:
 
 def _intake_reply_example(questions: list[IntakeQuestion], reply_token: str) -> str:
     return reply_token + "; " + _intake_owner_reply_example(questions)
+
+
+def _asks_for_internal_configuration(prompt: str, options: tuple[str, ...]) -> bool:
+    """Reject owner cards that expose Fastlane's internal classification choices."""
+
+    combined = " ".join((prompt, *options)).casefold()
+    return any(phrase in combined for phrase in INTERNAL_CONFIGURATION_PHRASES)
+
+
+def _validate_owner_card_prompt(
+    question_id: str,
+    prompt: str,
+    options: tuple[str, ...],
+    issues: list[tuple[str, str]],
+) -> None:
+    """Keep owner cards resolved and free of internal configuration choices."""
+
+    if not explicit_value(prompt, allow_none=False):
+        issues.append(("INTAKE_CARD_INVALID", f"{question_id} prompt is unresolved"))
+    if _asks_for_internal_configuration(prompt, options):
+        issues.append(
+            (
+                "INTAKE_CARD_INVALID",
+                f"{question_id} asks the owner to choose Fastlane internal configuration",
+            )
+        )
 
 
 def _parse_intake_response_register(
@@ -743,10 +789,9 @@ def _card_question(
     except ValueError as exc:
         issues.append(("INTAKE_CARD_INVALID", f"{question_id}: {exc}"))
         question_basis = ()
-    if not explicit_value(prompt, allow_none=False):
-        issues.append(("INTAKE_CARD_INVALID", f"{question_id} prompt is unresolved"))
+    options = (option_a, option_b, option_c)
+    _validate_owner_card_prompt(question_id, prompt, options, issues)
     if kind == "DECISION":
-        options = (option_a, option_b, option_c)
         if any(not explicit_value(option, allow_none=False) for option in options):
             issues.append(
                 (
@@ -906,9 +951,210 @@ def _card_question(
     return question, card_id, revision, reply_key, resolved
 
 
+def _next_question_guidance(
+    missing_fields: tuple[str, ...],
+    owner_work_context: str | None,
+    confirmed_basis_ids: tuple[str, ...],
+) -> IntakeQuestionGuidance:
+    """Derive one consultation objective without prescribing Codex's wording."""
+
+    if not missing_fields:
+        return IntakeQuestionGuidance(
+            status="COMPLETE",
+            owner_work_context=owner_work_context,
+            owner_action_required=False,
+            basis_ids=confirmed_basis_ids,
+        )
+    target_fields: tuple[str, ...]
+    if "OWNER_WORK_CONTEXT" in missing_fields:
+        target_fields = ("OWNER_WORK_CONTEXT",)
+        objective = (
+            "Learn whether the owner is starting a new application, changing an "
+            "existing application, or repairing or migrating existing behavior."
+        )
+        status = "STARTING_POINT_REQUIRED"
+    else:
+        groups = (
+            ("PRIMARY_USERS", "OWNER_STATED_PROBLEM", "OBSERVABLE_OUTCOME"),
+            ("FIRST_RELEASE_BOUNDARY", "SUCCESS_MEASURE"),
+            ("DATA_TYPES", "DATA_SENSITIVITY"),
+            ("RELEASE_AUDIENCE", "OPERATING_GEOGRAPHY"),
+        )
+        target_fields = next(
+            (
+                tuple(field for field in group if field in missing_fields)
+                for group in groups
+                if any(field in missing_fields for field in group)
+            ),
+            (missing_fields[0],),
+        )
+        context_objectives = {
+            "NEW_APPLICATION": (
+                "Understand who will use the new application, what is difficult "
+                "today, and the first useful result they need."
+            ),
+            "EXISTING_APPLICATION_CHANGE": (
+                "Understand what exists today, who relies on it, the change they "
+                "need, and the behavior that must keep working."
+            ),
+            "REPAIR_OR_MIGRATION": (
+                "Understand what is failing or moving, who is affected, what must "
+                "not break, and the result that would prove success."
+            ),
+        }
+        objective_by_group = {
+            groups[1]: (
+                "Define the smallest useful first release, its explicit deferrals, "
+                "and the observable result that will show it works."
+            ),
+            groups[2]: (
+                "Identify the information people enter, upload, view, or generate "
+                "and the practical sensitivity or access concerns around it."
+            ),
+            groups[3]: (
+                "Clarify who receives the first release and any geography or data-"
+                "location constraint that affects the product."
+            ),
+        }
+        if any(field in target_fields for field in groups[0]):
+            objective = context_objectives.get(
+                owner_work_context,
+                "Understand the users, their current difficulty, and the first useful result.",
+            )
+        else:
+            matching_group = next(
+                group for group in groups[1:] if any(f in target_fields for f in group)
+            )
+            objective = objective_by_group[matching_group]
+        status = "QUESTION_REQUIRED"
+    field_to_id = {field: intake_id for intake_id, field in INTAKE_FOUNDATION_FIELDS}
+    return IntakeQuestionGuidance(
+        status=status,
+        owner_work_context=owner_work_context,
+        objective=objective,
+        fields=target_fields,
+        target_ids=tuple(field_to_id[field] for field in target_fields),
+        basis_ids=confirmed_basis_ids,
+    )
+
+
+def _project_configuration_actions(
+    *,
+    current_mode: str | None,
+    derived_mode: str | None,
+    current_profile: str | None,
+    current_risk: str | None,
+    current_lane: str | None,
+) -> tuple[tuple[str, ...], bool]:
+    """Return the bounded Codex actions and whether current values conflict."""
+
+    actions: list[str] = []
+    conflict = False
+    if derived_mode is not None and current_mode != derived_mode:
+        actions.append(
+            "SET_PROJECT_MODE" if current_mode is None else "RECONCILE_PROJECT_MODE"
+        )
+        conflict = current_mode is not None
+    if current_risk is None:
+        actions.append("CLASSIFY_EFFECTIVE_RISK")
+    if current_profile is None:
+        actions.append("SELECT_DELIVERY_PROFILE")
+    elif current_risk in {"high", "critical"} and current_profile != "high-risk":
+        actions.append("ALIGN_DELIVERY_PROFILE_WITH_RISK")
+        conflict = True
+    if current_lane is None:
+        actions.append("SET_SAFEST_CURRENT_AWS_LANE")
+    return tuple(actions), conflict
+
+
+def _project_configuration_guidance(
+    intake_status: str,
+    owner_work_context: str | None,
+    confirmed_basis_ids: tuple[str, ...],
+    project_selections: Mapping[str, str | None] | None,
+) -> ProjectConfigurationGuidance:
+    """Derive internal configuration ownership without importing owner authority."""
+
+    selections = project_selections or {}
+    current_mode = selections.get("mode")
+    current_profile = selections.get("delivery_profile")
+    current_risk = selections.get("effective_risk")
+    current_lane = selections.get("aws_lane")
+    derived_mode = OWNER_WORK_CONTEXT_PROJECT_MODES.get(owner_work_context or "")
+    risk_basis_ids = tuple(
+        basis_id
+        for basis_id in confirmed_basis_ids
+        if basis_id
+        in {"INTAKE-0005", "INTAKE-0007", "INTAKE-0008", "INTAKE-0009", "INTAKE-0010"}
+    )
+    if intake_status != "READY_FOR_REQUIREMENTS":
+        return ProjectConfigurationGuidance(
+            owner_action_required=False,
+            current_project_mode=current_mode,
+            derived_project_mode=derived_mode,
+            current_delivery_profile=current_profile,
+            current_effective_risk=current_risk,
+            current_aws_lane=current_lane,
+            project_mode_basis_ids=("INTAKE-0001",) if derived_mode else (),
+            risk_profile_basis_ids=risk_basis_ids,
+        )
+
+    actions, conflict = _project_configuration_actions(
+        current_mode=current_mode,
+        derived_mode=derived_mode,
+        current_profile=current_profile,
+        current_risk=current_risk,
+        current_lane=current_lane,
+    )
+    return ProjectConfigurationGuidance(
+        status=(
+            "CONFLICT"
+            if conflict
+            else "CODEX_ACTION_REQUIRED"
+            if actions
+            else "CURRENT"
+        ),
+        owner_action_required=False,
+        current_project_mode=current_mode,
+        derived_project_mode=derived_mode,
+        current_delivery_profile=current_profile,
+        current_effective_risk=current_risk,
+        current_aws_lane=current_lane,
+        project_mode_basis_ids=("INTAKE-0001",) if derived_mode else (),
+        risk_profile_basis_ids=risk_basis_ids,
+        codex_actions=actions,
+    )
+
+
+def _intake_status(
+    issues: list[tuple[str, str]],
+    pending_questions: list[IntakeQuestion],
+    missing_fields: tuple[str, ...],
+) -> str:
+    """Return the canonical intake status after ordered validation."""
+
+    invalid_codes = {
+        "INTAKE_FOUNDATION_INVALID",
+        "INTAKE_FOUNDATION_PROVENANCE_INVALID",
+        "INTAKE_RESPONSE_REGISTER_INVALID",
+        "INTAKE_CARD_INVALID",
+        "INTAKE_SELECTION_PROVENANCE_INVALID",
+    }
+    if any(code in invalid_codes for code, _ in issues):
+        return "BLOCKED"
+    if pending_questions or missing_fields:
+        return (
+            "FOUNDATION_REQUIRED"
+            if INTAKE_CORE_FIELDS.intersection(missing_fields)
+            else "FOUNDATION_READY"
+        )
+    return "READY_FOR_REQUIREMENTS"
+
+
 def _derive_from_tables(
     tables: tuple[ContractTable, ContractTable, ContractTable],
     repository_mode_value: str | None,
+    project_selections: Mapping[str, str | None] | None,
 ) -> tuple[IntakeFoundationContract, list[tuple[str, str]]]:
     """SAFETY: Assemble intake state from the three validated canonical tables."""
 
@@ -1022,23 +1268,13 @@ def _derive_from_tables(
                 "Create the next one-question intake card for the remaining foundation fields",
             )
         )
-    invalid_codes = {
-        "INTAKE_FOUNDATION_INVALID",
-        "INTAKE_FOUNDATION_PROVENANCE_INVALID",
-        "INTAKE_RESPONSE_REGISTER_INVALID",
-        "INTAKE_CARD_INVALID",
-        "INTAKE_SELECTION_PROVENANCE_INVALID",
-    }
-    if any(code in invalid_codes for code, _ in issues):
-        status = "BLOCKED"
-    elif pending_questions or missing_fields:
-        status = (
-            "FOUNDATION_REQUIRED"
-            if INTAKE_CORE_FIELDS.intersection(missing_fields)
-            else "FOUNDATION_READY"
-        )
-    else:
-        status = "READY_FOR_REQUIREMENTS"
+    status = _intake_status(issues, pending_questions, missing_fields)
+    next_question_guidance = _next_question_guidance(
+        missing_fields, owner_work_context, basis_ids
+    )
+    project_configuration = _project_configuration_guidance(
+        status, owner_work_context, basis_ids, project_selections
+    )
     return IntakeFoundationContract(
         status=status,
         current_understanding=_current_understanding(owner_work_context, observed_rows),
@@ -1047,6 +1283,8 @@ def _derive_from_tables(
         basis_ids=basis_ids,
         missing_fields=missing_fields,
         pending_card=pending_card,
+        next_question_guidance=next_question_guidance,
+        project_configuration=project_configuration,
         normalized_responses=tuple(normalized_responses),
         all_questions=tuple(all_questions),
     ), issues
@@ -1057,6 +1295,7 @@ def derive_intake_foundation_contract(
     repository_mode: str | None,
     *,
     grandfather_current_gate_a: bool,
+    project_selections: Mapping[str, str | None] | None = None,
 ) -> tuple[IntakeFoundationContract, list[tuple[str, str]]]:
     """Derive owner-grounded intake state without treating examples as facts."""
 
@@ -1074,7 +1313,7 @@ def derive_intake_foundation_contract(
     if early_result is not None:
         return early_result
     assert tables is not None
-    return _derive_from_tables(tables, repository_mode_value)
+    return _derive_from_tables(tables, repository_mode_value, project_selections)
 
 
 __all__ = (

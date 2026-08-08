@@ -20,25 +20,47 @@
         "canonical digest change",
         "receipt change"
       ]
+    },
+    {
+      "id": "ADAPTIVE_KICKOFF_1_2_28",
+      "base_commit": "204b1b7477413425114deaa54a9ece8f9fc14e53",
+      "scope": [
+        "derived next-question consultation guidance",
+        "Codex-owned project configuration guidance",
+        "automatic requirements continuation after complete owner intake",
+        "context locator bytes for updated coordinator procedure"
+      ],
+      "prohibited": [
+        "gate or authority change",
+        "canonical requirement or design digest change",
+        "receipt change",
+        "owner approval inferred from project configuration"
+      ]
     }
   ],
   "summary_truth_compatibility": {
     "base_commit": "8dbb11fd0e54af392ac073ce597cdb26fc336fcc",
-    "allowed_projection": "document_summaries",
+    "allowed_projection": [
+      "document_summaries",
+      "intake_foundation.next_question_guidance",
+      "intake_foundation.project_configuration"
+    ],
     "allowed_locator_metadata": [
       "canonical_sha256",
       "source_bytes",
       "start_line",
-      "end_line"
+      "end_line",
+      "actual_initial_source_bytes",
+      "actual_initial_bytes"
     ],
     "report_case_digests": {
-      "template_source": "3137e52e381bd524015f621805e1d1a973ec4b2b4dcf8db0bdf1c77d5d5559ff",
-      "unconfigured_template": "c92a5a86a32fbcd361ad4ab7d045cd354bd402b9d22352b379a5875358884d58",
-      "rendered_intake": "148d12873c7f29075cc3e26fc5ea3e086b072e797d39cfb92c0e2f4c3470324d",
-      "gate_a_pending": "e571531e8412407e9c227855f82f10c186dbc4e1d7bf271512f73b69cc6eeb9b",
-      "gate_a_approved": "ff0128a1e2e2a96ac08b47584388aadeb089b65563a14b5f33fe979b7d3dde5f",
-      "gate_b_pending": "4e3afacd02bfd47562de31b604b30541a06edc557bd021f2f4a10e8b2c60a688",
-      "gate_b_approved": "28b3d7001c738216fac2dae0d48be0a3a2e1b1b09375c62357c6adc068f92b0c"
+      "template_source": "8068bc33c8b07acda91baab5b261903ee91cbbfea8e61282346ab33ae2731b1e",
+      "unconfigured_template": "e41b0b600d968a609baa855bde22c7e2cf0857e84b672c7ac6dc9e23699c9ab5",
+      "rendered_intake": "276b11bdb5b964908becb4eeb0542a97b9e664dfe805b0f229c5ced7b8ba5e4b",
+      "gate_a_pending": "e4ec90c81262247eaa9e1f1800f111e970f381994bef033b1c1006ca6818d647",
+      "gate_a_approved": "59f9e5d950d3ce31859671d552ee57d66cacce53ee8d9a031dfe16ceaf766979",
+      "gate_b_pending": "f5667c15e176261bb2fbfff83d76ef56187d6ec95d7dfb79566c579eb6cbe3be",
+      "gate_b_approved": "6627edf8bf67b5ffb010b7f6273df43fdb14eb7ab8fed16c1d8bc002cbef5d40"
     }
   },
   "normalization": {
@@ -2133,13 +2155,13 @@
     }
   },
   "report_case_digests": {
-    "template_source": "3d52a51bf7d096795cec3762aadef3c4696c340450a01c4c410a41552c2fead2",
-    "unconfigured_template": "e28aa9ea71b1971c2c906bfa247452b0c728237007fd8a66c11622a0ea4614cf",
-    "rendered_intake": "488d1224bc4b29396c9ce84076cfe51c5a7b386fcd4dafae0dc9841446605730",
-    "gate_a_pending": "83b713bd6a87ac86d048876bc601f91709137e8472b2c085a34d34b3325df9e3",
-    "gate_a_approved": "2162163c9cf9033b5ff34b89dbd93492f8efb7c2f993fae4318bd928cf4dd8a6",
-    "gate_b_pending": "8c7c76cdc31af027b468d0a56cd1814ff8499fa04625ef3e602229afa3279e13",
-    "gate_b_approved": "539170e25e0f5a360539efdebc5140bba4ad8c5c2f4d2b9b5c2e7035f4293744"
+    "template_source": "2cee2b153cf4522008ca42ed7f26c935b886302d1cd063352aa1eed460883abd",
+    "unconfigured_template": "8fa589888bf37f3e81d63fc25646da3719abd2edf672793c5b7c350a348d9695",
+    "rendered_intake": "f0d2ff140a652323245933ad5dec1498c1a4008c5e491b49c631346c2a511063",
+    "gate_a_pending": "8f35bd47ec02b5cd043f1462ef5092dc3d245a96e4f01ff8546e8337845b2b66",
+    "gate_a_approved": "55130de9e3b72bf24507e31cebc769c90c7d71f2a85391727b5a7d2fb99407ec",
+    "gate_b_pending": "fbb088e9465ee382fa40290147bc086a154d639c4032959ebcf6842e2b892e1a",
+    "gate_b_approved": "0dfa846ef13844db455e636acbe5f4fb2d4e983944caf2729a4ac6b30d8bad58"
   },
   "report_cases": {
     "template_source": {
@@ -2195,7 +2217,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 4747,
+          "actual_initial_source_bytes": 5369,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -2203,10 +2225,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 17,
+              "end_line": 32,
               "active_ids": [],
-              "canonical_sha256": "sha256:88dc63b9c5a97011a703fdda9d1eaf245c62896b4df6580c430e19249cb7a4cd",
-              "source_bytes": 3058,
+              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
+              "source_bytes": 3680,
               "reason": "Current phase procedure"
             },
             {
@@ -2237,8 +2259,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 18,
-              "end_line": 30,
+              "start_line": 33,
+              "end_line": 45,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -2248,8 +2270,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 31,
-              "end_line": 38,
+              "start_line": 46,
+              "end_line": 53,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -3330,6 +3352,34 @@
             "exact_reply": "R-CAF6F7A133F4; 1: <choose A, B, or C>",
             "canonical_sha256": "sha256:510346f7084fa4fbe1c4ac166386f39dcb8f1893778334bb8758da85d115e05f",
             "reply_token": "R-CAF6F7A133F4"
+          },
+          "next_question_guidance": {
+            "schema_version": 1,
+            "status": "STARTING_POINT_REQUIRED",
+            "owner_work_context": null,
+            "objective": "Learn whether the owner is starting a new application, changing an existing application, or repairing or migrating existing behavior.",
+            "fields": [
+              "OWNER_WORK_CONTEXT"
+            ],
+            "target_ids": [
+              "INTAKE-0001"
+            ],
+            "basis_ids": [],
+            "owner_action_required": true
+          },
+          "project_configuration": {
+            "schema_version": 1,
+            "status": "WAITING_FOR_OWNER_FACTS",
+            "owner_action_required": false,
+            "current_project_mode": null,
+            "derived_project_mode": null,
+            "current_delivery_profile": null,
+            "current_effective_risk": null,
+            "current_aws_lane": null,
+            "safest_current_aws_lane": "documentation-only",
+            "project_mode_basis_ids": [],
+            "risk_profile_basis_ids": [],
+            "codex_actions": []
           },
           "grandfathered_approved_gate_a": false
         },
@@ -4064,7 +4114,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 4747,
+          "actual_initial_source_bytes": 5369,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -4072,10 +4122,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 17,
+              "end_line": 32,
               "active_ids": [],
-              "canonical_sha256": "sha256:88dc63b9c5a97011a703fdda9d1eaf245c62896b4df6580c430e19249cb7a4cd",
-              "source_bytes": 3058,
+              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
+              "source_bytes": 3680,
               "reason": "Current phase procedure"
             },
             {
@@ -4106,8 +4156,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 18,
-              "end_line": 30,
+              "start_line": 33,
+              "end_line": 45,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -4117,8 +4167,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 31,
-              "end_line": 38,
+              "start_line": 46,
+              "end_line": 53,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -5200,6 +5250,34 @@
             "canonical_sha256": "sha256:510346f7084fa4fbe1c4ac166386f39dcb8f1893778334bb8758da85d115e05f",
             "reply_token": "R-CAF6F7A133F4"
           },
+          "next_question_guidance": {
+            "schema_version": 1,
+            "status": "STARTING_POINT_REQUIRED",
+            "owner_work_context": null,
+            "objective": "Learn whether the owner is starting a new application, changing an existing application, or repairing or migrating existing behavior.",
+            "fields": [
+              "OWNER_WORK_CONTEXT"
+            ],
+            "target_ids": [
+              "INTAKE-0001"
+            ],
+            "basis_ids": [],
+            "owner_action_required": true
+          },
+          "project_configuration": {
+            "schema_version": 1,
+            "status": "WAITING_FOR_OWNER_FACTS",
+            "owner_action_required": false,
+            "current_project_mode": null,
+            "derived_project_mode": null,
+            "current_delivery_profile": null,
+            "current_effective_risk": null,
+            "current_aws_lane": null,
+            "safest_current_aws_lane": "documentation-only",
+            "project_mode_basis_ids": [],
+            "risk_profile_basis_ids": [],
+            "codex_actions": []
+          },
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
@@ -5903,7 +5981,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 4747,
+          "actual_initial_source_bytes": 5369,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -5911,10 +5989,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 17,
+              "end_line": 32,
               "active_ids": [],
-              "canonical_sha256": "sha256:88dc63b9c5a97011a703fdda9d1eaf245c62896b4df6580c430e19249cb7a4cd",
-              "source_bytes": 3058,
+              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
+              "source_bytes": 3680,
               "reason": "Current phase procedure"
             },
             {
@@ -5945,8 +6023,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 18,
-              "end_line": 30,
+              "start_line": 33,
+              "end_line": 45,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -5956,8 +6034,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 31,
-              "end_line": 38,
+              "start_line": 46,
+              "end_line": 53,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -7266,6 +7344,34 @@
             "canonical_sha256": "sha256:510346f7084fa4fbe1c4ac166386f39dcb8f1893778334bb8758da85d115e05f",
             "reply_token": "R-CAF6F7A133F4"
           },
+          "next_question_guidance": {
+            "schema_version": 1,
+            "status": "STARTING_POINT_REQUIRED",
+            "owner_work_context": null,
+            "objective": "Learn whether the owner is starting a new application, changing an existing application, or repairing or migrating existing behavior.",
+            "fields": [
+              "OWNER_WORK_CONTEXT"
+            ],
+            "target_ids": [
+              "INTAKE-0001"
+            ],
+            "basis_ids": [],
+            "owner_action_required": true
+          },
+          "project_configuration": {
+            "schema_version": 1,
+            "status": "WAITING_FOR_OWNER_FACTS",
+            "owner_action_required": false,
+            "current_project_mode": null,
+            "derived_project_mode": null,
+            "current_delivery_profile": null,
+            "current_effective_risk": null,
+            "current_aws_lane": null,
+            "safest_current_aws_lane": "documentation-only",
+            "project_mode_basis_ids": [],
+            "risk_profile_basis_ids": [],
+            "codex_actions": []
+          },
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
@@ -7910,7 +8016,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 5128,
+          "actual_initial_source_bytes": 5750,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -7918,10 +8024,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 17,
+              "end_line": 32,
               "active_ids": [],
-              "canonical_sha256": "sha256:88dc63b9c5a97011a703fdda9d1eaf245c62896b4df6580c430e19249cb7a4cd",
-              "source_bytes": 3058,
+              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
+              "source_bytes": 3680,
               "reason": "Current phase procedure"
             },
             {
@@ -8029,8 +8135,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 18,
-              "end_line": 30,
+              "start_line": 33,
+              "end_line": 45,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -8040,8 +8146,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 31,
-              "end_line": 38,
+              "start_line": 46,
+              "end_line": 53,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -9765,6 +9871,49 @@
           ],
           "missing_fields": [],
           "pending_card": null,
+          "next_question_guidance": {
+            "schema_version": 1,
+            "status": "COMPLETE",
+            "owner_work_context": "NEW_APPLICATION",
+            "objective": null,
+            "fields": [],
+            "target_ids": [],
+            "basis_ids": [
+              "INTAKE-0001",
+              "INTAKE-0002",
+              "INTAKE-0003",
+              "INTAKE-0004",
+              "INTAKE-0005",
+              "INTAKE-0006",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "owner_action_required": false
+          },
+          "project_configuration": {
+            "schema_version": 1,
+            "status": "CURRENT",
+            "owner_action_required": false,
+            "current_project_mode": "greenfield",
+            "derived_project_mode": "greenfield",
+            "current_delivery_profile": "quick-mvp",
+            "current_effective_risk": "low",
+            "current_aws_lane": "documentation-only",
+            "safest_current_aws_lane": "documentation-only",
+            "project_mode_basis_ids": [
+              "INTAKE-0001"
+            ],
+            "risk_profile_basis_ids": [
+              "INTAKE-0005",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "codex_actions": []
+          },
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
@@ -12510,6 +12659,49 @@
           ],
           "missing_fields": [],
           "pending_card": null,
+          "next_question_guidance": {
+            "schema_version": 1,
+            "status": "COMPLETE",
+            "owner_work_context": "NEW_APPLICATION",
+            "objective": null,
+            "fields": [],
+            "target_ids": [],
+            "basis_ids": [
+              "INTAKE-0001",
+              "INTAKE-0002",
+              "INTAKE-0003",
+              "INTAKE-0004",
+              "INTAKE-0005",
+              "INTAKE-0006",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "owner_action_required": false
+          },
+          "project_configuration": {
+            "schema_version": 1,
+            "status": "CURRENT",
+            "owner_action_required": false,
+            "current_project_mode": "greenfield",
+            "derived_project_mode": "greenfield",
+            "current_delivery_profile": "quick-mvp",
+            "current_effective_risk": "low",
+            "current_aws_lane": "documentation-only",
+            "safest_current_aws_lane": "documentation-only",
+            "project_mode_basis_ids": [
+              "INTAKE-0001"
+            ],
+            "risk_profile_basis_ids": [
+              "INTAKE-0005",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "codex_actions": []
+          },
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
@@ -15473,6 +15665,49 @@
           ],
           "missing_fields": [],
           "pending_card": null,
+          "next_question_guidance": {
+            "schema_version": 1,
+            "status": "COMPLETE",
+            "owner_work_context": "NEW_APPLICATION",
+            "objective": null,
+            "fields": [],
+            "target_ids": [],
+            "basis_ids": [
+              "INTAKE-0001",
+              "INTAKE-0002",
+              "INTAKE-0003",
+              "INTAKE-0004",
+              "INTAKE-0005",
+              "INTAKE-0006",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "owner_action_required": false
+          },
+          "project_configuration": {
+            "schema_version": 1,
+            "status": "CURRENT",
+            "owner_action_required": false,
+            "current_project_mode": "greenfield",
+            "derived_project_mode": "greenfield",
+            "current_delivery_profile": "quick-mvp",
+            "current_effective_risk": "low",
+            "current_aws_lane": "documentation-only",
+            "safest_current_aws_lane": "documentation-only",
+            "project_mode_basis_ids": [
+              "INTAKE-0001"
+            ],
+            "risk_profile_basis_ids": [
+              "INTAKE-0005",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "codex_actions": []
+          },
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
@@ -17748,6 +17983,49 @@
           ],
           "missing_fields": [],
           "pending_card": null,
+          "next_question_guidance": {
+            "schema_version": 1,
+            "status": "COMPLETE",
+            "owner_work_context": "NEW_APPLICATION",
+            "objective": null,
+            "fields": [],
+            "target_ids": [],
+            "basis_ids": [
+              "INTAKE-0001",
+              "INTAKE-0002",
+              "INTAKE-0003",
+              "INTAKE-0004",
+              "INTAKE-0005",
+              "INTAKE-0006",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "owner_action_required": false
+          },
+          "project_configuration": {
+            "schema_version": 1,
+            "status": "CURRENT",
+            "owner_action_required": false,
+            "current_project_mode": "greenfield",
+            "derived_project_mode": "greenfield",
+            "current_delivery_profile": "quick-mvp",
+            "current_effective_risk": "low",
+            "current_aws_lane": "documentation-only",
+            "safest_current_aws_lane": "documentation-only",
+            "project_mode_basis_ids": [
+              "INTAKE-0001"
+            ],
+            "risk_profile_basis_ids": [
+              "INTAKE-0005",
+              "INTAKE-0007",
+              "INTAKE-0008",
+              "INTAKE-0009",
+              "INTAKE-0010"
+            ],
+            "codex_actions": []
+          },
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {

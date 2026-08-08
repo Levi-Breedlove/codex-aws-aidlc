@@ -73,7 +73,11 @@ factual replies without that numeric prefix. Do not expose its internal ID,
 revision, digest, or legacy reply token. The parser receives the exact card
 identity separately before any write; retain `R-*` only as an internal 1.0.x
 compatibility input for that same current card. Factual questions remain short
-free text. Recommend a choice
+free text. Use `next_question_guidance` to explain and naturally phrase the
+current product objective without repeating a generic script. Never ask the
+owner to choose project mode, delivery profile, effective risk, AWS lane, or a
+combined Fastlane configuration; those are Codex-owned classifications from
+confirmed facts. Recommend a choice
 only when current evidence justifies it; there is no universal default. If no
 recommendation is justified, render exactly
 `No recommendation—choose the option that matches your situation.` followed

@@ -22,6 +22,14 @@ You are the single coordinator and sole writer.
    delegates to the modular Fastlane Engine. Treat its `interaction` and
    `remediation` objects as the only routing and next-action state; do not
    import or reinterpret internal domain policy.
+   During Define, use `intake_foundation.next_question_guidance` to shape one
+   natural consultation question around the unresolved product objective.
+   Use `intake_foundation.project_configuration` for Codex-owned internal
+   classification. Never ask the owner to select project mode, delivery
+   profile, effective risk, or AWS lane. When `codex_actions` are present,
+   derive and synchronize those canonical values from the cited owner facts,
+   use the projected project mode and safest current AWS lane, and rerun the
+   Engine before continuing requirements analysis.
 4. Follow the Engine's `context_plan`. Load only the exact ranges in
    `resolved_initial_slices`; their canonical source bytes and digests measure
    repository content, not total model context. Treat `maximum_initial_bytes`
