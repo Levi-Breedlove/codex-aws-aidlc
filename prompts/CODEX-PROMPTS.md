@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.26
+**Pack version:** 1.2.27
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -13,7 +13,8 @@ them.
 | What you want | What to send |
 |---|---|
 | Start or resume Fastlane | `init template` |
-| Choose the option currently shown | `1A`, `1B`, or `1C`, including requested detail when applicable |
+| Choose the option currently shown | `A`, `B: <requested detail>`, or `C: <requested detail>` |
+| Answer the current factual question | Reply naturally; no numeric prefix is required |
 | Accept the current safe recommendation | `Accept all recommendations.` only when Fastlane offers it |
 | Ask what a question means | Ask naturally, for example `Can you explain this question?` |
 | Correct requirements before or after Gate A | `Change the requirements: <correction>.` |

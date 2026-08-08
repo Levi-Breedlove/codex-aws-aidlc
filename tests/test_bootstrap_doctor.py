@@ -3008,7 +3008,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.26")
+        self.assertEqual(report["bootstrap_version"], "1.2.27")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -8319,7 +8319,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         assert contract.pending_card is not None
         self.assertEqual(len(contract.pending_card.questions), 1)
         parsed = doctor.parse_intake_owner_response(
-            "1: Development teams",
+            "Development teams; especially release coordinators",
             contract.pending_card.to_dict(),
             expected_card_id="INTAKE-CARD-0002",
             expected_revision=1,
@@ -8328,6 +8328,10 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(parsed.status, "PASS", parsed.to_dict())
         self.assertEqual([answer.reply_key for answer in parsed.answers], ["1"])
+        self.assertEqual(
+            parsed.answers[0].detail,
+            "Development teams; especially release coordinators",
+        )
 
     def test_response_register_rejects_repeated_questions_and_empty_facts(self) -> None:
         source = complete_intake_foundation(

@@ -867,25 +867,57 @@ def reduce_prerequisites(evidence: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def opening_greeting() -> str:
-    return """Welcome to AWS Codex Fastlane.
+    return """FASTLANE · WELCOME
 
-Fastlane turns your idea into a clear AWS application plan and a tested local
-build. Describe the outcome in plain language; Codex asks focused questions,
-uses current AWS guidance through AWS Core, recommends the technical approach,
-and builds inside the boundaries you approve. You do not need to choose AWS
-services.
+Welcome to Fastlane.
 
-You approve two checkpoints: Gate A confirms what should be built, and Gate B
-confirms the design and build boundaries. Setup never authorizes AWS changes:
-Fast Dev stays inside the exact approved non-production Gate B envelope after
-read-only preflight; Explicit Gate requires its own exact action receipt.
+You describe the application you want to build. Fastlane helps turn that idea
+into clear requirements, an AWS-informed technical plan, a bounded local build,
+and evidence you can trust. You do not need to choose AWS services now.
+
+You remain in control of the important decisions.
+
+What to expect
+
+1. Define the product
+   Fastlane asks focused questions about the people, outcome, scope, data,
+   risks, and success criteria.
+
+2. Gate A — approve the Product Agreement
+   You confirm what should be built. This does not approve an architecture,
+   local construction, AWS access, or spending.
+
+3. Design the solution
+   Codex compares complete approaches and explains the recommended AWS
+   architecture, alternatives, tradeoffs, security, reliability, recovery,
+   and cost.
+
+4. Gate B — approve the technical plan
+   You approve the design and the exact boundary in which Codex may build and
+   test locally.
+
+5. Build and verify
+   Codex creates tasks, builds locally, runs validation, safely corrects
+   in-scope defects, and records what actually happened.
+
+AWS account reads, deployment, spending, rollback, and teardown always require
+their own separate exact authorization.
+
+Describe the outcome in ordinary language. Fastlane will guide the process one
+decision at a time.
 
 Setup did not inspect AWS credentials or access an AWS account.
+Setup never authorizes AWS changes.
+
+Need from you
 
 Reply once with:
-- Project name: (one line; ordinary punctuation and international text are supported)
-- Preferred AWS Region: (use an ID such as us-west-2, or "recommend one")
-- Development budget: (a currency cap, or "minimize cost; no hard cap")"""
+
+Project name:
+
+Preferred AWS Region: <Region or "recommend one">
+
+Development budget: <amount or "minimize cost; no hard cap">"""
 
 
 def render_setup_response(report: Mapping[str, Any]) -> str:

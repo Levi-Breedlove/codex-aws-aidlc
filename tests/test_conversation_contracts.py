@@ -114,6 +114,8 @@ class ConversationContractTests(unittest.TestCase):
         ready = setup.reduce_prerequisites(ready_evidence())
         welcome = setup.render_setup_response(ready)
         self.assertEqual(ready["state"], "PREREQUISITES_READY")
+        self.assertTrue(welcome.startswith("FASTLANE · WELCOME"))
+        self.assertEqual(welcome.count("Need from you"), 1)
         for label in ("Project name:", "Preferred AWS Region:", "Development budget:"):
             self.assertEqual(welcome.count(label), 1)
 
@@ -130,7 +132,8 @@ class ConversationContractTests(unittest.TestCase):
         self.assertTrue(rendered.startswith("FASTLANE · DEFINE"))
         self.assertEqual(rendered.count("Need from you:"), 1)
         for forbidden in (
-            "Welcome to AWS Codex Fastlane",
+            "FASTLANE · WELCOME",
+            "Welcome to Fastlane.",
             "Project name:",
             "Preferred AWS Region:",
             "Development budget:",

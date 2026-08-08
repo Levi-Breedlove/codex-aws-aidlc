@@ -1367,14 +1367,17 @@ def _intake_question_lines(card: Mapping[str, Any]) -> list[str]:
             required = set(question["required_detail_for"])
             for choice in ("A", "B", "C"):
                 prefix = "Recommended \u2014 " if recommended == choice else ""
-                lines.append(f"{choice}. {prefix}{options[choice]}")
+                lines.extend(("", f"{choice}. {prefix}{options[choice]}"))
                 if choice in required:
                     lines.append(
                         f"   If you choose {choice}: {question['detail_prompt']}"
                     )
             if recommended is None:
-                lines.append(
-                    "No recommendation—choose the option that matches your situation."
+                lines.extend(
+                    (
+                        "",
+                        "No recommendation—choose the option that matches your situation.",
+                    )
                 )
         else:
             lines.append(f"Reply: {question['detail_prompt']}")
@@ -1389,18 +1392,23 @@ def _intake_reply_guidance(card: Mapping[str, Any]) -> list[str]:
         question["kind"] == "DECISION" and question["recommended"] is not None
         for question in questions
     ):
-        return ["Copyable reply:", str(card["owner_reply"])]
+        recommendation = questions[0]["recommended"]
+        if recommendation not in {"A", "B", "C"}:
+            raise PresentationError(
+                "copyable decision reply requires a current recommendation"
+            )
+        return ["Copyable reply:", str(recommendation)]
     if len(questions) == 1 and questions[0]["kind"] == "DECISION":
         question = questions[0]
         required = set(question["required_detail_for"])
         lines = ["Reply with one of:"]
         for choice in ("A", "B", "C"):
-            example = f"{question['reply_key']}{choice}"
+            example = choice
             if choice in required:
                 example += ": <required detail>"
-            lines.append(f"- `{example}`")
+            lines.extend(("", f"- `{example}`"))
         return lines
-    return ["Reply format:", f"`{card['owner_reply']}`"]
+    return ["Reply in your own words—no prefix is needed."]
 
 
 def _render_intake_card(
