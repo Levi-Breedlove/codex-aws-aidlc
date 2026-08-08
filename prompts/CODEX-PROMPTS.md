@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.28
+**Pack version:** 1.2.29
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -236,9 +236,9 @@ Use the Fastlane coordinator and Define procedure for the current Engine report.
 
 **Preconditions:** Setup is complete and the Engine projects one current intake card or safe intake correction.
 
-**Authoritative inputs:** Current PRD intake records, repository observations, the new owner message, Engine card binding, and the derived `next_question_guidance` objective.
+**Authoritative inputs:** Current PRD intake records, repository observations, the new owner message, Engine card binding, and the derived `next_question_guidance` objective. An explicitly requested `SOURCE_ASSISTED_DEFINE` preview is non-authoritative input only.
 
-**Permitted writes:** Only a deterministically parsed current owner answer and its normalized provenance, or an Engine-projected safe correction.
+**Permitted writes:** Only a deterministically parsed current owner answer and its normalized provenance, or an Engine-projected safe correction. Source preview writes nothing.
 
 **GitHub mode:** No GitHub writes.
 
@@ -258,6 +258,9 @@ Use the Define and owner-response procedures for the exact current intake card.
 Tailor its natural wording to the Engine's current consultation objective. Never
 ask the owner to choose Fastlane's project mode, delivery profile, effective
 risk, AWS lane, or a combined internal configuration.
+
+For an explicit product brief, load `references/source-assisted-define.md`:
+preview it before writing and never treat it as approval or authority.
 ~~~
 
 ## REQ-10 — Requirements Analysis

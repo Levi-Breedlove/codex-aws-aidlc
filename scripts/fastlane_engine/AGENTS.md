@@ -13,6 +13,10 @@ This guide narrows the root rules and never widens approval or authorization.
 - `define/` owns intake, requirements, assumptions, adaptive coverage, change
   impact, brownfield safeguards, AWS materiality, and Gate A readiness. It
   consumes observed text and explicit caller policy; it cannot approve Gate A.
+- `define/source_assist.py` may classify one already-observed owner brief into
+  bounded candidate facts, technical proposals, and missing domains. It is
+  non-authoritative, performs no I/O or write, and cannot modify canonical
+  state, select architecture, approve a gate, change routing, or grant authority.
 - `design/` owns architecture comparison, technology and property support,
   source disposition, Harness selection, project interfaces and state models,
   diagrams, the construction envelope, and optional ADR rationale evaluation.

@@ -75,6 +75,7 @@ REQUIRED_CONTROL_FILES = {
     "scripts/fastlane_engine/define/models.py",
     "scripts/fastlane_engine/define/project.py",
     "scripts/fastlane_engine/define/requirements.py",
+    "scripts/fastlane_engine/define/source_assist.py",
     "scripts/fastlane_engine/design/__init__.py",
     "scripts/fastlane_engine/design/adr.py",
     "scripts/fastlane_engine/design/architecture.py",

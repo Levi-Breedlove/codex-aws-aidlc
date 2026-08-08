@@ -61,6 +61,10 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
 - Keep current-architecture qualification expectations independently authored.
   A test may invoke the production Engine once, but it must not calculate the
   expected owner meaning through that same projection or a wrapper around it.
+- Source-assisted Define tests must independently assert the candidate meaning,
+  technical-proposal boundary, missing domains, and owner choices. Prove one
+  bounded read, no canonical writes, no secret echo, and unchanged ordinary
+  Engine reports, routes, gates, receipts, and authority when no source is supplied.
 - Record every reviewed complexity overage in
   `engine_complexity_exceptions.py`. A `SAFETY:` or `COMPATIBILITY:` comment may
   explain code, but it never grants an exception or permits unreviewed growth.

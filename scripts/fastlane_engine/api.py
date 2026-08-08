@@ -2,9 +2,9 @@
 
 Inputs are repository-relative paths and caller-supplied observation policy.
 Outputs are immutable snapshots, Define, Design, Delivery, or AWS projections.
-Snapshot capture may read bounded regular files; domain evaluators consume caller-supplied text and
-perform no I/O. The API never writes, runs Git, invokes AWS, approves a gate, or
-grants authority.
+Snapshot capture may read bounded regular files; domain evaluators consume
+caller-supplied text and perform no I/O. The API never writes, runs Git, invokes
+AWS, approves a gate, or grants authority.
 """
 
 from __future__ import annotations
@@ -31,16 +31,19 @@ from .core.contracts import (
     contract_table_after_heading,
     table_after_heading,
 )
-from .core.ids import clean_cell
-from .core.snapshot import ProjectSnapshot, SnapshotObserver
+from .core.ids import clean_cell, validate_relative_path
+from .core.snapshot import ObservationError, ProjectSnapshot, SnapshotObserver
 from .define import (
     IntakeFoundationContract,
     RequirementsContract,
+    SOURCE_BRIEF_MAX_BYTES,
+    blocked_source_assist_preview,
     derive_change_impact_contract,
     derive_coverage_contract,
     derive_intake_foundation_contract,
     derive_req_aws_materiality,
     derive_requirements_contract,
+    derive_source_assist_preview,
 )
 from .design import (
     PROPERTY_EXECUTION_HEADERS,
@@ -123,6 +126,116 @@ def capture_project_snapshot(
         else:
             observer.observe_binary(relative)
     return observer.freeze()
+
+
+def preview_source_brief(root: Path, source_path: str) -> dict[str, Any]:
+    """Return one bounded non-authoritative source-assisted Define preview.
+
+    SAFETY: the source is observed once as a repository-relative regular UTF-8
+    file. The preview performs no canonical write, lifecycle transition, gate
+    approval, architecture selection, or authority derivation.
+    """
+
+    observed_at = datetime.now(timezone.utc)
+    display_path = (
+        source_path
+        if validate_relative_path(source_path) is not None
+        else "UNSAFE_OR_UNAVAILABLE_SOURCE"
+    )
+    observer = SnapshotObserver(
+        root,
+        observed_at=observed_at,
+        max_files=1,
+        max_file_bytes=SOURCE_BRIEF_MAX_BYTES,
+        max_source_bytes=SOURCE_BRIEF_MAX_BYTES,
+    )
+    try:
+        source = observer.observe_text(source_path, markdown=True)
+    except ObservationError as exc:
+        issue = {
+            "MANIFEST_UNSAFE_PATH": (
+                "SOURCE_BRIEF_PATH_UNSAFE",
+                "The source path must be a safe repository-relative POSIX path.",
+            ),
+            "REQUIRED_FILE_SYMLINK": (
+                "SOURCE_BRIEF_SYMLINK",
+                "The source path may not contain or resolve through a symbolic link.",
+            ),
+            "REQUIRED_FILE_MISSING": (
+                "SOURCE_BRIEF_MISSING",
+                "The source brief does not exist at the supplied "
+                "repository-relative path.",
+            ),
+            "REQUIRED_FILE_NOT_REGULAR": (
+                "SOURCE_BRIEF_NOT_REGULAR",
+                "The supplied source path is not a regular file.",
+            ),
+            "REQUIRED_FILE_TOO_LARGE": (
+                "SOURCE_BRIEF_TOO_LARGE",
+                f"The source brief exceeds the {SOURCE_BRIEF_MAX_BYTES}-byte limit.",
+            ),
+            "PROJECT_SOURCE_LIMIT": (
+                "SOURCE_BRIEF_TOO_LARGE",
+                f"The source brief exceeds the {SOURCE_BRIEF_MAX_BYTES}-byte limit.",
+            ),
+            "REQUIRED_FILE_UNREADABLE": (
+                "SOURCE_BRIEF_UNREADABLE",
+                "The source brief is not readable UTF-8 text.",
+            ),
+        }.get(
+            exc.code,
+            (
+                "SOURCE_BRIEF_OBSERVATION_FAILED",
+                "Fastlane could not safely observe the supplied source brief.",
+            ),
+        )
+        return blocked_source_assist_preview(
+            display_path,
+            observed_at,
+            code=issue[0],
+            message=issue[1] + " No canonical project record was changed.",
+        )
+    snapshot = observer.freeze()
+    return derive_source_assist_preview(
+        source_path,
+        source.canonical_text or "",
+        source.byte_sha256,
+        snapshot.observed_at,
+        markdown=snapshot.markdown.get(source_path),
+    )
+
+
+def prepare_source_brief_request(
+    root: Path,
+    source_path: str,
+    json_output: bool,
+    owner_input_mode_count: int,
+) -> tuple[dict[str, Any], int]:
+    """Prepare the source-preview payload and stable CLI exit status.
+
+    Invalid mode combinations fail closed without observing the source. A
+    successful result is still non-authoritative and grants no project action.
+    """
+
+    if owner_input_mode_count or not json_output:
+        return (
+            {
+                "schema_version": 1,
+                "status": "FAIL",
+                "issues": [
+                    {
+                        "code": "SOURCE_BRIEF_USAGE",
+                        "message": (
+                            "Source-assisted Define requires --json and may not "
+                            "be combined with an owner-input parser mode."
+                        ),
+                    }
+                ],
+            },
+            1,
+        )
+    preview = preview_source_brief(root, source_path)
+    return preview, 0 if preview["status"] == "READY_FOR_CONFIRMATION" else 2
 
 
 def _compatibility_aws_policy(
@@ -1246,6 +1359,8 @@ __all__ = (
     "parse_task_harness_evidence",
     "parse_task_property_projection",
     "parse_task_write_boundary",
+    "prepare_source_brief_request",
+    "preview_source_brief",
     "compute_task_contract_waves",
     "derive_task_ready_ids",
     "task_dependency_is_satisfied",

@@ -43,6 +43,20 @@ Change <plain field> to <new value>.
 recommendation. A correction never approves a gate. A side question is answered
 directly, then Fastlane restores the same pending project action.
 
+### Bring an existing product brief
+
+An existing PRD can shorten Define, but it does not become Fastlane's PRD.
+Codex first reviews the supplied repository-relative document as read-only,
+non-authoritative source material and shows a plain-language preview. Product
+facts can seed the consultation after the owner confirms how to use them;
+missing or conflicting decisions remain questions, and technical suggestions
+wait for independent evaluation during Design.
+
+Imported wording such as "approved," "ready to build," or "ready to deploy"
+does not approve Gate A or Gate B, authorize local construction, access AWS, or
+authorize deployment. The normal Product Agreement and both owner gates remain
+required.
+
 ## Customer delivery lifecycle
 
 ```mermaid

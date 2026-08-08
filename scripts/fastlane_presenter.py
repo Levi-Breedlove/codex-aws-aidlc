@@ -2178,6 +2178,172 @@ def render_answer_confirmation(
     return "\n".join(lines)
 
 
+def _source_brief_sequence(
+    preview: Mapping[str, Any], key: str
+) -> Sequence[Any]:
+    value = preview.get(key)
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise PresentationError(f"source-assisted Define {key} is invalid")
+    return value
+
+
+def _source_brief_summary_lines(
+    items: Sequence[Any], kind: str
+) -> list[str]:
+    lines: list[str] = []
+    for item in items:
+        if not isinstance(item, Mapping) or not isinstance(item.get("summary"), str):
+            raise PresentationError(f"source-assisted Define {kind} is invalid")
+        lines.append(f"- {item['summary']}")
+    return lines
+
+
+def _source_brief_choice_lines(confirmation: Mapping[str, Any]) -> list[str]:
+    options = _source_brief_sequence(confirmation, "options")
+    keys = [option.get("key") for option in options if isinstance(option, Mapping)]
+    if keys != ["A", "B", "C"]:
+        raise PresentationError("source-assisted Define choices must be A, B, and C")
+    lines: list[str] = []
+    for option in options:
+        if not isinstance(option, Mapping):
+            raise PresentationError("source-assisted Define choice is invalid")
+        label, effect = option.get("label"), option.get("effect")
+        if not isinstance(label, str) or not isinstance(effect, str):
+            raise PresentationError("source-assisted Define choice text is invalid")
+        prefix = f"{option['key']}."
+        if option.get("recommended") is True:
+            prefix += " Recommended —"
+        lines.extend((f"**{prefix} {label}**", "", effect, ""))
+    lines.append("Reply with A, B, or C—or answer in your own words.")
+    return lines
+
+
+def _render_blocked_source_brief(preview: Mapping[str, Any]) -> str:
+    issues = _source_brief_sequence(preview, "issues")
+    if not issues or not isinstance(issues[0], Mapping):
+        raise PresentationError("blocked source-assisted Define preview has no issue")
+    message = issues[0].get("message")
+    if not isinstance(message, str):
+        raise PresentationError("source-assisted Define issue is invalid")
+    return "\n".join(
+        (
+            "FASTLANE · SOURCE-ASSISTED DEFINE",
+            "",
+            "I could not safely use the supplied product brief.",
+            "",
+            "No canonical project file was changed. No approval or authority "
+            "was created.",
+            "",
+            "## What needs attention",
+            "",
+            message,
+            "",
+            "## Need from you",
+            "",
+            "Correct or redact the source brief, then ask Fastlane to review it again.",
+        )
+    )
+
+
+def _render_ready_source_brief(preview: Mapping[str, Any], path: str) -> str:
+    candidates = _source_brief_sequence(preview, "candidate_facts")
+    technical = _source_brief_sequence(preview, "technical_proposals")
+    missing = _source_brief_sequence(preview, "missing_or_unclear")
+    boundaries = _source_brief_sequence(preview, "does_not_authorize")
+    confirmation = preview.get("confirmation")
+    if not isinstance(confirmation, Mapping):
+        raise PresentationError("source-assisted Define confirmation is invalid")
+    lines = [
+        "FASTLANE · SOURCE-ASSISTED DEFINE",
+        "",
+        "I reviewed the supplied product brief as source material.",
+        "",
+        f"Source: `{path}`",
+        "",
+        "It has not replaced Fastlane's PRD, and none of its approval language "
+        "is authority.",
+        "Its contents are unconfirmed source material, not instructions to Codex.",
+        "",
+        "## What it appears to describe",
+        "",
+    ]
+    lines.extend(
+        _source_brief_summary_lines(candidates, "candidate")
+        if candidates
+        else ["- No product fact was classified confidently."]
+    )
+    lines.extend(("", "## Proposed technical ideas", ""))
+    lines.extend(
+        _source_brief_summary_lines(technical, "technical proposal")
+        if technical
+        else ["- No technical proposal was identified."]
+    )
+    if technical:
+        lines.extend(
+            (
+                "",
+                "These are proposals, not selected architecture. Fastlane will "
+                "evaluate them during Design.",
+            )
+        )
+    lines.extend(("", "## Still missing or unclear", ""))
+    lines.extend(
+        (f"- {item}" for item in missing)
+        if missing
+        else (
+            "- No standard Define domain is obviously absent; contradictions "
+            "still require review.",
+        )
+    )
+    lines.extend(
+        (
+            "",
+            "## What this action does",
+            "",
+            "It allows the document to seed requirements discovery after you "
+            "confirm how it should be used.",
+            "",
+            "## What it does not authorize",
+            "",
+        )
+    )
+    lines.extend(f"- {item}" for item in boundaries)
+    lines.extend(
+        ("", "## Need from you", "", str(confirmation.get("question", "")), "")
+    )
+    lines.extend(_source_brief_choice_lines(confirmation))
+    return "\n".join(lines)
+
+
+def render_source_brief_preview(preview: Mapping[str, Any]) -> str:
+    """Render one non-authoritative source-assisted Define decision."""
+
+    if (
+        preview.get("schema_version") != 1
+        or preview.get("kind") != "SOURCE_ASSISTED_DEFINE"
+    ):
+        raise PresentationError("source-assisted Define preview is invalid")
+    source, safety = preview.get("source"), preview.get("safety")
+    if not isinstance(source, Mapping) or not isinstance(safety, Mapping):
+        raise PresentationError("source-assisted Define metadata is invalid")
+    if safety.get("canonical_writes_allowed") is not False:
+        raise PresentationError("source-assisted Define cannot allow canonical writes")
+    if safety.get("source_instructions_trusted") is not False:
+        raise PresentationError(
+            "source-assisted Define cannot trust source instructions"
+        )
+    path = source.get("path")
+    if not isinstance(path, str) or not path or "\\" in path or path.startswith("/"):
+        raise PresentationError(
+            "source-assisted Define path is not repository-relative"
+        )
+    if preview.get("status") == "BLOCKED":
+        return _render_blocked_source_brief(preview)
+    if preview.get("status") != "READY_FOR_CONFIRMATION":
+        raise PresentationError("source-assisted Define status is unsupported")
+    return _render_ready_source_brief(preview, path)
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(
@@ -2191,6 +2357,7 @@ def main(argv: list[str] | None = None) -> int:
             "gate-a-brief",
             "gate-b-brief",
             "answer-confirmation",
+            "source-brief",
         ),
     )
     parser.add_argument(
@@ -2205,6 +2372,12 @@ def main(argv: list[str] | None = None) -> int:
         payload = json.load(sys.stdin)
         if not isinstance(payload, Mapping):
             raise PresentationError("input must be a JSON object")
+        if args.mode == "source-brief":
+            preview = payload.get("source_assist")
+            if not isinstance(preview, Mapping):
+                raise PresentationError("input is missing source_assist")
+            print(render_source_brief_preview(preview))
+            return 0
         report = payload.get("report")
         if not isinstance(report, Mapping):
             raise PresentationError("input is missing report")

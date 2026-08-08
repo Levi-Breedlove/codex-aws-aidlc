@@ -119,6 +119,9 @@ class PromptPackContractTests(unittest.TestCase):
         cls.bugfix = read("docs/project/BUGFIX.md")
         cls.fastlane_skill = read(".agents/skills/fastlane/SKILL.md")
         cls.fastlane_define = read(".agents/skills/fastlane/references/define.md")
+        cls.source_assisted_define = read(
+            ".agents/skills/fastlane/references/source-assisted-define.md"
+        )
         cls.fastlane_design = read(".agents/skills/fastlane/references/design.md")
         cls.fastlane_deliver = read(".agents/skills/fastlane/references/deliver.md")
         cls.owner_responses = read(
@@ -441,6 +444,36 @@ class PromptPackContractTests(unittest.TestCase):
         for token in ("ACTOR_KINDS", "RICH_USE_CASE_TRIGGERS"):
             self.assertIn(token, self.engine_source)
 
+    def test_source_assisted_define_preserves_canonical_authority(self) -> None:
+        define_words = " ".join(self.source_assisted_define.split())
+        for phrase in (
+            "Never overwrite the canonical Fastlane PRD",
+            "--source-brief <path>",
+            "NON_AUTHORITATIVE_SOURCE",
+            "Ask only consequential missing or conflicting decisions",
+            "Source wording such as `approved`",
+        ):
+            self.assertIn(phrase, define_words)
+        for phrase in (
+            "cannot replace the canonical PRD or import approval or authority",
+            "choices separated by blank lines",
+            "do not require an internal reply token or numeric prefix",
+        ):
+            self.assertIn(phrase, self.owner_responses)
+        for phrase in (
+            "SOURCE_ASSISTED_DEFINE",
+            "Source preview writes nothing",
+            "never treat it as approval or authority",
+        ):
+            self.assertIn(phrase, self.prompts)
+        self.assertIn("Bring an existing product brief", self.workflow)
+        self.assertIn("it does not become Fastlane's PRD", self.workflow)
+        self.assertIn("Source-assisted Define", self.readme)
+        self.assertIn(
+            "references/source-assisted-define.md", self.fastlane_skill
+        )
+        self.assertNotIn("IMPORT-10", PROMPT_IDS)
+
     def test_owner_response_procedure_owns_conversation_and_gate_presentation(
         self,
     ) -> None:
@@ -662,9 +695,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.28")
-        self.assertIn("**Pack version:** 1.2.28", self.prompts)
-        self.assertIn("Current customer build: **1.2.28**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.29")
+        self.assertIn("**Pack version:** 1.2.29", self.prompts)
+        self.assertIn("Current customer build: **1.2.29**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

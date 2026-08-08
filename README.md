@@ -6,7 +6,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
 
-Current customer build: **1.2.28**.
+Current customer build: **1.2.29**.
 
 Fastlane is a repository-native governance platform that turns Codex into a
 bounded technical consultant, AWS architecture guide, implementation agent, and
@@ -34,6 +34,7 @@ version-controlled records and deterministic contracts.
 | Delivery challenge | Fastlane response |
 |---|---|
 | Important decisions disappear into chat | Canonical records preserve requirements, design, tasks, evidence, and operations. |
+| Existing planning is expensive to repeat | A supplied product brief can seed Define after a non-authoritative preview and owner confirmation. |
 | Agent autonomy has an unclear boundary | Two owner gates establish what to build and the exact local construction envelope. |
 | Cloud recommendations become service lists | Codex compares complete solutions using current AWS Core guidance and project constraints. |
 | Plans are mistaken for proof | Every claim keeps its actual maturity: confirmed, source verified, locally observed, AWS observed, failed, stale, or unobserved. |
@@ -75,6 +76,8 @@ another genuine owner decision or protected boundary is reached.
 ## What Fastlane gives you
 
 - **Guided product consultation** with one consequential question at a time.
+- **Source-assisted Define** that can reuse an existing product brief without
+  importing its approvals, architecture, or authority.
 - **A canonical Product Agreement** with scope, risks, constraints, and
   measurable acceptance.
 - **An AWS-informed architecture comparison** based on complete solutions,

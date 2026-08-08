@@ -582,6 +582,7 @@ if __package__:
         derive_teardown_sequence_state,
         derive_write_authority,
         lifecycle_intent_record_boundary_is_settled,
+        prepare_source_brief_request,
     )
     from .fastlane_engine.authority.github import (
         _aws_action_transition_projection,
@@ -701,6 +702,7 @@ else:
         derive_teardown_sequence_state,
         derive_write_authority,
         lifecycle_intent_record_boundary_is_settled,
+        prepare_source_brief_request,
     )
     from fastlane_engine.authority.github import (
         _aws_action_transition_projection,
@@ -1054,6 +1056,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Allow unresolved render tokens in the reusable template source",
     )
+    parser.add_argument("--source-brief", help="Preview one owner product brief")
     parser.add_argument(
         "--prior-remediation-fingerprint",
         help="Prior sha256 remediation fingerprint for one bounded retry",
@@ -1099,6 +1102,12 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 1
+    if args.source_brief is not None:
+        payload, exit_code = prepare_source_brief_request(
+            args.root, args.source_brief, args.json, owner_input_modes
+        )
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return exit_code
     if args.parse_gate_correction:
         if not args.input_stdin or not args.json:
             print(
