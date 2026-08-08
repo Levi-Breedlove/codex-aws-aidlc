@@ -701,7 +701,7 @@ sequenceDiagram
         workflow = REPOSITORY_ROOT / "docs" / "WORKFLOW.md"
         self.assertFalse((REPOSITORY_ROOT / "docs/AGENTS.md").exists())
         self.assertLessEqual(len(guide.read_text(encoding="utf-8").splitlines()), 70)
-        self.assertLessEqual(len(workflow.read_bytes()), 7_500)
+        self.assertLessEqual(len(workflow.read_bytes()), 16_000)
         index_text = index.read_text(encoding="utf-8")
         for target in (
             "SETUP.md",
@@ -739,6 +739,20 @@ sequenceDiagram
         self.assertIn("docs.astral.sh/uv/getting-started/installation", setup)
 
         owner_workflow = workflow.read_text(encoding="utf-8")
+        self.assertEqual(owner_workflow.count("```mermaid"), 2)
+        self.assertEqual(owner_workflow.count("flowchart TB"), 2)
+        self.assertNotIn("<br", owner_workflow)
+        for customer_explanation in (
+            "## Customer delivery lifecycle",
+            "## How the control plane works",
+            "ProjectSnapshot",
+            "EngineEvaluation",
+            "Authority intersection",
+            "Schema-2 report",
+            "task_waves.py",
+            "Reconciliation means Fastlane compared expected and observed AWS state.",
+        ):
+            self.assertIn(customer_explanation, owner_workflow)
         for internal_term in (
             "canonical digest",
             "schema-migration",
@@ -752,30 +766,49 @@ sequenceDiagram
 
     def test_readme_is_a_compact_governance_platform_landing_page(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(readme.splitlines()), 180)
+        self.assertLessEqual(len(readme.splitlines()), 275)
         self.assertLessEqual(len(readme.encode("utf-8")), 16_000)
-        for heading in (
+        headings = (
             "## Why Fastlane",
-            "## How Fastlane governs delivery",
-            "## One platform, four clear roles",
-            "## What Fastlane governs",
+            "## Customer delivery lifecycle",
+            "## What Fastlane gives you",
             "## Start in minutes",
-            "## Durable project records",
-            "## Trust boundaries",
+            "## How Fastlane works under the hood",
+            "## Skills and agents",
+            "## Canonical state and semantic anchors",
+            "## AWS architecture and operational evidence",
+            "## Trust model and maturity",
             "## Explore Fastlane",
-        ):
+        )
+        for heading in headings:
             self.assertIn(heading, readme)
+        self.assertEqual(
+            [readme.index(heading) for heading in headings],
+            sorted(readme.index(heading) for heading in headings),
+        )
         for product_claim in (
             "repository-native governance platform",
-            "flowchart TD",
-            "Gate A<br/>Approve what should be built",
-            "Gate B<br/>Approve the design and local construction boundary",
-            "Fastlane Engine<br/>Validates state, routing, evidence, and authority",
+            "accTitle: Fastlane customer delivery lifecycle",
+            "Gate A: approve the Product Agreement",
+            "Gate B: approve the technical plan and local construction boundary",
+            "accTitle: Fastlane technical control plane",
+            "ProjectSnapshot",
+            "EngineEvaluation",
+            "Authority intersection",
+            "Schema-2 report",
+            "task_waves.py",
+            "Exact owner authorization",
             "Separate AWS authorization",
-            "Neither gate authorizes AWS access",
-            "Human-readable summaries and Owner Briefs are derived views.",
+            "neither gate authorizes an AWS account action",
+            "Human-readable summaries and Owner Briefs are derived views",
         ):
             self.assertIn(product_claim, readme)
+        self.assertEqual(readme.count("```mermaid"), 2)
+        self.assertEqual(readme.count("flowchart TB"), 2)
+        self.assertEqual(readme.count("accTitle:"), 2)
+        self.assertEqual(readme.count("accDescr:"), 2)
+        self.assertNotIn("<br", readme)
+        self.assertNotIn("flowchart TD", readme)
         self.assertNotIn("flowchart LR", readme)
 
 

@@ -482,7 +482,7 @@ class SetupAssistantTests(unittest.TestCase):
             "Deployment and teardown retain separate exact Fastlane authority",
             setup_doc,
         )
-        self.assertLessEqual(len(readme.splitlines()), 180)
+        self.assertLessEqual(len(readme.splitlines()), 275)
         self.assertLessEqual(len(readme.encode("utf-8")), 16_000)
         self.assertLessEqual(len((REPOSITORY_ROOT / "AGENTS.md").read_bytes()), 7_200)
 
