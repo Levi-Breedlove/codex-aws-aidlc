@@ -25,6 +25,17 @@ Engine routing, one-question intake, both gates, task readiness, greenfield,
 brownfield, infrastructure-only, correction, side-question, overlap, privacy,
 and hook-disabled behavior. Hooks may be checked only with harmless fixtures.
 
+Keep the frozen pre-refactor report oracle unchanged. A separate qualification
+oracle may add complete current-architecture reports and typed state-machine
+projections, but its owner-facing expectations must be written independently
+from the production projection. Every deployment and teardown terminal state
+must remain bound to a named executable regression.
+
+Complexity exceptions are explicit records, never magic comments or docstring
+prefixes. Each record names one symbol, its reviewed measurements, strict
+maximums, rationale, reviewed version, and expiry or justified permanent state.
+Any new overage, unrecorded growth, or expired exception fails qualification.
+
 ## Rendered and role-play evidence
 
 Render the untouched template plus representative Design-stage greenfield,

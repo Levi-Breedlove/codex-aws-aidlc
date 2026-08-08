@@ -1105,6 +1105,7 @@ MAX_REQUIRED_FILES = 512
 MAX_REQUIRED_FILE_BYTES = 16 * 1024 * 1024
 MAX_PROJECT_SOURCE_BYTES = 64 * 1024 * 1024
 BINARY_REQUIRED_SUFFIXES = frozenset({".png"})
+_BINARY_REQUIRED_PREFIXES = ("tests/fixtures/",)
 
 MANIFEST_POLICY = ManifestPolicy(
     manifest_file=MANIFEST_FILE,
@@ -1114,6 +1115,7 @@ MANIFEST_POLICY = ManifestPolicy(
     canonical_placeholders=frozenset(CANONICAL_PLACEHOLDERS),
     max_required_files=MAX_REQUIRED_FILES,
     binary_required_suffixes=BINARY_REQUIRED_SUFFIXES,
+    binary_required_prefixes=_BINARY_REQUIRED_PREFIXES,
 )
 
 STATE_POLICY = StatePolicy(
@@ -1194,7 +1196,7 @@ def capture_engine_snapshot(
         if relative in seen:
             continue
         seen.add(relative)
-        if PurePosixPath(relative).suffix.casefold() in BINARY_REQUIRED_SUFFIXES:
+        if MANIFEST_POLICY.requires_binary_observation(relative):
             observer.capture_binary(relative)
         else:
             observer.capture_text(relative)

@@ -63,6 +63,9 @@ class EngineParityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.oracle = json.loads(parity.ORACLE_PATH.read_text(encoding="utf-8"))
+        cls.qualification_oracle = json.loads(
+            parity.QUALIFICATION_ORACLE_PATH.read_text(encoding="utf-8")
+        )
 
     def test_oracle_is_bound_to_the_exact_pre_refactor_baseline(self) -> None:
         self.assertEqual(self.oracle["schema_version"], 1)
@@ -186,7 +189,9 @@ class EngineParityTests(unittest.TestCase):
             self.assertTrue(selectors, scenario)
             for selector in selectors:
                 with self.subTest(scenario=scenario, selector=selector):
-                    self.assertIn(selector, discovered)
+                    self.assertIn(
+                        parity.current_scenario_selector(selector), discovered
+                    )
 
     def test_complete_normalized_reports_match_the_frozen_oracle(self) -> None:
         observed = parity.build_parity_reports()
@@ -200,6 +205,139 @@ class EngineParityTests(unittest.TestCase):
                     parity.canonical_digest(observed[name]),
                     self.oracle["report_case_digests"][name],
                 )
+
+    def test_current_architecture_reports_match_independent_owner_meaning(self) -> None:
+        reports = parity.build_qualification_reports()
+        expected = {
+            "stale_gate_a_summary": {
+                "ok": False,
+                "lifecycle_state": "WAITING_GATE_A",
+                "next_prompt": "INTAKE-20",
+                "owner_action_kind": "NONE_CONTINUE_AUTOMATICALLY",
+                "summary_status": "STALE",
+                "brief_status": "BLOCKED",
+                "remediation_action": "CORRECT_AND_REVALIDATE",
+                "authorizations": {"construction": "NONE", "aws": "NONE"},
+            },
+            "task_ready": {
+                "ok": True,
+                "lifecycle_state": "CONSTRUCTION_SINGLE",
+                "next_prompt": "BUILD-10",
+                "owner_action_kind": "NONE_CONTINUE_AUTOMATICALLY",
+                "summary_status": "CURRENT",
+                "brief_status": "NONE",
+                "remediation_action": "CONTINUE_CURRENT_ROUTE",
+                "authorizations": {"construction": "AUTH-0001", "aws": "NONE"},
+            },
+        }
+        for name, meaning in expected.items():
+            with self.subTest(case=name):
+                report = reports[name]["report"]
+                observed = {
+                    "ok": report["ok"],
+                    "lifecycle_state": report["lifecycle_state"],
+                    "next_prompt": report["next_prompt"],
+                    "owner_action_kind": report["interaction"]["owner_action_kind"],
+                    "summary_status": report["document_summaries"]["status"],
+                    "brief_status": report["owner_decision_brief"]["status"],
+                    "remediation_action": report["remediation"]["next_action"][
+                        "action_kind"
+                    ],
+                    "authorizations": report["authorizations"],
+                }
+                self.assertEqual(observed, meaning)
+
+    def test_current_architecture_reports_match_qualification_oracle(self) -> None:
+        oracle = self.qualification_oracle
+        self.assertEqual(oracle["schema_version"], 1)
+        self.assertEqual(oracle["baseline"]["commit"], parity.QUALIFICATION_BASE_COMMIT)
+        self.assertEqual(
+            oracle["baseline"]["package_version"],
+            parity.QUALIFICATION_BASE_PACKAGE_VERSION,
+        )
+        self.assertEqual(oracle["baseline"]["report_schema_version"], 2)
+        observed = parity.build_qualification_reports()
+        self.assertEqual(tuple(observed), parity.QUALIFICATION_REPORT_CASES)
+        for name in parity.QUALIFICATION_REPORT_CASES:
+            with self.subTest(case=name):
+                difference = first_difference(
+                    oracle["report_cases"][name], observed[name]
+                )
+                self.assertIsNone(difference, difference)
+                self.assertEqual(
+                    parity.canonical_digest(observed[name]),
+                    oracle["report_case_digests"][name],
+                )
+
+    def test_deployment_terminals_match_independent_evidence_meaning(self) -> None:
+        expected: dict[str, dict[str, Any]] = {
+            "action_started": {
+                "status": "ACTION_TERMINAL_REQUIRED",
+                "action_status": "STARTED",
+                "reconciliation_status": "NONE",
+                "phase": "AWS-20",
+                "route": ["AWS_DEPLOYMENT_ACTION_TERMINAL", "AWS-20"],
+                "issues": [],
+            },
+            **{
+                f"action_{status.casefold()}": {
+                    "status": "RECONCILIATION_REQUIRED",
+                    "action_status": status,
+                    "reconciliation_status": "NONE",
+                    "phase": "AWS-20",
+                    "route": ["AWS_DEPLOYMENT_RECONCILIATION", "AWS-30"],
+                    "issues": [],
+                }
+                for status in ("SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN")
+            },
+            **{
+                f"reconciled_{status.casefold()}": {
+                    "status": "RECONCILED",
+                    "action_status": status,
+                    "reconciliation_status": "COMPLETE",
+                    "phase": "AWS-30",
+                    "route": ["RELEASE_REVIEW", "RELEASE-10"],
+                    "issues": [],
+                }
+                for status in ("SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN")
+            },
+            "reconciliation_blocked": {
+                "status": "BLOCKED",
+                "action_status": "SUCCEEDED",
+                "reconciliation_status": "BLOCKED",
+                "phase": "AWS-30",
+                "route": ["RELEASE_REVIEW", "RELEASE-10"],
+                "issues": [],
+            },
+            "reconciliation_stale": {
+                "status": "RECONCILIATION_REQUIRED",
+                "action_status": "SUCCEEDED",
+                "reconciliation_status": "STALE",
+                "phase": "AWS-30",
+                "route": ["AWS_DEPLOYMENT_RECONCILIATION", "AWS-30"],
+                "issues": [],
+            },
+        }
+        observed = parity.build_deployment_qualification_cases()
+        self.assertEqual(observed, expected)
+        self.assertEqual(observed, self.qualification_oracle["deployment_cases"])
+        self.assertEqual(
+            {name: parity.canonical_digest(case) for name, case in observed.items()},
+            self.qualification_oracle["deployment_case_digests"],
+        )
+
+    def test_qualification_aws_states_are_bound_to_split_regressions(self) -> None:
+        expected = {
+            name: list(selectors)
+            for name, selectors in parity.QUALIFICATION_AWS_SCENARIO_COVERAGE.items()
+        }
+        self.assertEqual(self.qualification_oracle["aws_scenario_coverage"], expected)
+        discovered = discovered_test_selectors()
+        for scenario, selectors in expected.items():
+            self.assertTrue(selectors, scenario)
+            for selector in selectors:
+                with self.subTest(scenario=scenario, selector=selector):
+                    self.assertIn(selector, discovered)
 
     def test_exact_gate_and_aws_receipts_match_the_frozen_oracle(self) -> None:
         observed = parity.receipt_contracts()
@@ -216,13 +354,15 @@ class EngineParityTests(unittest.TestCase):
         )
 
     def test_oracle_contains_only_synthetic_repository_relative_data(self) -> None:
-        text = parity.ORACLE_PATH.read_text(encoding="utf-8")
-        self.assertIsNone(WINDOWS_PATH.search(text))
-        self.assertNotIn("/Users/", text)
-        self.assertNotIn("/home/", text)
-        self.assertNotIn("OneDrive", text)
-        self.assertNotIn("AWS_ACCESS_KEY", text)
-        self.assertNotIn("SECRET_ACCESS_KEY", text)
+        for path in (parity.ORACLE_PATH, parity.QUALIFICATION_ORACLE_PATH):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.name):
+                self.assertIsNone(WINDOWS_PATH.search(text))
+                self.assertNotIn("/Users/", text)
+                self.assertNotIn("/home/", text)
+                self.assertNotIn("OneDrive", text)
+                self.assertNotIn("AWS_ACCESS_KEY", text)
+                self.assertNotIn("SECRET_ACCESS_KEY", text)
 
         def strings(value: Any):
             if isinstance(value, dict):
@@ -234,9 +374,10 @@ class EngineParityTests(unittest.TestCase):
             elif isinstance(value, str):
                 yield value
 
-        for value in strings(self.oracle):
-            self.assertIsNone(ACCOUNT_ID.fullmatch(value), value)
-            self.assertNotIn("arn:aws", value.casefold())
+        for oracle in (self.oracle, self.qualification_oracle):
+            for value in strings(oracle):
+                self.assertIsNone(ACCOUNT_ID.fullmatch(value), value)
+                self.assertNotIn("arn:aws", value.casefold())
 
 
 if __name__ == "__main__":

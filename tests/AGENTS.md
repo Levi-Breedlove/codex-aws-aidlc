@@ -58,3 +58,9 @@ not create a false success. Never weaken an assertion merely to obtain a pass.
 - Enforce import boundaries, one report builder, one route owner, one
   diagnostic model, public Delivery API use by `task_waves.py`, and complete
   control-manifest coverage for every packaged Engine module.
+- Keep current-architecture qualification expectations independently authored.
+  A test may invoke the production Engine once, but it must not calculate the
+  expected owner meaning through that same projection or a wrapper around it.
+- Record every reviewed complexity overage in
+  `engine_complexity_exceptions.py`. A `SAFETY:` or `COMPATIBILITY:` comment may
+  explain code, but it never grants an exception or permits unreviewed growth.
