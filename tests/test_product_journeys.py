@@ -276,6 +276,21 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(foundation["repository_mode"], "GREENFIELD")
             self.assertIsNone(foundation["owner_work_context"])
             self.assertEqual(foundation["status"], "FOUNDATION_REQUIRED")
+            self.assertEqual(
+                foundation["next_question_guidance"]["status"],
+                "STARTING_POINT_REQUIRED",
+            )
+            self.assertEqual(
+                foundation["next_question_guidance"]["target_ids"],
+                ["INTAKE-0001"],
+            )
+            self.assertFalse(
+                foundation["project_configuration"]["owner_action_required"]
+            )
+            self.assertEqual(
+                foundation["project_configuration"]["safest_current_aws_lane"],
+                "documentation-only",
+            )
             self.assertTrue(first_resume["interaction"]["turn_boundary_required"])
             self.assertEqual(foundation, second_resume["intake_foundation"])
             card = foundation["pending_card"]
@@ -302,6 +317,15 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertNotIn("Accept all recommendations.", resumed)
             self.assertNotIn("INTAKE-CARD", resumed)
             self.assertNotIn(str(card["reply_token"]), resumed)
+            for internal_configuration in (
+                "Project configuration",
+                "Delivery profile",
+                "Effective risk",
+                "AWS lane",
+                "Documentation-only",
+                "Explicit-gate",
+            ):
+                self.assertNotIn(internal_configuration, resumed)
             parsed = doctor.parse_intake_owner_response(
                 "A",
                 card,
@@ -1708,6 +1732,11 @@ class ProductJourneyTests(unittest.TestCase):
         self.assertEqual(foundation["repository_mode"], "GREENFIELD")
         self.assertIsNone(foundation["owner_work_context"])
         self.assertEqual(foundation["status"], "FOUNDATION_REQUIRED")
+        self.assertEqual(
+            foundation["next_question_guidance"]["status"],
+            "STARTING_POINT_REQUIRED",
+        )
+        self.assertFalse(foundation["project_configuration"]["owner_action_required"])
         self.assertEqual(len(foundation["pending_card"]["questions"]), 1)
         self.assertTrue(report["interaction"]["turn_boundary_required"])
         self.assertNotIn("Current understanding:", rendered)

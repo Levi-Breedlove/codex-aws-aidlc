@@ -191,6 +191,66 @@ class NormalizedOwnerResponse:
 
 
 @dataclass(frozen=True)
+class IntakeQuestionGuidance:
+    """Derived, non-authoritative guidance for the next owner consultation."""
+
+    schema_version: int = 1
+    status: str = "WAITING_FOR_OWNER_CONTEXT"
+    owner_work_context: str | None = None
+    objective: str | None = None
+    fields: tuple[str, ...] = ()
+    target_ids: tuple[str, ...] = ()
+    basis_ids: tuple[str, ...] = ()
+    owner_action_required: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "owner_work_context": self.owner_work_context,
+            "objective": self.objective,
+            "fields": list(self.fields),
+            "target_ids": list(self.target_ids),
+            "basis_ids": list(self.basis_ids),
+            "owner_action_required": self.owner_action_required,
+        }
+
+
+@dataclass(frozen=True)
+class ProjectConfigurationGuidance:
+    """Derived, non-authoritative ownership and basis for internal selections."""
+
+    schema_version: int = 1
+    status: str = "WAITING_FOR_OWNER_FACTS"
+    owner_action_required: bool = False
+    current_project_mode: str | None = None
+    derived_project_mode: str | None = None
+    current_delivery_profile: str | None = None
+    current_effective_risk: str | None = None
+    current_aws_lane: str | None = None
+    safest_current_aws_lane: str = "documentation-only"
+    project_mode_basis_ids: tuple[str, ...] = ()
+    risk_profile_basis_ids: tuple[str, ...] = ()
+    codex_actions: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "owner_action_required": self.owner_action_required,
+            "current_project_mode": self.current_project_mode,
+            "derived_project_mode": self.derived_project_mode,
+            "current_delivery_profile": self.current_delivery_profile,
+            "current_effective_risk": self.current_effective_risk,
+            "current_aws_lane": self.current_aws_lane,
+            "safest_current_aws_lane": self.safest_current_aws_lane,
+            "project_mode_basis_ids": list(self.project_mode_basis_ids),
+            "risk_profile_basis_ids": list(self.risk_profile_basis_ids),
+            "codex_actions": list(self.codex_actions),
+        }
+
+
+@dataclass(frozen=True)
 class IntakeFoundationContract:
     schema_version: int = 2
     status: str = "UNINITIALIZED"
@@ -200,6 +260,12 @@ class IntakeFoundationContract:
     basis_ids: tuple[str, ...] = ()
     missing_fields: tuple[str, ...] = ()
     pending_card: IntakeCard | None = None
+    next_question_guidance: IntakeQuestionGuidance = field(
+        default_factory=IntakeQuestionGuidance
+    )
+    project_configuration: ProjectConfigurationGuidance = field(
+        default_factory=ProjectConfigurationGuidance
+    )
     grandfathered_approved_gate_a: bool = False
     normalized_responses: tuple[NormalizedOwnerResponse, ...] = field(
         default=(), repr=False, compare=False
@@ -218,6 +284,8 @@ class IntakeFoundationContract:
             "basis_ids": list(self.basis_ids),
             "missing_fields": list(self.missing_fields),
             "pending_card": self.pending_card.to_dict() if self.pending_card else None,
+            "next_question_guidance": self.next_question_guidance.to_dict(),
+            "project_configuration": self.project_configuration.to_dict(),
             "grandfathered_approved_gate_a": self.grandfathered_approved_gate_a,
         }
 
@@ -305,8 +373,10 @@ __all__ = (
     "CoverageOmission",
     "IntakeCard",
     "IntakeFoundationContract",
+    "IntakeQuestionGuidance",
     "IntakeQuestion",
     "NormalizedOwnerResponse",
+    "ProjectConfigurationGuidance",
     "RequirementsChangeLineage",
     "RequirementsContract",
 )

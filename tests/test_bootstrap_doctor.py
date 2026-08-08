@@ -3008,7 +3008,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.27")
+        self.assertEqual(report["bootstrap_version"], "1.2.28")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -5058,6 +5058,14 @@ class BootstrapDoctorTests(unittest.TestCase):
             report = doctor.inspect_project(project)
 
         self.assertIn("PROJECT_RISK_PROFILE", codes(report))
+        item = next(
+            item
+            for item in report["remediation"]["items"]
+            if item["diagnostic_code"] == "PROJECT_RISK_PROFILE"
+        )
+        self.assertEqual(item["responsible_party"], "CODEX")
+        self.assertTrue(item["automatic_correction_allowed"])
+        self.assertFalse(report["interaction"]["turn_boundary_required"])
 
     def test_persisted_running_state_is_not_safe_to_resume(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -8123,6 +8131,15 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertIsNone(contract.pending_card.questions[0].recommended)
         self.assertFalse(contract.pending_card.accept_all_allowed)
+        self.assertEqual(
+            contract.next_question_guidance.status, "STARTING_POINT_REQUIRED"
+        )
+        self.assertEqual(contract.next_question_guidance.target_ids, ("INTAKE-0001",))
+        self.assertFalse(contract.project_configuration.owner_action_required)
+        self.assertEqual(
+            contract.project_configuration.safest_current_aws_lane,
+            "documentation-only",
+        )
 
     def test_intake_selection_requires_current_owner_provenance_and_detail(
         self,
@@ -8221,11 +8238,11 @@ class BootstrapDoctorTests(unittest.TestCase):
     def test_owner_work_context_choices_map_exactly_to_semantic_values(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         expected = {
-            "A": "NEW_APPLICATION",
-            "B": "EXISTING_APPLICATION_CHANGE",
-            "C": "REPAIR_OR_MIGRATION",
+            "A": ("NEW_APPLICATION", "greenfield"),
+            "B": ("EXISTING_APPLICATION_CHANGE", "brownfield"),
+            "C": ("REPAIR_OR_MIGRATION", "brownfield"),
         }
-        for choice, owner_work_context in expected.items():
+        for choice, (owner_work_context, project_mode) in expected.items():
             with self.subTest(choice=choice):
                 contract, issues = doctor.derive_intake_foundation_contract(
                     complete_intake_foundation(source, work_context_choice=choice),
@@ -8234,6 +8251,96 @@ class BootstrapDoctorTests(unittest.TestCase):
                 )
                 self.assertEqual(issues, [])
                 self.assertEqual(contract.owner_work_context, owner_work_context)
+                self.assertEqual(
+                    contract.project_configuration.derived_project_mode,
+                    project_mode,
+                )
+                self.assertFalse(contract.project_configuration.owner_action_required)
+                self.assertEqual(
+                    contract.project_configuration.codex_actions,
+                    (
+                        "SET_PROJECT_MODE",
+                        "CLASSIFY_EFFECTIVE_RISK",
+                        "SELECT_DELIVERY_PROFILE",
+                        "SET_SAFEST_CURRENT_AWS_LANE",
+                    ),
+                )
+
+    def test_internal_configuration_is_not_a_valid_owner_intake_decision(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        invalid = replace_contract_table(
+            source,
+            doctor.INTAKE_CARD_HEADING,
+            doctor.INTAKE_CARD_HEADERS,
+            [
+                (
+                    "INTAKE-CARD-0001",
+                    "1",
+                    "1",
+                    "INTAKE-Q-0001",
+                    "DECISION",
+                    "INTAKE-0001",
+                    "Which project configuration should I use?",
+                    "Greenfield · High-risk · Documentation-only",
+                    "Greenfield · High-risk · Read-only",
+                    "Greenfield · High-risk · Explicit-gate",
+                    "A",
+                    "NONE",
+                    "NONE",
+                    "PENDING",
+                    "NONE",
+                    "NONE",
+                )
+            ],
+        )
+
+        contract, issues = doctor.derive_intake_foundation_contract(
+            invalid, "greenfield", grandfather_current_gate_a=False
+        )
+
+        self.assertEqual(contract.status, "BLOCKED")
+        self.assertIn(
+            (
+                "INTAKE_CARD_INVALID",
+                "INTAKE-Q-0001 asks the owner to choose Fastlane internal configuration",
+            ),
+            issues,
+        )
+
+    def test_product_access_language_is_not_mistaken_for_configuration(self) -> None:
+        source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        product_question = replace_contract_table(
+            source,
+            doctor.INTAKE_CARD_HEADING,
+            doctor.INTAKE_CARD_HEADERS,
+            [
+                (
+                    "INTAKE-CARD-0001",
+                    "1",
+                    "1",
+                    "INTAKE-Q-0001",
+                    "DECISION",
+                    "INTAKE-0001",
+                    "Which access should a standard reviewer have?",
+                    "Read-only access",
+                    "Comment access",
+                    "Administrative access",
+                    "A",
+                    "NONE",
+                    "NONE",
+                    "PENDING",
+                    "NONE",
+                    "NONE",
+                )
+            ],
+        )
+
+        contract, issues = doctor.derive_intake_foundation_contract(
+            product_question, "greenfield", grandfather_current_gate_a=False
+        )
+
+        self.assertEqual(issues, [])
+        self.assertEqual(contract.status, "FOUNDATION_REQUIRED")
 
     def test_resolved_card_requires_the_next_one_question_card(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -8318,6 +8425,18 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(issues, [])
         assert contract.pending_card is not None
         self.assertEqual(len(contract.pending_card.questions), 1)
+        self.assertEqual(
+            contract.next_question_guidance.fields,
+            ("PRIMARY_USERS", "OWNER_STATED_PROBLEM", "OBSERVABLE_OUTCOME"),
+        )
+        self.assertEqual(
+            contract.next_question_guidance.objective,
+            (
+                "Understand who will use the new application, what is difficult "
+                "today, and the first useful result they need."
+            ),
+        )
+        self.assertEqual(contract.next_question_guidance.basis_ids, ("INTAKE-0001",))
         parsed = doctor.parse_intake_owner_response(
             "Development teams; especially release coordinators",
             contract.pending_card.to_dict(),
@@ -9018,6 +9137,98 @@ class BootstrapDoctorTests(unittest.TestCase):
                 self.assertEqual(
                     report["interaction"]["route_reason_code"], "INTAKE_REQUIRED"
                 )
+
+    def test_complete_intake_routes_to_codex_owned_configuration_and_requirements(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            prd_path = project / "docs/project/PRD.md"
+            prd_path.write_text(
+                complete_intake_foundation(prd_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            report = doctor.inspect_project(project)
+
+        self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["next_prompt"], "REQ-10")
+        self.assertEqual(report["lifecycle_state"], "REQUIREMENTS_ANALYSIS")
+        self.assertEqual(
+            report["interaction"]["owner_action_kind"],
+            "NONE_CONTINUE_AUTOMATICALLY",
+        )
+        configuration = report["intake_foundation"]["project_configuration"]
+        self.assertEqual(configuration["status"], "CODEX_ACTION_REQUIRED")
+        self.assertFalse(configuration["owner_action_required"])
+        self.assertEqual(configuration["derived_project_mode"], "greenfield")
+        self.assertEqual(configuration["safest_current_aws_lane"], "documentation-only")
+        self.assertEqual(
+            configuration["codex_actions"],
+            [
+                "SET_PROJECT_MODE",
+                "CLASSIFY_EFFECTIVE_RISK",
+                "SELECT_DELIVERY_PROFILE",
+                "SET_SAFEST_CURRENT_AWS_LANE",
+            ],
+        )
+        self.assertEqual(
+            configuration["risk_profile_basis_ids"],
+            [
+                "INTAKE-0005",
+                "INTAKE-0007",
+                "INTAKE-0008",
+                "INTAKE-0009",
+                "INTAKE-0010",
+            ],
+        )
+
+    def test_owner_work_context_conflict_is_a_codex_owned_correction(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            prd_path = project / "docs/project/PRD.md"
+            text = complete_intake_foundation(
+                prd_path.read_text(encoding="utf-8"), work_context_choice="B"
+            )
+            for field, value in {
+                "Project mode": "`greenfield`",
+                "Delivery profile": "`standard`",
+                "Effective risk": "`moderate`",
+                "AWS lane": "`documentation-only`",
+            }.items():
+                text = set_table_value(
+                    text,
+                    "## Document status",
+                    "## 1. Workload profile",
+                    field,
+                    value,
+                )
+            prd_path.write_text(text, encoding="utf-8")
+            state_path = project / "bootstrap.yaml"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["project"].update(
+                {
+                    "mode": "greenfield",
+                    "delivery_profile": "standard",
+                    "effective_risk": "moderate",
+                    "aws_lane": "documentation-only",
+                    "brownfield_baseline": "NOT_APPLICABLE",
+                }
+            )
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            report = doctor.inspect_project(project)
+
+        self.assertIn("PROJECT_CONFIGURATION_CONFLICT", codes(report))
+        item = next(
+            item
+            for item in report["remediation"]["items"]
+            if item["diagnostic_code"] == "PROJECT_CONFIGURATION_CONFLICT"
+        )
+        self.assertEqual(item["responsible_party"], "CODEX")
+        self.assertEqual(item["category"], "AGENT_CORRECTION")
+        self.assertTrue(item["automatic_correction_allowed"])
+        self.assertFalse(report["interaction"]["turn_boundary_required"])
 
     def test_malformed_multi_choice_intake_value_remains_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

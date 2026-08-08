@@ -687,6 +687,42 @@ def validate_readiness_card(
             )
 
 
+def _intake_repository_mode(
+    selections: Mapping[str, str | None],
+    state: Mapping[str, Any],
+    *,
+    template_source: bool,
+) -> str | None:
+    """Preserve repository classification without presenting it as owner intent."""
+
+    mode = selections.get("mode")
+    setup_state = state.get("setup") if isinstance(state.get("setup"), dict) else {}
+    if (
+        mode is None
+        and not template_source
+        and setup_state.get("status")
+        not in {"UNCONFIGURED_TEMPLATE", "{{SETUP_STATUS}}"}
+    ):
+        return "greenfield"
+    return mode
+
+
+def _record_project_configuration_issues(
+    ctx: Context, intake_contract: IntakeFoundationContract
+) -> None:
+    """Fail closed when confirmed owner context conflicts with recorded mode."""
+
+    actions = set(intake_contract.project_configuration.codex_actions)
+    if intake_contract.status == "READY_FOR_REQUIREMENTS" and (
+        "RECONCILE_PROJECT_MODE" in actions
+    ):
+        ctx.error(
+            "PROJECT_CONFIGURATION_CONFLICT",
+            "Confirmed owner work context conflicts with the recorded project mode",
+            PRD_FILE,
+        )
+
+
 def validate_prd(
     ctx: Context,
     state: dict[str, Any],
@@ -897,19 +933,14 @@ def validate_prd(
     if gate_a_agent_ready or gate_a_ready_or_current:
         for issue in req_aws_materiality_issues:
             ctx.error("REQ_AWS_MATERIALITY_INVALID", issue, PRD_FILE)
-    intake_repository_mode = selections.get("mode")
-    setup_state = state.get("setup") if isinstance(state.get("setup"), dict) else {}
-    if (
-        intake_repository_mode is None
-        and not ctx.template_source
-        and setup_state.get("status")
-        not in {"UNCONFIGURED_TEMPLATE", "{{SETUP_STATUS}}"}
-    ):
-        intake_repository_mode = "greenfield"
+    intake_repository_mode = _intake_repository_mode(
+        selections, state, template_source=ctx.template_source
+    )
     intake_contract, intake_issues = derive_intake_foundation_contract(
         text,
         intake_repository_mode,
         grandfather_current_gate_a=grandfather_approved_v1_requirements,
+        project_selections=selections,
     )
     for code, issue in intake_issues:
         ctx.error(code, issue, PRD_FILE)
@@ -919,6 +950,7 @@ def validate_prd(
             "Gate A requires a complete owner-grounded intake foundation and no pending card",
             PRD_FILE,
         )
+    _record_project_configuration_issues(ctx, intake_contract)
     coverage_contract, coverage_issues = derive_coverage_contract(
         text,
         fields.get("requirements_revision"),

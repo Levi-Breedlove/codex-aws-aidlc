@@ -169,7 +169,9 @@ class EngineParityTests(unittest.TestCase):
     def test_summary_truth_change_preserves_every_other_report_contract(self) -> None:
         reports = parity.build_parity_reports()
         observed = {
-            name: parity.canonical_digest(parity.summary_truth_compatibility_case(case))
+            name: parity.canonical_digest(
+                parity.approved_behavior_compatibility_case(case)
+            )
             for name, case in reports.items()
         }
         self.assertEqual(observed, parity.SUMMARY_TRUTH_COMPATIBILITY_DIGESTS)
@@ -177,6 +179,115 @@ class EngineParityTests(unittest.TestCase):
             self.oracle["summary_truth_compatibility"]["report_case_digests"],
             parity.SUMMARY_TRUTH_COMPATIBILITY_DIGESTS,
         )
+
+    def test_adaptive_kickoff_matches_independent_owner_meaning(self) -> None:
+        reports = parity.build_parity_reports()
+        expected = {
+            "template_source": (
+                "INTAKE_REQUIRED",
+                "INTAKE-10",
+                "ANSWER_OPEN_DECISIONS",
+                "STARTING_POINT_REQUIRED",
+                "WAITING_FOR_OWNER_FACTS",
+                None,
+                {"construction": "NONE", "aws": "NONE"},
+            ),
+            "unconfigured_template": (
+                "BLOCKED",
+                "STOP",
+                "COMPLETE_PREREQUISITE_CHECKLIST",
+                "STARTING_POINT_REQUIRED",
+                "WAITING_FOR_OWNER_FACTS",
+                None,
+                {"construction": "NONE", "aws": "NONE"},
+            ),
+            "rendered_intake": (
+                "INTAKE_REQUIRED",
+                "INTAKE-10",
+                "ANSWER_OPEN_DECISIONS",
+                "STARTING_POINT_REQUIRED",
+                "WAITING_FOR_OWNER_FACTS",
+                None,
+                {"construction": "NONE", "aws": "NONE"},
+            ),
+            "gate_a_pending": (
+                "WAITING_GATE_A",
+                "INTAKE-20",
+                "APPROVE_GATE_A",
+                "COMPLETE",
+                "CURRENT",
+                "greenfield",
+                {"construction": "NONE", "aws": "NONE"},
+            ),
+            "gate_a_approved": (
+                "DESIGN_REQUIRED",
+                "DESIGN-10",
+                "NONE_CONTINUE_AUTOMATICALLY",
+                "COMPLETE",
+                "CURRENT",
+                "greenfield",
+                {"construction": "NONE", "aws": "NONE"},
+            ),
+            "gate_b_pending": (
+                "WAITING_GATE_B",
+                "DESIGN-20",
+                "APPROVE_GATE_B",
+                "COMPLETE",
+                "CURRENT",
+                "greenfield",
+                {"construction": "NONE", "aws": "NONE"},
+            ),
+            "gate_b_approved": (
+                "TASK_PLAN_REQUIRED",
+                "TASK-10",
+                "NONE_CONTINUE_AUTOMATICALLY",
+                "COMPLETE",
+                "CURRENT",
+                "greenfield",
+                {"construction": "AUTH-0001", "aws": "NONE"},
+            ),
+        }
+        for name, meaning in expected.items():
+            with self.subTest(case=name):
+                report = reports[name]["report"]
+                intake = report["intake_foundation"]
+                question = intake["next_question_guidance"]
+                configuration = intake["project_configuration"]
+                observed = (
+                    report["lifecycle_state"],
+                    report["next_prompt"],
+                    report["interaction"]["owner_action_kind"],
+                    question["status"],
+                    configuration["status"],
+                    configuration["derived_project_mode"],
+                    report["authorizations"],
+                )
+                self.assertEqual(observed, meaning)
+                self.assertFalse(configuration["owner_action_required"])
+                self.assertEqual(
+                    configuration["safest_current_aws_lane"],
+                    "documentation-only",
+                )
+                if question["status"] == "STARTING_POINT_REQUIRED":
+                    self.assertEqual(question["fields"], ["OWNER_WORK_CONTEXT"])
+                    self.assertTrue(question["owner_action_required"])
+                else:
+                    self.assertEqual(question["fields"], [])
+                    self.assertFalse(question["owner_action_required"])
+                    self.assertEqual(
+                        configuration["project_mode_basis_ids"], ["INTAKE-0001"]
+                    )
+                    self.assertEqual(
+                        configuration["risk_profile_basis_ids"],
+                        [
+                            "INTAKE-0005",
+                            "INTAKE-0007",
+                            "INTAKE-0008",
+                            "INTAKE-0009",
+                            "INTAKE-0010",
+                        ],
+                    )
+                    self.assertEqual(configuration["codex_actions"], [])
 
     def test_required_scenarios_are_bound_to_existing_regressions(self) -> None:
         expected = {
@@ -256,6 +367,9 @@ class EngineParityTests(unittest.TestCase):
             parity.QUALIFICATION_BASE_PACKAGE_VERSION,
         )
         self.assertEqual(oracle["baseline"]["report_schema_version"], 2)
+        self.assertEqual(
+            oracle["approved_behavior_changes"], parity.APPROVED_BEHAVIOR_CHANGES
+        )
         observed = parity.build_qualification_reports()
         self.assertEqual(tuple(observed), parity.QUALIFICATION_REPORT_CASES)
         for name in parity.QUALIFICATION_REPORT_CASES:

@@ -565,9 +565,9 @@ def evaluate_project(
     if (
         gate_a == "BLOCKED"
         and not ctx.has_errors
-        and any(value is None for value in selections.values())
+        and intake_contract.status == "READY_FOR_REQUIREMENTS"
     ):
-        lifecycle_state, next_prompt = "INTAKE_REQUIRED", "INTAKE-10"
+        lifecycle_state, next_prompt = "REQUIREMENTS_ANALYSIS", "REQ-10"
     artifact_binding = ""
     aws_10_issues = ["AWS-10 active artifact binding is unresolved"]
     if verify_text is not None:

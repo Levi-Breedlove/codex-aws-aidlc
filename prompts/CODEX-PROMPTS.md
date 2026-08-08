@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.27
+**Pack version:** 1.2.28
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -236,7 +236,7 @@ Use the Fastlane coordinator and Define procedure for the current Engine report.
 
 **Preconditions:** Setup is complete and the Engine projects one current intake card or safe intake correction.
 
-**Authoritative inputs:** Current PRD intake records, repository observations, the new owner message, and Engine card binding.
+**Authoritative inputs:** Current PRD intake records, repository observations, the new owner message, Engine card binding, and the derived `next_question_guidance` objective.
 
 **Permitted writes:** Only a deterministically parsed current owner answer and its normalized provenance, or an Engine-projected safe correction.
 
@@ -255,6 +255,9 @@ Use the Fastlane coordinator and Define procedure for the current Engine report.
 ~~~text
 [INTAKE-10]
 Use the Define and owner-response procedures for the exact current intake card.
+Tailor its natural wording to the Engine's current consultation objective. Never
+ask the owner to choose Fastlane's project mode, delivery profile, effective
+risk, AWS lane, or a combined internal configuration.
 ~~~
 
 ## REQ-10 — Requirements Analysis
@@ -263,9 +266,9 @@ Use the Define and owner-response procedures for the exact current intake card.
 
 **Preconditions:** Required intake foundation is complete and no owner decision remains open.
 
-**Authoritative inputs:** Current PRD facts and decisions, repository evidence, required AWS Core documentation evidence, and Engine coverage projections.
+**Authoritative inputs:** Current PRD facts and decisions, repository evidence, required AWS Core documentation evidence, Engine coverage projections, and the derived Codex-owned `project_configuration` actions and basis IDs.
 
-**Permitted writes:** Current requirements, analysis, assumptions, lineage, traceability, and Gate A readiness records inside the PRD.
+**Permitted writes:** Current requirements, analysis, assumptions, lineage, traceability, Gate A readiness records, and synchronized internal project configuration derived from confirmed facts.
 
 **GitHub mode:** No GitHub writes.
 
@@ -281,7 +284,11 @@ Use the Define and owner-response procedures for the exact current intake card.
 
 ~~~text
 [REQ-10]
-Use the Define procedure and deterministic requirements contract.
+Use the Define procedure and deterministic requirements contract. Before
+requirements analysis, complete any projected Codex-owned project configuration
+action from its cited facts, use the derived project mode and safest current AWS
+lane, synchronize the PRD and `bootstrap.yaml`, and rerun the Engine. Do not
+turn that internal classification into an owner question.
 ~~~
 
 ## INTAKE-20 — Requirements Gate A

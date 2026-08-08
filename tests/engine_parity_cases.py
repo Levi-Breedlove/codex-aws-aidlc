@@ -40,6 +40,7 @@ QUALIFICATION_ORACLE_PATH = (
 BASELINE_COMMIT = "312b53ce00f9db5263f3a72e778f833e70c7db8e"
 BASELINE_PACKAGE_VERSION = "1" + ".2.10"
 SUMMARY_TRUTH_BASE_COMMIT = "8dbb11fd0e54af392ac073ce597cdb26fc336fcc"
+ADAPTIVE_KICKOFF_BASE_COMMIT = "204b1b7477413425114deaa54a9ece8f9fc14e53"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -61,29 +62,45 @@ APPROVED_BEHAVIOR_CHANGES = [
             "canonical digest change",
             "receipt change",
         ],
-    }
+    },
+    {
+        "id": "ADAPTIVE_KICKOFF_1_2_28",
+        "base_commit": ADAPTIVE_KICKOFF_BASE_COMMIT,
+        "scope": [
+            "derived next-question consultation guidance",
+            "Codex-owned project configuration guidance",
+            "automatic requirements continuation after complete owner intake",
+            "context locator bytes for updated coordinator procedure",
+        ],
+        "prohibited": [
+            "gate or authority change",
+            "canonical requirement or design digest change",
+            "receipt change",
+            "owner approval inferred from project configuration",
+        ],
+    },
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
-        "3137e52e381bd524015f621805e1d1a973ec4b2b4dcf8db0bdf1c77d5d5559ff"
+        "8068bc33c8b07acda91baab5b261903ee91cbbfea8e61282346ab33ae2731b1e"
     ),
     "unconfigured_template": (
-        "c92a5a86a32fbcd361ad4ab7d045cd354bd402b9d22352b379a5875358884d58"
+        "e41b0b600d968a609baa855bde22c7e2cf0857e84b672c7ac6dc9e23699c9ab5"
     ),
     "rendered_intake": (
-        "148d12873c7f29075cc3e26fc5ea3e086b072e797d39cfb92c0e2f4c3470324d"
+        "276b11bdb5b964908becb4eeb0542a97b9e664dfe805b0f229c5ced7b8ba5e4b"
     ),
     "gate_a_pending": (
-        "e571531e8412407e9c227855f82f10c186dbc4e1d7bf271512f73b69cc6eeb9b"
+        "e4ec90c81262247eaa9e1f1800f111e970f381994bef033b1c1006ca6818d647"
     ),
     "gate_a_approved": (
-        "ff0128a1e2e2a96ac08b47584388aadeb089b65563a14b5f33fe979b7d3dde5f"
+        "59f9e5d950d3ce31859671d552ee57d66cacce53ee8d9a031dfe16ceaf766979"
     ),
     "gate_b_pending": (
-        "4e3afacd02bfd47562de31b604b30541a06edc557bd021f2f4a10e8b2c60a688"
+        "f5667c15e176261bb2fbfff83d76ef56187d6ec95d7dfb79566c579eb6cbe3be"
     ),
     "gate_b_approved": (
-        "28b3d7001c738216fac2dae0d48be0a3a2e1b1b09375c62357c6adc068f92b0c"
+        "6627edf8bf67b5ffb010b7f6273df43fdb14eb7ab8fed16c1d8bc002cbef5d40"
     ),
 }
 
@@ -714,17 +731,23 @@ def canonical_digest(value: Any) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def summary_truth_compatibility_case(case: Mapping[str, Any]) -> dict[str, Any]:
-    """Remove only the approved derived view and locator-coordinate drift."""
+def approved_behavior_compatibility_case(case: Mapping[str, Any]) -> dict[str, Any]:
+    """Remove only approved additive projections and locator-coordinate drift."""
 
     normalized = copy.deepcopy(dict(case))
     report = normalized.get("report")
     if not isinstance(report, dict):
         return normalized
     report.pop("document_summaries", None)
+    intake = report.get("intake_foundation")
+    if isinstance(intake, dict):
+        intake.pop("next_question_guidance", None)
+        intake.pop("project_configuration", None)
     context_plan = report.get("context_plan")
     if not isinstance(context_plan, dict):
         return normalized
+    context_plan.pop("actual_initial_source_bytes", None)
+    context_plan.pop("actual_initial_bytes", None)
     for group in ("resolved_initial_slices", "resolved_on_demand_slices"):
         slices = context_plan.get(group)
         if not isinstance(slices, list):
@@ -740,6 +763,12 @@ def summary_truth_compatibility_case(case: Mapping[str, Any]) -> dict[str, Any]:
             ):
                 source_slice.pop(field, None)
     return normalized
+
+
+def summary_truth_compatibility_case(case: Mapping[str, Any]) -> dict[str, Any]:
+    """COMPATIBILITY: retain the public test helper name from Fastlane 1.2.19."""
+
+    return approved_behavior_compatibility_case(case)
 
 
 def frozen_doctor_characterization() -> dict[str, Any]:
@@ -770,12 +799,18 @@ def build_oracle() -> dict[str, Any]:
         "approved_behavior_changes": APPROVED_BEHAVIOR_CHANGES,
         "summary_truth_compatibility": {
             "base_commit": SUMMARY_TRUTH_BASE_COMMIT,
-            "allowed_projection": "document_summaries",
+            "allowed_projection": [
+                "document_summaries",
+                "intake_foundation.next_question_guidance",
+                "intake_foundation.project_configuration",
+            ],
             "allowed_locator_metadata": [
                 "canonical_sha256",
                 "source_bytes",
                 "start_line",
                 "end_line",
+                "actual_initial_source_bytes",
+                "actual_initial_bytes",
             ],
             "report_case_digests": SUMMARY_TRUTH_COMPATIBILITY_DIGESTS,
         },
@@ -817,6 +852,7 @@ def build_qualification_oracle() -> dict[str, Any]:
             "package_version": QUALIFICATION_BASE_PACKAGE_VERSION,
             "report_schema_version": 2,
         },
+        "approved_behavior_changes": APPROVED_BEHAVIOR_CHANGES,
         "normalization": {
             "allowed": [
                 "package version",

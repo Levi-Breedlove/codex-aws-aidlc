@@ -32,9 +32,10 @@ own behavior. Stop conflicting authority. Nested `AGENTS.md` only narrows this g
   synchronize derived snapshots.
 ## Choices and safeguards
 
-Before Gate A record mode (`greenfield`/`brownfield`), profile (`quick-mvp`,
-`standard`, `high-risk`), and lane (`documentation-only`, `read-only`,
-`fast-dev`, `explicit-gate`). A Quick MVP is one small, reversible development release.
+Before Gate A Codex derives mode, profile, risk, and safest current AWS lane
+from confirmed facts; owners never choose Fastlane configuration. Use
+`documentation-only` during Define. A Quick MVP is one small, reversible
+development release.
 Use `high-risk` for production, regulated data, payments/identity, shared or
 irreversible work, or large outage/cost impact. Profiles change depth, never gates or safeguards/evidence.
 

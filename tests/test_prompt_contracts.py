@@ -433,6 +433,9 @@ class PromptPackContractTests(unittest.TestCase):
             "requirements change lineage",
             "search_documentation",
             "retrieve_skill",
+            "next_question_guidance",
+            "project_configuration",
+            "not owner choices",
         ):
             self.assertIn(phrase, self.fastlane_define)
         for token in ("ACTOR_KINDS", "RICH_USE_CASE_TRIGGERS"):
@@ -463,6 +466,18 @@ class PromptPackContractTests(unittest.TestCase):
             "Owner-facing responses are technical consultation, not raw state relay.",
             self.fastlane_skill,
         )
+        self.assertIn("intake_foundation.next_question_guidance", self.fastlane_skill)
+        self.assertIn("intake_foundation.project_configuration", self.fastlane_skill)
+        self.assertIn(
+            "Never ask the owner to select project mode",
+            self.fastlane_skill,
+        )
+        for phrase in (
+            "derived `next_question_guidance` objective",
+            "derived Codex-owned `project_configuration` actions",
+            "internal classification into an owner question.",
+        ):
+            self.assertIn(phrase, self.prompts)
 
     def test_design_procedure_owns_architecture_and_validation_method(self) -> None:
         for phrase in (
@@ -647,9 +662,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.27")
-        self.assertIn("**Pack version:** 1.2.27", self.prompts)
-        self.assertIn("Current customer build: **1.2.27**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.28")
+        self.assertIn("**Pack version:** 1.2.28", self.prompts)
+        self.assertIn("Current customer build: **1.2.28**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,
