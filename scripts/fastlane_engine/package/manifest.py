@@ -37,6 +37,16 @@ class ManifestPolicy:
     canonical_placeholders: frozenset[str]
     max_required_files: int = 512
     binary_required_suffixes: frozenset[str] = frozenset({".png"})
+    binary_required_prefixes: tuple[str, ...] = ()
+
+    def requires_binary_observation(self, relative: str) -> bool:
+        """SAFETY: retain non-runtime package artifacts as hash-bound bytes."""
+
+        return PurePosixPath(
+            relative
+        ).suffix.lower() in self.binary_required_suffixes or any(
+            relative.startswith(prefix) for prefix in self.binary_required_prefixes
+        )
 
 
 ReadBinary = Callable[[ManifestContext, str], bytes | None]
@@ -141,7 +151,7 @@ def _validate_inventory(
             continue
         seen.add(relative)
         folded.add(relative.casefold())
-        if PurePosixPath(relative).suffix.lower() in policy.binary_required_suffixes:
+        if policy.requires_binary_observation(relative):
             read_binary(ctx, relative)
         else:
             read_text(ctx, relative)

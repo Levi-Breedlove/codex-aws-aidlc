@@ -148,7 +148,11 @@ class EngineFoundationTests(unittest.TestCase):
             snapshot = capture_engine_snapshot(ROOT, observed_at=observed_at)
 
         required = set(snapshot.manifest["required_files"])
+        fixture_paths = sorted(
+            path for path in required if path.startswith("tests/fixtures/")
+        )
         self.assertEqual(required, set(snapshot.files))
+        self.assertTrue(fixture_paths)
         self.assertEqual(snapshot.observed_at, observed_at)
         self.assertEqual(snapshot.observation_metrics.files_opened, len(required))
         self.assertEqual(
@@ -160,6 +164,15 @@ class EngineFoundationTests(unittest.TestCase):
         self.assertEqual(
             {path: opens[path] for path in required}, dict.fromkeys(required, 1)
         )
+        for path in fixture_paths:
+            fixture = snapshot.files[path]
+            self.assertIsNone(fixture.presentation_text)
+            self.assertIsNone(fixture.canonical_text)
+            self.assertEqual(
+                fixture.byte_sha256,
+                snapshot.manifest["source_sha256"][path],
+            )
+        self.assertIsNotNone(snapshot.files[PRD_FILE].canonical_text)
 
         context = Context(ROOT, template_source=True, observed_snapshot=snapshot)
         with mock.patch.object(
