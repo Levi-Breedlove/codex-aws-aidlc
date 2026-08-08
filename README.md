@@ -53,15 +53,15 @@ flowchart TB
     accDescr: The owner describes an outcome, approves requirements and the technical plan, Codex builds and validates locally, and AWS operations remain separately authorized.
 
     IDEA["Describe the outcome"]
-    DEFINE["Guided consultation<br/>Users, scope, data, risks, and success"]
-    GATEA{"Gate A<br/>Approve the Product Agreement"}
-    DESIGN["Architecture consultation<br/>Compare complete AWS-informed solutions"]
-    GATEB{"Gate B<br/>Approve the technical plan and local construction boundary"}
-    TASKS["Bounded task plan<br/>Dependencies, paths, commands, and validation"]
-    BUILD["Local construction<br/>Implement, test, and correct safe in-scope defects"]
-    RELEASE["Evidence-backed release decision<br/>Ready, blocked, failed, stale, or unobserved"]
-    AWSAUTH{"Separate AWS authorization<br/>Account, Region, actions, limits, and expiry"}
-    AWSOPS["Optional AWS operations<br/>Preflight, deploy, reconcile, review, or teardown"]
+    DEFINE["Guided consultation: users, scope, data, risks, and success"]
+    GATEA{"Gate A: approve the Product Agreement"}
+    DESIGN["Architecture consultation: compare complete AWS-informed solutions"]
+    GATEB{"Gate B: approve the technical plan and local construction boundary"}
+    TASKS["Bounded task plan: dependencies, paths, commands, and validation"]
+    BUILD["Local construction: implement, test, and correct safe in-scope defects"]
+    RELEASE["Evidence-backed release decision: ready, blocked, failed, stale, or unobserved"]
+    AWSAUTH{"Separate AWS authorization: account, Region, actions, limits, and expiry"}
+    AWSOPS["Optional AWS operations: preflight, deploy, reconcile, review, or teardown"]
 
     IDEA --> DEFINE --> GATEA --> DESIGN --> GATEB
     GATEB --> TASKS --> BUILD --> RELEASE
@@ -123,34 +123,34 @@ flowchart TB
     accTitle: Fastlane technical control plane
     accDescr: One coordinator evaluates canonical repository records through an immutable snapshot, derives routing and authority, uses dedicated bounded mutation paths, records evidence, and presents the evaluated truth to the owner.
 
-    OWNER["Owner<br/>Intent, decisions, gates, and external authorization"]
-    COORD["Fastlane coordinator<br/>Technical consultant and sole writer"]
-    ALIASES["Compatibility skills<br/>Launch, Plan, and Build delegate here"]
-    CHALLENGERS["Conditional challengers<br/>Read-only requirements or architecture critique"]
+    OWNER["Owner: intent, decisions, gates, and external authorization"]
+    COORD["Fastlane coordinator: technical consultant and sole writer"]
+    ALIASES["Compatibility skills: Launch, Plan, and Build delegate here"]
+    CHALLENGERS["Conditional challengers: read-only requirements or architecture critique"]
 
     subgraph RECORDS["Canonical repository state"]
         PROJECT["PRD · TASKS · VERIFY · RUNBOOK · BUGFIX"]
-        MIRROR["bootstrap.yaml<br/>Derived lifecycle mirror"]
+        MIRROR["bootstrap.yaml: derived lifecycle mirror"]
     end
 
     subgraph ENGINE["Deterministic Fastlane Engine"]
-        SNAP["ProjectSnapshot<br/>One coherent repository observation"]
-        EVAL["EngineEvaluation<br/>Package, Define, Design, Deliver, and AWS results"]
-        AUTH["Authority intersection<br/>Normalized approved facts only"]
-        ROUTE["Routing, remediation,<br/>interaction, and context"]
-        REPORT["Schema-2 report<br/>Serialization without new policy"]
-        PRESENTER["Presenter<br/>Status, confirmations, and Owner Briefs"]
+        SNAP["ProjectSnapshot: one coherent repository observation"]
+        EVAL["EngineEvaluation: Package, Define, Design, Deliver, and AWS results"]
+        AUTH["Authority intersection: normalized approved facts only"]
+        ROUTE["Routing, remediation, interaction, and context"]
+        REPORT["Schema-2 report: serialization without new policy"]
+        PRESENTER["Presenter: status, confirmations, and Owner Briefs"]
 
         SNAP --> EVAL --> AUTH --> ROUTE --> REPORT --> PRESENTER
     end
 
     subgraph EXECUTION["Dedicated bounded execution"]
-        MUTATOR["task_waves.py<br/>Sole task-state mutator"]
-        HARNESS["Approved project paths<br/>Validation and local evidence"]
-        OPERATE["Operate Fastlane AWS<br/>Explicit AWS procedure"]
+        MUTATOR["task_waves.py: sole task-state mutator"]
+        HARNESS["Approved project paths: validation and local evidence"]
+        OPERATE["Operate Fastlane AWS: explicit AWS procedure"]
         RECEIPT{"Exact owner authorization"}
-        AWSACCOUNT["AWS account action<br/>Read, mutate, reconcile, or teardown"]
-        HOOKS["Optional hooks<br/>Additional denial only"]
+        AWSACCOUNT["AWS account action: read, mutate, reconcile, or teardown"]
+        HOOKS["Optional hooks: additional denial only"]
     end
 
     OWNER --> COORD

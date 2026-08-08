@@ -741,6 +741,7 @@ sequenceDiagram
         owner_workflow = workflow.read_text(encoding="utf-8")
         self.assertEqual(owner_workflow.count("```mermaid"), 2)
         self.assertEqual(owner_workflow.count("flowchart TB"), 2)
+        self.assertNotIn("<br", owner_workflow)
         for customer_explanation in (
             "## Customer delivery lifecycle",
             "## How the control plane works",
@@ -788,8 +789,8 @@ sequenceDiagram
         for product_claim in (
             "repository-native governance platform",
             "accTitle: Fastlane customer delivery lifecycle",
-            "Gate A<br/>Approve the Product Agreement",
-            "Gate B<br/>Approve the technical plan and local construction boundary",
+            "Gate A: approve the Product Agreement",
+            "Gate B: approve the technical plan and local construction boundary",
             "accTitle: Fastlane technical control plane",
             "ProjectSnapshot",
             "EngineEvaluation",
@@ -806,6 +807,7 @@ sequenceDiagram
         self.assertEqual(readme.count("flowchart TB"), 2)
         self.assertEqual(readme.count("accTitle:"), 2)
         self.assertEqual(readme.count("accDescr:"), 2)
+        self.assertNotIn("<br", readme)
         self.assertNotIn("flowchart TD", readme)
         self.assertNotIn("flowchart LR", readme)
 

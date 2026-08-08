@@ -51,15 +51,15 @@ flowchart TB
     accDescr: The owner describes an outcome, approves requirements and the technical plan, Codex builds and validates locally, and AWS operations remain separately authorized.
 
     IDEA["Describe the outcome"]
-    DEFINE["Guided consultation<br/>Users, scope, data, risks, and success"]
-    GATEA{"Gate A<br/>Approve the Product Agreement"}
-    DESIGN["Architecture consultation<br/>Compare complete AWS-informed solutions"]
-    GATEB{"Gate B<br/>Approve the technical plan and local construction boundary"}
-    TASKS["Bounded task plan<br/>Dependencies, paths, commands, and validation"]
-    BUILD["Local construction<br/>Implement, test, and correct safe in-scope defects"]
-    RELEASE["Evidence-backed release decision<br/>Ready, blocked, failed, stale, or unobserved"]
-    AWSAUTH{"Separate AWS authorization<br/>Account, Region, actions, limits, and expiry"}
-    AWSOPS["Optional AWS operations<br/>Preflight, deploy, reconcile, review, or teardown"]
+    DEFINE["Guided consultation: users, scope, data, risks, and success"]
+    GATEA{"Gate A: approve the Product Agreement"}
+    DESIGN["Architecture consultation: compare complete AWS-informed solutions"]
+    GATEB{"Gate B: approve the technical plan and local construction boundary"}
+    TASKS["Bounded task plan: dependencies, paths, commands, and validation"]
+    BUILD["Local construction: implement, test, and correct safe in-scope defects"]
+    RELEASE["Evidence-backed release decision: ready, blocked, failed, stale, or unobserved"]
+    AWSAUTH{"Separate AWS authorization: account, Region, actions, limits, and expiry"}
+    AWSOPS["Optional AWS operations: preflight, deploy, reconcile, review, or teardown"]
 
     IDEA --> DEFINE --> GATEA --> DESIGN --> GATEB
     GATEB --> TASKS --> BUILD --> RELEASE
@@ -134,48 +134,48 @@ flowchart TB
     accTitle: Fastlane technical control plane and agent routing
     accDescr: One Fastlane coordinator works from canonical repository records through a deterministic Engine. Compatibility skills delegate to the coordinator, challenger agents are read-only, task and AWS mutations use dedicated bounded paths, and owner-facing reports derive from evaluated state.
 
-    OWNER["Owner<br/>Intent, decisions, gates, and external authorization"]
-    COORD["Fastlane<br/>Sole coordinator and sole writer"]
+    OWNER["Owner: intent, decisions, gates, and external authorization"]
+    COORD["Fastlane: sole coordinator and sole writer"]
 
     subgraph SKILLS["Skills and conditional agents"]
-        ALIASES["Launch · Plan · Build<br/>Compatibility entry points"]
-        EXPLAIN["Explain Fastlane<br/>Read-only teaching"]
-        CHALLENGERS["Requirements or architecture challenger<br/>Conditional read-only critique"]
-        OPERATE["Operate Fastlane AWS<br/>Explicit AWS operation path"]
-        MAINTAIN["Maintain Fastlane<br/>Separate framework lifecycle"]
-        AWSCORE["AWS Core<br/>Current AWS expertise and procedures"]
+        ALIASES["Launch · Plan · Build: compatibility entry points"]
+        EXPLAIN["Explain Fastlane: read-only teaching"]
+        CHALLENGERS["Requirements or architecture challenger: conditional read-only critique"]
+        OPERATE["Operate Fastlane AWS: explicit AWS operation path"]
+        MAINTAIN["Maintain Fastlane: separate framework lifecycle"]
+        AWSCORE["AWS Core: current AWS expertise and procedures"]
     end
 
     subgraph RECORDS["Canonical repository state"]
-        PRD["PRD<br/>Requirements, design, Gate A/B, and envelope"]
-        TASKREC["TASKS<br/>Task, attempt, and checkpoint state"]
-        VERIFY["VERIFY<br/>Evidence, release state, and AWS journals"]
-        RUNBOOK["RUNBOOK<br/>Deploy, rollback, recovery, and teardown"]
-        BUGFIX["BUGFIX<br/>Bounded repair contract"]
-        MIRROR["bootstrap.yaml<br/>Derived lifecycle mirror"]
+        PRD["PRD: requirements, design, Gate A/B, and envelope"]
+        TASKREC["TASKS: task, attempt, and checkpoint state"]
+        VERIFY["VERIFY: evidence, release state, and AWS journals"]
+        RUNBOOK["RUNBOOK: deploy, rollback, recovery, and teardown"]
+        BUGFIX["BUGFIX: bounded repair contract"]
+        MIRROR["bootstrap.yaml: derived lifecycle mirror"]
     end
 
     subgraph ENGINE["Deterministic Fastlane Engine"]
-        SNAP["ProjectSnapshot<br/>One coherent repository observation"]
-        EVAL["EngineEvaluation<br/>Package, Define, Design, Deliver, and AWS results"]
-        AUTH["Authority intersection<br/>Normalized approved facts only"]
-        ROUTE["Routing, remediation,<br/>interaction, and context"]
-        REPORT["Schema-2 report<br/>Serialization without new policy"]
-        PRESENTER["Presenter<br/>Status, confirmations, and Owner Briefs"]
+        SNAP["ProjectSnapshot: one coherent repository observation"]
+        EVAL["EngineEvaluation: Package, Define, Design, Deliver, and AWS results"]
+        AUTH["Authority intersection: normalized approved facts only"]
+        ROUTE["Routing, remediation, interaction, and context"]
+        REPORT["Schema-2 report: serialization without new policy"]
+        PRESENTER["Presenter: status, confirmations, and Owner Briefs"]
 
         SNAP --> EVAL --> AUTH --> ROUTE --> REPORT --> PRESENTER
     end
 
     subgraph LOCAL["Bounded local execution"]
-        MUTATOR["task_waves.py<br/>Sole task-state mutator"]
-        PATHS["Approved project paths<br/>Application, infrastructure, and tests"]
-        CHECKS["Approved validation<br/>Tests, scans, IaC, and policy checks"]
-        HOOKS["Optional hooks<br/>Additional denial only"]
+        MUTATOR["task_waves.py: sole task-state mutator"]
+        PATHS["Approved project paths: application, infrastructure, and tests"]
+        CHECKS["Approved validation: tests, scans, IaC, and policy checks"]
+        HOOKS["Optional hooks: additional denial only"]
     end
 
     subgraph AWSLANE["Separately authorized AWS lane"]
         RECEIPT{"Exact owner authorization"}
-        AWSACCOUNT["AWS account action<br/>Read, mutate, reconcile, or teardown"]
+        AWSACCOUNT["AWS account action: read, mutate, reconcile, or teardown"]
     end
 
     OWNER --> COORD
