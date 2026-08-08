@@ -41,6 +41,11 @@ cross-platform, fail-closed, and free of hidden external actions.
   owns bounded filesystem and trusted read-only Git observation; domain
   validators do not read files, run Git, call subprocesses, write state, or
   access GitHub or AWS.
+- Source-assisted Define observes one explicitly named repository-relative
+  UTF-8 brief through the same bounded snapshot primitive. Its pure Define
+  projection may classify candidate facts and technical proposals, but it must
+  emit no raw secret-like content, perform no write, alter no lifecycle report,
+  and grant no approval or authority.
 - `define`, `design`, `deliver`, and `aws` own their domain validation.
   `authority` owns exact receipt and envelope intersections. `orchestration`
   composes immutable results; `routing` selects the next route; `remediation`

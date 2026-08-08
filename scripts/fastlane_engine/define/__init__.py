@@ -30,6 +30,11 @@ from .requirements import (
     derive_requirements_contract,
     gate_a_method_contract_issues,
 )
+from .source_assist import (
+    SOURCE_BRIEF_MAX_BYTES,
+    blocked_source_assist_preview,
+    derive_source_assist_preview,
+)
 
 __all__ = (
     "AssumptionLifecycleRecord",
@@ -43,13 +48,16 @@ __all__ = (
     "NormalizedOwnerResponse",
     "RequirementsChangeLineage",
     "RequirementsContract",
+    "SOURCE_BRIEF_MAX_BYTES",
     "authoritative_requirement_ids",
     "brownfield_contract_issues",
+    "blocked_source_assist_preview",
     "derive_change_impact_contract",
     "derive_coverage_contract",
     "derive_intake_foundation_contract",
     "derive_req_aws_materiality",
     "derive_requirements_contract",
+    "derive_source_assist_preview",
     "gate_a_method_contract_issues",
     "gate_a_readiness_card_issues",
 )

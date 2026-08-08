@@ -6,6 +6,12 @@
 - Present one concrete next action. Show an owner action only for a genuine
   decision, setup step, approval, authorization, protected-boundary decision,
   or human safety review. Otherwise continue the selected phase.
+- For an explicitly supplied product brief, render the Engine's
+  `SOURCE_ASSISTED_DEFINE` projection with the deterministic `source-brief`
+  presenter mode. Explain that the brief can reduce consultation questions but
+  cannot replace the canonical PRD or import approval or authority. Keep A, B,
+  and C choices separated by blank lines and accept the owner's meaning in
+  ordinary language; do not require an internal reply token or numeric prefix.
 - Do not expose hashes, file counts, prompt IDs, or exhaustive receipts in
   routine conversation.
 - Never accept self-asserted audit prose. After observable current AWS Core
