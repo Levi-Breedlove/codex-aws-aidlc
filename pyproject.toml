@@ -26,3 +26,5 @@ function_preferred_lines = 60
 function_review_lines = 100
 complexity_preferred = 10
 complexity_review = 15
+complexity_exception_registry = "tests/engine_complexity_exceptions.py"
+qualification_baseline_commit = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"

@@ -33,6 +33,7 @@ from scripts.fastlane_engine.project_inspection import (
     capture_engine_snapshot,
     safe_read_text,
 )
+from tests.engine_complexity_exceptions import REVIEWED_COMPLEXITY_EXCEPTIONS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -375,7 +376,7 @@ class EngineFoundationTests(unittest.TestCase):
         self.assertTrue(runtime <= set(manifest["source_sha256"]))
         self.assertIn("scripts/fastlane_engine/AGENTS.md", manifest["required_files"])
 
-    def test_new_engine_modules_respect_size_and_complexity_review_budgets(
+    def test_engine_complexity_overages_require_explicit_reviewed_exceptions(
         self,
     ) -> None:
         configuration = {
@@ -394,6 +395,7 @@ class EngineFoundationTests(unittest.TestCase):
             ast.comprehension,
             ast.Match,
         )
+        observed: dict[str, dict[str, int]] = {}
         for path in sorted(ENGINE_ROOT.rglob("*.py")):
             relative = path.relative_to(ENGINE_ROOT).as_posix()
             text = path.read_text(encoding="utf-8")
@@ -410,13 +412,37 @@ class EngineFoundationTests(unittest.TestCase):
                 complexity = 1 + sum(
                     isinstance(item, branch_nodes) for item in ast.walk(node)
                 )
-                label = f"{relative}:{node.lineno}:{node.name}"
                 if (
                     line_count > configuration["function_review_lines"]
                     or complexity > configuration["complexity_review"]
                 ):
-                    docstring = ast.get_docstring(node) or ""
-                    self.assertRegex(docstring, r"^(?:SAFETY|COMPATIBILITY):", label)
+                    observed[f"{relative}:{node.name}"] = {
+                        "lines": line_count,
+                        "complexity": complexity,
+                    }
+
+        self.assertEqual(
+            set(observed),
+            set(REVIEWED_COMPLEXITY_EXCEPTIONS),
+            "Engine complexity exceptions must be explicit, current, and complete",
+        )
+        for key, metrics in observed.items():
+            with self.subTest(symbol=key):
+                exception = REVIEWED_COMPLEXITY_EXCEPTIONS[key]
+                self.assertEqual(exception["reviewed_in"], "1.2.25")
+                self.assertTrue(str(exception["reason"]).strip())
+                self.assertRegex(
+                    str(exception["expires"]),
+                    r"^(?:PERMANENT|[0-9]+\.[0-9]+\.[0-9]+)$",
+                )
+                self.assertEqual(exception["reviewed_lines"], metrics["lines"])
+                self.assertEqual(
+                    exception["reviewed_complexity"], metrics["complexity"]
+                )
+                self.assertLessEqual(metrics["lines"], exception["maximum_lines"])
+                self.assertLessEqual(
+                    metrics["complexity"], exception["maximum_complexity"]
+                )
 
 
 if __name__ == "__main__":

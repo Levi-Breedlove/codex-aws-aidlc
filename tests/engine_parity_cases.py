@@ -34,9 +34,14 @@ from tests import test_bootstrap_doctor as doctor_fixtures
 
 
 ORACLE_PATH = REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json"
+QUALIFICATION_ORACLE_PATH = (
+    REPOSITORY_ROOT / "tests/fixtures/engine_qualification_v1.json"
+)
 BASELINE_COMMIT = "312b53ce00f9db5263f3a72e778f833e70c7db8e"
 BASELINE_PACKAGE_VERSION = "1" + ".2.10"
 SUMMARY_TRUTH_BASE_COMMIT = "8dbb11fd0e54af392ac073ce597cdb26fc336fcc"
+QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
+QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
 GIT_SHA_SENTINEL = "<GIT_SHA>"
 GIT_SHA = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])")
@@ -255,6 +260,27 @@ SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# COMPATIBILITY: the frozen pre-refactor oracle records the original selectors.
+# The regression methods moved without semantic changes during 1.2.25
+# qualification, so discovery resolves only these exact class prefixes.
+SCENARIO_SELECTOR_RELOCATIONS = {
+    ("tests.test_bootstrap_doctor.AwsDeploymentReconciliationRegressionTests."): (
+        "tests.test_engine_aws_deployment.AwsDeploymentReconciliationRegressionTests."
+    ),
+    ("tests.test_bootstrap_doctor.AwsExecutionContractRegressionTests."): (
+        "tests.test_engine_aws_execution.AwsExecutionContractRegressionTests."
+    ),
+}
+
+
+def current_scenario_selector(selector: str) -> str:
+    """Return the current location for one frozen regression selector."""
+
+    for previous, current in SCENARIO_SELECTOR_RELOCATIONS.items():
+        if selector.startswith(previous):
+            return current + selector[len(previous) :]
+    return selector
+
 
 REPORT_CASES = (
     "template_source",
@@ -265,6 +291,29 @@ REPORT_CASES = (
     "gate_b_pending",
     "gate_b_approved",
 )
+
+QUALIFICATION_REPORT_CASES = (
+    "stale_gate_a_summary",
+    "task_ready",
+)
+
+QUALIFICATION_AWS_SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
+    "deployment_action_terminals": (
+        "tests.test_engine_aws_deployment."
+        "AwsDeploymentReconciliationRegressionTests."
+        "test_started_and_every_terminal_action_require_aws30",
+    ),
+    "deployment_reconciliation_terminals": (
+        "tests.test_engine_aws_deployment."
+        "AwsDeploymentReconciliationRegressionTests."
+        "test_aws30_complete_blocked_and_stale_have_distinct_states",
+    ),
+    "teardown_action_and_review_terminals": (
+        "tests.test_engine_aws_execution."
+        "AwsExecutionContractRegressionTests."
+        "test_teardown_sequence_routes_by_current_phase_evidence",
+    ),
+}
 
 
 def _normalize_string(value: str) -> str:
@@ -386,6 +435,174 @@ def build_parity_reports() -> dict[str, dict[str, Any]]:
             temporary, "gate-b-approved", approve_gate_b
         )
     return {name: reports[name] for name in REPORT_CASES}
+
+
+def build_qualification_reports() -> dict[str, dict[str, Any]]:
+    """Build reports not present in the frozen pre-refactor oracle."""
+
+    with tempfile.TemporaryDirectory() as directory:
+        temporary = Path(directory)
+
+        def stale_gate_a_summary(
+            fixture: doctor_fixtures.BootstrapDoctorTests, project: Path
+        ) -> None:
+            fixture.pending_gate_a(project)
+            baseline = doctor.inspect_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            source_text = prd_path.read_text(encoding="utf-8")
+            prd_summary = next(
+                item
+                for item in baseline["document_summaries"]["documents"]
+                if item["path"] == doctor.PRD_FILE
+            )
+            product_outcome = next(
+                item["value"]
+                for item in prd_summary["fields"]
+                if item["label"] == "Product outcome"
+            )
+            changed = source_text.replace(
+                f"| Product outcome | {product_outcome} |",
+                "| Product outcome | Stale generated value |",
+                1,
+            )
+            if changed == source_text:
+                raise AssertionError("qualification summary fixture did not change")
+            prd_path.write_text(changed, encoding="utf-8", newline="\n")
+            doctor_fixtures.refresh_control_hashes(project)
+
+        def task_ready(
+            fixture: doctor_fixtures.BootstrapDoctorTests, project: Path
+        ) -> None:
+            fixture.approve_project(project)
+            fixture.set_non_material_req_evidence(project)
+            fixture.initialize_task_plan(
+                project,
+                doctor_fixtures.ready_task(
+                    requirements=(
+                        doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE + "; PROP-001"
+                    ),
+                    design="DES-0001; TECH: TECH-0001, TECH-0007",
+                    command="python -m unittest tests.test_properties",
+                    property_projection=(
+                        doctor_fixtures.property_execution_projection()
+                    ),
+                ),
+            )
+            doctor_fixtures.refresh_document_summaries(project)
+
+        reports = {
+            "stale_gate_a_summary": _project_case(
+                temporary, "stale-gate-a-summary", stale_gate_a_summary
+            ),
+            "task_ready": _project_case(temporary, "gate-b-task-ready", task_ready),
+        }
+    return {name: reports[name] for name in QUALIFICATION_REPORT_CASES}
+
+
+def build_deployment_qualification_cases() -> dict[str, dict[str, Any]]:
+    """Project every deployment terminal through the public Engine contract."""
+
+    from tests.test_engine_aws_deployment import (
+        AwsDeploymentReconciliationRegressionTests,
+    )
+
+    fixture = AwsDeploymentReconciliationRegressionTests()
+    read_authority = fixture.deployment_read_authority()
+    cases: dict[str, dict[str, Any]] = {}
+
+    def capture(name: str, rows: list[tuple[str, ...]], *, read: bool = False) -> None:
+        projection = fixture.derive_deployment(
+            rows,
+            read_authority=read_authority if read else None,
+        )
+        route = doctor.derive_aws_delivery_route(
+            "READY_TO_DEPLOY",
+            {"progress_state": "AWS_PREFLIGHT_READY"},
+            projection,
+            "fast-dev",
+        )
+        cases[name] = {
+            "status": projection["status"],
+            "action_status": projection["action_status"],
+            "reconciliation_status": projection["reconciliation_status"],
+            "phase": projection["phase"],
+            "route": list(route) if route else None,
+            "issues": list(projection["issues"]),
+        }
+
+    for index, action_status in enumerate(
+        ("STARTED", "SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN"), start=1
+    ):
+        rows = [
+            fixture.deployment_row(
+                evidence_id=f"EV-31{index:02d}",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-01T00:00:00Z",
+            )
+        ]
+        if action_status != "STARTED":
+            rows.append(
+                fixture.deployment_row(
+                    evidence_id=f"EV-32{index:02d}",
+                    phase="AWS-20",
+                    status=action_status,
+                    observed_at="2027-01-01T00:01:00Z",
+                )
+            )
+        capture(f"action_{action_status.casefold()}", rows)
+
+    for index, action_status in enumerate(
+        ("SUCCEEDED", "FAILED", "PARTIAL", "UNKNOWN"), start=1
+    ):
+        rows = [
+            fixture.deployment_row(
+                evidence_id=f"EV-33{index:02d}",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-02T00:00:00Z",
+            ),
+            fixture.deployment_row(
+                evidence_id=f"EV-34{index:02d}",
+                phase="AWS-20",
+                status=action_status,
+                observed_at="2027-01-02T00:01:00Z",
+            ),
+            fixture.deployment_row(
+                evidence_id=f"EV-35{index:02d}",
+                phase="AWS-30",
+                status="COMPLETE",
+                observed_at="2027-01-02T00:02:00Z",
+                read_authority=read_authority,
+            ),
+        ]
+        capture(f"reconciled_{action_status.casefold()}", rows, read=True)
+
+    for index, reconciliation_status in enumerate(("BLOCKED", "STALE"), start=1):
+        rows = [
+            fixture.deployment_row(
+                evidence_id=f"EV-36{index:02d}",
+                phase="AWS-20",
+                status="STARTED",
+                observed_at="2027-01-03T00:00:00Z",
+            ),
+            fixture.deployment_row(
+                evidence_id=f"EV-37{index:02d}",
+                phase="AWS-20",
+                status="SUCCEEDED",
+                observed_at="2027-01-03T00:01:00Z",
+            ),
+            fixture.deployment_row(
+                evidence_id=f"EV-38{index:02d}",
+                phase="AWS-30",
+                status=reconciliation_status,
+                observed_at="2027-01-03T00:02:00Z",
+                read_authority=read_authority,
+            ),
+        ]
+        capture(f"reconciliation_{reconciliation_status.casefold()}", rows, read=True)
+
+    return cases
 
 
 def _branch_complexity(node: ast.AST) -> int:
@@ -588,6 +805,47 @@ def build_oracle() -> dict[str, Any]:
     }
 
 
+def build_qualification_oracle() -> dict[str, Any]:
+    """Freeze current modular boundaries without replacing the original oracle."""
+
+    reports = build_qualification_reports()
+    deployment_cases = build_deployment_qualification_cases()
+    return {
+        "schema_version": 1,
+        "baseline": {
+            "commit": QUALIFICATION_BASE_COMMIT,
+            "package_version": QUALIFICATION_BASE_PACKAGE_VERSION,
+            "report_schema_version": 2,
+        },
+        "normalization": {
+            "allowed": [
+                "package version",
+                "repository or synthetic Git commit identity",
+            ],
+            "forbidden": [
+                "diagnostic IDs or order",
+                "lifecycle or next prompt",
+                "owner action or continuation",
+                "authority or remediation",
+                "deployment action or reconciliation result",
+                "canonical projections or receipts",
+            ],
+        },
+        "report_case_digests": {
+            name: canonical_digest(case) for name, case in reports.items()
+        },
+        "report_cases": reports,
+        "deployment_case_digests": {
+            name: canonical_digest(case) for name, case in deployment_cases.items()
+        },
+        "deployment_cases": deployment_cases,
+        "aws_scenario_coverage": {
+            name: list(selectors)
+            for name, selectors in QUALIFICATION_AWS_SCENARIO_COVERAGE.items()
+        },
+    }
+
+
 def benchmark_template_source(iterations: int = 5) -> dict[str, Any]:
     """Measure the same-process template scenario without persisting machine data."""
 
@@ -620,19 +878,28 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--write-oracle", action="store_true")
+    action.add_argument("--write-qualification-oracle", action="store_true")
     action.add_argument("--benchmark", action="store_true")
     parser.add_argument("--iterations", type=int, default=5)
     args = parser.parse_args(argv)
     if args.benchmark:
         print(json.dumps(benchmark_template_source(args.iterations), indent=2))
         return 0
-    ORACLE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    ORACLE_PATH.write_text(
-        json.dumps(build_oracle(), indent=2, ensure_ascii=False) + "\n",
+    output_path = (
+        QUALIFICATION_ORACLE_PATH if args.write_qualification_oracle else ORACLE_PATH
+    )
+    payload = (
+        build_qualification_oracle()
+        if args.write_qualification_oracle
+        else build_oracle()
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
         newline="\n",
     )
-    print(f"Wrote {ORACLE_PATH.relative_to(REPOSITORY_ROOT).as_posix()}")
+    print(f"Wrote {output_path.relative_to(REPOSITORY_ROOT).as_posix()}")
     return 0
 
 

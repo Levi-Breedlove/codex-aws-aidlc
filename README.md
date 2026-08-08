@@ -6,7 +6,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
 
-Current customer build: **1.2.24**.
+Current customer build: **1.2.25**.
 
 Fastlane is a repository-native governance platform for Codex-assisted AWS
 application delivery. It turns a product idea or existing codebase into approved
