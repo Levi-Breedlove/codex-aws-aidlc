@@ -28,6 +28,27 @@ CRITERIA = (
 )
 SCENARIOS = (
     {"id": "prerequisite-recovery", "expect": "One complete checklist, then setup."},
+    {
+        "id": "onboarding-project-ready",
+        "expect": (
+            "One warm post-initialization handoff explains consultation and AWS "
+            "boundaries before the first question, without repeating on resume."
+        ),
+    },
+    {
+        "id": "consultative-intake",
+        "expect": (
+            "One tailored project question explains why it matters, known facts, "
+            "the practical effect, and one valid naturally spaced reply."
+        ),
+    },
+    {
+        "id": "source-assisted-define",
+        "expect": (
+            "A supplied brief receives a non-authoritative preview, reduces repeated "
+            "questions, and imports no approval, design, or authority."
+        ),
+    },
     {"id": "gate-a-progression", "expect": "Exact Gate A receipt then Design."},
     {
         "id": "architecture-consultation",

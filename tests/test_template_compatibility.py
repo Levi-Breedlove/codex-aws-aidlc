@@ -143,11 +143,14 @@ class TemplateCompatibilityTests(unittest.TestCase):
 
     def test_model_roleplay_plan_is_complete_and_non_operational(self) -> None:
         plan = model_roleplay_eval.plan_payload()
-        self.assertEqual(len(plan["scenarios"]), 22)
+        self.assertEqual(len(plan["scenarios"]), 25)
         scenario_ids = {scenario["id"] for scenario in plan["scenarios"]}
         self.assertTrue(
             {
                 "one-question-intake",
+                "onboarding-project-ready",
+                "consultative-intake",
+                "source-assisted-define",
                 "answer-confirmation",
                 "gate-a-brief-comprehension",
                 "gate-b-brief-comprehension",

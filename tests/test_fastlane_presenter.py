@@ -48,6 +48,19 @@ def intake_foundation() -> dict[str, object]:
         "basis_ids": [],
         "missing_fields": ["OWNER_WORK_CONTEXT", "PRIMARY_USERS"],
         "grandfathered_approved_gate_a": False,
+        "next_question_guidance": {
+            "schema_version": 1,
+            "status": "STARTING_POINT_REQUIRED",
+            "owner_work_context": None,
+            "objective": (
+                "Learn whether the owner is starting a new application, changing "
+                "an existing application, or repairing or migrating existing behavior."
+            ),
+            "fields": ["OWNER_WORK_CONTEXT"],
+            "target_ids": ["INTAKE-0001"],
+            "basis_ids": [],
+            "owner_action_required": True,
+        },
         "pending_card": {
             "card_id": "INTAKE-CARD-0001",
             "revision": 1,
@@ -81,6 +94,19 @@ def intake_foundation() -> dict[str, object]:
 
 def factual_intake_foundation() -> dict[str, object]:
     foundation = intake_foundation()
+    foundation["next_question_guidance"] = {
+        "schema_version": 1,
+        "status": "QUESTION_REQUIRED",
+        "owner_work_context": "NEW_APPLICATION",
+        "objective": (
+            "Understand who will use the new application, what is difficult today, "
+            "and the first useful result they need."
+        ),
+        "fields": ["PRIMARY_USERS", "OWNER_STATED_PROBLEM", "OBSERVABLE_OUTCOME"],
+        "target_ids": ["INTAKE-0002", "INTAKE-0003", "INTAKE-0004"],
+        "basis_ids": ["INTAKE-0001"],
+        "owner_action_required": True,
+    }
     card = foundation["pending_card"]
     assert isinstance(card, dict)
     card["owner_reply"] = "1: <your answer>"
@@ -90,7 +116,7 @@ def factual_intake_foundation() -> dict[str, object]:
             "reply_key": "1",
             "question_id": "INTAKE-Q-0002",
             "kind": "FACT",
-            "basis_ids": ["INTAKE-0002", "INTAKE-0003"],
+            "basis_ids": ["INTAKE-0002", "INTAKE-0003", "INTAKE-0004"],
             "prompt": (
                 "Tell me about the app in your own words: who is it for, "
                 "what is hard today, and what should become easier?"
@@ -1537,6 +1563,28 @@ class FastlanePresenterTests(unittest.TestCase):
         output = result.stdout.decode("utf-8", errors="strict")
         self.assertIn("FASTLANE \u00b7 DESIGN", output)
 
+    def test_public_cli_renders_project_ready_from_current_report_only(self) -> None:
+        current = report(turn_boundary_required=True)
+        current["project"] = {
+            "name": "Builder Review Hub",
+            "region": "us-west-2",
+            "cost_posture": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
+        }
+        current["authorizations"] = {"construction": "NONE", "aws": "NONE"}
+        current["intake_foundation"] = intake_foundation()
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "project-ready", "--input-stdin"],
+            input=json.dumps({"report": current}),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("FASTLANE · PROJECT READY", result.stdout)
+        self.assertEqual(result.stdout.count("Need from you:"), 1)
+
     def test_grounded_intake_card_uses_uppercase_choices_and_plain_reply(self) -> None:
         current = report(turn_boundary_required=True)
         current["intake_foundation"] = intake_foundation()
@@ -1550,13 +1598,18 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn(
             "Status: 1 question remains before requirements analysis.", rendered
         )
-        self.assertIn("1. What are you starting with?", rendered)
+        self.assertIn("Why this matters", rendered)
+        self.assertIn(
+            "This tells Fastlane whether you are starting a new application",
+            rendered,
+        )
+        self.assertIn("1. What kind of project are we starting together?", rendered)
         self.assertIn("A. A new application.", rendered)
         self.assertIn("B. A change to an existing application.", rendered)
         self.assertIn("C. A repair or migration.", rendered)
         self.assertIn("If you choose B: Name the existing application.", rendered)
         expected_choice_block = (
-            "1. What are you starting with?\n\n"
+            "1. What kind of project are we starting together?\n\n"
             "A. A new application.\n\n"
             "B. A change to an existing application.\n"
             "   If you choose B: Name the existing application.\n\n"
@@ -1587,6 +1640,97 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("INTAKE-CARD", rendered)
         self.assertNotIn("sha256:", rendered)
+        self.assertIn("What your answer changes", rendered)
+        self.assertIn("existing behavior, data, and migration risk", rendered)
+
+    def test_project_ready_is_one_warm_post_initialization_handoff(self) -> None:
+        current = report(turn_boundary_required=True)
+        current["project"] = {
+            "name": "Builder Review Hub",
+            "region": "us-west-2",
+            "cost_posture": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
+            "mode": "greenfield",
+            "delivery_profile": "standard",
+        }
+        current["authorizations"] = {"construction": "NONE", "aws": "NONE"}
+        current["intake_foundation"] = intake_foundation()
+
+        rendered = presenter.render_project_ready(current)
+
+        self.assertTrue(rendered.startswith("FASTLANE · PROJECT READY"))
+        self.assertEqual(rendered.count("Need from you:"), 1)
+        self.assertIn("Builder Review Hub is initialized", rendered)
+        self.assertIn("Preferred AWS Region: `us-west-2`", rendered)
+        self.assertIn("no hard cap stated", rendered)
+        self.assertIn("AWS account access: Not authorized.", rendered)
+        self.assertIn("How consultation works", rendered)
+        self.assertIn("one consequential project question at a time", rendered)
+        self.assertIn("1. What kind of project are we starting together?", rendered)
+        self.assertIn("Reply with one of:\n\n- `A`", rendered)
+        for internal in (
+            "greenfield",
+            "standard",
+            "documentation-only",
+            "INTAKE-CARD",
+            "sha256:",
+        ):
+            self.assertNotIn(internal, rendered)
+
+        resumed = presenter.render_owner_update(current)
+        self.assertTrue(resumed.startswith("FASTLANE · DEFINE"))
+        self.assertNotIn("PROJECT READY", resumed)
+        self.assertNotIn("Project settings", resumed)
+
+    def test_project_ready_rejects_noninitial_or_authorized_state(self) -> None:
+        current = report(turn_boundary_required=True)
+        current["project"] = {
+            "name": "Builder Review Hub",
+            "region": "us-west-2",
+            "cost_posture": "MINIMIZE_TOTAL_COST; HARD_CAP: USD 50",
+        }
+        current["authorizations"] = {"construction": "AUTH-0001", "aws": "NONE"}
+        current["intake_foundation"] = intake_foundation()
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_project_ready(current)
+
+        current["authorizations"] = {"construction": "NONE", "aws": "NONE"}
+        foundation = current["intake_foundation"]
+        assert isinstance(foundation, dict)
+        foundation["current_understanding"] = ["Starting point: a new application."]
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_project_ready(current)
+
+        current = report(turn_boundary_required=False)
+        current["project"] = {
+            "name": "Builder Review Hub",
+            "region": "us-west-2",
+            "cost_posture": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
+        }
+        current["authorizations"] = {"construction": "NONE", "aws": "NONE"}
+        current["intake_foundation"] = intake_foundation()
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_project_ready(current)
+
+    def test_consultation_objectives_are_translated_for_owners(self) -> None:
+        cases = {
+            "Understand who uses the product.": (
+                "This helps Fastlane understand who uses the product."
+            ),
+            "Define the first useful release.": (
+                "This helps define the first useful release."
+            ),
+            "Identify the information people enter.": (
+                "This identifies the information people enter."
+            ),
+            "Clarify the initial audience.": "This clarifies the initial audience.",
+        }
+        for objective, expected in cases.items():
+            with self.subTest(objective=objective):
+                self.assertEqual(
+                    presenter._owner_consultation_objective(objective), expected
+                )
+        with self.assertRaises(presenter.PresentationError):
+            presenter._owner_consultation_objective("Explain schema 2 to the owner.")
 
     def test_accept_all_is_rendered_only_for_complete_recommendations(self) -> None:
         foundation = intake_foundation()
@@ -1663,7 +1807,7 @@ class FastlanePresenterTests(unittest.TestCase):
 
         self.assertIn("Project state changed: No.", rendered)
         self.assertIn("The pending questions are unchanged:", rendered)
-        self.assertIn("1. What are you starting with?", rendered)
+        self.assertIn("1. What kind of project are we starting together?", rendered)
         self.assertIn("A. A new application.", rendered)
         self.assertIn(
             "No recommendation—choose the option that matches your situation.",
@@ -1690,13 +1834,14 @@ class FastlanePresenterTests(unittest.TestCase):
         rendered = presenter.render_owner_update(
             current, updated="I recorded two confirmed facts."
         )
-        self.assertIn("Current understanding:", rendered)
+        self.assertIn("What Fastlane already knows", rendered)
         self.assertIn("- Starting point: a new application.", rendered)
         self.assertLess(
-            rendered.index("Updated:"), rendered.index("Current understanding:")
+            rendered.index("Updated:"), rendered.index("What Fastlane already knows")
         )
         self.assertLess(
-            rendered.index("Current understanding:"), rendered.index("Need from you:")
+            rendered.index("What Fastlane already knows"),
+            rendered.index("Need from you:"),
         )
 
         side = presenter.render_side_question_response(

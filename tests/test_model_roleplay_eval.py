@@ -142,6 +142,22 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
         )
         self.assertFalse(plan["constraints"]["ordinary_ci_invokes_live_model"])
         self.assertFalse(plan["constraints"]["release_readiness_claimed_by_scorer"])
+        scenarios = {
+            scenario["id"]: scenario["expect"] for scenario in plan["scenarios"]
+        }
+        for scenario_id in (
+            "onboarding-project-ready",
+            "consultative-intake",
+            "source-assisted-define",
+        ):
+            self.assertIn(scenario_id, scenarios)
+        self.assertIn(
+            "without repeating on resume", scenarios["onboarding-project-ready"]
+        )
+        self.assertIn(
+            "one valid naturally spaced reply", scenarios["consultative-intake"]
+        )
+        self.assertIn("imports no approval", scenarios["source-assisted-define"])
 
     def test_development_bundle_passes_without_release_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
