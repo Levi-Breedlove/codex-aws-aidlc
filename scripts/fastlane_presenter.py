@@ -2246,6 +2246,15 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
         lines.extend(
             (
                 "",
+                (
+                    "[View the complete architecture diagram]"
+                    "(docs/project/PRD.md#proposed-system-at-a-glance)"
+                ),
+            )
+        )
+        lines.extend(
+            (
+                "",
                 "<details>",
                 "<summary>Decision reasoning, tradeoffs, risks, and sources</summary>",
                 "",

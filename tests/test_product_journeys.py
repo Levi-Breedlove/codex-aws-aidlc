@@ -470,6 +470,11 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
+            self.assertIn(
+                "[View the complete architecture diagram]"
+                "(docs/project/PRD.md#proposed-system-at-a-glance)",
+                rendered_gate_b,
+            )
             for label in (
                 "Meaning and selection:",
                 "Basis and rationale:",
