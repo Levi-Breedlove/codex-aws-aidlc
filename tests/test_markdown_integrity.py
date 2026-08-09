@@ -766,9 +766,7 @@ sequenceDiagram
 
     def test_readme_is_a_compact_governance_platform_landing_page(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(
-            encoding="utf-8"
-        )
+        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
         self.assertLessEqual(len(readme.splitlines()), 140)
         self.assertLessEqual(len(readme.encode("utf-8")), 9_000)
         headings = (
