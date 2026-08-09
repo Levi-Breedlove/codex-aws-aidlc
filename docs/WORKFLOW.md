@@ -1,19 +1,20 @@
-# Fastlane workflow
+# Fastlane workflow and operating model
 
-Fastlane turns an application idea or bounded change into owner-approved
-requirements, one AWS-informed technical design, a tested local build, and an
-evidence-backed release decision.
+This guide owns the complete customer lifecycle, gate behavior, technical
+control plane, project-record flow, and AWS authority boundaries. Start with the
+[README](../README.md) for the product overview and quick start.
 
-You describe the outcome. Codex acts as the technical consultant, coordinator,
-builder, and verifier. AWS Core supplies current AWS guidance. The Fastlane
-Engine keeps the project state, route, evidence, and authority consistent.
+Fastlane turns an idea or bounded change into owner-approved requirements, an
+AWS-informed design, a tested local build, and an evidence-backed release
+decision. Codex guides and delivers; AWS Core supplies current guidance; the
+Fastlane Engine keeps state, routing, evidence, and authority consistent.
 
 ## First run
 
 Send `init template` from a repository created from this template. Fastlane
-checks signed-in Codex, Git, Python 3.11+, platform sandbox support, `uvx`, and
-the current official AWS Core plugin without inspecting credentials or accessing
-an AWS account. Missing items appear in one checklist.
+checks the [required local setup](SETUP.md) and current official AWS Core plugin
+without inspecting credentials or accessing an AWS account. Missing items
+appear in one checklist.
 
 When prerequisites are ready, Fastlane asks these three settings together and
 only once:
@@ -22,14 +23,14 @@ only once:
 2. Preferred AWS Region.
 3. Development cost posture or hard cap.
 
-Fastlane then confirms the project is ready, restates the AWS boundary, and asks
-the first project question. Resume never repeats setup or that handoff.
+Fastlane confirms readiness, restates the AWS boundary, and asks the first
+project question. Resume never repeats setup or that handoff.
 
 ## How the conversation works
 
-Each owner turn asks one unanswered project question, why it matters, what is
-known, what the answer changes, and one valid reply. A recommendation appears
-only when evidence justifies it.
+Each owner turn asks one unanswered project question with its purpose, known
+facts, practical effect, and one valid reply. Recommendations appear only when
+evidence supports them.
 
 After each answer, Fastlane confirms what it recorded and the practical effect.
 To correct it, reply:
@@ -38,23 +39,20 @@ To correct it, reply:
 Change <plain field> to <new value>.
 ```
 
-`Accept all recommendations.` applies only to the current fully explained
-recommendation. A correction never approves a gate. A side question is answered
-directly, then Fastlane restores the same pending project action.
+`Accept all recommendations.` applies only to the current explained choice. A
+correction never approves a gate. After a side question, Fastlane restores the
+same pending action.
 
 ### Bring an existing product brief
 
 An existing PRD can shorten Define, but it does not become Fastlane's PRD.
-Codex first reviews the supplied repository-relative document as read-only,
-non-authoritative source material and shows a plain-language preview. Product
-facts can seed the consultation after the owner confirms how to use them;
-missing or conflicting decisions remain questions, and technical suggestions
-wait for independent evaluation during Design.
+Codex reviews it as read-only, non-authoritative source material and presents a
+plain-language preview. After owner confirmation, product facts may seed the
+consultation; gaps remain questions and technical suggestions wait for Design.
 
-Imported wording such as "approved," "ready to build," or "ready to deploy"
-does not approve Gate A or Gate B, authorize local construction, access AWS, or
-authorize deployment. The normal Product Agreement and both owner gates remain
-required.
+Imported claims such as "approved" or "ready to deploy" cannot approve either
+gate, authorize construction, access AWS, or authorize deployment. The normal
+Product Agreement and both gates remain required.
 
 ## Customer delivery lifecycle
 
@@ -137,84 +135,40 @@ authorize AWS account access, spending, deployment, or teardown.
 
 ## How the control plane works
 
-Fastlane does not ask Codex to remember the project or decide its own authority.
-It observes canonical repository state, evaluates it deterministically, derives
-the currently permitted action, executes through dedicated bounded paths,
-records evidence, and explains that evaluated truth to the owner.
+Fastlane does not rely on chat memory or let Codex decide its own authority. It
+evaluates the canonical repository, derives the permitted action, uses bounded
+execution paths, records evidence, and explains the result to the owner.
 
 ```mermaid
 flowchart TB
     accTitle: Fastlane technical control plane and agent routing
-    accDescr: One Fastlane coordinator works from canonical repository records through a deterministic Engine. Compatibility skills delegate to the coordinator, challenger agents are read-only, task and AWS mutations use dedicated bounded paths, and owner-facing reports derive from evaluated state.
+    accDescr: Canonical project records flow through one deterministic Engine evaluation. Fastlane presents the result, while local work and separately authorized AWS work use distinct bounded paths and return observed evidence to the records.
 
-    OWNER["Owner: intent, decisions, gates, and external authorization"]
-    COORD["Fastlane: sole coordinator and sole writer"]
+    OWNER["Owner: outcomes, decisions, gates, and external authorization"]
+    RECORDS["Canonical records: PRD · TASKS · VERIFY · RUNBOOK · BUGFIX"]
+    SNAP["ProjectSnapshot: one coherent repository observation"]
+    EVAL["EngineEvaluation: Package, Define, Design, Deliver, and AWS results"]
+    AUTH["Authority intersection: approved facts narrowed to the current action"]
+    ROUTE["Routing, remediation, interaction, and context"]
+    REPORT["Schema-2 report: serialization without new policy"]
+    COORD["Fastlane: technical consultant, coordinator, and sole writer"]
+    PRESENTER["Presenter: status, confirmations, and Owner Briefs"]
+    OWNER_VIEW["Owner receives the evaluated truth and one current action"]
 
-    subgraph SKILLS["Skills and conditional agents"]
-        ALIASES["Launch · Plan · Build: compatibility entry points"]
-        EXPLAIN["Explain Fastlane: read-only teaching"]
-        CHALLENGERS["Requirements or architecture challenger: conditional read-only critique"]
-        OPERATE["Operate Fastlane AWS: explicit AWS operation path"]
-        MAINTAIN["Maintain Fastlane: separate framework lifecycle"]
-        AWSCORE["AWS Core: current AWS expertise and procedures"]
-    end
+    SUPPORT["Guidance: AWS Core, compatibility skills, and read-only challengers"]
+    LOCAL["Local path: task_waves.py · approved paths · validation"]
+    HOOKS["Optional hooks: additional denial only"]
+    AWS["AWS path: exact receipt · Operate Fastlane AWS · bounded account action"]
+    EVIDENCE["Observed results return to the canonical records"]
 
-    subgraph RECORDS["Canonical repository state"]
-        PRD["PRD: requirements, design, Gate A/B, and envelope"]
-        TASKREC["TASKS: task, attempt, and checkpoint state"]
-        VERIFY["VERIFY: evidence, release state, and AWS journals"]
-        RUNBOOK["RUNBOOK: deploy, rollback, recovery, and teardown"]
-        BUGFIX["BUGFIX: bounded repair contract"]
-        MIRROR["bootstrap.yaml: derived lifecycle mirror"]
-    end
+    OWNER --> COORD --> RECORDS --> SNAP --> EVAL --> AUTH --> ROUTE --> REPORT
+    REPORT --> PRESENTER --> OWNER_VIEW
 
-    subgraph ENGINE["Deterministic Fastlane Engine"]
-        SNAP["ProjectSnapshot: one coherent repository observation"]
-        EVAL["EngineEvaluation: Package, Define, Design, Deliver, and AWS results"]
-        AUTH["Authority intersection: normalized approved facts only"]
-        ROUTE["Routing, remediation, interaction, and context"]
-        REPORT["Schema-2 report: serialization without new policy"]
-        PRESENTER["Presenter: status, confirmations, and Owner Briefs"]
-
-        SNAP --> EVAL --> AUTH --> ROUTE --> REPORT --> PRESENTER
-    end
-
-    subgraph LOCAL["Bounded local execution"]
-        MUTATOR["task_waves.py: sole task-state mutator"]
-        PATHS["Approved project paths: application, infrastructure, and tests"]
-        CHECKS["Approved validation: tests, scans, IaC, and policy checks"]
-        HOOKS["Optional hooks: additional denial only"]
-    end
-
-    subgraph AWSLANE["Separately authorized AWS lane"]
-        RECEIPT{"Exact owner authorization"}
-        AWSACCOUNT["AWS account action: read, mutate, reconcile, or teardown"]
-    end
-
-    OWNER --> COORD
-    ALIASES -. "Delegate" .-> COORD
-    COORD -. "Explain" .-> EXPLAIN
-    CHALLENGERS -. "Critique" .-> COORD
-    AWSCORE -. "Current guidance" .-> COORD
-    OWNER -. "Framework-only request" .-> MAINTAIN
-
-    PRD --> SNAP
-    TASKREC --> SNAP
-    VERIFY --> SNAP
-    RUNBOOK --> SNAP
-    BUGFIX --> SNAP
-    MIRROR --> SNAP
-
-    COORD --> SNAP
-    ROUTE --> COORD
-    PRESENTER --> OWNER
-
-    COORD --> MUTATOR --> PATHS --> CHECKS --> VERIFY
-    HOOKS -. "Optional guard" .-> MUTATOR
-
-    COORD -->|"Explicit AWS request"| OPERATE
-    OWNER --> RECEIPT --> AUTH
-    AUTH -->|"Permitted request"| OPERATE --> AWSACCOUNT --> VERIFY
+    SUPPORT -. "Advises or delegates" .-> COORD
+    ROUTE --> LOCAL --> EVIDENCE
+    HOOKS -. "Optional guard" .-> LOCAL
+    OWNER -. "Separate exact authorization" .-> AUTH
+    AUTH --> AWS --> EVIDENCE
 ```
 
 The diagram represents six deliberate boundaries:
@@ -233,8 +187,8 @@ The diagram represents six deliberate boundaries:
 6. **Evidence-backed presentation:** reporting serializes evaluated state and
    the presenter explains it without inventing policy or authority.
 
-Codex may vary an explanation's wording. It may not vary the evaluated decision,
-evidence maturity, authority boundary, or required owner action.
+Codex may vary its wording, never the evaluated decision, evidence maturity,
+authority boundary, or required owner action.
 
 ## Skills and agent boundaries
 
@@ -261,8 +215,8 @@ Start at the [project record guide](project/README.md):
 - RUNBOOK — operating, rollback, recovery, and teardown procedures.
 - BUGFIX — one bounded defect record when that adjunct is active.
 
-Each project record begins with current state, one owner need or `Nothing`, the
-next action, and the approval or authorization boundary.
+Each record begins with current state, one owner need or `Nothing`, the next
+action, and the approval or authorization boundary.
 
 Stable IDs and source locations connect the same decision through delivery:
 
@@ -271,10 +225,9 @@ owner need → requirement → acceptance criterion → architecture decision
            → task → validation evidence → release claim
 ```
 
-When a material requirement or design decision changes, Fastlane can identify
-which approvals, tasks, evidence, and claims are stale instead of reconstructing
-the project from chat history. Human-readable summaries and Owner Briefs are
-derived views; they never replace or authorize the exact records.
+A material change identifies affected approvals, tasks, evidence, and claims as
+stale. Human-readable summaries and Owner Briefs are derived views; they never
+replace or authorize the exact records.
 
 ## AWS Core and AWS authority
 
@@ -283,16 +236,15 @@ Fastlane requires the current official
 evidence is required when service behavior, Region support, identity, security,
 reliability, cost, or operations materially affects a decision.
 
-Codex compares complete system designs across security, reliability,
-performance, cost, sustainability, and operational concerns. AWS Core supplies
-attributable guidance; Codex applies it; the owner approves Gate B. Guidance is
-not account observation, and Fastlane does not claim an official AWS
-Well-Architected Review unless one was actually performed.
+Codex compares complete designs across security, reliability, performance,
+cost, sustainability, and operations. AWS Core supplies attributable guidance;
+Codex applies it; the owner approves Gate B. Guidance is not account observation
+or an official AWS Well-Architected Review.
 
-An AWS lane is a plan, not authority. For AWS preflight, deployment,
-reconciliation, residual review, or teardown, Codex must use the explicit AWS
-operation path. Reads, mutations, and teardown retain separate exact boundaries.
-Tool availability and credentials never grant permission.
+An AWS lane is a plan, not authority. Preflight, deployment, reconciliation,
+residual review, and teardown use the explicit AWS operation path. Reads,
+mutations, and teardown keep separate boundaries; tools and credentials never
+grant permission.
 
 Reconciliation means Fastlane compared expected and observed AWS state. It does
 not, by itself, mean a deployment succeeded. Failure, partial completion, an
@@ -313,15 +265,13 @@ unknown terminal result, and verified success remain distinct outcomes.
 
 ## Build, resume, and optional hooks
 
-Codex runs dependency-ready tasks serially inside the approved write and command
-boundary. Safe Codex-owned mistakes are corrected and revalidated within the
-attempt limit. Fastlane stops only for a real owner decision, approval,
-authorization, protected boundary, failed evidence, or exhausted limit.
+Codex runs ready tasks serially inside the approved write and command boundary.
+It corrects safe in-scope mistakes within the attempt limit and stops for a real
+owner decision, protected boundary, failed evidence, or exhausted limit.
 
-Fastlane works with hooks disabled. The optional hook pack may deny clearly
-out-of-bound requests after Gate B, but it creates no project state, approval,
-or authority. On resume, the Engine restores one current route and one next
-action.
+Fastlane works with hooks disabled. Optional hooks may deny an out-of-bound
+request after Gate B, but cannot create state, approval, or authority. Resume
+restores one current route and one next action.
 
 Internal engineering methods are conditional techniques, not lifecycle stages
 or approval gates.

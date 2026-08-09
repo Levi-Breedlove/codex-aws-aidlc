@@ -701,7 +701,7 @@ sequenceDiagram
         workflow = REPOSITORY_ROOT / "docs" / "WORKFLOW.md"
         self.assertFalse((REPOSITORY_ROOT / "docs/AGENTS.md").exists())
         self.assertLessEqual(len(guide.read_text(encoding="utf-8").splitlines()), 70)
-        self.assertLessEqual(len(workflow.read_bytes()), 16_000)
+        self.assertLessEqual(len(workflow.read_bytes()), 15_500)
         index_text = index.read_text(encoding="utf-8")
         for target in (
             "SETUP.md",
@@ -766,19 +766,20 @@ sequenceDiagram
 
     def test_readme_is_a_compact_governance_platform_landing_page(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(readme.splitlines()), 275)
-        self.assertLessEqual(len(readme.encode("utf-8")), 16_000)
+        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertLessEqual(len(readme.splitlines()), 140)
+        self.assertLessEqual(len(readme.encode("utf-8")), 9_000)
         headings = (
-            "## Why Fastlane",
-            "## Customer delivery lifecycle",
-            "## What Fastlane gives you",
+            "## Why teams use Fastlane",
+            "## Where it fits",
+            "## Fastlane at a glance",
+            "## What you receive",
+            "## The important terms",
             "## Start in minutes",
-            "## How Fastlane works under the hood",
-            "## Skills and agents",
-            "## Canonical state and semantic anchors",
-            "## AWS architecture and operational evidence",
-            "## Trust model and maturity",
-            "## Explore Fastlane",
+            "## Trust by design",
+            "## Go deeper",
         )
         for heading in headings:
             self.assertIn(heading, readme)
@@ -788,28 +789,66 @@ sequenceDiagram
         )
         for product_claim in (
             "repository-native governance platform",
-            "accTitle: Fastlane customer delivery lifecycle",
-            "Gate A: approve the Product Agreement",
-            "Gate B: approve the technical plan and local construction boundary",
-            "accTitle: Fastlane technical control plane",
-            "ProjectSnapshot",
-            "EngineEvaluation",
-            "Authority intersection",
-            "Schema-2 report",
-            "task_waves.py",
-            "Exact owner authorization",
-            "Separate AWS authorization",
-            "neither gate authorizes an AWS account action",
-            "Human-readable summaries and Owner Briefs are derived views",
+            "New AWS applications",
+            "Existing applications",
+            "Infrastructure-only work",
+            "Existing product briefs",
+            "Bounded repairs",
+            "Product Agreement",
+            "Technical Owner Brief",
+            "complete architecture diagram",
+            "Gate A approves what should be built",
+            "Gate B approves the technical plan",
+            "Neither gate authorizes AWS account access",
+            "Fastlane Engine",
+            "separate exact authorization",
         ):
             self.assertIn(product_claim, readme)
-        self.assertEqual(readme.count("```mermaid"), 2)
-        self.assertEqual(readme.count("flowchart TB"), 2)
-        self.assertEqual(readme.count("accTitle:"), 2)
-        self.assertEqual(readme.count("accDescr:"), 2)
+        self.assertEqual(readme.count("```mermaid"), 1)
+        self.assertEqual(readme.count("flowchart TB"), 1)
+        self.assertEqual(readme.count("accTitle:"), 1)
+        self.assertEqual(readme.count("accDescr:"), 1)
         self.assertNotIn("<br", readme)
         self.assertNotIn("flowchart TD", readme)
         self.assertNotIn("flowchart LR", readme)
+        for implementation_detail in (
+            "ProjectSnapshot",
+            "EngineEvaluation",
+            "Schema-2",
+            "task_waves.py",
+            "parser",
+            "digest",
+            "## Skills and agents",
+            "## How Fastlane works under the hood",
+            "accTitle: Fastlane customer delivery lifecycle",
+            "accTitle: Fastlane technical control plane",
+        ):
+            self.assertNotIn(implementation_detail, readme)
+        self.assertIsNone(
+            re.search(
+                r"\b(?:BOOT|INTAKE|REQ|DESIGN|TASK|BUILD|RELEASE|AWS)-\d{2}\b",
+                readme,
+            )
+        )
+
+        self.assertIn("## Customer delivery lifecycle", workflow)
+        self.assertIn("accTitle: Fastlane customer delivery lifecycle", workflow)
+        self.assertIn("## How the control plane works", workflow)
+        self.assertIn("accTitle: Fastlane technical control plane", workflow)
+        self.assertIn("ProjectSnapshot", workflow)
+        self.assertIn("EngineEvaluation", workflow)
+        self.assertIn("task_waves.py", workflow)
+
+        def substantial_lines(source: str) -> set[str]:
+            return {
+                line.strip()
+                for line in source.splitlines()
+                if len(line.strip()) >= 40
+                and not line.lstrip().startswith(("#", "- [", "```"))
+            }
+
+        shared_lines = substantial_lines(readme) & substantial_lines(workflow)
+        self.assertLessEqual(len(shared_lines), 12, msg=sorted(shared_lines))
 
 
 if __name__ == "__main__":
