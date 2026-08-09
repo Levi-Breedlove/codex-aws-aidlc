@@ -541,8 +541,8 @@ Development budget: <amount or "minimize cost; no hard cap">"""
             "Deployment and teardown retain separate exact Fastlane authority",
             setup_doc,
         )
-        self.assertLessEqual(len(readme.splitlines()), 275)
-        self.assertLessEqual(len(readme.encode("utf-8")), 16_000)
+        self.assertLessEqual(len(readme.splitlines()), 140)
+        self.assertLessEqual(len(readme.encode("utf-8")), 9_000)
         self.assertLessEqual(len((REPOSITORY_ROOT / "AGENTS.md").read_bytes()), 7_200)
 
         prompts = (REPOSITORY_ROOT / "prompts/CODEX-PROMPTS.md").read_text(
