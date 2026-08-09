@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.29
+**Pack version:** 1.2.30
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -221,13 +221,17 @@ checkpoint and follows the resulting next action.
 
 **Stop conditions:** A real owner setup action, source-integrity conflict, unsafe collision, unsupported target, or Engine safety review.
 
-**Receipt:** Routine owner status or one consolidated prerequisite checklist.
+**Receipt:** One consolidated prerequisite checklist; the deterministic welcome;
+or, immediately after successful initialization, one `project-ready` handoff
+from the first Engine report.
 
 **Next:** Follow the Engine route, normally INTAKE-10 for a new project.
 
 ~~~text
 [BOOT-00]
 Use the Fastlane coordinator and Define procedure for the current Engine report.
+After a new project is initialized, render `project-ready` exactly once before
+ordinary intake. Never render it during resume.
 ~~~
 
 ## INTAKE-10 — Guided Intake
@@ -255,7 +259,8 @@ Use the Fastlane coordinator and Define procedure for the current Engine report.
 ~~~text
 [INTAKE-10]
 Use the Define and owner-response procedures for the exact current intake card.
-Tailor its natural wording to the Engine's current consultation objective. Never
+Let the presenter explain why the current consultation objective matters and
+what the answer changes. Never
 ask the owner to choose Fastlane's project mode, delivery profile, effective
 risk, AWS lane, or a combined internal configuration.
 

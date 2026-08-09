@@ -100,8 +100,9 @@ repository hooks remain disabled until a current Gate B approves construction.
 5. Answer the three one-time project settings together: project name, preferred
    AWS Region, and development budget or cost posture.
 
-Fastlane then configures the template dry-run-first and begins product
-discovery.
+Fastlane then configures the template dry-run-first and presents one **Project
+Ready** handoff. It confirms the settings and that AWS access is not authorized,
+explains how the consultation works, and asks the first project question.
 
 If you do not have a hard budget, answer:
 
@@ -110,7 +111,7 @@ minimize cost; no hard cap
 ```
 
 After initialization, Fastlane resumes from its recorded project state and
-does not repeat prerequisites or setup questions.
+does not repeat prerequisites, setup questions, or the Project Ready handoff.
 
 Ruff is only a Fastlane maintainer and CI check. Project owners do not install
 Ruff system-wide to use the template.

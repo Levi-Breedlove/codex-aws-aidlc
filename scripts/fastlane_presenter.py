@@ -1355,12 +1355,115 @@ def _intake_current_understanding(report: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-def _intake_question_lines(card: Mapping[str, Any]) -> list[str]:
+def _intake_consultation(
+    report: Mapping[str, Any], card: Mapping[str, Any]
+) -> tuple[str, tuple[str, ...], str]:
+    """Return owner-safe wording from the Engine's current question guidance."""
+
+    foundation = report.get("intake_foundation")
+    if not isinstance(foundation, Mapping):
+        raise PresentationError("intake consultation requires the current foundation")
+    if foundation.get("schema_version") == 1:
+        question = card["questions"][0]
+        return "", (), str(question["prompt"])
+    guidance = foundation.get("next_question_guidance")
+    if not isinstance(guidance, Mapping) or guidance.get("schema_version") != 1:
+        raise PresentationError("intake consultation guidance is invalid")
+    if (
+        guidance.get("status")
+        not in {
+            "STARTING_POINT_REQUIRED",
+            "QUESTION_REQUIRED",
+        }
+        or guidance.get("owner_action_required") is not True
+    ):
+        raise PresentationError("intake consultation is not awaiting one owner answer")
+    objective = guidance.get("objective")
+    fields = guidance.get("fields")
+    target_ids = guidance.get("target_ids")
+    if (
+        not isinstance(objective, str)
+        or not objective.strip()
+        or len(objective) > 400
+        or not isinstance(fields, Sequence)
+        or isinstance(fields, (str, bytes))
+        or not 1 <= len(fields) <= 3
+        or any(
+            not isinstance(field, str)
+            or re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", field) is None
+            for field in fields
+        )
+        or not isinstance(target_ids, Sequence)
+        or isinstance(target_ids, (str, bytes))
+    ):
+        raise PresentationError("intake consultation guidance is malformed")
+    question = card["questions"][0]
+    if tuple(target_ids) != tuple(question.get("basis_ids", ())):
+        raise PresentationError(
+            "intake consultation does not bind the current question"
+        )
+    owner_objective = _owner_consultation_objective(objective)
+    prompt = str(question["prompt"])
+    if tuple(fields) == ("OWNER_WORK_CONTEXT",):
+        prompt = "What kind of project are we starting together?"
+    return owner_objective, tuple(str(field) for field in fields), prompt
+
+
+def _owner_consultation_objective(objective: str) -> str:
+    replacements = (
+        ("Learn whether the owner is ", "This tells Fastlane whether you are "),
+        ("Understand ", "This helps Fastlane understand "),
+        ("Define ", "This helps define "),
+        ("Identify ", "This identifies "),
+        ("Clarify ", "This clarifies "),
+    )
+    rendered = objective.strip()
+    for prefix, replacement in replacements:
+        if rendered.startswith(prefix):
+            rendered = replacement + rendered[len(prefix) :]
+            break
+    if re.search(r"(?:INTAKE|REQ|DES|AUTH)-|\b(?:digest|parser|schema)\b", rendered):
+        raise PresentationError("intake consultation exposes internal terminology")
+    return rendered
+
+
+def _intake_project_effect(fields: tuple[str, ...]) -> str:
+    field_set = set(fields)
+    if field_set == {"OWNER_WORK_CONTEXT"}:
+        return (
+            "Your answer tells Fastlane whether existing behavior, data, and "
+            "migration risk must be protected."
+        )
+    if field_set & {"PRIMARY_USERS", "OWNER_STATED_PROBLEM", "OBSERVABLE_OUTCOME"}:
+        return (
+            "Your answer establishes who the product serves, the problem to solve, "
+            "and the first useful result."
+        )
+    if field_set & {"FIRST_RELEASE_BOUNDARY", "SUCCESS_MEASURE"}:
+        return (
+            "Your answer sets the smallest useful first release and how its result "
+            "will be recognized."
+        )
+    if field_set & {"DATA_TYPES", "DATA_SENSITIVITY"}:
+        return (
+            "Your answer shapes the product's data, access, privacy, and security "
+            "requirements."
+        )
+    return (
+        "Your answer sets the first audience and any location boundary that the "
+        "Product Agreement must preserve."
+    )
+
+
+def _intake_question_lines(
+    card: Mapping[str, Any], *, prompt: str | None = None
+) -> list[str]:
     questions = card["questions"]
     lines: list[str] = []
     for question in questions:
         reply_key = str(question["reply_key"])
-        lines.extend(("", f"{reply_key}. {question['prompt']}"))
+        owner_prompt = prompt or str(question["prompt"])
+        lines.extend(("", f"{reply_key}. {owner_prompt}"))
         if question["kind"] == "DECISION":
             options = question["options"]
             recommended = question["recommended"]
@@ -1423,12 +1526,19 @@ def _render_intake_card(
         "Status: 1 question remains before requirements analysis.",
         f"Updated: {updated}",
     ]
+    objective, fields, prompt = _intake_consultation(report, card)
+    if objective:
+        lines.extend(("", "Why this matters", "", objective))
     current_understanding = _intake_current_understanding(report)
     if current_understanding:
-        lines.append("Current understanding:")
+        lines.extend(("", "What Fastlane already knows", ""))
         lines.extend(f"- {item}" for item in current_understanding)
-    lines.append("Need from you: Answer this remaining question.")
-    lines.extend(_intake_question_lines(card))
+    lines.extend(("", "Need from you: Answer this remaining question."))
+    lines.extend(_intake_question_lines(card, prompt=prompt))
+    if fields:
+        lines.extend(
+            ("", "What your answer changes", "", _intake_project_effect(fields))
+        )
     lines.extend(
         (
             "",
@@ -1439,6 +1549,115 @@ def _render_intake_card(
     if card["accept_all_allowed"]:
         lines.append("You may also reply `Accept all recommendations.`")
     lines.extend(("", *_intake_reply_guidance(card)))
+    return "\n".join(lines)
+
+
+def _owner_project_setting(value: Any, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or value != value.strip()
+        or len(value) > 160
+        or any(character in value for character in "\r\n`{}")
+    ):
+        raise PresentationError(f"project-ready {label} is invalid")
+    return value
+
+
+def _owner_cost_posture(value: Any) -> str:
+    posture = _owner_project_setting(value, "cost posture")
+    if posture == "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED":
+        return "Minimize total development cost; no hard cap stated."
+    match = re.fullmatch(
+        r"MINIMIZE_TOTAL_COST; HARD_CAP: ([A-Z]{3}) ([0-9]+(?:\.[0-9]{1,2})?)",
+        posture,
+    )
+    if match is None:
+        raise PresentationError("project-ready cost posture is not canonical")
+    return (
+        f"Minimize total development cost; hard cap {match.group(1)} {match.group(2)}."
+    )
+
+
+def render_project_ready(report: Mapping[str, Any]) -> str:
+    """Render the one post-initialization handoff before ordinary resume mode."""
+
+    interaction = _interaction(report)
+    if (
+        interaction.get("owner_stage") != "DEFINE"
+        or interaction.get("response_mode") != "OWNER_UPDATE"
+        or interaction.get("state") != "NEEDS_INPUT"
+        or interaction.get("route_reason_code") != "INTAKE_REQUIRED"
+        or interaction.get("owner_action_kind") != "ANSWER_OPEN_DECISIONS"
+        or interaction.get("owner_action_required") is not True
+        or interaction.get("automatic_continuation_allowed") is not False
+        or interaction.get("formal_receipt_required") is not False
+        or interaction.get("turn_boundary_required") is not True
+        or interaction.get("blocking_ids") != []
+    ):
+        raise PresentationError("project-ready requires the first Define owner action")
+    project = report.get("project")
+    authorizations = report.get("authorizations")
+    if not isinstance(project, Mapping) or authorizations != {
+        "construction": "NONE",
+        "aws": "NONE",
+    }:
+        raise PresentationError("project-ready cannot imply current authority")
+    name = _owner_project_setting(project.get("name"), "project name")
+    region = _owner_project_setting(project.get("region"), "Region")
+    cost = _owner_cost_posture(project.get("cost_posture"))
+    card = _pending_intake_card(report)
+    if (
+        card is None
+        or card.get("card_id") != "INTAKE-CARD-0001"
+        or card.get("revision") != 1
+    ):
+        raise PresentationError("project-ready requires the first current intake card")
+    objective, fields, prompt = _intake_consultation(report, card)
+    if fields != ("OWNER_WORK_CONTEXT",) or _intake_current_understanding(report):
+        raise PresentationError(
+            "project-ready is available only immediately after initialization"
+        )
+    lines = [
+        "FASTLANE · PROJECT READY",
+        "",
+        f"{name} is initialized and ready for product definition.",
+        "",
+        "Project settings",
+        "",
+        f"- Preferred AWS Region: `{region}`",
+        f"- Development cost posture: {cost}",
+        "- AWS account access: Not authorized.",
+        "",
+        "How consultation works",
+        "",
+        "Fastlane asks one consequential project question at a time. Codex explains "
+        "why it matters, recommends an option only when current evidence supports "
+        "one, and confirms what changed after each answer.",
+        "",
+        "You can ask for an explanation or correct an earlier answer at any time. "
+        "Fastlane handles its internal planning configuration automatically.",
+        "",
+        "Need from you: Answer the first project question.",
+        "",
+        "Why this matters",
+        "",
+        objective,
+    ]
+    lines.extend(_intake_question_lines(card, prompt=prompt))
+    lines.extend(
+        (
+            "",
+            "What your answer changes",
+            "",
+            _intake_project_effect(fields),
+            "",
+            "Next: Codex will record only your confirmed answer, validate it, and "
+            "continue the guided consultation.",
+            "",
+            *_intake_reply_guidance(card),
+        )
+    )
     return "\n".join(lines)
 
 
@@ -1624,8 +1843,9 @@ def render_side_question_response(
     if required and action_kind == "ANSWER_OPEN_DECISIONS":
         card = _pending_intake_card(report)
         if card is not None:
+            _objective, _fields, prompt = _intake_consultation(report, card)
             lines.extend(("", "The pending questions are unchanged:"))
-            lines.extend(_intake_question_lines(card))
+            lines.extend(_intake_question_lines(card, prompt=prompt))
             if card["accept_all_allowed"]:
                 lines.append("You may also reply `Accept all recommendations.`")
             lines.extend(("", *_intake_reply_guidance(card)))
@@ -2026,6 +2246,15 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
         lines.extend(
             (
                 "",
+                (
+                    "[View the complete architecture diagram]"
+                    "(docs/project/PRD.md#proposed-system-at-a-glance)"
+                ),
+            )
+        )
+        lines.extend(
+            (
+                "",
                 "<details>",
                 "<summary>Decision reasoning, tradeoffs, risks, and sources</summary>",
                 "",
@@ -2349,6 +2578,7 @@ def main(argv: list[str] | None = None) -> int:
         "mode",
         choices=(
             "owner",
+            "project-ready",
             "side-question",
             "gate-a-brief",
             "gate-b-brief",
@@ -2377,7 +2607,9 @@ def main(argv: list[str] | None = None) -> int:
         report = payload.get("report")
         if not isinstance(report, Mapping):
             raise PresentationError("input is missing report")
-        if args.mode == "owner":
+        if args.mode == "project-ready":
+            output = render_project_ready(report)
+        elif args.mode == "owner":
             if "audit" in payload:
                 raise PresentationError(
                     "audit text is derived from the Fastlane Engine report, not caller prose"

@@ -491,6 +491,9 @@ class PromptPackContractTests(unittest.TestCase):
             "Separate every labeled choice and reply example",
             "repository-relative Markdown links",
             "receipt remains last and byte-identical",
+            "fastlane_presenter.py project-ready --input-stdin",
+            "Why this matters",
+            "What your answer changes",
         ):
             self.assertIn(phrase, self.owner_responses)
         self.assertIn(
@@ -499,6 +502,8 @@ class PromptPackContractTests(unittest.TestCase):
         )
         self.assertIn("intake_foundation.next_question_guidance", self.fastlane_skill)
         self.assertIn("intake_foundation.project_configuration", self.fastlane_skill)
+        self.assertIn("fastlane_presenter.py project-ready", self.fastlane_skill)
+        self.assertIn("Never render it during resume.", self.prompts)
         self.assertIn(
             "Never ask the owner to select project mode",
             self.fastlane_skill,
@@ -693,9 +698,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.29")
-        self.assertIn("**Pack version:** 1.2.29", self.prompts)
-        self.assertIn("Current customer build: **1.2.29**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.30")
+        self.assertIn("**Pack version:** 1.2.30", self.prompts)
+        self.assertIn("Current customer build: **1.2.30**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

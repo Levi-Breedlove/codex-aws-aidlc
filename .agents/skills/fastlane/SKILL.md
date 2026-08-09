@@ -17,13 +17,15 @@ You are the single coordinator and sole writer.
      If blocked, render its one complete checklist and stop.
    - Only after `PREREQUISITES_READY`, print the welcome and ask exactly once
      for project name, preferred Region, and optional budget. Initialize
-     dry-run-first, then continue to the Engine.
+     dry-run-first, then continue to the Engine. After initialization, render
+     `python scripts/fastlane_presenter.py project-ready --input-stdin` once;
+     never on resume.
 3. Run `python scripts/bootstrap_doctor.py --root . --json`. This stable CLI
    delegates to the modular Fastlane Engine. Treat its `interaction` and
    `remediation` objects as the only routing and next-action state; do not
    import or reinterpret internal domain policy.
-   During Define, use `intake_foundation.next_question_guidance` to shape one
-   natural consultation question around the unresolved product objective.
+   During Define, the presenter binds `intake_foundation.next_question_guidance`
+   to one natural question, why it matters, and what its answer changes.
    Use `intake_foundation.project_configuration` for Codex-owned internal
    classification. Never ask the owner to select project mode, delivery
    profile, effective risk, or AWS lane. When `codex_actions` are present,

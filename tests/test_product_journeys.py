@@ -304,9 +304,20 @@ class ProductJourneyTests(unittest.TestCase):
                 card["exact_reply"],
                 f"{card['reply_token']}; {card['owner_reply']}",
             )
+            project_ready = presenter.render_project_ready(first_resume)
+            self.assertTrue(project_ready.startswith("FASTLANE · PROJECT READY"))
+            self.assertIn("Journey Test Project is initialized", project_ready)
+            self.assertIn("Preferred AWS Region: `us-west-2`", project_ready)
+            self.assertIn("AWS account access: Not authorized.", project_ready)
+            self.assertIn("How consultation works", project_ready)
+            self.assertEqual(project_ready.count("Need from you:"), 1)
+            self.assertIn(
+                "1. What kind of project are we starting together?", project_ready
+            )
             resumed = presenter.render_owner_update(first_resume)
-            self.assertNotIn("Current understanding:", resumed)
-            self.assertIn("1. What are you starting with?", resumed)
+            self.assertNotIn("What Fastlane already knows", resumed)
+            self.assertIn("Why this matters", resumed)
+            self.assertIn("1. What kind of project are we starting together?", resumed)
             self.assertIn("A. A new application", resumed)
             self.assertIn("B. A change to an existing application", resumed)
             self.assertIn("C. A repair", resumed)
@@ -459,6 +470,11 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
+            self.assertIn(
+                "[View the complete architecture diagram]"
+                "(docs/project/PRD.md#proposed-system-at-a-glance)",
+                rendered_gate_b,
+            )
             for label in (
                 "Meaning and selection:",
                 "Basis and rationale:",
@@ -1739,8 +1755,9 @@ class ProductJourneyTests(unittest.TestCase):
         self.assertFalse(foundation["project_configuration"]["owner_action_required"])
         self.assertEqual(len(foundation["pending_card"]["questions"]), 1)
         self.assertTrue(report["interaction"]["turn_boundary_required"])
-        self.assertNotIn("Current understanding:", rendered)
-        self.assertIn("1. What are you starting with?", rendered)
+        self.assertNotIn("What Fastlane already knows", rendered)
+        self.assertIn("Why this matters", rendered)
+        self.assertIn("1. What kind of project are we starting together?", rendered)
         self.assertIn("A. A new application", rendered)
         self.assertIn("B. A change to an existing application", rendered)
         self.assertIn("C. A repair", rendered)

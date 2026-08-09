@@ -3,6 +3,10 @@
 - Lead with plain-language project status, not internal execution narration.
 - Render routine status with `python scripts/fastlane_presenter.py owner
   --input-stdin`; do not hand-compose lifecycle routing.
+- Immediately after successful initialization, render the first Engine report
+  once with `python scripts/fastlane_presenter.py project-ready --input-stdin`.
+  This is the only post-setup handoff: normal resume uses `owner` mode and never
+  repeats the welcome, project settings, or Project Ready explanation.
 - Present one concrete next action. Show an owner action only for a genuine
   decision, setup step, approval, authorization, protected-boundary decision,
   or human safety review. Otherwise continue the selected phase.
@@ -79,8 +83,9 @@ factual replies without that numeric prefix. Do not expose its internal ID,
 revision, digest, or legacy reply token. The parser receives the exact card
 identity separately before any write; retain `R-*` only as an internal 1.0.x
 compatibility input for that same current card. Factual questions remain short
-free text. Use `next_question_guidance` to explain and naturally phrase the
-current product objective without repeating a generic script. Never ask the
+free text. Use `next_question_guidance` to render `Why this matters`, the
+current question, and `What your answer changes` without repeating a generic
+script. Never ask the
 owner to choose project mode, delivery profile, effective risk, AWS lane, or a
 combined Fastlane configuration; those are Codex-owned classifications from
 confirmed facts. Recommend a choice

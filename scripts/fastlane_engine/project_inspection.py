@@ -1106,7 +1106,15 @@ MAX_REQUIRED_FILES = 512
 MAX_REQUIRED_FILE_BYTES = 16 * 1024 * 1024
 MAX_PROJECT_SOURCE_BYTES = 64 * 1024 * 1024
 BINARY_REQUIRED_SUFFIXES = frozenset({".png"})
-_BINARY_REQUIRED_PREFIXES = ("tests/fixtures/",)
+# SAFETY: distributed verification sources are package-integrity inputs, not
+# lifecycle text. Keep their bytes hash-bound without retaining decoded copies
+# in every normal ProjectSnapshot. The scoped tests/AGENTS.md guide remains a
+# text input because context planning may select it during construction work.
+_BINARY_REQUIRED_PREFIXES = (
+    "tests/engine_",
+    "tests/fixtures/",
+    "tests/test_",
+)
 
 MANIFEST_POLICY = ManifestPolicy(
     manifest_file=MANIFEST_FILE,

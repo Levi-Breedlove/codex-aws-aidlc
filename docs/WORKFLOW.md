@@ -22,15 +22,14 @@ only once:
 2. Preferred AWS Region.
 3. Development cost posture or hard cap.
 
-Initialized projects resume from their repository records without repeating
-setup.
+Fastlane then confirms the project is ready, restates the AWS boundary, and asks
+the first project question. Resume never repeats setup or that handoff.
 
 ## How the conversation works
 
-After the three settings, Fastlane asks exactly one unanswered project question
-per owner turn. A decision explains the practical consequence, what Fastlane
-already knows, any evidence-backed recommendation, the main tradeoff, and one
-valid reply.
+Each owner turn asks one unanswered project question, why it matters, what is
+known, what the answer changes, and one valid reply. A recommendation appears
+only when evidence justifies it.
 
 After each answer, Fastlane confirms what it recorded and the practical effect.
 To correct it, reply:
