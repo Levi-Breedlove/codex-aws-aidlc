@@ -73,10 +73,10 @@ Gate A approves what should be built. Gate B approves the technical plan and exa
 
 - A **Product Agreement** defining the outcome, users, first-release scope, non-goals, risks, constraints, and measurable success.
 - A **Technical Owner Brief** explaining the complete recommended design, alternatives, tradeoffs, evidence maturity, and construction boundary.
-- A **complete architecture diagram**, including the planned AWS system, before Gate B asks you to approve construction.
-- A **bounded task plan** that lets Codex continue through safe local work without requesting permission for every task.
+- A **Complete Architecture Diagram**, including the planned AWS system, before Gate B asks you to approve construction.
+- A **Bounded Task Plan** that lets Codex continue through safe local work without requesting permission for every task.
 - An **evidence-backed release decision** stating what passed, failed, or has not yet been observed.
-- An **operations plan** for deployment, verification, rollback, recovery, and teardown without implying that any account action is authorized.
+- An **Operations Plan** for deployment, verification, rollback, recovery, and teardown without implying that any account action is authorized.
 
 ## The important terms
 
