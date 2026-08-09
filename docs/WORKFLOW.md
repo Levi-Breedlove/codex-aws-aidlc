@@ -59,22 +59,38 @@ Product Agreement and both gates remain required.
 ```mermaid
 flowchart TB
     accTitle: Fastlane customer delivery lifecycle
-    accDescr: The owner describes an outcome, approves requirements and the technical plan, Codex builds and validates locally, and AWS operations remain separately authorized.
+    accDescr: The owner approves product and technical boundaries. Fastlane plans, builds, and verifies locally; corrections return to the affected stage, and separately authorized AWS results return to release review.
 
-    IDEA["Describe the outcome"]
-    DEFINE["Guided consultation: users, scope, data, risks, and success"]
-    GATEA{"Gate A: approve the Product Agreement"}
-    DESIGN["Architecture consultation: compare complete AWS-informed solutions"]
-    GATEB{"Gate B: approve the technical plan and local construction boundary"}
-    TASKS["Bounded task plan: dependencies, paths, commands, and validation"]
-    BUILD["Local construction: implement, test, and correct safe in-scope defects"]
-    RELEASE["Evidence-backed release decision: ready, blocked, failed, stale, or unobserved"]
-    AWSAUTH{"Separate AWS authorization: account, Region, actions, limits, and expiry"}
-    AWSOPS["Optional AWS operations: preflight, deploy, reconcile, review, or teardown"]
+    IDEA["Describe the outcome or bounded change"]
+    DEFINE["Define users, journeys, scope, data, risks, and success"]
+    GATEA{"Gate A: approve the Product Agreement?"}
+    DESIGN["Compare complete AWS-informed system designs"]
+    GATEB{"Gate B: approve the plan and local boundary?"}
+    TASKS["Create dependency-aware bounded tasks"]
+    BUILD["Build inside approved local paths"]
+    VERIFY["Run validation and classify evidence"]
+    RELEASE{"Review release readiness"}
+    LOCAL["Conclude with the verified local state"]
+    AWSAUTH{"Authorize one exact AWS operation?"}
+    AWSOPS["Preflight, deploy, reconcile, review, or teardown"]
+    AWSRESULT["Record the observed AWS result"]
 
-    IDEA --> DEFINE --> GATEA --> DESIGN --> GATEB
-    GATEB --> TASKS --> BUILD --> RELEASE
-    RELEASE -->|"Optional"| AWSAUTH --> AWSOPS
+    IDEA --> DEFINE --> GATEA
+    GATEA -->|"Approve"| DESIGN
+    GATEA -. "Request changes" .-> DEFINE
+
+    DESIGN --> GATEB
+    GATEB -->|"Approve"| TASKS
+    GATEB -. "Request changes" .-> DESIGN
+
+    TASKS --> BUILD --> VERIFY --> RELEASE
+    VERIFY -->|"Safe in-scope defect"| BUILD
+    VERIFY -. "Material product gap" .-> DEFINE
+    VERIFY -. "Material design gap" .-> DESIGN
+
+    RELEASE -->|"Local result"| LOCAL
+    RELEASE -. "Optional AWS path" .-> AWSAUTH
+    AWSAUTH -->|"Exact scope only"| AWSOPS --> AWSRESULT --> RELEASE
 ```
 
 | Stage | What Fastlane does | What you do |
@@ -141,34 +157,59 @@ execution paths, records evidence, and explains the result to the owner.
 
 ```mermaid
 flowchart TB
-    accTitle: Fastlane technical control plane and agent routing
-    accDescr: Canonical project records flow through one deterministic Engine evaluation. Fastlane presents the result, while local work and separately authorized AWS work use distinct bounded paths and return observed evidence to the records.
+    accTitle: Fastlane technical control plane and evidence loop
+    accDescr: One coordinator evaluates canonical repository state through a read-only Engine, invokes only bounded action paths, and returns every observed result for canonical recording and reevaluation.
 
-    OWNER["Owner: outcomes, decisions, gates, and external authorization"]
-    RECORDS["Canonical records: PRD · TASKS · VERIFY · RUNBOOK · BUGFIX"]
-    SNAP["ProjectSnapshot: one coherent repository observation"]
-    EVAL["EngineEvaluation: Package, Define, Design, Deliver, and AWS results"]
-    AUTH["Authority intersection: approved facts narrowed to the current action"]
-    ROUTE["Routing, remediation, interaction, and context"]
-    REPORT["Schema-2 report: serialization without new policy"]
-    COORD["Fastlane: technical consultant, coordinator, and sole writer"]
-    PRESENTER["Presenter: status, confirmations, and Owner Briefs"]
-    OWNER_VIEW["Owner receives the evaluated truth and one current action"]
-
-    SUPPORT["Guidance: AWS Core, compatibility skills, and read-only challengers"]
-    LOCAL["Local path: task_waves.py · approved paths · validation"]
+    OWNER["Owner: intent, decisions, gates, and exact receipts"]
+    COORD["Fastlane: consultant, coordinator, and sole adopter writer"]
+    PRESENTER["Presenter: evaluated status and one current action"]
+    ALIASES["Launch, Plan, and Build compatibility aliases"]
+    CRITICS["Read-only requirements and architecture challengers"]
+    AWSCORE["AWS Core: current guidance and procedures"]
     HOOKS["Optional hooks: additional denial only"]
-    AWS["AWS path: exact receipt · Operate Fastlane AWS · bounded account action"]
-    EVIDENCE["Observed results return to the canonical records"]
 
-    OWNER --> COORD --> RECORDS --> SNAP --> EVAL --> AUTH --> ROUTE --> REPORT
-    REPORT --> PRESENTER --> OWNER_VIEW
+    subgraph STATE["Canonical repository state"]
+        RECORDS["PRD · TASKS · VERIFY · RUNBOOK · BUGFIX"]
+    end
 
-    SUPPORT -. "Advises or delegates" .-> COORD
-    ROUTE --> LOCAL --> EVIDENCE
-    HOOKS -. "Optional guard" .-> LOCAL
-    OWNER -. "Separate exact authorization" .-> AUTH
-    AUTH --> AWS --> EVIDENCE
+    subgraph ENGINE["Read-only deterministic Fastlane Engine"]
+        SNAP["ProjectSnapshot: one coherent observation"]
+        EVAL["EngineEvaluation: Package · Define · Design · Deliver · AWS"]
+        AUTH["Authority intersection, route, remediation, and context"]
+        REPORT["Schema-2 report without new policy"]
+
+        SNAP --> EVAL --> AUTH --> REPORT
+    end
+
+    subgraph PATHS["Dedicated bounded action paths"]
+        WRITES["Validated canonical-record writes"]
+        TASKSTATE["task_waves.py task-state mutation"]
+        LOCAL["Approved application and infrastructure edits"]
+        CHECKS["Harness and CI observations"]
+        OPERATE["Operate Fastlane AWS"]
+        ACCOUNT["Bounded AWS account action"]
+        RESULTS["Observed local and AWS results"]
+    end
+
+    OWNER --> COORD
+    ALIASES -. "Delegate" .-> COORD
+    CRITICS -. "Critique" .-> COORD
+    AWSCORE -. "Advise" .-> COORD
+
+    RECORDS --> SNAP
+    COORD -->|"Invoke evaluation"| SNAP
+    REPORT -->|"Return route and bounded authority"| COORD
+    COORD -->|"Render evaluated truth"| PRESENTER --> OWNER
+
+    COORD -->|"Validated record update"| WRITES --> RECORDS
+    COORD -->|"Approved task transition"| TASKSTATE --> RECORDS
+    COORD -->|"Approved local edit"| LOCAL --> CHECKS --> RESULTS
+    COORD -->|"Engine-authorized AWS request"| OPERATE --> ACCOUNT --> RESULTS
+
+    AWSCORE -. "Supply current procedures" .-> OPERATE
+    HOOKS -. "May deny" .-> LOCAL
+    HOOKS -. "May deny" .-> OPERATE
+    RESULTS -->|"Return for canonical evidence recording"| COORD
 ```
 
 The diagram represents six deliberate boundaries:
