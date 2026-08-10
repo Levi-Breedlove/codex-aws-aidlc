@@ -403,6 +403,9 @@ class ProjectDesignContract:
     grandfathered_v5: bool = False
     grandfathered_v6: bool = False
     canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
+    presentation_labels: tuple[tuple[str, str], ...] = field(
+        default=(), repr=False, compare=False
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

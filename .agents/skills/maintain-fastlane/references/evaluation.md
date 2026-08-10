@@ -44,6 +44,23 @@ Print scenarios and anchored rubrics:
 python scripts/model_roleplay_eval.py plan --json
 ```
 
+Derive the exact prompt-contract digest from the repository guidance, Fastlane
+phase and owner-response procedures, skill invocation metadata, adjunct skills,
+and prompt registry used by fresh role plays:
+
+```text
+python scripts/model_roleplay_eval.py prompt-contract --root . --json
+```
+
+The command hashes LF-normalized UTF-8 bytes from its explicit ordered file
+inventory, reports every constituent file digest, and fails closed on a missing,
+non-regular, non-UTF-8, or symlinked instruction. Use its
+`prompt_contract_sha256` value throughout the external evidence bundle and the
+score command; do not substitute a single-file or manually inferred digest.
+Generate it only from the clean exact checkout named by `expected_commit`, after
+manifest and package validation, and rerun it if any inventoried byte changes;
+the command intentionally reads bounded files and does not inspect Git identity.
+
 Use synthetic facts, run every scenario at least three times, and store the
 complete evidence bundle outside the repository. Schema 5 binds the expected
 commit and prompt-contract digest plus unique transcript, scorecard, and any

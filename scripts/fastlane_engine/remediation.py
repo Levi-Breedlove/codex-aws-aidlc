@@ -95,6 +95,7 @@ DESIGN_AGENT_DIAGNOSTICS = frozenset(
         "APPLICATION_SOURCE_PARALLEL_ROOT",
         "AWS_LANE_BOUNDARY",
         "DESIGN_CONTRACT_INVALID",
+        "DIAGRAM_PRESENTATION_STALE",
         "GATE_B_DESIGN_CONTRACT_HASH",
         "GATE_B_ENVELOPE",
         "GATE_B_ENVELOPE_HASH",
@@ -244,6 +245,8 @@ def _agent_correction_is_safe(
         return bool(
             re.fullmatch(r"docs/adr/\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md", relative)
         )
+    if diagnostic.code == "DIAGRAM_PRESENTATION_STALE":
+        return relative == PRD_FILE
 
     if owner_stage == "DEFINE":
         if diagnostic.code not in DEFINE_AGENT_DIAGNOSTICS:

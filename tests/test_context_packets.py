@@ -15,6 +15,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import bootstrap_doctor as doctor
+from scripts.fastlane_engine.design import ProjectDesignContract
 from fastlane_context import (
     SliceRequest,
     canonical_source_bytes,
@@ -452,6 +453,7 @@ class ContextPacketTests(unittest.TestCase):
             "DIAGRAM-0002",
             "DIAGRAM-0003",
             "DIAGRAM-0004",
+            "DIAGRAM-0008",
         ):
             pattern = (
                 rf"(?m)^(\| {diagram_id} \| [^\n]+ \|) NOT_YET_CREATED (\| [^\n]+)$"
@@ -466,6 +468,76 @@ class ContextPacketTests(unittest.TestCase):
             source_texts={**source_texts, doctor.PRD_FILE: current},
         )
         self.assertNotIn(patterns_path, complete["on_demand_slices"])
+
+        presentation_repair = doctor.derive_context_plan(
+            interaction,
+            doctor.TaskSummary(),
+            coverage,
+            next_prompt="DESIGN-10",
+            source_texts={**source_texts, doctor.PRD_FILE: current},
+            diagram_remediation_required=True,
+        )
+        self.assertIn(patterns_path, presentation_repair["on_demand_slices"])
+
+        missing_table_repair = doctor.derive_context_plan(
+            interaction,
+            doctor.TaskSummary(),
+            coverage,
+            next_prompt="DESIGN-10",
+            source_texts={**source_texts, doctor.PRD_FILE: current},
+            design_contract=doctor.DesignContract(),
+            diagram_remediation_required=True,
+        )
+        for heading in (
+            "Project diagram contract",
+            "Proposed system at a glance",
+            "Data lifecycle view",
+            "AWS implementation at a glance",
+        ):
+            self.assertIn(
+                f"{doctor.PRD_FILE}#{heading}",
+                missing_table_repair["on_demand_slices"],
+            )
+
+        conditional = doctor.derive_context_plan(
+            interaction,
+            doctor.TaskSummary(),
+            coverage,
+            next_prompt="DESIGN-10",
+            source_texts={**source_texts, doctor.PRD_FILE: current},
+            requirements_contract=doctor.RequirementsContract(
+                journey_ids=("JOURNEY-001", "JOURNEY-002")
+            ),
+            design_contract=doctor.DesignContract(
+                project_contract=ProjectDesignContract(state_ids=("STATE-001",))
+            ),
+        )
+        self.assertIn(patterns_path, conditional["on_demand_slices"])
+
+        legacy_prd = (
+            REPOSITORY_ROOT / "tests/fixtures/legacy_schema6_approved_prd.md"
+        ).read_text(encoding="utf-8")
+        legacy_contract, legacy_issues = doctor.derive_design_contract(
+            legacy_prd,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(legacy_issues, [])
+        legacy = doctor.derive_context_plan(
+            interaction,
+            doctor.TaskSummary(),
+            coverage,
+            next_prompt="DESIGN-10",
+            source_texts={**source_texts, doctor.PRD_FILE: legacy_prd},
+            design_contract=legacy_contract,
+        )
+        self.assertEqual(legacy["budget_status"], "WITHIN_LIMIT")
+        self.assertEqual(legacy.get("resolution_issues", []), [])
+        self.assertNotIn(
+            f"{doctor.PRD_FILE}#AWS implementation at a glance",
+            legacy["on_demand_slices"],
+        )
 
     def test_referenced_adr_is_on_demand_and_never_initial(self) -> None:
         adr_path = "docs/adr/0001-runtime.md"

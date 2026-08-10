@@ -352,12 +352,55 @@ class FastlanePresenterTests(unittest.TestCase):
             "gate_a": "APPROVED_FOR_DESIGN",
             "gate_b": "APPROVED_FOR_CONSTRUCTION",
         }
+        current["design_contract"] = {
+            "diagram_contract": {
+                "records": [
+                    {"kind": "SYSTEM_CONTEXT", "status": "CURRENT"},
+                    {"kind": "AWS_IMPLEMENTATION", "status": "CURRENT"},
+                ]
+            }
+        }
         current["next_prompt"] = "TASK-10"
         rendered = presenter.render_owner_update(
             current, updated="Gate B was approved."
         )
         self.assertIn("(docs/project/PRD.md#gate-b-review)", rendered)
+        self.assertIn("(docs/project/PRD.md#proposed-system-at-a-glance)", rendered)
+        self.assertIn("(docs/project/PRD.md#aws-implementation-at-a-glance)", rendered)
+        self.assertIn("(docs/project/PRD.md#diagram-guide)", rendered)
         self.assertIn("(docs/project/TASKS.md#current-progress)", rendered)
+
+    def test_legacy_gate_b_navigation_omits_unavailable_diagram_links(self) -> None:
+        current = report(
+            owner_stage="DELIVER",
+            state="WORKING",
+            route_reason_code="TASK_PLAN_REQUIRED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+        )
+        current["gates"] = {
+            "gate_a": "APPROVED_FOR_DESIGN",
+            "gate_b": "APPROVED_FOR_CONSTRUCTION",
+        }
+        current["design_contract"] = {
+            "diagram_contract": {
+                "records": [{"kind": "SYSTEM_CONTEXT", "status": "CURRENT"}]
+            }
+        }
+        current["next_prompt"] = "TASK-10"
+
+        rendered = presenter.render_owner_update(
+            current, updated="Legacy Gate B remains current."
+        )
+
+        self.assertIn("(docs/project/PRD.md#gate-b-review)", rendered)
+        self.assertIn("(docs/project/PRD.md#proposed-system-at-a-glance)", rendered)
+        self.assertIn("(docs/project/TASKS.md#current-progress)", rendered)
+        self.assertNotIn(
+            "(docs/project/PRD.md#aws-implementation-at-a-glance)", rendered
+        )
+        self.assertNotIn("(docs/project/PRD.md#diagram-guide)", rendered)
 
     def test_aws_guidance_is_automatic_and_credential_free(self) -> None:
         rendered = presenter.render_owner_update(
@@ -1008,14 +1051,15 @@ class FastlanePresenterTests(unittest.TestCase):
                 "RESIDUAL_REVIEW",
                 "AWS_RESIDUAL_REVIEW",
                 "Owner chose INVESTIGATE at 2026-07-29T12:00:00+00:00; "
-                "this selects AWS-40 and grants no AWS access or mutation.",
+                "this selects a read-only residual review and grants no AWS access "
+                "or mutation.",
             ),
             (
                 "TEARDOWN",
                 "WAITING_AWS_TEARDOWN_AUTH",
                 "Owner chose REMOVE at 2026-07-29T12:00:00+00:00; this requests "
-                "the teardown path but grants no AWS access or mutation; AWS-50 "
-                "still requires the exact teardown authorization.",
+                "the teardown path but grants no AWS access or mutation; a separate "
+                "exact teardown authorization is still required.",
             ),
         )
         for value, reason, expected in cases:
@@ -1038,7 +1082,7 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn(
             "Audit: Owner chose REMOVE at 2026-07-29T12:00:00+00:00; this "
             "requests the teardown path but grants no AWS access or mutation; "
-            "AWS-50 still requires the exact teardown authorization.",
+            "a separate exact teardown authorization is still required.",
             rendered,
         )
 
@@ -1053,7 +1097,7 @@ class FastlanePresenterTests(unittest.TestCase):
                 rendered = presenter.render_owner_update(current)
 
                 self.assertNotIn("AWS lifecycle intent", rendered)
-                self.assertNotIn("selects AWS-40", rendered)
+                self.assertNotIn("selects a read-only residual review", rendered)
 
     def test_lifecycle_intent_projection_fails_closed(self) -> None:
         cases: list[tuple[str, dict[str, object]]] = []

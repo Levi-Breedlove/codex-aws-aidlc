@@ -73,6 +73,9 @@ class RequirementsContract:
     canonical_sha256: str | None = None
     grandfathered_approved_gate_a: bool = False
     canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
+    presentation_labels: tuple[tuple[str, str], ...] = field(
+        default=(), repr=False, compare=False
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

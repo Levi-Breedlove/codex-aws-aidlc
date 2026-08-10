@@ -33,7 +33,10 @@ from scripts.fastlane_engine.project_inspection import (
     capture_engine_snapshot,
     safe_read_text,
 )
-from tests.engine_complexity_exceptions import REVIEWED_COMPLEXITY_EXCEPTIONS
+from tests.engine_complexity_exceptions import (
+    REVIEWED_COMPLEXITY_EXCEPTIONS,
+    REVIEWED_MODULE_SIZE_EXCEPTIONS,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -159,7 +162,10 @@ class EngineFoundationTests(unittest.TestCase):
         self.assertEqual(snapshot.observation_metrics.files_opened, len(required))
         self.assertEqual(
             snapshot.observation_metrics.markdown_indexes,
-            sum(path.endswith(".md") for path in required),
+            sum(
+                path.endswith(".md") and path not in binary_test_paths
+                for path in required
+            ),
         )
         self.assertEqual(snapshot.observation_metrics.git_processes, 1)
         self.assertEqual(snapshot.observation_metrics.duplicate_git_processes, 0)
@@ -412,12 +418,21 @@ class EngineFoundationTests(unittest.TestCase):
             ast.Match,
         )
         observed: dict[str, dict[str, int]] = {}
+        observed_modules: dict[str, int] = {}
         for path in sorted(ENGINE_ROOT.rglob("*.py")):
             relative = path.relative_to(ENGINE_ROOT).as_posix()
             text = path.read_text(encoding="utf-8")
+            module_lines = len(text.splitlines())
+            if module_lines > configuration["module_hard_review_lines"]:
+                observed_modules[relative] = module_lines
+            module_limit = int(
+                REVIEWED_MODULE_SIZE_EXCEPTIONS.get(relative, {}).get(
+                    "maximum_lines", configuration["module_hard_review_lines"]
+                )
+            )
             self.assertLessEqual(
-                len(text.splitlines()),
-                configuration["module_hard_review_lines"],
+                module_lines,
+                module_limit,
                 relative,
             )
             tree = ast.parse(text, filename=relative)
@@ -438,6 +453,24 @@ class EngineFoundationTests(unittest.TestCase):
                     }
 
         self.assertEqual(
+            set(observed_modules),
+            set(REVIEWED_MODULE_SIZE_EXCEPTIONS),
+            "Engine module-size exceptions must be explicit, current, and complete",
+        )
+        for key, line_count in observed_modules.items():
+            with self.subTest(module=key):
+                exception = REVIEWED_MODULE_SIZE_EXCEPTIONS[key]
+                self.assertEqual(exception["reviewed_lines"], line_count)
+                self.assertTrue(str(exception["reason"]).strip())
+                self.assertRegex(
+                    str(exception["reviewed_in"]), r"^[0-9]+\.[0-9]+\.[0-9]+$"
+                )
+                self.assertRegex(
+                    str(exception["expires"]),
+                    r"^(?:PERMANENT|[0-9]+\.[0-9]+\.[0-9]+)$",
+                )
+
+        self.assertEqual(
             set(observed),
             set(REVIEWED_COMPLEXITY_EXCEPTIONS),
             "Engine complexity exceptions must be explicit, current, and complete",
@@ -445,7 +478,10 @@ class EngineFoundationTests(unittest.TestCase):
         for key, metrics in observed.items():
             with self.subTest(symbol=key):
                 exception = REVIEWED_COMPLEXITY_EXCEPTIONS[key]
-                self.assertEqual(exception["reviewed_in"], "1.2.25")
+                self.assertRegex(
+                    str(exception["reviewed_in"]),
+                    r"^[0-9]+\.[0-9]+\.[0-9]+$",
+                )
                 self.assertTrue(str(exception["reason"]).strip())
                 self.assertRegex(
                     str(exception["expires"]),

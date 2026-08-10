@@ -22,6 +22,29 @@ SPEC.loader.exec_module(model_roleplay_eval)
 
 EXPECTED_COMMIT = "a" * 40
 PROMPT_DIGEST = "sha256:" + "b" * 64
+EXPECTED_PROMPT_CONTRACT_PATHS = (
+    "AGENTS.md",
+    ".codex/hooks/AGENTS.md",
+    "docs/project/AGENTS.md",
+    "infrastructure/AGENTS.md",
+    "scripts/AGENTS.md",
+    "scripts/fastlane_engine/AGENTS.md",
+    "tests/AGENTS.md",
+    ".agents/skills/fastlane/SKILL.md",
+    ".agents/skills/fastlane/agents/openai.yaml",
+    ".agents/skills/fastlane/references/define.md",
+    ".agents/skills/fastlane/references/source-assisted-define.md",
+    ".agents/skills/fastlane/references/design.md",
+    ".agents/skills/fastlane/references/diagram-patterns.md",
+    ".agents/skills/fastlane/references/deliver.md",
+    ".agents/skills/fastlane/references/owner-responses.md",
+    ".agents/skills/fastlane/references/authorization-receipts.md",
+    ".agents/skills/explain-fastlane/SKILL.md",
+    ".agents/skills/explain-fastlane/agents/openai.yaml",
+    ".agents/skills/operate-fastlane-aws/SKILL.md",
+    ".agents/skills/operate-fastlane-aws/agents/openai.yaml",
+    "prompts/CODEX-PROMPTS.md",
+)
 
 
 def write_artifact(
@@ -49,6 +72,12 @@ def rewrite_artifact(
 
 
 class ModelRoleplayEvaluationTests(unittest.TestCase):
+    def write_prompt_contract_root(self, root: Path, newline: bytes = b"\r\n") -> None:
+        for index, relative in enumerate(EXPECTED_PROMPT_CONTRACT_PATHS):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(f"{index}:{relative}".encode("utf-8") + newline)
+
     def binding(self, scenario: str, iteration: int) -> dict[str, object]:
         return {
             "schema_version": model_roleplay_eval.ARTIFACT_SCHEMA_VERSION,
@@ -158,6 +187,123 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             "one valid naturally spaced reply", scenarios["consultative-intake"]
         )
         self.assertIn("imports no approval", scenarios["source-assisted-define"])
+        self.assertEqual(
+            plan["evidence_bundle"]["prompt_contract_command"],
+            "python scripts/model_roleplay_eval.py prompt-contract --root . --json",
+        )
+
+    def test_prompt_contract_digest_is_complete_deterministic_and_content_bound(
+        self,
+    ) -> None:
+        observed = model_roleplay_eval.prompt_contract_payload(REPOSITORY_ROOT)
+        self.assertEqual(observed["schema_version"], 1)
+        self.assertEqual(
+            tuple(item["path"] for item in observed["files"]),
+            EXPECTED_PROMPT_CONTRACT_PATHS,
+        )
+        self.assertEqual(
+            {
+                path.relative_to(REPOSITORY_ROOT).as_posix()
+                for path in REPOSITORY_ROOT.rglob("AGENTS.md")
+            },
+            {
+                path
+                for path in EXPECTED_PROMPT_CONTRACT_PATHS
+                if path.endswith("AGENTS.md")
+            },
+        )
+        self.assertEqual(
+            {
+                path.relative_to(REPOSITORY_ROOT).as_posix()
+                for path in (
+                    REPOSITORY_ROOT / ".agents/skills/fastlane/references"
+                ).glob("*.md")
+            },
+            {
+                path
+                for path in EXPECTED_PROMPT_CONTRACT_PATHS
+                if path.startswith(".agents/skills/fastlane/references/")
+            },
+        )
+        for item in observed["files"]:
+            source = (REPOSITORY_ROOT / item["path"]).read_text(encoding="utf-8")
+            canonical = source.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+            self.assertEqual(item["sha256"], model_roleplay_eval._digest(canonical))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_prompt_contract_root(root)
+            first = model_roleplay_eval.prompt_contract_payload(root)
+            second = model_roleplay_eval.prompt_contract_payload(root)
+            self.assertEqual(first, second)
+            changed = root / EXPECTED_PROMPT_CONTRACT_PATHS[-1]
+            changed.write_bytes(changed.read_bytes() + b"changed\n")
+            self.assertNotEqual(
+                first["prompt_contract_sha256"],
+                model_roleplay_eval.prompt_contract_payload(root)[
+                    "prompt_contract_sha256"
+                ],
+            )
+            lf_root = root / "lf"
+            crlf_root = root / "crlf"
+            self.write_prompt_contract_root(lf_root, b"\n")
+            self.write_prompt_contract_root(crlf_root, b"\r\n")
+            self.assertEqual(
+                model_roleplay_eval.prompt_contract_payload(lf_root),
+                model_roleplay_eval.prompt_contract_payload(crlf_root),
+            )
+
+    def test_prompt_contract_digest_fails_closed_on_invalid_instruction_files(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_prompt_contract_root(root)
+            missing = root / EXPECTED_PROMPT_CONTRACT_PATHS[0]
+            missing.unlink()
+            with self.assertRaisesRegex(ValueError, "missing or outside"):
+                model_roleplay_eval.prompt_contract_payload(root)
+            missing.write_bytes(b"restored\n")
+            invalid = root / EXPECTED_PROMPT_CONTRACT_PATHS[1]
+            invalid.write_bytes(b"\xff")
+            with self.assertRaisesRegex(ValueError, "must be UTF-8"):
+                model_roleplay_eval.prompt_contract_payload(root)
+            invalid.write_bytes(b"restored\n")
+            non_regular = root / EXPECTED_PROMPT_CONTRACT_PATHS[2]
+            non_regular.unlink()
+            non_regular.mkdir()
+            with self.assertRaisesRegex(ValueError, "must be regular"):
+                model_roleplay_eval.prompt_contract_payload(root)
+
+    def test_prompt_contract_digest_rejects_a_symlinked_instruction(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_prompt_contract_root(root)
+            linked = root / EXPECTED_PROMPT_CONTRACT_PATHS[0]
+            target = root / EXPECTED_PROMPT_CONTRACT_PATHS[1]
+            linked.unlink()
+            try:
+                linked.symlink_to(target)
+            except OSError as exc:
+                self.skipTest(f"symlinks unavailable: {exc}")
+            with self.assertRaisesRegex(ValueError, "must not traverse a symlink"):
+                model_roleplay_eval.prompt_contract_payload(root)
+
+    def test_prompt_contract_cli_reports_the_reproducible_composite_digest(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_prompt_contract_root(root)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                exit_code = model_roleplay_eval.main(
+                    ["prompt-contract", "--root", str(root), "--json"]
+                )
+        self.assertEqual(exit_code, 0, output.getvalue())
+        payload = json.loads(output.getvalue())
+        self.assertRegex(payload["prompt_contract_sha256"], r"^sha256:[0-9a-f]{64}$")
+        self.assertEqual(len(payload["files"]), len(EXPECTED_PROMPT_CONTRACT_PATHS))
 
     def test_development_bundle_passes_without_release_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -51,6 +51,22 @@
         "receipt change",
         "AWS access or execution claim"
       ]
+    },
+    {
+      "id": "HUMAN_DIAGRAM_SUPPORT_DIGESTS_1_2_35",
+      "base_commit": "66bcf1de7e5e06feb3dcf84fae2081d515c881a4",
+      "scope": [
+        "owner-readable planned architecture and AWS implementation diagrams",
+        "normalized selected-technology and AWS-evidence bindings required to keep the Golden technical plan and its diagrams mutually consistent",
+        "diagram direction, edge-kind, purpose, normalized-containment, semantic-digest, and presentation-source fingerprint binding",
+        "Design digest binding for error-handling, AWS implementation, and IaC validation support tables",
+        "PRD snapshot and context-locator bytes changed only by those human Design records"
+      ],
+      "prohibited": [
+        "requirement, lifecycle, routing, remediation, task, gate, authority, or receipt change",
+        "construction or AWS authorization change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "normalization": {
@@ -68,8 +84,8 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "ba7f81ac31b91d4664a4faf0e38f227dc0cfb075229a68722c3386353d7ef255",
-    "task_ready": "055b92772cef3ef86c7263f2ac076dae05586471258d69558899d8f997b3a90c"
+    "stale_gate_a_summary": "d1d76d3dc1bb760881d829649c56b278ddf7a46b0fc98d4f021e2c75dae17b2a",
+    "task_ready": "e13a2ba7bc269320afe287f72608d08b45bc69c7468b07ef5bf0dc98224c8b2d"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -657,7 +673,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:2798dd42b76fcee9bd8ba97b59ae3230a64e0c500aa6578bd222365953890429"
+          "prd_snapshot_sha256": "sha256:294f5d52bf252cebf82eaa4d681c173a3e97533ecde4e58617b58e41509aee86"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -2893,11 +2909,11 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1335,
-              "end_line": 1391,
+              "start_line": 1442,
+              "end_line": 1498,
               "active_ids": [],
-              "canonical_sha256": "sha256:459a79de3ffb41db7bb6b61323174a5f6e19209d8607c3a7741c65f602539f68",
-              "source_bytes": 4116,
+              "canonical_sha256": "sha256:dcfc7ccb7295e01e54f5d544376a31513bf568d6f61351d9ef6c3bc0e4a01b21",
+              "source_bytes": 4129,
               "reason": "On-demand canonical source"
             },
             {
@@ -3236,7 +3252,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:7148459ce4630dfa82ec2f698fbce413a539f6d963bafb2d0c297b341f035e5f"
+          "prd_snapshot_sha256": "sha256:a1a3ee7a1bb5d0d259ccfb68d2e6ae02e64f8a20a08b2e9ee8a34dc2e632cd2b"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -4310,22 +4326,22 @@
             {
               "decision_id": "TECH-0001",
               "concern": "APPLICATION_RUNTIME",
-              "selection": "Python",
+              "selection": "Python 3.12 on AWS Lambda",
               "version_policy": "CURRENT_LTS_AS_OF: 2026-07-01",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: It is current, supported, and fits the approved local slice; REJECTED: A second runtime would add packaging and operations cost",
+              "alternatives_and_rationale": "RATIONALE: The managed runtime fits the bounded workload and current Python support; REJECTED: A second runtime would add packaging and operations cost",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             },
             {
               "decision_id": "TECH-0002",
               "concern": "APPLICATION_FRAMEWORK",
-              "selection": "FastAPI",
+              "selection": "FastAPI through a Lambda adapter",
               "version_policy": "COMPATIBLE_MAJOR: 1",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: It provides the smallest typed HTTP surface for the approved journey; REJECTED: A larger framework adds features the first release does not need",
+              "alternatives_and_rationale": "RATIONALE: It provides the smallest typed HTTP surface on the selected managed runtime; REJECTED: A larger framework adds features the first release does not need",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             },
@@ -4343,7 +4359,7 @@
             {
               "decision_id": "TECH-0004",
               "concern": "INFRASTRUCTURE_AS_CODE",
-              "selection": "AWS SAM",
+              "selection": "AWS SAM infrastructure templates",
               "version_policy": "COMPATIBLE_MAJOR: 1",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
@@ -4387,18 +4403,18 @@
             {
               "decision_id": "TECH-0008",
               "concern": "SECURITY_VALIDATION",
-              "selection": "Bandit",
+              "selection": "Bandit static checks; AWS KMS-managed encryption; no application secrets stored",
               "version_policy": "EXACT: 1.7.9",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: Static checks provide a repeatable local security baseline; REJECTED: Manual review alone is not reproducible",
+              "alternatives_and_rationale": "RATIONALE: Static checks and managed encryption protect code and stored records; REJECTED: Manual review alone is not reproducible",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             },
             {
               "decision_id": "TECH-0009",
               "concern": "DEPLOYMENT_TOOLING",
-              "selection": "AWS SAM CLI",
+              "selection": "AWS SAM CLI deployment and change sets",
               "version_policy": "MINIMUM: 1.120",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
@@ -4409,22 +4425,22 @@
             {
               "decision_id": "TECH-0010",
               "concern": "IDENTITY_AUTHORIZATION",
-              "selection": "Local development identity with server-side authorization",
+              "selection": "Amazon Cognito with server-side authorization",
               "version_policy": "ORG_MANAGED: approved design contract",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: It preserves server-side access decisions in the local slice; REJECTED: Client-only authorization would not enforce the boundary",
+              "alternatives_and_rationale": "RATIONALE: It preserves server-side access decisions with a managed user boundary; REJECTED: Client-only authorization would not enforce the boundary",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             },
             {
               "decision_id": "TECH-0011",
               "concern": "DATA_STORAGE",
-              "selection": "Local JSON store with per-owner records",
+              "selection": "Amazon DynamoDB with per-owner records",
               "version_policy": "ORG_MANAGED: approved design contract",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: It is sufficient for the bounded local journey and preserves ownership; REJECTED: A network database adds setup without current value",
+              "alternatives_and_rationale": "RATIONALE: It preserves owner-scoped records without database operations; REJECTED: A relational database adds operations not required by the access pattern",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             },
@@ -4442,33 +4458,33 @@
             {
               "decision_id": "TECH-0013",
               "concern": "EDGE_NETWORKING",
-              "selection": "NOT_APPLICABLE — local-only development surface",
-              "version_policy": "NOT_APPLICABLE — local-only development surface",
+              "selection": "Amazon API Gateway regional HTTPS endpoint",
+              "version_policy": "ORG_MANAGED: approved design contract",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: The release is local and has no public edge; REJECTED: A public endpoint would widen exposure before authorization",
+              "alternatives_and_rationale": "RATIONALE: A regional managed HTTPS entry point bounds the public interface; REJECTED: A separate CDN adds a layer the current access pattern does not need",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             },
             {
               "decision_id": "TECH-0014",
               "concern": "OBSERVABILITY_INCIDENT_RESPONSE",
-              "selection": "Structured local logs and failure counters",
+              "selection": "Amazon CloudWatch logs, metrics, and alarms",
               "version_policy": "ORG_MANAGED: approved design contract",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: Structured logs and counters expose local failures without sensitive content; REJECTED: Unstructured console output is harder to verify",
+              "alternatives_and_rationale": "RATIONALE: Managed logs, metrics, and alarms expose failures without sensitive content; REJECTED: Unstructured console output is harder to verify",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             },
             {
               "decision_id": "TECH-0015",
               "concern": "RELIABILITY_RECOVERY",
-              "selection": "Baseline commit restore with explicit rollback checks",
+              "selection": "AWS SAM rollback to the last validated stack",
               "version_policy": "ORG_MANAGED: approved design contract",
               "source": "AGENT_RECOMMENDATION",
               "basis_ids": "DES-0001, FR-001",
-              "alternatives_and_rationale": "RATIONALE: The authorized baseline provides a bounded local rollback; REJECTED: A separate recovery service is unnecessary before deployment",
+              "alternatives_and_rationale": "RATIONALE: The selected deployment path can restore the last validated stack; REJECTED: A multi-Region recovery design exceeds the current recovery requirement",
               "compatibility_migration": "No migration required",
               "validation": "Validate with the task command"
             }
@@ -4760,8 +4776,8 @@
               {
                 "evidence_id": "AWS-EV-0001",
                 "discovery_id": "AWS-DISC-0002",
-                "design_ids": "DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001",
-                "material_claim": "AWS managed serverless services support bounded pay-per-use execution patterns",
+                "design_ids": "DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001, TECH-0002",
+                "material_claim": "AWS Lambda supports the selected bounded Python and FastAPI execution model",
                 "capability": "retrieve_skill",
                 "official_reference": "https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html",
                 "observed_date": "2026-07-17"
@@ -4769,14 +4785,59 @@
               {
                 "evidence_id": "AWS-EV-0002",
                 "discovery_id": "AWS-DISC-0002",
-                "design_ids": "DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0004",
-                "material_claim": "AWS documentation defines current serverless security and operational guidance",
+                "design_ids": "DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0013",
+                "material_claim": "Amazon API Gateway provides the selected managed regional HTTPS entry point",
                 "capability": "search_documentation",
-                "official_reference": "https://docs.aws.amazon.com/lambda/latest/dg/security.html",
+                "official_reference": "https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html",
+                "observed_date": "2026-07-17"
+              },
+              {
+                "evidence_id": "AWS-EV-0003",
+                "discovery_id": "AWS-DISC-0002",
+                "design_ids": "TECH-0010",
+                "material_claim": "Amazon Cognito supports the selected authenticated user boundary",
+                "capability": "retrieve_skill",
+                "official_reference": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools.html",
+                "observed_date": "2026-07-17"
+              },
+              {
+                "evidence_id": "AWS-EV-0004",
+                "discovery_id": "AWS-DISC-0002",
+                "design_ids": "TECH-0011",
+                "material_claim": "Amazon DynamoDB supports owner-scoped records with managed persistence",
+                "capability": "search_documentation",
+                "official_reference": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+                "observed_date": "2026-07-17"
+              },
+              {
+                "evidence_id": "AWS-EV-0005",
+                "discovery_id": "AWS-DISC-0002",
+                "design_ids": "TECH-0014",
+                "material_claim": "Amazon CloudWatch provides the selected logs, metrics, and alarms",
+                "capability": "search_documentation",
+                "official_reference": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html",
+                "observed_date": "2026-07-17"
+              },
+              {
+                "evidence_id": "AWS-EV-0006",
+                "discovery_id": "AWS-DISC-0002",
+                "design_ids": "TECH-0004, TECH-0009, TECH-0015",
+                "material_claim": "AWS SAM supports reviewable infrastructure, change sets, deployment, and bounded rollback",
+                "capability": "retrieve_skill",
+                "official_reference": "https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html",
+                "observed_date": "2026-07-17"
+              },
+              {
+                "evidence_id": "AWS-EV-0007",
+                "discovery_id": "AWS-DISC-0002",
+                "design_ids": "TECH-0008",
+                "material_claim": "AWS KMS supports managed encryption controls for the selected application data path",
+                "capability": "search_documentation",
+                "official_reference": "https://docs.aws.amazon.com/kms/latest/developerguide/overview.html",
                 "observed_date": "2026-07-17"
               }
             ],
-            "canonical_sha256": "sha256:c63404378b1432b96a1d6598920067a115068b0d1bd2c4aefae3c8a7b6bd56d1",
+            "canonical_sha256": "sha256:387bb7b165a8c6953dd07f26c2c96496bec1e39b157aef87ef573834288316a4",
             "grandfathered_v1": false
           },
           "harness": {
@@ -4914,17 +4975,89 @@
                 ],
                 "referenced_ids": [
                   "ARCH-0001",
-                  "API-001"
+                  "ACT-001",
+                  "API-001",
+                  "BOUNDARY-001",
+                  "TECH-0001",
+                  "TECH-0002",
+                  "TECH-0004",
+                  "TECH-0008",
+                  "TECH-0009",
+                  "TECH-0010",
+                  "TECH-0011",
+                  "TECH-0013",
+                  "TECH-0014",
+                  "TECH-0015"
                 ],
                 "relationships": [
                   {
+                    "from_id": "ACT-001",
+                    "relation": "sends a review request through",
+                    "to_id": "TECH-0013"
+                  },
+                  {
+                    "from_id": "API-001",
+                    "relation": "invokes",
+                    "to_id": "TECH-0002"
+                  },
+                  {
                     "from_id": "ARCH-0001",
-                    "relation": "serves",
+                    "relation": "emits operational signals to",
+                    "to_id": "TECH-0014"
+                  },
+                  {
+                    "from_id": "ARCH-0001",
+                    "relation": "stores owner records in",
+                    "to_id": "TECH-0011"
+                  },
+                  {
+                    "from_id": "BOUNDARY-001",
+                    "relation": "allows requests to",
                     "to_id": "API-001"
+                  },
+                  {
+                    "from_id": "TECH-0001",
+                    "relation": "implements",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0002",
+                    "relation": "runs on",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0004",
+                    "relation": "defines changes for",
+                    "to_id": "TECH-0009"
+                  },
+                  {
+                    "from_id": "TECH-0008",
+                    "relation": "protects code, data, and secrets posture for",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0009",
+                    "relation": "deploys",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0010",
+                    "relation": "provides token issuer trust to",
+                    "to_id": "TECH-0013"
+                  },
+                  {
+                    "from_id": "TECH-0013",
+                    "relation": "routes authenticated requests into",
+                    "to_id": "BOUNDARY-001"
+                  },
+                  {
+                    "from_id": "TECH-0015",
+                    "relation": "restores",
+                    "to_id": "TECH-0001"
                   }
                 ],
-                "semantic_sha256": "sha256:fe5c0460d5453bc07f917b0928aa2084457b569bf2c7266f0cebb59aacb4c81c",
-                "rendered_sha256": "sha256:4651fe77446b7190d0eedd490e8a6b2f7e3ef7619f57722a681ed7a151f36dad"
+                "semantic_sha256": "sha256:f8a222d373be341997bfca9e2562446d66ac449f1f2af145976a512058b9d0dc",
+                "rendered_sha256": "sha256:87ddd666efcf270ace3c4ac9b955234da442d1ebf6a5c30619154ee38b1cd662"
               },
               {
                 "diagram_id": "DIAGRAM-0002",
@@ -4943,17 +5076,17 @@
                 "relationships": [
                   {
                     "from_id": "ACT-001",
-                    "relation": "requests approved outcome",
+                    "relation": "submits a review request to",
                     "to_id": "API-001"
                   },
                   {
                     "from_id": "API-001",
-                    "relation": "returns approved outcome",
+                    "relation": "returns the validated review to",
                     "to_id": "ACT-001"
                   }
                 ],
-                "semantic_sha256": "sha256:3b2a8cec6c6c173b8ba68e4e4d2f72048929a9e74d5939b6786c6c3317797c31",
-                "rendered_sha256": "sha256:c83444f44eb240a85fe2e5937c8cae877f8a5c052957f3c5e860c3d08e968a10"
+                "semantic_sha256": "sha256:36bbf81154e669440d57af1d381481d2d6acf8581c53ccd4afe4603cdd68c7f7",
+                "rendered_sha256": "sha256:5c16f47e0022bae1318ed9a2d2b115dc296bfe505a4bde4525f94508a4544f5f"
               },
               {
                 "diagram_id": "DIAGRAM-0003",
@@ -4967,17 +5100,17 @@
                 ],
                 "referenced_ids": [
                   "API-001",
-                  "DATA-001"
+                  "TECH-0011"
                 ],
                 "relationships": [
                   {
                     "from_id": "API-001",
-                    "relation": "stores approved data",
-                    "to_id": "DATA-001"
+                    "relation": "validates and stores in",
+                    "to_id": "TECH-0011"
                   }
                 ],
-                "semantic_sha256": "sha256:c4cfa6b6e15a8406035457bf8488f29bc0191bfebce2b1c2fd286b93a21aeaa0",
-                "rendered_sha256": "sha256:3afbab77ea83632de3ee7fcf45fddb08220acadf21ad78408c5baa0001ef6b2e"
+                "semantic_sha256": "sha256:0465ae349d42797e923a1bceab81d9d40abab6ac6a686e43e88824999232ee4a",
+                "rendered_sha256": "sha256:3e6abc7ce300e3fe7cff64a867a6c8616df05cfbb28091b99ea11726cb037925"
               },
               {
                 "diagram_id": "DIAGRAM-0004",
@@ -4991,17 +5124,17 @@
                 ],
                 "referenced_ids": [
                   "API-001",
-                  "REL-005"
+                  "TECH-0015"
                 ],
                 "relationships": [
                   {
                     "from_id": "API-001",
-                    "relation": "fails health checks and invokes",
-                    "to_id": "REL-005"
+                    "relation": "fails safely and invokes",
+                    "to_id": "TECH-0015"
                   }
                 ],
-                "semantic_sha256": "sha256:bfacf0b3358cc5b62b4b61381d00583f2ab9d4c20164c56f885525808f7f571b",
-                "rendered_sha256": "sha256:971a68fcabb079b0b08379631c8a766e17a47ac5f3ff693513f650c0c7b1f786"
+                "semantic_sha256": "sha256:3363c93b8b4fdf7c5ec429fe37f9d1dd2d38da667beb6aa6c9eda6648eb143fb",
+                "rendered_sha256": "sha256:e625a0e19fd32fbb4562861e2de3e2593cd5cdab50ed4fd9174a99e10f22cbd7"
               },
               {
                 "diagram_id": "DIAGRAM-0005",
@@ -5038,12 +5171,90 @@
                 "relationships": [],
                 "semantic_sha256": null,
                 "rendered_sha256": null
+              },
+              {
+                "diagram_id": "DIAGRAM-0008",
+                "kind": "AWS_IMPLEMENTATION",
+                "applicability": "REQUIRED",
+                "status": "CURRENT",
+                "anchor": "aws-implementation-at-a-glance",
+                "basis_ids": [
+                  "ARCH-0001",
+                  "DES-0001"
+                ],
+                "referenced_ids": [
+                  "ARCH-0001",
+                  "TECH-0001",
+                  "TECH-0002",
+                  "TECH-0004",
+                  "TECH-0008",
+                  "TECH-0009",
+                  "TECH-0010",
+                  "TECH-0011",
+                  "TECH-0013",
+                  "TECH-0014",
+                  "TECH-0015"
+                ],
+                "relationships": [
+                  {
+                    "from_id": "ARCH-0001",
+                    "relation": "emits signals to",
+                    "to_id": "TECH-0014"
+                  },
+                  {
+                    "from_id": "ARCH-0001",
+                    "relation": "reads and writes",
+                    "to_id": "TECH-0011"
+                  },
+                  {
+                    "from_id": "TECH-0001",
+                    "relation": "implements",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0002",
+                    "relation": "runs on",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0004",
+                    "relation": "defines changes for",
+                    "to_id": "TECH-0009"
+                  },
+                  {
+                    "from_id": "TECH-0008",
+                    "relation": "protects",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0009",
+                    "relation": "deploys",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0010",
+                    "relation": "provides token issuer trust to",
+                    "to_id": "TECH-0013"
+                  },
+                  {
+                    "from_id": "TECH-0013",
+                    "relation": "routes authenticated requests to",
+                    "to_id": "TECH-0002"
+                  },
+                  {
+                    "from_id": "TECH-0015",
+                    "relation": "restores",
+                    "to_id": "TECH-0001"
+                  }
+                ],
+                "semantic_sha256": "sha256:44af223f3f8526b8798541903c701eb07c4be94e0964b8dfe842497813cc4225",
+                "rendered_sha256": "sha256:6771ca90e66e095797252d6639d86f14a7d44baf07187b8816d49d0d41208350"
               }
             ],
-            "canonical_sha256": "sha256:ce8b2dfed3fb6cb3967244bfe2f11265c440e1ae03c2bb92b0ede1966cc5d9d8",
+            "canonical_sha256": "sha256:a0ff2ed8c5bb7f11dfa737d6cca301ba64955fbf3dce3c915d343d7a29095930",
             "grandfathered_schema5": false
           },
-          "canonical_sha256": "sha256:9e925fbaf47a328ab9ea327d6d7f1058d9945154d8ecabe27384a9115bf23cbc",
+          "canonical_sha256": "sha256:032b993f616b656fe4a34354f64b6bf842731d106169277015ee7fe80914c146",
           "project_contract": {
             "schema_version": 7,
             "status": "READY",
@@ -5584,6 +5795,20 @@
       ],
       "issues": []
     }
+  },
+  "design_scenario_coverage": {
+    "diagram_directed_edges_and_edge_kinds": [
+      "tests.test_bootstrap_doctor.BootstrapDoctorTests.test_golden_diagram_edges_are_independently_authored_and_exact"
+    ],
+    "diagram_kind_purpose": [
+      "tests.test_bootstrap_doctor.BootstrapDoctorTests.test_focused_diagrams_must_match_their_owner_purpose"
+    ],
+    "design_support_digest_binding": [
+      "tests.test_bootstrap_doctor.BootstrapDoctorTests.test_design_support_records_are_complete_and_technology_bound"
+    ],
+    "architecture_traceability_digest_binding": [
+      "tests.test_bootstrap_doctor.BootstrapDoctorTests.test_architecture_contract_is_traceable_fail_closed_and_digest_bound"
+    ]
   },
   "aws_scenario_coverage": {
     "deployment_action_terminals": [

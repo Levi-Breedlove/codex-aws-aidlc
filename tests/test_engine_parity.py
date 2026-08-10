@@ -453,6 +453,23 @@ class EngineParityTests(unittest.TestCase):
                 with self.subTest(scenario=scenario, selector=selector):
                     self.assertIn(selector, discovered)
 
+    def test_qualification_design_contracts_are_bound_to_independent_regressions(
+        self,
+    ) -> None:
+        expected = {
+            name: list(selectors)
+            for name, selectors in parity.QUALIFICATION_DESIGN_SCENARIO_COVERAGE.items()
+        }
+        self.assertEqual(
+            self.qualification_oracle["design_scenario_coverage"], expected
+        )
+        discovered = discovered_test_selectors()
+        for scenario, selectors in expected.items():
+            self.assertTrue(selectors, scenario)
+            for selector in selectors:
+                with self.subTest(scenario=scenario, selector=selector):
+                    self.assertIn(selector, discovered)
+
     def test_exact_gate_and_aws_receipts_match_the_frozen_oracle(self) -> None:
         observed = parity.receipt_contracts()
         self.assertEqual(observed, self.oracle["receipt_contracts"])

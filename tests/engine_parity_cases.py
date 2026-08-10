@@ -42,6 +42,7 @@ BASELINE_PACKAGE_VERSION = "1" + ".2.10"
 SUMMARY_TRUTH_BASE_COMMIT = "8dbb11fd0e54af392ac073ce597cdb26fc336fcc"
 ADAPTIVE_KICKOFF_BASE_COMMIT = "204b1b7477413425114deaa54a9ece8f9fc14e53"
 AWS_DESIGN_COVERAGE_BASE_COMMIT = "e31d60bec32dd52b3ec29f36abfad2096e9ef867"
+HUMAN_DIAGRAM_SUPPORT_DIGEST_BASE_COMMIT = "66bcf1de7e5e06feb3dcf84fae2081d515c881a4"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -95,28 +96,44 @@ APPROVED_BEHAVIOR_CHANGES = [
             "AWS access or execution claim",
         ],
     },
+    {
+        "id": "HUMAN_DIAGRAM_SUPPORT_DIGESTS_1_2_35",
+        "base_commit": HUMAN_DIAGRAM_SUPPORT_DIGEST_BASE_COMMIT,
+        "scope": [
+            "owner-readable planned architecture and AWS implementation diagrams",
+            "normalized selected-technology and AWS-evidence bindings required to keep the Golden technical plan and its diagrams mutually consistent",
+            "diagram direction, edge-kind, purpose, normalized-containment, semantic-digest, and presentation-source fingerprint binding",
+            "Design digest binding for error-handling, AWS implementation, and IaC validation support tables",
+            "PRD snapshot and context-locator bytes changed only by those human Design records",
+        ],
+        "prohibited": [
+            "requirement, lifecycle, routing, remediation, task, gate, authority, or receipt change",
+            "construction or AWS authorization change",
+            "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        ],
+    },
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
-        "d21057188e1f58be4ac23c2bf3c1bb9899d55e467bc19646a840ff7939f777e1"
+        "72e5b4dd65ebe31f39730ba7c9c2b95e7ca03d536893191c348f8e692bb3101e"
     ),
     "unconfigured_template": (
-        "0ae76d2cdbb3dfe997980a94da866c994c195322d004c9f9b654f16a0d815aed"
+        "b89cbd72ea715d7e0da5a2f42212d6096e3e3e54b4c0be79bb05df8815facbec"
     ),
     "rendered_intake": (
-        "e159099fc9c561681c053947580c59351d745bf7e123f88823e0383ceeb80f84"
+        "ba1ca47026488e364b1fa9f9a08bb3d57aba32d839f2a98e96155df70cf8496b"
     ),
     "gate_a_pending": (
-        "505bc4ec377f94f998d6a934de3eb41dbb981d3708528324f7d3b43817a0edcf"
+        "02c030ef10b8a084240abc6d899619596ea15229671ab535a41f706f497f09c0"
     ),
     "gate_a_approved": (
-        "c41d53e03cee48e7fda3090ba604b9828a1cbffbad9f5b146f10e715f610a540"
+        "7f881338a0b7aabe4fc694605163deb759b4e518cadd1e989e1d1d89e2368c7b"
     ),
     "gate_b_pending": (
-        "a78c8ed7d4b9d4e71114e49141967e8e490ea7b4608be228c0633ad731d570ca"
+        "7fb8678a2716ea7012d00e268ed7067790a022218897ae85ca30b43c53cc7653"
     ),
     "gate_b_approved": (
-        "32ba13bfc7dd3c691f50ffa9a126caa5e15337f392724fde8817837c349ef0ef"
+        "9deb8e395b9bc3c019a72513c815ebb5aa25d74c68c6eda5e13d4ecb13822272"
     ),
 }
 
@@ -266,6 +283,10 @@ SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
     "grandfathered_schemas": (
         "tests.test_bootstrap_doctor.BootstrapDoctorTests."
         "test_approved_schema_five_design_is_grandfathered_without_diagrams",
+        "tests.test_bootstrap_doctor.BootstrapDoctorTests."
+        "test_genuine_1234_design_keeps_exact_schema_seven_and_six_digests",
+        "tests.test_bootstrap_doctor.BootstrapDoctorTests."
+        "test_genuine_schema_six_approved_design_keeps_its_historical_digest",
     ),
     "malformed_or_duplicate_rows": (
         "tests.test_fastlane_contracts.SharedEvidenceAndCheckpointTests."
@@ -345,6 +366,25 @@ QUALIFICATION_AWS_SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
         "tests.test_engine_aws_execution."
         "AwsExecutionContractRegressionTests."
         "test_teardown_sequence_routes_by_current_phase_evidence",
+    ),
+}
+
+QUALIFICATION_DESIGN_SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
+    "diagram_directed_edges_and_edge_kinds": (
+        "tests.test_bootstrap_doctor.BootstrapDoctorTests."
+        "test_golden_diagram_edges_are_independently_authored_and_exact",
+    ),
+    "diagram_kind_purpose": (
+        "tests.test_bootstrap_doctor.BootstrapDoctorTests."
+        "test_focused_diagrams_must_match_their_owner_purpose",
+    ),
+    "design_support_digest_binding": (
+        "tests.test_bootstrap_doctor.BootstrapDoctorTests."
+        "test_design_support_records_are_complete_and_technology_bound",
+    ),
+    "architecture_traceability_digest_binding": (
+        "tests.test_bootstrap_doctor.BootstrapDoctorTests."
+        "test_architecture_contract_is_traceable_fail_closed_and_digest_bound",
     ),
 }
 
@@ -891,6 +931,10 @@ def build_qualification_oracle() -> dict[str, Any]:
             name: canonical_digest(case) for name, case in deployment_cases.items()
         },
         "deployment_cases": deployment_cases,
+        "design_scenario_coverage": {
+            name: list(selectors)
+            for name, selectors in QUALIFICATION_DESIGN_SCENARIO_COVERAGE.items()
+        },
         "aws_scenario_coverage": {
             name: list(selectors)
             for name, selectors in QUALIFICATION_AWS_SCENARIO_COVERAGE.items()

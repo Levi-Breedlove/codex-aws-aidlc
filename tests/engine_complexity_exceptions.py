@@ -8,6 +8,17 @@ unlisted overages, and obsolete entries fail qualification.
 from __future__ import annotations
 
 
+REVIEWED_MODULE_SIZE_EXCEPTIONS: dict[str, dict[str, int | str]] = {
+    "design/diagrams.py": {
+        "maximum_lines": 2_182,
+        "reviewed_lines": 2_182,
+        "reason": "One cohesive diagram contract owns legacy compatibility, semantic binding, portable Mermaid validation, claim safety, and presentation-only repair without a second architecture graph.",
+        "reviewed_in": "1.2.35",
+        "expires": "1.3.0",
+    },
+}
+
+
 REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
     "api.py:derive_approved_task_contract": {
         "maximum_lines": 119,
@@ -217,12 +228,12 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "expires": "PERMANENT",
     },
     "composition.py:derive_context_plan": {
-        "maximum_lines": 246,
-        "maximum_complexity": 49,
-        "reviewed_lines": 246,
-        "reviewed_complexity": 49,
+        "maximum_lines": 250,
+        "maximum_complexity": 53,
+        "reviewed_lines": 250,
+        "reviewed_complexity": 53,
         "reason": "Top-level immutable composition preserves historical domain order and complete state assembly.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "composition.py:_summary_deployment_observation": {
@@ -253,12 +264,12 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "expires": "1.3.0",
     },
     "composition.py:build_evaluation": {
-        "maximum_lines": 568,
-        "maximum_complexity": 63,
-        "reviewed_lines": 568,
-        "reviewed_complexity": 63,
+        "maximum_lines": 573,
+        "maximum_complexity": 64,
+        "reviewed_lines": 573,
+        "reviewed_complexity": 64,
         "reason": "Top-level immutable composition preserves historical domain order and complete state assembly.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "core/snapshot.py:_synthetic_result": {
@@ -397,12 +408,12 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "expires": "1.3.0",
     },
     "define/requirements.py:derive_requirements_contract": {
-        "maximum_lines": 835,
+        "maximum_lines": 838,
         "maximum_complexity": 153,
-        "reviewed_lines": 835,
+        "reviewed_lines": 838,
         "reviewed_complexity": 153,
         "reason": "Canonical Define validation preserves owner provenance, compatibility, and deterministic Gate A diagnostics.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "deliver/evidence.py:parse_harness_projection_rows": {
@@ -558,13 +569,13 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "reviewed_in": "1.2.25",
         "expires": "1.3.0",
     },
-    "design/diagrams.py:derive_diagram_contract": {
-        "maximum_lines": 229,
-        "maximum_complexity": 51,
-        "reviewed_lines": 229,
-        "reviewed_complexity": 51,
-        "reason": "Canonical Design validation preserves traceability, compatibility, and deterministic Gate B diagnostics.",
-        "reviewed_in": "1.2.25",
+    "design/diagrams.py:_derive_current_diagram_contract": {
+        "maximum_lines": 267,
+        "maximum_complexity": 50,
+        "reviewed_lines": 267,
+        "reviewed_complexity": 50,
+        "reason": "One ordered compatibility-aware diagram evaluator preserves semantic digests, presentation-only repair, and deterministic Gate B diagnostics.",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "design/envelope.py:validate_application_source_write_set": {
@@ -595,21 +606,21 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "expires": "1.3.0",
     },
     "design/project.py:derive_project_design_contract": {
-        "maximum_lines": 598,
+        "maximum_lines": 601,
         "maximum_complexity": 143,
-        "reviewed_lines": 598,
+        "reviewed_lines": 601,
         "reviewed_complexity": 143,
         "reason": "Canonical Design validation preserves traceability, compatibility, and deterministic Gate B diagnostics.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "design/project.py:derive_design_contract": {
-        "maximum_lines": 497,
-        "maximum_complexity": 118,
-        "reviewed_lines": 497,
-        "reviewed_complexity": 118,
+        "maximum_lines": 515,
+        "maximum_complexity": 117,
+        "reviewed_lines": 515,
+        "reviewed_complexity": 117,
         "reason": "Canonical Design validation preserves traceability, compatibility, and deterministic Gate B diagnostics.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "design/source.py:validate_application_source_disposition": {
@@ -617,15 +628,6 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "maximum_complexity": 20,
         "reviewed_lines": 90,
         "reviewed_complexity": 20,
-        "reason": "Canonical Design validation preserves traceability, compatibility, and deterministic Gate B diagnostics.",
-        "reviewed_in": "1.2.25",
-        "expires": "1.3.0",
-    },
-    "design/support.py:_aws_decision_issues": {
-        "maximum_lines": 67,
-        "maximum_complexity": 18,
-        "reviewed_lines": 67,
-        "reviewed_complexity": 18,
         "reason": "Canonical Design validation preserves traceability, compatibility, and deterministic Gate B diagnostics.",
         "reviewed_in": "1.2.25",
         "expires": "1.3.0",
@@ -669,10 +671,10 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
     "owner_decisions.py:derive_owner_decision_brief": {
         "maximum_lines": 418,
         "maximum_complexity": 42,
-        "reviewed_lines": 418,
+        "reviewed_lines": 383,
         "reviewed_complexity": 42,
         "reason": "Complete owner projection keeps each required decision and authority boundary together.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "owner_decisions.py:derive_owner_answer_confirmation": {
@@ -766,12 +768,12 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "expires": "1.3.0",
     },
     "project_validation.py:derive_design_contract": {
-        "maximum_lines": 73,
+        "maximum_lines": 75,
         "maximum_complexity": 16,
-        "reviewed_lines": 73,
+        "reviewed_lines": 75,
         "reviewed_complexity": 16,
         "reason": "Cross-record PRD composition preserves canonical validation and diagnostic order.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "project_validation.py:validate_construction_envelope": {
@@ -786,19 +788,19 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
     "project_validation.py:validate_prd": {
         "maximum_lines": 651,
         "maximum_complexity": 112,
-        "reviewed_lines": 647,
-        "reviewed_complexity": 109,
+        "reviewed_lines": 649,
+        "reviewed_complexity": 111,
         "reason": "Cross-record PRD composition preserves canonical validation and diagnostic order.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "remediation.py:_agent_correction_is_safe": {
-        "maximum_lines": 72,
-        "maximum_complexity": 24,
-        "reviewed_lines": 72,
-        "reviewed_complexity": 24,
+        "maximum_lines": 74,
+        "maximum_complexity": 25,
+        "reviewed_lines": 74,
+        "reviewed_complexity": 25,
         "reason": "One ordered remediation decision preserves responsible-party and owner-action semantics.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.35",
         "expires": "1.3.0",
     },
     "remediation.py:derive_remediation": {

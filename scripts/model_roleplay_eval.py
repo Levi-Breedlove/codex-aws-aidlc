@@ -12,9 +12,33 @@ from typing import Any, Mapping, Sequence
 
 SCHEMA_VERSION = 5
 ARTIFACT_SCHEMA_VERSION = 1
+PROMPT_CONTRACT_SCHEMA_VERSION = 1
 REQUIRED_RUNS = 3
 MINIMUM_AVERAGE = 4.0
 CLAIM_SCOPE = "EXPORTED_EVIDENCE_INTEGRITY_AND_SCORE_CONSISTENCY_ONLY"
+PROMPT_CONTRACT_PATHS = (
+    "AGENTS.md",
+    ".codex/hooks/AGENTS.md",
+    "docs/project/AGENTS.md",
+    "infrastructure/AGENTS.md",
+    "scripts/AGENTS.md",
+    "scripts/fastlane_engine/AGENTS.md",
+    "tests/AGENTS.md",
+    ".agents/skills/fastlane/SKILL.md",
+    ".agents/skills/fastlane/agents/openai.yaml",
+    ".agents/skills/fastlane/references/define.md",
+    ".agents/skills/fastlane/references/source-assisted-define.md",
+    ".agents/skills/fastlane/references/design.md",
+    ".agents/skills/fastlane/references/diagram-patterns.md",
+    ".agents/skills/fastlane/references/deliver.md",
+    ".agents/skills/fastlane/references/owner-responses.md",
+    ".agents/skills/fastlane/references/authorization-receipts.md",
+    ".agents/skills/explain-fastlane/SKILL.md",
+    ".agents/skills/explain-fastlane/agents/openai.yaml",
+    ".agents/skills/operate-fastlane-aws/SKILL.md",
+    ".agents/skills/operate-fastlane-aws/agents/openai.yaml",
+    "prompts/CODEX-PROMPTS.md",
+)
 CRITERIA = (
     "owner_clarity",
     "continuity",
@@ -266,6 +290,9 @@ def plan_payload() -> dict[str, Any]:
             "required_artifacts": ["MODEL_TRANSCRIPT", "RATER_SCORECARD"],
             "conditional_artifact": "ADJUDICATION",
             "claim_scope": CLAIM_SCOPE,
+            "prompt_contract_command": (
+                "python scripts/model_roleplay_eval.py prompt-contract --root . --json"
+            ),
         },
         "constraints": {
             "synthetic_data_only": True,
@@ -321,6 +348,53 @@ def _score_map(value: object, label: str, errors: list[str]) -> dict[str, int] |
 
 def _digest(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def prompt_contract_payload(root: Path) -> dict[str, Any]:
+    """Bind the exact repository guidance used by fresh Fastlane role plays."""
+
+    try:
+        resolved_root = root.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("prompt-contract root does not exist") from exc
+    if not resolved_root.is_dir():
+        raise ValueError("prompt-contract root must be a directory")
+    files: list[dict[str, str]] = []
+    for relative in PROMPT_CONTRACT_PATHS:
+        relative_path = PurePosixPath(relative)
+        current = resolved_root
+        for part in relative_path.parts:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError(
+                    f"prompt-contract file must not traverse a symlink: {relative}"
+                )
+        try:
+            resolved = current.resolve(strict=True)
+            resolved.relative_to(resolved_root)
+        except (OSError, ValueError) as exc:
+            raise ValueError(
+                f"prompt-contract file is missing or outside the root: {relative}"
+            ) from exc
+        if not resolved.is_file():
+            raise ValueError(f"prompt-contract file must be regular: {relative}")
+        try:
+            text = resolved.read_bytes().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"prompt-contract file must be UTF-8: {relative}") from exc
+        canonical = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+        files.append({"path": relative, "sha256": _digest(canonical)})
+    contract = {
+        "schema_version": PROMPT_CONTRACT_SCHEMA_VERSION,
+        "files": files,
+    }
+    canonical_contract = json.dumps(
+        contract,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return {**contract, "prompt_contract_sha256": _digest(canonical_contract)}
 
 
 def _bundle_root(path: Path, errors: list[str]) -> Path | None:
@@ -899,11 +973,16 @@ def _manifest_path(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Plan or validate opt-in Fastlane model role-play evidence."
+        description=(
+            "Plan, bind, or validate opt-in Fastlane model role-play evidence."
+        )
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     plan = subparsers.add_parser("plan")
     plan.add_argument("--json", action="store_true", required=True)
+    prompt_contract = subparsers.add_parser("prompt-contract")
+    prompt_contract.add_argument("--root", required=True, type=Path)
+    prompt_contract.add_argument("--json", action="store_true", required=True)
     score = subparsers.add_parser("score")
     score.add_argument("--input", required=True, type=Path)
     score.add_argument("--bundle-root", required=True, type=Path)
@@ -917,6 +996,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "plan":
         print(json.dumps(plan_payload(), indent=2, sort_keys=True))
+        return 0
+    if args.command == "prompt-contract":
+        try:
+            payload = prompt_contract_payload(args.root)
+        except (OSError, ValueError) as exc:
+            print(json.dumps({"status": "FAIL", "errors": [str(exc)]}, indent=2))
+            return 2
+        print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
     errors: list[str] = []
     resolved_root = _bundle_root(args.bundle_root, errors)

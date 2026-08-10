@@ -39,7 +39,7 @@ from .aws import (
     derive_aws_residual_disposition,
     release_lifecycle_intent_boundary_is_settled,
 )
-from .core.contracts import contract_table_after_heading, table_after_heading
+from .core.contracts import table_after_heading
 from .core.ids import clean_cell, explicit_value, validate_relative_path
 from .define.models import (
     CoverageContract,
@@ -48,11 +48,11 @@ from .define.models import (
 )
 from .define.requirements import authoritative_requirement_ids
 from .design import (
-    DIAGRAM_CONTRACT_HEADERS,
-    DIAGRAM_CONTRACT_HEADING,
     DesignContract,
-    required_diagram_kinds,
+    diagram_remediation_headings,
+    diagram_patterns_required,
 )
+from .design.diagrams import filter_diagram_slices
 from .evaluation import EngineEvaluation
 from .deliver import (
     TaskSummary,
@@ -266,11 +266,14 @@ def derive_context_plan(
     restricted_teardown_closure: bool = False,
     source_texts: Mapping[str, str] | None = None,
     adr_rationale: Mapping[str, Any] | None = None,
+    requirements_contract: RequirementsContract | None = None,
+    design_contract: DesignContract | None = None,
+    diagram_remediation_required: bool = False,
 ) -> dict[str, Any]:
     """SAFETY: select an ephemeral, route-bounded canonical context packet."""
-
     stage = interaction.get("owner_stage")
     reason = interaction.get("route_reason_code")
+    prd_source = source_texts.get(PRD_FILE) if source_texts is not None else None
     deployment_closure_context = restricted_deployment_closure and next_prompt in {
         "AWS-20",
         "AWS-30",
@@ -345,6 +348,8 @@ def derive_context_plan(
             f"{PRD_FILE}#Architecture traceability",
             f"{PRD_FILE}#Change impact record",
             f"{PRD_FILE}#Project diagram contract",
+            f"{PRD_FILE}#Proposed system at a glance",
+            f"{PRD_FILE}#AWS implementation at a glance",
             f"{PRD_FILE}#Gate B Harness Profile",
             f"{PRD_FILE}#Construction envelope",
         ]
@@ -453,27 +458,26 @@ def derive_context_plan(
                 f"{VERIFY_FILE}#Current release decision",
             ]
         )
-    if stage == "DESIGN" and source_texts is not None:
-        prd_source = source_texts.get(PRD_FILE)
-        if isinstance(prd_source, str):
-            try:
-                diagram_table = contract_table_after_heading(
-                    prd_source, DIAGRAM_CONTRACT_HEADING, DIAGRAM_CONTRACT_HEADERS
-                )
-            except ValueError:
-                diagram_table = None
-            required_kinds = required_diagram_kinds(
+    if stage == "DESIGN" or diagram_remediation_required:
+        reqs, design = requirements_contract, design_contract
+        if isinstance(prd_source, str) and (
+            diagram_remediation_required
+            or diagram_patterns_required(
                 prd_source,
                 authoritative_requirement_ids(prd_source),
                 coverage.work_kind,
+                journey_ids=reqs.journey_ids if reqs else (),
+                use_case_ids=reqs.use_case_ids if reqs else (),
+                state_ids=design.project_contract.state_ids if design else (),
             )
-            if diagram_table is not None and any(
-                row[1] in required_kinds and row[3] != "CURRENT"
-                for row in diagram_table.rows
-            ):
-                on_demand_slices.append(
-                    ".agents/skills/fastlane/references/diagram-patterns.md"
-                )
+        ):
+            on_demand_slices.append(
+                ".agents/skills/fastlane/references/diagram-patterns.md"
+            )
+    if diagram_remediation_required and design_contract is not None:
+        headings = diagram_remediation_headings(design_contract.diagram_contract)
+        on_demand_slices.extend(f"{PRD_FILE}#{heading}" for heading in headings)
+    on_demand_slices = filter_diagram_slices(on_demand_slices, PRD_FILE, prd_source)
     if stage in {"DESIGN", "DELIVER"} and isinstance(adr_rationale, Mapping):
         records = adr_rationale.get("records")
         if isinstance(records, list):
@@ -1350,8 +1354,9 @@ def build_evaluation(
     aws_mutation_authority_ready = authority_state["aws_mutation_authority_ready"]
     deployment_authority_restricted = authority_state["deployment_restricted"]
     teardown_authority_restricted = authority_state["teardown_restricted"]
-    (owner_decision_brief, owner_decision_inventory, owner_brief_issues) = (
-        derive_owner_decision_brief(
+
+    def _brief():
+        return derive_owner_decision_brief(
             ctx.texts.get(PRD_FILE, ""),
             prd_fields,
             intake_contract,
@@ -1361,7 +1366,8 @@ def build_evaluation(
             has_errors=ctx.has_errors,
             enabled=classification not in {"TEMPLATE_SOURCE", "UNCONFIGURED_TEMPLATE"},
         )
-    )
+
+    owner_decision_brief, owner_decision_inventory, owner_brief_issues = _brief()
     for code, message in owner_brief_issues:
         if code == "OWNER_BRIEF_SOURCE_STALE":
             ctx.warning(code, message, PRD_FILE)
@@ -1406,16 +1412,29 @@ def build_evaluation(
         == "COMPLETE_PREREQUISITE_CHECKLIST"
     ):
         interaction = derive_unconfigured_template_interaction(diagnostic_codes)
-    context_plan = derive_context_plan(
-        interaction,
-        tasks,
-        coverage_contract,
-        next_prompt=next_prompt,
-        restricted_deployment_closure=deployment_authority_restricted,
-        restricted_teardown_closure=teardown_authority_restricted,
-        source_texts=ctx.texts,
-        adr_rationale=adr_rationale_projection,
+    diagram_remediation_required = (
+        "DIAGRAM_PRESENTATION_STALE" in diagnostic_codes
+        or design_contract.diagram_contract.status not in {"TEMPLATE", "CURRENT"}
     )
+
+    restrictions = (deployment_authority_restricted, teardown_authority_restricted)
+
+    def current_context_plan(restrictions: tuple[bool, bool]) -> dict[str, Any]:
+        return derive_context_plan(
+            interaction,
+            tasks,
+            coverage_contract,
+            next_prompt=next_prompt,
+            restricted_deployment_closure=restrictions[0],
+            restricted_teardown_closure=restrictions[1],
+            source_texts=ctx.texts,
+            adr_rationale=adr_rationale_projection,
+            requirements_contract=requirements_contract,
+            design_contract=design_contract,
+            diagram_remediation_required=diagram_remediation_required,
+        )
+
+    context_plan = current_context_plan(restrictions)
     context_issues = context_plan.pop("_resolution_issues", [])
     if context_issues:
         for issue in context_issues:
@@ -1495,19 +1514,7 @@ def build_evaluation(
                 )
             )
         )
-        (owner_decision_brief, owner_decision_inventory, _owner_brief_issues) = (
-            derive_owner_decision_brief(
-                ctx.texts.get(PRD_FILE, ""),
-                prd_fields,
-                intake_contract,
-                requirements_contract,
-                design_contract,
-                envelope,
-                has_errors=ctx.has_errors,
-                enabled=classification
-                not in {"TEMPLATE_SOURCE", "UNCONFIGURED_TEMPLATE"},
-            )
-        )
+        owner_decision_brief, owner_decision_inventory, _owner_brief_issues = _brief()
         diagnostic_codes = [item.code for item in ctx.diagnostics]
         remediation = derive_remediation(
             ctx,
@@ -1542,16 +1549,7 @@ def build_evaluation(
             == "COMPLETE_PREREQUISITE_CHECKLIST"
         ):
             interaction = derive_unconfigured_template_interaction(diagnostic_codes)
-        context_plan = derive_context_plan(
-            interaction,
-            tasks,
-            coverage_contract,
-            next_prompt=next_prompt,
-            restricted_deployment_closure=False,
-            restricted_teardown_closure=False,
-            source_texts=ctx.texts,
-            adr_rationale=adr_rationale_projection,
-        )
+        context_plan = current_context_plan((False, False))
         context_plan.pop("_resolution_issues", None)
     summary_sources: dict[str, str] = {}
     for summary_path in DOCUMENT_SUMMARY_FILES:
@@ -1561,9 +1559,29 @@ def build_evaluation(
             summary_text = ctx.presentation_texts.get(summary_path)
         if summary_text is not None:
             summary_sources[summary_path] = summary_text
-    # fmt: off
-    summary_specifications = derive_document_summary_specifications(ctx, classification=classification, lifecycle_state=lifecycle_state, next_prompt=next_prompt, project=project, prd_fields=prd_fields, gate_a=gate_a, gate_b=gate_b, tasks=tasks, release_decision=release_decision, release_evidence_cutoff=release_evidence_cutoff, aws_authorization=aws_authorization, external_authority=external_authority, interaction=interaction, active_artifact=active_artifact, deployment_sequence=deployment_sequence_projection, teardown_sequence=teardown_sequence_projection, aws_core_usage=aws_core_usage or {}, req_aws_core_materiality=req_aws_core_materiality, write_authority=write_authority, remediation=remediation)
-    # fmt: on
+    summary_specifications = derive_document_summary_specifications(
+        ctx,
+        classification=classification,
+        lifecycle_state=lifecycle_state,
+        next_prompt=next_prompt,
+        project=project,
+        prd_fields=prd_fields,
+        gate_a=gate_a,
+        gate_b=gate_b,
+        tasks=tasks,
+        release_decision=release_decision,
+        release_evidence_cutoff=release_evidence_cutoff,
+        aws_authorization=aws_authorization,
+        external_authority=external_authority,
+        interaction=interaction,
+        active_artifact=active_artifact,
+        deployment_sequence=deployment_sequence_projection,
+        teardown_sequence=teardown_sequence_projection,
+        aws_core_usage=aws_core_usage or {},
+        req_aws_core_materiality=req_aws_core_materiality,
+        write_authority=write_authority,
+        remediation=remediation,
+    )
     document_summaries, summary_issues = project_document_summaries(
         summary_sources, summary_specifications
     )
@@ -1625,16 +1643,7 @@ def build_evaluation(
             == "COMPLETE_PREREQUISITE_CHECKLIST"
         ):
             interaction = derive_unconfigured_template_interaction(diagnostic_codes)
-        context_plan = derive_context_plan(
-            interaction,
-            tasks,
-            coverage_contract,
-            next_prompt=next_prompt,
-            restricted_deployment_closure=deployment_authority_restricted,
-            restricted_teardown_closure=teardown_authority_restricted,
-            source_texts=ctx.texts,
-            adr_rationale=adr_rationale_projection,
-        )
+        context_plan = current_context_plan(restrictions)
         context_plan.pop("_resolution_issues", None)
 
     aws_mode_boundary = derive_aws_mode_boundary(
