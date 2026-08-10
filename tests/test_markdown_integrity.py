@@ -794,7 +794,7 @@ sequenceDiagram
             "Bounded repairs",
             "Product Agreement",
             "Technical Owner Brief",
-            "complete architecture diagram",
+            "Complete Architecture Diagram",
             "Gate A approves what should be built",
             "Gate B approves the technical plan",
             "Neither gate authorizes AWS account access",
