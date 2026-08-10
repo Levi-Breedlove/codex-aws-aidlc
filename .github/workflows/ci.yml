@@ -83,6 +83,9 @@ jobs:
       - name: Render sanitized published and Golden Project diagrams
         run: |
           python -m tests.render_mermaid_fixtures --output-dir "${RUNNER_TEMP}/fastlane-mermaid"
+          puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"
+          # GitHub-hosted Linux disables Chromium's usable sandbox; this process sees sanitized fixtures only.
+          printf '%s\n' '{"args":["--no-sandbox"]}' > "${puppeteer_config}"
           for source in "${RUNNER_TEMP}"/fastlane-mermaid/*.mmd; do
             for theme in default dark; do
               background="white"
@@ -90,6 +93,7 @@ jobs:
                 background="#333333"
               fi
               npx --yes @mermaid-js/mermaid-cli@11.16.0 \
+                --puppeteerConfigFile "${puppeteer_config}" \
                 --theme "${theme}" \
                 --backgroundColor "${background}" \
                 -i "${source}" \

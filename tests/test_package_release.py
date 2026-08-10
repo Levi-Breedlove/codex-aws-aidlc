@@ -290,6 +290,15 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn("@mermaid-js/mermaid-cli@11.16.0", workflow)
         self.assertIn('node-version: "22.17.1"', workflow)
         self.assertIn("python -m tests.render_mermaid_fixtures", workflow)
+        self.assertIn(
+            'puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"',
+            workflow,
+        )
+        self.assertEqual(workflow.count('{"args":["--no-sandbox"]}'), 1)
+        self.assertEqual(
+            workflow.count('--puppeteerConfigFile "${puppeteer_config}"'), 1
+        )
+        self.assertNotIn("--disable-setuid-sandbox", workflow)
         self.assertIn("for theme in default dark", workflow)
         self.assertIn('--theme "${theme}"', workflow)
         self.assertIn('background="white"', workflow)
