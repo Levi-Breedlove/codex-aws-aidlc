@@ -36,6 +36,21 @@
         "receipt change",
         "owner approval inferred from project configuration"
       ]
+    },
+    {
+      "id": "AWS_DESIGN_COVERAGE_1_2_33",
+      "base_commit": "e31d60bec32dd52b3ec29f36abfad2096e9ef867",
+      "scope": [
+        "canonical PRD AWS implementation concern vocabulary",
+        "owner-readable Gate A to Design to Gate B timing",
+        "PRD snapshot and source-locator metadata for the updated section"
+      ],
+      "prohibited": [
+        "lifecycle, routing, or remediation change",
+        "requirement, design, diagram, gate, or authority semantic change",
+        "receipt change",
+        "AWS access or execution claim"
+      ]
     }
   ],
   "summary_truth_compatibility": {
@@ -54,13 +69,13 @@
       "actual_initial_bytes"
     ],
     "report_case_digests": {
-      "template_source": "8068bc33c8b07acda91baab5b261903ee91cbbfea8e61282346ab33ae2731b1e",
-      "unconfigured_template": "e41b0b600d968a609baa855bde22c7e2cf0857e84b672c7ac6dc9e23699c9ab5",
-      "rendered_intake": "276b11bdb5b964908becb4eeb0542a97b9e664dfe805b0f229c5ced7b8ba5e4b",
-      "gate_a_pending": "e4ec90c81262247eaa9e1f1800f111e970f381994bef033b1c1006ca6818d647",
-      "gate_a_approved": "59f9e5d950d3ce31859671d552ee57d66cacce53ee8d9a031dfe16ceaf766979",
-      "gate_b_pending": "f5667c15e176261bb2fbfff83d76ef56187d6ec95d7dfb79566c579eb6cbe3be",
-      "gate_b_approved": "6627edf8bf67b5ffb010b7f6273df43fdb14eb7ab8fed16c1d8bc002cbef5d40"
+      "template_source": "d21057188e1f58be4ac23c2bf3c1bb9899d55e467bc19646a840ff7939f777e1",
+      "unconfigured_template": "0ae76d2cdbb3dfe997980a94da866c994c195322d004c9f9b654f16a0d815aed",
+      "rendered_intake": "e159099fc9c561681c053947580c59351d745bf7e123f88823e0383ceeb80f84",
+      "gate_a_pending": "505bc4ec377f94f998d6a934de3eb41dbb981d3708528324f7d3b43817a0edcf",
+      "gate_a_approved": "c41d53e03cee48e7fda3090ba604b9828a1cbffbad9f5b146f10e715f610a540",
+      "gate_b_pending": "a78c8ed7d4b9d4e71114e49141967e8e490ea7b4608be228c0633ad731d570ca",
+      "gate_b_approved": "32ba13bfc7dd3c691f50ffa9a126caa5e15337f392724fde8817837c349ef0ef"
     }
   },
   "normalization": {
@@ -2155,13 +2170,13 @@
     }
   },
   "report_case_digests": {
-    "template_source": "2cee2b153cf4522008ca42ed7f26c935b886302d1cd063352aa1eed460883abd",
-    "unconfigured_template": "8fa589888bf37f3e81d63fc25646da3719abd2edf672793c5b7c350a348d9695",
-    "rendered_intake": "f0d2ff140a652323245933ad5dec1498c1a4008c5e491b49c631346c2a511063",
-    "gate_a_pending": "8f35bd47ec02b5cd043f1462ef5092dc3d245a96e4f01ff8546e8337845b2b66",
-    "gate_a_approved": "55130de9e3b72bf24507e31cebc769c90c7d71f2a85391727b5a7d2fb99407ec",
-    "gate_b_pending": "fbb088e9465ee382fa40290147bc086a154d639c4032959ebcf6842e2b892e1a",
-    "gate_b_approved": "0dfa846ef13844db455e636acbe5f4fb2d4e983944caf2729a4ac6b30d8bad58"
+    "template_source": "a8fa8d7ef75248c40294df2855073d20797d0669c7f6275f08c69bc199f86957",
+    "unconfigured_template": "beff6008715686649dbdf621118d6d09ab75410cfe6e7873a63dbcbb21e60d09",
+    "rendered_intake": "616c60866cdcedccb8a57071a249d87199ee1a1b719f3ac984f6d18b4e26f0b1",
+    "gate_a_pending": "e415f1004d0ff4453ce4a85476d16b43723879463e63d98cfa70d991c42852ab",
+    "gate_a_approved": "d6f3c282920ee0c7de4fb8e151595c664cb983054c994a50c6f1516916814b88",
+    "gate_b_pending": "32f4e262ef4213042d515d89407407b5917c1bdf31b7a77c3276f4cb38f465d0",
+    "gate_b_approved": "bee445bc51f450ba7925c9289ef778d068b8831d2cbc66b1bee097288583c4bb"
   },
   "report_cases": {
     "template_source": {
@@ -2585,7 +2600,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:3acabaf5c63b8fb362de61b07fd88319aa3224753c2522f6c9bd2703c5e515ea"
+          "prd_snapshot_sha256": "sha256:e455e0ea72cdc17045f2b501491e2f1d9cb0ad705354dee1fad145558245819e"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -4482,7 +4497,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:3acabaf5c63b8fb362de61b07fd88319aa3224753c2522f6c9bd2703c5e515ea"
+          "prd_snapshot_sha256": "sha256:e455e0ea72cdc17045f2b501491e2f1d9cb0ad705354dee1fad145558245819e"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -6349,7 +6364,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:fc4b37445f67eb261a57000a03a02439109bd347153dba1d820c1183752bc392"
+          "prd_snapshot_sha256": "sha256:6f22c65f9bbd480207f0c24318475306c3d71fc5ce028e29b26ca7a9c6f54273"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -8500,7 +8515,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:3ea9889fa24c1c4f1636c20e658a0e7103e8e8688fa585dd5e7d3d442437a5c5"
+          "prd_snapshot_sha256": "sha256:2798dd42b76fcee9bd8ba97b59ae3230a64e0c500aa6578bd222365953890429"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -10701,7 +10716,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 7040,
+          "actual_initial_source_bytes": 7671,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -10709,10 +10724,10 @@
               "selector_kind": "HEADING",
               "selector": "Architecture selection and records",
               "start_line": 13,
-              "end_line": 24,
+              "end_line": 25,
               "active_ids": [],
-              "canonical_sha256": "sha256:e4a413681bcdb63242d21cc006efd678af4235a245a0dcf7b13effd326f20fc5",
-              "source_bytes": 2664,
+              "canonical_sha256": "sha256:a3bdc8eda2ea6ce38beaaaf5775d5b05f87bb0c8cc48afc1db9ec2e54dddaebf",
+              "source_bytes": 3295,
               "reason": "Current phase procedure"
             },
             {
@@ -10826,8 +10841,8 @@
               "path": ".agents/skills/fastlane/references/design.md",
               "selector_kind": "HEADING",
               "selector": "Validation, diagrams, and Gate B",
-              "start_line": 25,
-              "end_line": 42,
+              "start_line": 26,
+              "end_line": 43,
               "active_ids": [],
               "canonical_sha256": "sha256:7c63979498d256b000961663fac2178b0e426f4f04d979a535d5d058e2722aca",
               "source_bytes": 5771,
@@ -10837,8 +10852,8 @@
               "path": ".agents/skills/fastlane/references/design.md",
               "selector_kind": "HEADING",
               "selector": "Challenger and approval",
-              "start_line": 43,
-              "end_line": 48,
+              "start_line": 44,
+              "end_line": 49,
               "active_ids": [],
               "canonical_sha256": "sha256:c571b2f000e0f71ad09e77360b7aa82f6d1fce42a11dff6b2668313925ba36fa",
               "source_bytes": 1419,
@@ -10892,8 +10907,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Gate B Harness Profile",
-              "start_line": 1046,
-              "end_line": 1079,
+              "start_line": 1050,
+              "end_line": 1083,
               "active_ids": [],
               "canonical_sha256": "sha256:0e2ac18f467fb91fd487233a3a4bc2f64275af21cc31f7a35d5b2b74432be60e",
               "source_bytes": 2629,
@@ -10903,8 +10918,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1258,
-              "end_line": 1314,
+              "start_line": 1262,
+              "end_line": 1318,
               "active_ids": [
                 "FR-001",
                 "REQ-0001",
@@ -11200,7 +11215,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:1245a1ea07b92ac2fb6215c760d49102af294d35b593d82646c471377e0bd7ee"
+          "prd_snapshot_sha256": "sha256:44e5e99301420e0b36ab0f2cb49248b87365785c876b96702034652ee61f33f7"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -12289,8 +12304,8 @@
               "path": "docs/project/PRD.md",
               "heading": "20. AWS implementation approach",
               "start_line": 938,
-              "end_line": 968,
-              "section_sha256": "sha256:7049803ec6d263e2ef3fc3fdb77175ba46cc77dc06097c0901cc4e6965776eed",
+              "end_line": 972,
+              "section_sha256": "sha256:66fa912e8014be0b5d561636b6767223d91af66cefe0620107611fcb3b6b90f0",
               "required": true
             },
             {
@@ -12298,8 +12313,8 @@
               "label": "Validation strategy",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1013,
-              "end_line": 1017,
+              "start_line": 1017,
+              "end_line": 1021,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -12308,8 +12323,8 @@
               "label": "Harness checks",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1013,
-              "end_line": 1017,
+              "start_line": 1017,
+              "end_line": 1021,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -12318,8 +12333,8 @@
               "label": "Release acceptance",
               "path": "docs/project/PRD.md",
               "heading": "26. Release acceptance",
-              "start_line": 1168,
-              "end_line": 1179,
+              "start_line": 1172,
+              "end_line": 1183,
               "section_sha256": "sha256:c832a27356dcd160f306dc1a9eac78b7d340127f4ccff5a4abf2ed25f2b45a45",
               "required": true
             },
@@ -12328,8 +12343,8 @@
               "label": "First construction wave",
               "path": "docs/project/PRD.md",
               "heading": "21. Implementation boundaries and order",
-              "start_line": 969,
-              "end_line": 1012,
+              "start_line": 973,
+              "end_line": 1016,
               "section_sha256": "sha256:577f11cacda9a82f87540cfb9c68a56aaa3810bd7c70bd155a4b1097790afd23",
               "required": true
             },
@@ -12338,8 +12353,8 @@
               "label": "Gate B readiness",
               "path": "docs/project/PRD.md",
               "heading": "Gate B — readiness card",
-              "start_line": 1225,
-              "end_line": 1248,
+              "start_line": 1229,
+              "end_line": 1252,
               "section_sha256": "sha256:7913dd626676ebf2b7492b5432d735491617bda58ef3ee38a67167996f86d496",
               "required": true
             },
@@ -12348,8 +12363,8 @@
               "label": "Construction boundary",
               "path": "docs/project/PRD.md",
               "heading": "Construction and authorization boundary",
-              "start_line": 1249,
-              "end_line": 1257,
+              "start_line": 1253,
+              "end_line": 1261,
               "section_sha256": "sha256:d3abef77ee0ad9abc81d5bb96fb72912434ebf60553713ee40678b192a64908e",
               "required": true
             },
@@ -12358,8 +12373,8 @@
               "label": "Gate B authorization record",
               "path": "docs/project/PRD.md",
               "heading": "29. Gate B owner authorization record",
-              "start_line": 1315,
-              "end_line": 1353,
+              "start_line": 1319,
+              "end_line": 1357,
               "section_sha256": "sha256:6fb946c821749fe38980af47ff0202589b302544d4d670d3c23f3029ae77ec6f",
               "required": true
             }
@@ -12373,7 +12388,7 @@
             ]
           },
           "formal_receipt_required": false,
-          "canonical_sha256": "sha256:de7c52d1ca7342a20173e33e4edfe32e0ca7ced3739687535fc1d9f6615e986f"
+          "canonical_sha256": "sha256:92a80268bca245c4690f046bce85f6925d5265a2e840859fb823acdf4c3ec345"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -13488,7 +13503,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 9866,
+          "actual_initial_source_bytes": 10497,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -13496,10 +13511,10 @@
               "selector_kind": "HEADING",
               "selector": "Architecture selection and records",
               "start_line": 13,
-              "end_line": 24,
+              "end_line": 25,
               "active_ids": [],
-              "canonical_sha256": "sha256:e4a413681bcdb63242d21cc006efd678af4235a245a0dcf7b13effd326f20fc5",
-              "source_bytes": 2664,
+              "canonical_sha256": "sha256:a3bdc8eda2ea6ce38beaaaf5775d5b05f87bb0c8cc48afc1db9ec2e54dddaebf",
+              "source_bytes": 3295,
               "reason": "Current phase procedure"
             },
             {
@@ -13727,8 +13742,8 @@
               "path": ".agents/skills/fastlane/references/design.md",
               "selector_kind": "HEADING",
               "selector": "Validation, diagrams, and Gate B",
-              "start_line": 25,
-              "end_line": 42,
+              "start_line": 26,
+              "end_line": 43,
               "active_ids": [],
               "canonical_sha256": "sha256:7c63979498d256b000961663fac2178b0e426f4f04d979a535d5d058e2722aca",
               "source_bytes": 5771,
@@ -13738,8 +13753,8 @@
               "path": ".agents/skills/fastlane/references/design.md",
               "selector_kind": "HEADING",
               "selector": "Challenger and approval",
-              "start_line": 43,
-              "end_line": 48,
+              "start_line": 44,
+              "end_line": 49,
               "active_ids": [],
               "canonical_sha256": "sha256:c571b2f000e0f71ad09e77360b7aa82f6d1fce42a11dff6b2668313925ba36fa",
               "source_bytes": 1419,
@@ -13824,8 +13839,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Gate B Harness Profile",
-              "start_line": 1093,
-              "end_line": 1120,
+              "start_line": 1097,
+              "end_line": 1124,
               "active_ids": [
                 "FR-001"
               ],
@@ -13837,8 +13852,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1331,
-              "end_line": 1387,
+              "start_line": 1335,
+              "end_line": 1391,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -14180,7 +14195,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:1a678d1ba3b83b9b0fcc6fa325639f1522325c8db8a00b6ce941f0840e0064a7"
+          "prd_snapshot_sha256": "sha256:0c7a6ae3a7f62aa98cad92867d6eb7f2394b15dea369cb02a673e2cd77117d78"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -15282,8 +15297,8 @@
               "path": "docs/project/PRD.md",
               "heading": "20. AWS implementation approach",
               "start_line": 987,
-              "end_line": 1017,
-              "section_sha256": "sha256:dbc844fdb2280b2af86656486e40c904dcda9dfea826480cf60d90afa5006656",
+              "end_line": 1021,
+              "section_sha256": "sha256:f82a2cf9ede7bdf7ace0a187d4b8ca950cc9602cfce4577c4b1bd6f32dca5c03",
               "required": true
             },
             {
@@ -15291,8 +15306,8 @@
               "label": "Validation strategy",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1060,
-              "end_line": 1064,
+              "start_line": 1064,
+              "end_line": 1068,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -15301,8 +15316,8 @@
               "label": "Harness checks",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1060,
-              "end_line": 1064,
+              "start_line": 1064,
+              "end_line": 1068,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -15311,8 +15326,8 @@
               "label": "Release acceptance",
               "path": "docs/project/PRD.md",
               "heading": "26. Release acceptance",
-              "start_line": 1241,
-              "end_line": 1252,
+              "start_line": 1245,
+              "end_line": 1256,
               "section_sha256": "sha256:c832a27356dcd160f306dc1a9eac78b7d340127f4ccff5a4abf2ed25f2b45a45",
               "required": true
             },
@@ -15321,8 +15336,8 @@
               "label": "First construction wave",
               "path": "docs/project/PRD.md",
               "heading": "21. Implementation boundaries and order",
-              "start_line": 1018,
-              "end_line": 1059,
+              "start_line": 1022,
+              "end_line": 1063,
               "section_sha256": "sha256:eb9209edb3098d7361605f491ab03f7784bc47ec761fec9b76145dfe590d429d",
               "required": true
             },
@@ -15331,8 +15346,8 @@
               "label": "Gate B readiness",
               "path": "docs/project/PRD.md",
               "heading": "Gate B — readiness card",
-              "start_line": 1298,
-              "end_line": 1321,
+              "start_line": 1302,
+              "end_line": 1325,
               "section_sha256": "sha256:aca0534f4d08c8096d17e4a2dff82a42f49b8cf37a77749de80545b2e465bf63",
               "required": true
             },
@@ -15341,8 +15356,8 @@
               "label": "Construction boundary",
               "path": "docs/project/PRD.md",
               "heading": "Construction and authorization boundary",
-              "start_line": 1322,
-              "end_line": 1330,
+              "start_line": 1326,
+              "end_line": 1334,
               "section_sha256": "sha256:d3abef77ee0ad9abc81d5bb96fb72912434ebf60553713ee40678b192a64908e",
               "required": true
             },
@@ -15351,8 +15366,8 @@
               "label": "Gate B authorization record",
               "path": "docs/project/PRD.md",
               "heading": "29. Gate B owner authorization record",
-              "start_line": 1388,
-              "end_line": 1426,
+              "start_line": 1392,
+              "end_line": 1430,
               "section_sha256": "sha256:03fe193429af2277608667650c4747c081595e8fd7af75fde93c858a7e0776d8",
               "required": true
             }
@@ -15366,7 +15381,7 @@
             ]
           },
           "formal_receipt_required": true,
-          "canonical_sha256": "sha256:437324a42a61d2040066d511913d35e45a0a65a5e2ecaca56b4e1c650b955212"
+          "canonical_sha256": "sha256:50c39f6ef6db2d1827943baf4e0dd9ec676d615d4cb9aae7ff7a845f2915d573"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -16833,8 +16848,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1331,
-              "end_line": 1387,
+              "start_line": 1335,
+              "end_line": 1391,
               "active_ids": [],
               "canonical_sha256": "sha256:459a79de3ffb41db7bb6b61323174a5f6e19209d8607c3a7741c65f602539f68",
               "source_bytes": 4116,
@@ -17176,7 +17191,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:95690676e1efc74cadf6705eb4ea648dc34a584dc00c02db331b7062a813093a"
+          "prd_snapshot_sha256": "sha256:7148459ce4630dfa82ec2f698fbce413a539f6d963bafb2d0c297b341f035e5f"
         },
         "document_summaries": {
           "schema_version": 1,

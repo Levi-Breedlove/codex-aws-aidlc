@@ -41,6 +41,7 @@ BASELINE_COMMIT = "312b53ce00f9db5263f3a72e778f833e70c7db8e"
 BASELINE_PACKAGE_VERSION = "1" + ".2.10"
 SUMMARY_TRUTH_BASE_COMMIT = "8dbb11fd0e54af392ac073ce597cdb26fc336fcc"
 ADAPTIVE_KICKOFF_BASE_COMMIT = "204b1b7477413425114deaa54a9ece8f9fc14e53"
+AWS_DESIGN_COVERAGE_BASE_COMMIT = "e31d60bec32dd52b3ec29f36abfad2096e9ef867"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -79,28 +80,43 @@ APPROVED_BEHAVIOR_CHANGES = [
             "owner approval inferred from project configuration",
         ],
     },
+    {
+        "id": "AWS_DESIGN_COVERAGE_1_2_33",
+        "base_commit": AWS_DESIGN_COVERAGE_BASE_COMMIT,
+        "scope": [
+            "canonical PRD AWS implementation concern vocabulary",
+            "owner-readable Gate A to Design to Gate B timing",
+            "PRD snapshot and source-locator metadata for the updated section",
+        ],
+        "prohibited": [
+            "lifecycle, routing, or remediation change",
+            "requirement, design, diagram, gate, or authority semantic change",
+            "receipt change",
+            "AWS access or execution claim",
+        ],
+    },
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
-        "8068bc33c8b07acda91baab5b261903ee91cbbfea8e61282346ab33ae2731b1e"
+        "d21057188e1f58be4ac23c2bf3c1bb9899d55e467bc19646a840ff7939f777e1"
     ),
     "unconfigured_template": (
-        "e41b0b600d968a609baa855bde22c7e2cf0857e84b672c7ac6dc9e23699c9ab5"
+        "0ae76d2cdbb3dfe997980a94da866c994c195322d004c9f9b654f16a0d815aed"
     ),
     "rendered_intake": (
-        "276b11bdb5b964908becb4eeb0542a97b9e664dfe805b0f229c5ced7b8ba5e4b"
+        "e159099fc9c561681c053947580c59351d745bf7e123f88823e0383ceeb80f84"
     ),
     "gate_a_pending": (
-        "e4ec90c81262247eaa9e1f1800f111e970f381994bef033b1c1006ca6818d647"
+        "505bc4ec377f94f998d6a934de3eb41dbb981d3708528324f7d3b43817a0edcf"
     ),
     "gate_a_approved": (
-        "59f9e5d950d3ce31859671d552ee57d66cacce53ee8d9a031dfe16ceaf766979"
+        "c41d53e03cee48e7fda3090ba604b9828a1cbffbad9f5b146f10e715f610a540"
     ),
     "gate_b_pending": (
-        "f5667c15e176261bb2fbfff83d76ef56187d6ec95d7dfb79566c579eb6cbe3be"
+        "a78c8ed7d4b9d4e71114e49141967e8e490ea7b4608be228c0633ad731d570ca"
     ),
     "gate_b_approved": (
-        "6627edf8bf67b5ffb010b7f6273df43fdb14eb7ab8fed16c1d8bc002cbef5d40"
+        "32ba13bfc7dd3c691f50ffa9a126caa5e15337f392724fde8817837c349ef0ef"
     ),
 }
 

@@ -530,6 +530,10 @@ class PromptPackContractTests(unittest.TestCase):
             "Harness Profile",
             "PROP-*",
             "Gate B Technical Owner Brief",
+            "Complete the AWS implementation approach during DESIGN-10, never during Gate A",
+            "Compute`, `API and edge`, `Identity`, `Data`, `Messaging`, `Observability`, `Deployment`, and `Secrets and encryption",
+            "not an exhaustive AWS product catalog",
+            "ask the owner only when an unresolved owner constraint or product tradeoff genuinely requires a decision",
         ):
             self.assertIn(phrase, self.fastlane_design)
 
@@ -698,9 +702,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.33")
-        self.assertIn("**Pack version:** 1.2.33", self.prompts)
-        self.assertIn("Current customer build: **1.2.33**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.34")
+        self.assertIn("**Pack version:** 1.2.34", self.prompts)
+        self.assertIn("Current customer build: **1.2.34**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 
 from scripts import fastlane_document_summaries as document_summaries
 from scripts.fastlane_adr import ADR_AUTHORITY
+from scripts.fastlane_engine.design.support import AWS_SERVICE_TECH_CONCERNS
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = REPOSITORY_ROOT
@@ -27,6 +28,17 @@ TEMPLATE_SOURCE_MODE = "{{SETUP_STATUS}}" in (
 source_template_only = unittest.skipUnless(
     TEMPLATE_SOURCE_MODE,
     "maintainer source-integrity test is not applicable after project configuration",
+)
+
+EXPECTED_AWS_DESIGN_CONCERNS = (
+    "Compute",
+    "API and edge",
+    "Identity",
+    "Data",
+    "Messaging",
+    "Observability",
+    "Deployment",
+    "Secrets and encryption",
 )
 
 
@@ -3008,7 +3020,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.33")
+        self.assertEqual(report["bootstrap_version"], "1.2.34")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -3757,6 +3769,20 @@ class BootstrapDoctorTests(unittest.TestCase):
 
     def test_design_support_records_are_complete_and_technology_bound(self) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        template_table = doctor.contract_table_after_heading(
+            template,
+            doctor.AWS_SERVICE_DECISION_HEADING,
+            doctor.AWS_SERVICE_DECISION_HEADERS,
+        )
+        self.assertIsNotNone(template_table)
+        self.assertEqual(
+            tuple(AWS_SERVICE_TECH_CONCERNS),
+            EXPECTED_AWS_DESIGN_CONCERNS,
+        )
+        self.assertEqual(
+            tuple(row[0] for row in template_table.rows),
+            EXPECTED_AWS_DESIGN_CONCERNS,
+        )
         complete = complete_design_contract(template)
         ready, ready_issues = doctor.derive_design_contract(
             complete,
@@ -3779,6 +3805,31 @@ class BootstrapDoctorTests(unittest.TestCase):
             "unbounded retry": (
                 complete.replace("Bounded to 3 attempts", "Retry forever", 1),
                 "retry posture is unbounded",
+            ),
+            "missing AWS concern": (
+                re.sub(r"(?m)^\| Messaging \|.*\r?\n", "", complete, count=1),
+                "AWS concern Messaging must appear exactly once; found 0",
+            ),
+            "duplicate AWS concern": (
+                re.sub(
+                    r"(?m)^(\| Messaging \|.*\r?\n)",
+                    lambda match: match.group(1) * 2,
+                    complete,
+                    count=1,
+                ),
+                "AWS concern Messaging must appear exactly once; found 2",
+            ),
+            "unexpected AWS concern": (
+                complete.replace("| Messaging |", "| Networking |", 1),
+                "Unexpected AWS decision concerns: Networking",
+            ),
+            "unresolved AWS mechanism": (
+                complete.replace(
+                    "AWS Lambda behind the approved application interface",
+                    "TODO",
+                    1,
+                ),
+                "Compute: AWS service or mechanism is unresolved",
             ),
             "unknown AWS technology decision": (
                 complete.replace(
