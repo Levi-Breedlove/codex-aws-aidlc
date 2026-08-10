@@ -892,23 +892,27 @@ retry is safe, what operators can observe, and how the product recovers.
 
 ## 20. AWS implementation approach
 
-Fastlane explains each selected AWS capability, why it fits, its main tradeoff,
-and the current evidence supporting it. AWS Core informs the recommendation;
+Fastlane explains how the selected design handles each material AWS
+implementation concern, why it fits, its main tradeoff, and the current
+evidence; this is not a catalog of every AWS service. Gate A approves product
+requirements and constraints, then Codex completes this approach and the full
+architecture diagram for Gate B; AWS Core informs the recommendation, while
 only the owner can approve it or separately authorize account work.
 
 <details>
 <summary>Exact AWS service decision records</summary>
 
-This table preserves each AWS capability selected for the design, the current
-decision records behind it, its rationale, and its principal tradeoff.
+This table summarizes the material AWS implementation concerns for the selected
+design. One row may use several services or mechanisms; its linked technical
+decisions and current AWS evidence preserve the complete basis.
 
 | Concern | Decision IDs | AWS service or mechanism | Rationale | Tradeoff |
 |---|---|---|---|---|
 | Compute | TODO | TODO | TODO | TODO |
+| API and edge | TODO | TODO | TODO | TODO |
 | Identity | TODO | TODO | TODO | TODO |
 | Data | TODO | TODO | TODO | TODO |
-| Messaging or orchestration | TODO | TODO | TODO | TODO |
-| Networking | TODO | TODO | TODO | TODO |
+| Messaging | TODO | TODO | TODO | TODO |
 | Observability | TODO | TODO | TODO | TODO |
 | Deployment | TODO | TODO | TODO | TODO |
 | Secrets and encryption | TODO | TODO | TODO | TODO |

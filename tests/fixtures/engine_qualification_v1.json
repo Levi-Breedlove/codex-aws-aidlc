@@ -36,6 +36,21 @@
         "receipt change",
         "owner approval inferred from project configuration"
       ]
+    },
+    {
+      "id": "AWS_DESIGN_COVERAGE_1_2_33",
+      "base_commit": "e31d60bec32dd52b3ec29f36abfad2096e9ef867",
+      "scope": [
+        "canonical PRD AWS implementation concern vocabulary",
+        "owner-readable Gate A to Design to Gate B timing",
+        "PRD snapshot and source-locator metadata for the updated section"
+      ],
+      "prohibited": [
+        "lifecycle, routing, or remediation change",
+        "requirement, design, diagram, gate, or authority semantic change",
+        "receipt change",
+        "AWS access or execution claim"
+      ]
     }
   ],
   "normalization": {
@@ -53,8 +68,8 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "df58225eb29e72f153097cfbe7e759723c605c4befb2220e2e3724e7f9c5ebad",
-    "task_ready": "0c5ddec5136f403441e110a9c39c24df2b287e8caf701c19df3de2ac08e34d3a"
+    "stale_gate_a_summary": "ba7f81ac31b91d4664a4faf0e38f227dc0cfb075229a68722c3386353d7ef255",
+    "task_ready": "055b92772cef3ef86c7263f2ac076dae05586471258d69558899d8f997b3a90c"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -642,7 +657,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:3ea9889fa24c1c4f1636c20e658a0e7103e8e8688fa585dd5e7d3d442437a5c5"
+          "prd_snapshot_sha256": "sha256:2798dd42b76fcee9bd8ba97b59ae3230a64e0c500aa6578bd222365953890429"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -2878,8 +2893,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1331,
-              "end_line": 1387,
+              "start_line": 1335,
+              "end_line": 1391,
               "active_ids": [],
               "canonical_sha256": "sha256:459a79de3ffb41db7bb6b61323174a5f6e19209d8607c3a7741c65f602539f68",
               "source_bytes": 4116,
@@ -3221,7 +3236,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:95690676e1efc74cadf6705eb4ea648dc34a584dc00c02db331b7062a813093a"
+          "prd_snapshot_sha256": "sha256:7148459ce4630dfa82ec2f698fbce413a539f6d963bafb2d0c297b341f035e5f"
         },
         "document_summaries": {
           "schema_version": 1,

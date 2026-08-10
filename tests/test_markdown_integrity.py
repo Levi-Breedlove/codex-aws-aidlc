@@ -307,6 +307,38 @@ sequenceDiagram
         ):
             self.assertIn(phrase, design)
 
+    def test_prd_explains_complete_material_aws_design_coverage(self) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        expected_concerns = (
+            "Compute",
+            "API and edge",
+            "Identity",
+            "Data",
+            "Messaging",
+            "Observability",
+            "Deployment",
+            "Secrets and encryption",
+        )
+        section = prd.split("## 20. AWS implementation approach", 1)[1].split(
+            "### Lightweight Well-Architected decision review", 1
+        )[0]
+        normalized_section = " ".join(section.split())
+        concerns = tuple(
+            match.group(1)
+            for match in re.finditer(r"(?m)^\| ([^|]+?) \| TODO \|", section)
+        )
+        self.assertEqual(concerns, expected_concerns)
+        for phrase in (
+            "material AWS implementation concern",
+            "not a catalog of every AWS service",
+            "Gate A approves product requirements and constraints",
+            "full architecture diagram for Gate B",
+            "One row may use several services or mechanisms",
+        ):
+            self.assertIn(phrase, normalized_section)
+        self.assertNotIn("| Messaging or orchestration |", section)
+        self.assertNotIn("| Networking |", section)
+
     def test_each_mermaid_block_is_checked_independently(self) -> None:
         fixture = """
 ```mermaid

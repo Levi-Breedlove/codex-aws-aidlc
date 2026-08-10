@@ -475,6 +475,10 @@ class ProductJourneyTests(unittest.TestCase):
                 "(docs/project/PRD.md#proposed-system-at-a-glance)",
                 rendered_gate_b,
             )
+            self.assertIn(
+                "(docs/project/PRD.md#20-aws-implementation-approach)",
+                rendered_gate_b,
+            )
             for label in (
                 "Meaning and selection:",
                 "Basis and rationale:",
