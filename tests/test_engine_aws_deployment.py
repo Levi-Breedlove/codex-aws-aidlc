@@ -313,14 +313,11 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
     ) -> tuple[str, ...]:
         is_read = phase == "AWS-30"
         blocked = status in {"BLOCKED", "STALE"}
+        receipt_backed = receipt_digest != "NONE"
         authorization = deployment_authorization or (
-            "AWS-AUTH-0001" if lane == "explicit-gate" else "AUTH-0001"
+            "AWS-AUTH-0001" if receipt_backed else "AUTH-0001"
         )
-        plan = (
-            self._DEPLOYMENT_PLAN
-            if lane == "explicit-gate"
-            else "STACK: fastlane-stack"
-        )
+        plan = self._DEPLOYMENT_PLAN if receipt_backed else "STACK: fastlane-stack"
         read = read_authority or self.deployment_read_authority()
         values = {
             "Evidence ID": evidence_id,
@@ -330,15 +327,11 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
             "Deployment authorization": authorization,
             "Deployment receipt digest": receipt_digest,
             "Deployment valid until": deployment_valid_until
-            or (
-                "2099-01-01T00:00:00Z"
-                if lane == "explicit-gate"
-                else "2099-12-31T23:59:59Z"
-            ),
+            or ("2099-01-01T00:00:00Z" if receipt_backed else "2099-12-31T23:59:59Z"),
             "Deployment authority source": deployment_authority_source
             or (
                 "owner-message MSG-AWS-0001"
-                if lane == "explicit-gate"
+                if receipt_backed
                 else "owner-message MSG-GATE-B-0001"
             ),
             "Read authorization": (
@@ -430,7 +423,7 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
             verification_rows,
         )
         receipt_digest = "NONE"
-        if lane == "explicit-gate":
+        if lane in {"fast-dev", "explicit-gate"}:
             verify_text, receipt_digest = self.bind_explicit_deployment_receipt(
                 verify_text, authorization_id=explicit_authorization_id
             )
@@ -981,87 +974,86 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
             result,
         )
 
-    def test_second_explicit_attempt_requires_prior_cutoff_and_fresh_authority(
+    def test_second_receipt_backed_attempt_requires_prior_cutoff_and_fresh_authority(
         self,
     ) -> None:
         read = self.deployment_read_authority()
-        _unused, current_digest = self.deployment_verify_text(
-            [],
-            lane="explicit-gate",
-            explicit_authorization_id="AWS-AUTH-0002",
-        )
-        historical_digest = "sha256:" + "e" * 64
-        rows = [
-            self.deployment_row(
-                evidence_id="EV-2371",
-                attempt_id="AWS-DEPLOY-0001",
-                phase="AWS-20",
-                status="STARTED",
-                observed_at="2027-01-01T00:00:00Z",
-                lane="explicit-gate",
-                deployment_authorization="AWS-AUTH-0001",
-                receipt_digest=historical_digest,
-            ),
-            self.deployment_row(
-                evidence_id="EV-2372",
-                attempt_id="AWS-DEPLOY-0001",
-                phase="AWS-20",
-                status="SUCCEEDED",
-                observed_at="2027-01-01T00:01:00Z",
-                lane="explicit-gate",
-                deployment_authorization="AWS-AUTH-0001",
-                receipt_digest=historical_digest,
-            ),
-            self.deployment_row(
-                evidence_id="EV-2373",
-                attempt_id="AWS-DEPLOY-0001",
-                phase="AWS-30",
-                status="COMPLETE",
-                observed_at="2027-01-01T00:02:00Z",
-                lane="explicit-gate",
-                deployment_authorization="AWS-AUTH-0001",
-                receipt_digest=historical_digest,
-                read_authority=read,
-            ),
-            self.deployment_row(
-                evidence_id="EV-2374",
-                attempt_id="AWS-DEPLOY-0002",
-                phase="AWS-20",
-                status="STARTED",
-                observed_at="2027-01-01T00:03:00Z",
-                lane="explicit-gate",
-                deployment_authorization="AWS-AUTH-0002",
-                receipt_digest=current_digest,
-            ),
-        ]
-        for cutoff in ("NONE", "EV-9001"):
-            with self.subTest(cutoff=cutoff):
-                blocked = self.derive_deployment(
+        for lane in ("fast-dev", "explicit-gate"):
+            with self.subTest(lane=lane):
+                _unused, current_digest = self.deployment_verify_text(
+                    [], lane=lane, explicit_authorization_id="AWS-AUTH-0002"
+                )
+                historical_digest = "sha256:" + "e" * 64
+                rows = [
+                    self.deployment_row(
+                        evidence_id="EV-2371",
+                        attempt_id="AWS-DEPLOY-0001",
+                        phase="AWS-20",
+                        status="STARTED",
+                        observed_at="2027-01-01T00:00:00Z",
+                        lane=lane,
+                        deployment_authorization="AWS-AUTH-0001",
+                        receipt_digest=historical_digest,
+                    ),
+                    self.deployment_row(
+                        evidence_id="EV-2372",
+                        attempt_id="AWS-DEPLOY-0001",
+                        phase="AWS-20",
+                        status="SUCCEEDED",
+                        observed_at="2027-01-01T00:01:00Z",
+                        lane=lane,
+                        deployment_authorization="AWS-AUTH-0001",
+                        receipt_digest=historical_digest,
+                    ),
+                    self.deployment_row(
+                        evidence_id="EV-2373",
+                        attempt_id="AWS-DEPLOY-0001",
+                        phase="AWS-30",
+                        status="COMPLETE",
+                        observed_at="2027-01-01T00:02:00Z",
+                        lane=lane,
+                        deployment_authorization="AWS-AUTH-0001",
+                        receipt_digest=historical_digest,
+                        read_authority=read,
+                    ),
+                    self.deployment_row(
+                        evidence_id="EV-2374",
+                        attempt_id="AWS-DEPLOY-0002",
+                        phase="AWS-20",
+                        status="STARTED",
+                        observed_at="2027-01-01T00:03:00Z",
+                        lane=lane,
+                        deployment_authorization="AWS-AUTH-0002",
+                        receipt_digest=current_digest,
+                    ),
+                ]
+                for cutoff in ("NONE", "EV-9001"):
+                    blocked = self.derive_deployment(
+                        rows,
+                        lane=lane,
+                        read_authority=read,
+                        release_evidence_cutoff=cutoff,
+                        explicit_authorization_id="AWS-AUTH-0002",
+                    )
+                    self.assertEqual(blocked["status"], "BLOCKED", blocked)
+                    self.assertTrue(
+                        any(
+                            "prior" in issue.casefold() and "cutoff" in issue.casefold()
+                            for issue in blocked["issues"]
+                        ),
+                        blocked,
+                    )
+
+                allowed = self.derive_deployment(
                     rows,
-                    lane="explicit-gate",
+                    lane=lane,
                     read_authority=read,
-                    release_evidence_cutoff=cutoff,
+                    release_evidence_cutoff="EV-2373",
                     explicit_authorization_id="AWS-AUTH-0002",
                 )
-                self.assertEqual(blocked["status"], "BLOCKED", blocked)
-                self.assertTrue(
-                    any(
-                        "prior" in issue.casefold() and "cutoff" in issue.casefold()
-                        for issue in blocked["issues"]
-                    ),
-                    blocked,
-                )
-
-        allowed = self.derive_deployment(
-            rows,
-            lane="explicit-gate",
-            read_authority=read,
-            release_evidence_cutoff="EV-2373",
-            explicit_authorization_id="AWS-AUTH-0002",
-        )
-        self.assertEqual(allowed["status"], "ACTION_TERMINAL_REQUIRED", allowed)
-        self.assertEqual(allowed["attempt_id"], "AWS-DEPLOY-0002")
-        self.assertEqual(allowed["deployment_authorization"], "AWS-AUTH-0002")
+                self.assertEqual(allowed["status"], "ACTION_TERMINAL_REQUIRED", allowed)
+                self.assertEqual(allowed["attempt_id"], "AWS-DEPLOY-0002")
+                self.assertEqual(allowed["deployment_authorization"], "AWS-AUTH-0002")
 
     def test_deployment_and_read_observations_cannot_precede_authorization(
         self,

@@ -381,7 +381,7 @@ TRANSITION_STAGES = {
     "AWS_RESULT_BOUND",
     "TERMINAL_PATCH_PENDING",
 }
-TRANSITION_ACTIONS = {"FAST_DEV_GATE_B", "AWS_DEPLOYMENT", "AWS_TEARDOWN"}
+TRANSITION_ACTIONS = {"AWS_DEPLOYMENT", "AWS_TEARDOWN"}
 TRANSITION_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 DEPLOYMENT_JOURNAL = "## AWS deployment action and reconciliation evidence"
 TEARDOWN_JOURNAL = "## Teardown reconciliation evidence"
@@ -707,7 +707,7 @@ def _started_patch_candidate(
     if journal == DEPLOYMENT_JOURNAL:
         action_kind = str(match.get("authority_kind"))
         valid = bool(
-            action_kind in {"AWS_DEPLOYMENT", "FAST_DEV_GATE_B"}
+            action_kind == "AWS_DEPLOYMENT"
             and cells[2] == "AWS-20"
             and cells[4] == str(match.get("authorization_id") or "NONE")
             and cells[5] == str(match.get("receipt_digest") or "NONE")
@@ -2666,7 +2666,6 @@ def _reviewed_script_denial(
         return "Fastlane blocked mutation because current authority is read-only."
     if authority_kind not in {
         "AWS_READ_ONLY",
-        "FAST_DEV_GATE_B",
         "AWS_DEPLOYMENT",
         "AWS_TEARDOWN",
     }:
@@ -2749,7 +2748,6 @@ def _aws_authority_denial(
     if kind == "READ":
         if authority_kind not in {
             "AWS_READ_ONLY",
-            "FAST_DEV_GATE_B",
             "AWS_DEPLOYMENT",
             "AWS_TEARDOWN",
         }:
@@ -2757,7 +2755,7 @@ def _aws_authority_denial(
     elif kind == "TEARDOWN":
         if authority_kind != "AWS_TEARDOWN":
             return "Fastlane blocked teardown because a distinct current teardown receipt is absent."
-    elif authority_kind not in {"FAST_DEV_GATE_B", "AWS_DEPLOYMENT"}:
+    elif authority_kind != "AWS_DEPLOYMENT":
         return "Fastlane blocked AWS mutation because exact current mutation authority is absent."
     operations = authority.get("operations")
     resources = authority.get("resources")

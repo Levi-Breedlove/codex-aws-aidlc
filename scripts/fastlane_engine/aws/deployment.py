@@ -218,18 +218,11 @@ def _deployment_expected_binding(
         artifact_binding, envelope, artifact_binding
     ):
         issues.append("deployment evidence artifact is outside current Gate B")
-    authorization_validity = clean_cell(envelope.get("AWS authorization validity", ""))
-    validity_match = re.fullmatch(
-        r"Expires at (?P<timestamp>[^\s;]+); earlier completion: [^\r\n]+",
-        authorization_validity,
-    )
     expected: dict[str, Any] = {
         "authorization_id": construction_authorization,
         "receipt_digest": "NONE",
         "authorized_at": clean_cell(gate_b_authorized_at),
-        "valid_until": (
-            validity_match.group("timestamp") if validity_match is not None else "NONE"
-        ),
+        "valid_until": "NONE",
         "deployment_role": deployment_role or "NONE",
         "deployment_authority_source": clean_cell(gate_b_authority_source),
         "artifact": artifact_binding,
@@ -241,30 +234,6 @@ def _deployment_expected_binding(
         "operations": operations,
         "verify_text": verify_text,
     }
-    if lane == "fast-dev":
-        if validity_match is None:
-            issues.append(
-                "fast-dev deployment evidence requires exact authorization validity"
-            )
-        if not explicit_timestamp(expected["authorized_at"]):
-            issues.append(
-                "fast-dev deployment evidence requires the Gate B authorization timestamp"
-            )
-        if not explicit_value(expected["plan"], allow_none=False):
-            issues.append(
-                "fast-dev deployment evidence requires an exact stack or application"
-            )
-        if (
-            not explicit_value(
-                expected["deployment_authority_source"], allow_none=False
-            )
-            or "*" in expected["deployment_authority_source"]
-        ):
-            issues.append(
-                "fast-dev deployment evidence requires the Gate B owner authorization source"
-            )
-        return expected, issues
-
     try:
         receipt = policy.marked_receipt(verify_text, "aws-deployment")
         provenance = policy.action_authorization_rows(verify_text).get("Deployment")
@@ -283,9 +252,7 @@ def _deployment_expected_binding(
         else "NONE"
     )
     if fields is None or provenance is None or unresolved(receipt):
-        issues.append(
-            "explicit-gate deployment evidence requires one exact owner-authored receipt"
-        )
+        issues.append("deployment evidence requires one exact owner-authored receipt")
         return expected, issues
     receipt_resources = policy.split_authority_values(
         fields["Stack, application, and resources"]
@@ -1394,6 +1361,10 @@ def derive_deployment_sequence_state(
     )
     attempt_id = attempt_order[-1]
     group = groups[attempt_id]
+    legacy_fast_dev = (
+        lane == "fast-dev"
+        and clean_cell(group[0].get("Deployment receipt digest", "")) == "NONE"
+    )
     projection = _deployment_group_projection(policy, base, attempt_id, group)
     terminal_reconciliation = next(
         (
@@ -1476,7 +1447,7 @@ def derive_deployment_sequence_state(
                 clean_cell(current_expected.get("authorization_id", "")),
                 clean_cell(current_expected.get("receipt_digest", "")),
             )
-            if terminal_basis_stale:
+            if terminal_basis_stale or legacy_fast_dev:
                 terminal_issues = _deployment_historical_group_issues(
                     policy,
                     group,
@@ -1567,7 +1538,7 @@ def derive_deployment_sequence_state(
                 "reconciliation_only": False,
                 "attempt_id": attempt_id,
             }
-    if basis_stale:
+    if basis_stale or legacy_fast_dev:
         historical_issues = _deployment_historical_group_issues(
             policy,
             group,
@@ -1590,11 +1561,11 @@ def derive_deployment_sequence_state(
                 "issues": historical_issues,
             }
         if projection.get("status") == "ACTION_TERMINAL_REQUIRED":
-            return {**projection, "basis_stale": True}
+            return {**projection, "basis_stale": basis_stale}
         return {
             **projection,
             "status": "RECONCILIATION_REQUIRED",
-            "basis_stale": True,
+            "basis_stale": basis_stale,
             "reconciliation_read_authority": (
                 dict(reconciliation_read_authority)
                 if reconciliation_read_authority is not None
@@ -1603,7 +1574,11 @@ def derive_deployment_sequence_state(
             "blocker_or_stale_reason": (
                 projection.get("blocker_or_stale_reason")
                 if projection.get("reconciliation_status") == "STALE"
-                else "Current REQ / DES / AUTH differs from the attempted action"
+                else (
+                    "Current REQ / DES / AUTH differs from the attempted action"
+                    if basis_stale
+                    else "Legacy fast-dev attempt requires reconciliation before new authority"
+                )
             ),
         }
 

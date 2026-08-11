@@ -81,6 +81,22 @@
         "construction or AWS authorization change",
         "AWS access, execution, deployment, recovery, or teardown evidence claim"
       ]
+    },
+    {
+      "id": "SEPARATE_AWS_MUTATION_AUTHORITY_1_2_37",
+      "base_commit": "94594e7fabfa0a4dc7a1020cf51792a9ca10f07e",
+      "scope": [
+        "fast-dev AWS-20 routing waits for a separate exact deployment receipt",
+        "receipt-backed AWS_DEPLOYMENT authority for both mutation lanes",
+        "legacy fast-dev deployment-journal reconciliation without renewed mutation authority",
+        "consequential owner interaction, hook, prompt, and package-version projections"
+      ],
+      "prohibited": [
+        "Gate A or Gate B schema, receipt, approval, or migration change",
+        "requirement, design, diagram, task, or local construction authority change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        "release, GitHub, or teardown authority broadening"
+      ]
     }
   ],
   "summary_truth_compatibility": {

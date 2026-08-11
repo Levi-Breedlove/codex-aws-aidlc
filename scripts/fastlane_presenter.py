@@ -683,9 +683,7 @@ def _validate_aws_progress_interaction(
         ):
             raise PresentationError("automatic AWS progress state is inconsistent")
     elif reason == "AWS_PREFLIGHT_READY":
-        if lane == "fast-dev":
-            expected_automatic = True
-        elif lane in {"documentation-only", "read-only"}:
+        if lane in {"documentation-only", "read-only"}:
             expected_automatic = False
         else:
             raise PresentationError("AWS preflight readiness has an unsupported lane")
@@ -699,11 +697,26 @@ def _validate_aws_progress_interaction(
     elif reason == "WAITING_AWS_MUTATION_AUTH":
         awaiting = action == "AUTHORIZE_AWS_OPERATION"
         continuing = action == "NONE_CONTINUE_AUTOMATICALLY"
+        external = report.get("external_authority")
+        if not isinstance(external, Mapping):
+            raise PresentationError("AWS mutation authority projection is missing")
         if awaiting:
-            if not required or automatic or not formal:
+            if (
+                not required
+                or automatic
+                or not formal
+                or external.get("kind") != "AWS_ACTION_RECEIPT_REQUIRED"
+                or external.get("validity") != "REQUIRED"
+            ):
                 raise PresentationError("AWS mutation authority state is inconsistent")
         elif continuing:
-            if required or not automatic or formal:
+            if (
+                required
+                or not automatic
+                or formal
+                or external.get("kind") != "AWS_DEPLOYMENT"
+                or external.get("validity") != "CURRENT"
+            ):
                 raise PresentationError(
                     "authorized AWS continuation state is inconsistent"
                 )
@@ -1215,11 +1228,6 @@ def _aws_ready_owner_copy(
         return (
             "The authorized read-only AWS inspection is complete.",
             "No AWS resource mutation will occur.",
-        )
-    if lane == "fast-dev":
-        return (
-            "Read-only AWS preflight and the bounded Gate B authority are current.",
-            "Codex will perform only the exact Gate-B-authorized non-production mutation.",
         )
     raise PresentationError("AWS preflight readiness has an unsupported lane")
 

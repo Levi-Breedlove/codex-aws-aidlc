@@ -974,41 +974,31 @@ sequenceDiagram
             "Gate B approves the technical plan",
             "Neither gate authorizes AWS account access",
             "Fastlane Engine",
-            "separate exact authorization",
+            "Separate, exact permission",
         ):
             self.assertIn(product_claim, readme)
         self.assertEqual(readme.count("```mermaid"), 1)
         self.assertEqual(readme.count("flowchart TB"), 1)
         self.assertEqual(readme.count("accTitle:"), 1)
         self.assertEqual(readme.count("accDescr:"), 1)
-        self.assertEqual(readme.count("subgraph "), 3)
-        self.assertEqual(readme.count("classDef "), 5)
-        for phase in (
-            'subgraph PLAN["PRODUCT AND TECHNICAL PLAN"]',
-            'subgraph LOCAL["BOUNDED LOCAL DELIVERY"]',
-            'subgraph CLOUD["OPTIONAL AWS PATH — OUTSIDE THE LOCAL LIFECYCLE"]',
-        ):
-            self.assertIn(phase, readme)
-        for role in (
-            "class IDEA,DEFINE,DESIGN,BUILD work",
-            "class GATEA,GATEB gate",
-            "class AWSAUTH authorization",
-            "class VERIFY,RESULT,AWSOBS evidence",
-            "class AWSOPS aws",
-        ):
-            self.assertIn(role, readme)
+        self.assertEqual(readme.count("subgraph "), 0)
+        self.assertEqual(readme.count("classDef "), 0)
+        self.assertIn("accTitle: Fastlane customer delivery lifecycle", readme)
         self.assertEqual(readme.count('GATEA{"Gate A:'), 1)
         self.assertEqual(readme.count('GATEB{"Gate B:'), 1)
-        self.assertNotIn("AWSAUTH{", readme)
-        self.assertIn("An optional AWS path sits outside both gates", readme)
-        self.assertIn(
-            'AWSAUTH["Owner provides separate exact AWS authorization"]',
-            readme,
+        self.assertEqual(
+            readme.count('AWSAUTH{"Authorize one exact AWS operation?"}'), 1
         )
-        self.assertIn(
-            'AWSOBS -->|"Observed evidence returns to review"| RESULT',
-            readme,
-        )
+        for lifecycle_edge in (
+            "IDEA --> DEFINE --> GATEA",
+            'GATEB -->|"Approve"| TASKS',
+            "TASKS --> BUILD --> VERIFY --> RELEASE",
+            'VERIFY -. "Material product gap" .-> DEFINE',
+            'VERIFY -. "Material design gap" .-> DESIGN',
+            'RELEASE -->|"Local result"| LOCAL',
+            'AWSAUTH -->|"Exact scope only"| AWSOPS --> AWSRESULT --> RELEASE',
+        ):
+            self.assertIn(lifecycle_edge, readme)
         self.assertNotIn("<br", readme)
         self.assertNotIn("flowchart TD", readme)
         self.assertNotIn("flowchart LR", readme)
@@ -1021,7 +1011,6 @@ sequenceDiagram
             "digest",
             "## Skills and agents",
             "## How Fastlane works under the hood",
-            "accTitle: Fastlane customer delivery lifecycle",
             "accTitle: Fastlane technical control plane",
         ):
             self.assertNotIn(implementation_detail, readme)
@@ -1041,9 +1030,10 @@ sequenceDiagram
         self.assertIn("task_waves.py", workflow)
 
         def substantial_lines(source: str) -> set[str]:
+            prose = re.sub(r"```mermaid.*?```", "", source, flags=re.DOTALL)
             return {
                 line.strip()
-                for line in source.splitlines()
+                for line in prose.splitlines()
                 if len(line.strip()) >= 40
                 and not line.lstrip().startswith(("#", "- [", "```"))
             }

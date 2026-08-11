@@ -932,13 +932,11 @@ def derive_document_summary_specifications(
         "AWS_READ_ONLY",
         "AWS_DEPLOYMENT",
         "AWS_TEARDOWN",
-        "FAST_DEV_GATE_B",
     }
     authority_label = {
         "AWS_READ_ONLY": "Read-only AWS access",
         "AWS_DEPLOYMENT": "AWS deployment authority",
         "AWS_TEARDOWN": "AWS teardown authority",
-        "FAST_DEV_GATE_B": "Fast-development AWS deployment authority",
     }.get(authority_kind, "None")
     # fmt: off
     return build_summary_specifications({
@@ -980,7 +978,7 @@ def derive_document_summary_specifications(
             "deployment_state": deployment["state"],
             "authority": authority_label if account_access else "None",
             "safe_action": "Only the exact authorized AWS operation" if account_access else "Local validation only",
-            "deployment_approval": "Authorized only for the current deployment" if account_access and external_authority.get("kind") in {"AWS_DEPLOYMENT", "FAST_DEV_GATE_B"} else "Not authorized",
+            "deployment_approval": "Authorized only for the current deployment" if account_access and external_authority.get("kind") == "AWS_DEPLOYMENT" else "Not authorized",
             "teardown_approval": "Authorized only for the current teardown" if account_access and external_authority.get("kind") == "AWS_TEARDOWN" else "Not authorized",
             "recovery_state": "Not yet observed",
             "emergency_state": deployment["emergency"],
@@ -1117,7 +1115,7 @@ def _compose_authority_state(
     aws_authorization = "NONE"
     if external_authority.get("validity") == "CURRENT" and external_authority.get(
         "kind"
-    ) in {"AWS_READ_ONLY", "AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}:
+    ) in {"AWS_READ_ONLY", "AWS_DEPLOYMENT", "AWS_TEARDOWN"}:
         projected_authorization = external_authority.get("authorization_id")
         if isinstance(projected_authorization, str):
             aws_authorization = projected_authorization
@@ -1192,8 +1190,7 @@ def _compose_authority_state(
         "transition": transition,
         "aws_mutation_authority_ready": (
             external_authority.get("validity") == "CURRENT"
-            and external_authority.get("kind")
-            in {"AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}
+            and external_authority.get("kind") in {"AWS_DEPLOYMENT", "AWS_TEARDOWN"}
         ),
         "deployment_restricted": deployment_restricted,
         "teardown_restricted": teardown_restricted,
@@ -1311,7 +1308,7 @@ def build_evaluation(
         None: "NOT_USED",
         "documentation-only": "DOCUMENTATION_ONLY",
         "read-only": "READ_ONLY",
-        "fast-dev": "AUTHORIZED_BOUNDARY_REQUIRED",
+        "fast-dev": "EXACT_AUTHORIZATION_REQUIRED",
         "explicit-gate": "EXACT_AUTHORIZATION_REQUIRED",
     }.get(lane, "NOT_USED")
     gate_a = prd_fields.get("gate_a") or lifecycle.get("gate_a") or "BLOCKED"
