@@ -170,6 +170,12 @@ def aws_progress_report(
             "environment": "development",
         },
     }
+    if progress_state == "WAITING_AWS_MUTATION_AUTH":
+        current["external_authority"] = (
+            {"kind": "AWS_ACTION_RECEIPT_REQUIRED", "validity": "REQUIRED"}
+            if action_kind == "AUTHORIZE_AWS_OPERATION"
+            else {"kind": "AWS_DEPLOYMENT", "validity": "CURRENT"}
+        )
     return current
 
 
@@ -482,29 +488,58 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertNotIn("Read-only AWS preflight", rendered)
         self.assertNotIn("observed preflight", rendered)
 
-    def test_fast_dev_ready_uses_bounded_nonproduction_mutation_copy(self) -> None:
+    def test_fast_dev_waits_for_separate_exact_deployment_receipt(self) -> None:
         current = aws_progress_report(
-            "AWS_PREFLIGHT_READY",
+            "WAITING_AWS_MUTATION_AUTH",
+            action_kind="AUTHORIZE_AWS_OPERATION",
+            owner_action_required=True,
+            automatic_continuation_allowed=False,
+            formal_receipt_required=True,
             preflight_status="READY",
             account_access="READ_ONLY_OBSERVED",
             lane="fast-dev",
         )
-        rendered = presenter.render_owner_update(current)
         side_question = presenter.render_side_question_response(
             current,
             answer="The preflight itself remained read-only.",
         )
-        expected = "exact Gate-B-authorized non-production mutation"
-        self.assertIn(expected, rendered)
-        self.assertIn(expected, side_question)
-        self.assertIn("No mutation was performed.", rendered)
-        self.assertNotIn("without changing AWS resources", rendered)
+        self.assertIn(
+            "Review the exact AWS deployment receipt before any AWS mutation",
+            side_question,
+        )
+        self.assertNotIn("Gate-B-authorized", side_question)
+
+    def test_legacy_fast_dev_gate_b_authority_cannot_reach_owner_copy(self) -> None:
+        for action_kind, required, automatic, formal in (
+            ("AUTHORIZE_AWS_OPERATION", True, False, True),
+            ("NONE_CONTINUE_AUTOMATICALLY", False, True, False),
+        ):
+            with self.subTest(action_kind=action_kind):
+                current = aws_progress_report(
+                    "WAITING_AWS_MUTATION_AUTH",
+                    action_kind=action_kind,
+                    owner_action_required=required,
+                    automatic_continuation_allowed=automatic,
+                    formal_receipt_required=formal,
+                    preflight_status="READY",
+                    account_access="READ_ONLY_OBSERVED",
+                    lane="fast-dev",
+                )
+                current["external_authority"] = {
+                    "kind": "FAST_DEV_GATE_B",
+                    "validity": "CURRENT",
+                }
+                with self.assertRaises(presenter.PresentationError):
+                    presenter.render_owner_update(current)
+                with self.assertRaises(presenter.PresentationError):
+                    presenter.render_side_question_response(
+                        current, answer="The receipt boundary remains unchanged."
+                    )
 
     def test_preflight_ready_rejects_lane_continuation_mismatch(self) -> None:
         cases = (
             ("documentation-only", True, "NOT_APPLICABLE", "NOT_USED"),
             ("read-only", True, "READY", "READ_ONLY_OBSERVED"),
-            ("fast-dev", False, "READY", "READ_ONLY_OBSERVED"),
         )
         for lane, automatic, preflight_status, account_access in cases:
             with self.subTest(lane=lane, automatic=automatic):

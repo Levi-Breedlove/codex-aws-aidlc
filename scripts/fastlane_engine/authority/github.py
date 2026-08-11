@@ -395,7 +395,7 @@ def derive_aws_mode_boundary(
     )
     mutation_authorized = (
         current_prompt_mode == "MUTATION"
-        and external_kind in {"AWS_DEPLOYMENT", "AWS_TEARDOWN", "FAST_DEV_GATE_B"}
+        and external_kind in {"AWS_DEPLOYMENT", "AWS_TEARDOWN"}
         and external_validity == "CURRENT"
     )
     return {

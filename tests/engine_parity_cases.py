@@ -44,6 +44,7 @@ ADAPTIVE_KICKOFF_BASE_COMMIT = "204b1b7477413425114deaa54a9ece8f9fc14e53"
 AWS_DESIGN_COVERAGE_BASE_COMMIT = "e31d60bec32dd52b3ec29f36abfad2096e9ef867"
 HUMAN_DIAGRAM_SUPPORT_DIGEST_BASE_COMMIT = "66bcf1de7e5e06feb3dcf84fae2081d515c881a4"
 OWNER_SOURCE_NAVIGATION_BASE_COMMIT = "47e1e548e0ae429d47ff838b3ebd60e98a1a5e1e"
+SEPARATE_AWS_AUTHORITY_BASE_COMMIT = "94594e7fabfa0a4dc7a1020cf51792a9ca10f07e"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -125,6 +126,22 @@ APPROVED_BEHAVIOR_CHANGES = [
             "requirement, design, diagram, lifecycle, routing, remediation, task, gate, authority, or receipt change",
             "construction or AWS authorization change",
             "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        ],
+    },
+    {
+        "id": "SEPARATE_AWS_MUTATION_AUTHORITY_1_2_37",
+        "base_commit": SEPARATE_AWS_AUTHORITY_BASE_COMMIT,
+        "scope": [
+            "fast-dev AWS-20 routing waits for a separate exact deployment receipt",
+            "receipt-backed AWS_DEPLOYMENT authority for both mutation lanes",
+            "legacy fast-dev deployment-journal reconciliation without renewed mutation authority",
+            "consequential owner interaction, hook, prompt, and package-version projections",
+        ],
+        "prohibited": [
+            "Gate A or Gate B schema, receipt, approval, or migration change",
+            "requirement, design, diagram, task, or local construction authority change",
+            "AWS access, execution, deployment, recovery, or teardown evidence claim",
+            "release, GitHub, or teardown authority broadening",
         ],
     },
 ]
@@ -367,6 +384,11 @@ QUALIFICATION_REPORT_CASES = (
 )
 
 QUALIFICATION_AWS_SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
+    "fast_dev_separate_deployment_receipt": (
+        "tests.test_engine_aws_execution."
+        "AwsExecutionContractRegressionTests."
+        "test_fast_dev_mutation_requires_observed_preflight_and_exact_receipt",
+    ),
     "deployment_action_terminals": (
         "tests.test_engine_aws_deployment."
         "AwsDeploymentReconciliationRegressionTests."

@@ -60,20 +60,19 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
    evidence destination, and authority. A description, cached script, opaque
    command, stale record, or tool name never proves or authorizes execution.
 8. Before `AWS-20`, prove the final infrastructure diff is completely contained
-   in the current approved boundary and successful observed preflight. For
-   `explicit-gate`, require the Engine's authoritative
+   in the current approved boundary and successful observed preflight. For both
+   `fast-dev` and `explicit-gate`, require the Engine's authoritative
    `aws_execution.progress_state` to be `WAITING_AWS_MUTATION_AUTH` plus the
-   exact current `AWS_DEPLOYMENT` receipt. For `fast-dev`, require
-   `AWS_PREFLIGHT_READY` plus the current bounded `FAST_DEV_GATE_B` authority;
-   Gate B is only a maximum scope and never replaces observed preflight. The
+   exact current `AWS_DEPLOYMENT` receipt. Gate B is only a maximum scope and
+   never authorizes an AWS mutation or replaces observed preflight. The
    legacy readiness boolean is compatibility output only. Allocate one unused
    `AWS-DEPLOY-nnnn` Attempt ID and append an AWS-20 STARTED row to VERIFY's
    canonical `AWS deployment action and reconciliation evidence` table before
-   the external call. Preserve immutable deployment authorization, validity,
-   and source in all attempt rows: explicit-gate derives them from its receipt;
-   fast-dev stores the exact current construction `AUTH-*`, parses the expiry
-   timestamp from Gate B `AWS authorization validity`, and uses Gate B's
-   authorization source. STARTED uses the exact pre-call sentinel
+   the external call. Preserve the receipt's immutable `AWS-AUTH-*`
+   authorization, digest, validity, and source in all new attempt rows.
+   Historical fast-dev `AUTH-*` rows with receipt digest `NONE` are
+   reconciliation-only evidence and can never authorize a new AWS call.
+   STARTED uses the exact pre-call sentinel
    and is not proof that AWS received or executed anything. After the call
    resolves or becomes ambiguous, append exactly one terminal AWS-20 row with
    `SUCCEEDED`, `FAILED`, `PARTIAL`, or `UNKNOWN`; use exactly
@@ -115,9 +114,9 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
    authority and evidence are restored. RELEASE-10 records the terminal AWS-30
    Evidence ID as Active evidence cutoff so it cannot reroute. A FAILED,
    PARTIAL, or UNKNOWN attempt cannot be retried before reconciliation and that
-   RELEASE-10 acknowledgment. Retry requires distinct current mutation
-   authority: a new exact deployment receipt for explicit-gate or freshly
-   approved construction authorization for fast-dev, plus a new Attempt ID.
+   RELEASE-10 acknowledgment. Retry requires a new exact deployment receipt
+   and a new Attempt ID in both mutation lanes; Gate B reapproval is not a
+   substitute for the action-specific receipt.
    CloudFormation `CreateChangeSet` is a mutation that can create account-side
    state and must be authorized separately from `ExecuteChangeSet`. An
    authenticated IAM Access Analyzer `ValidatePolicy` call is read-only AWS-10

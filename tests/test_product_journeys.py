@@ -1295,18 +1295,46 @@ class ProductJourneyTests(unittest.TestCase):
             no_authority["hookSpecificOutput"]["permissionDecisionReason"],
         )
 
+        legacy_fast_dev = hook_fixtures.authority(
+            "FAST_DEV_GATE_B", ["cloudformation:CreateStack"]
+        )
+        legacy_denied = hook_fixtures.fastlane_hook.handle_event(
+            "pre-tool-use",
+            hook_fixtures.payload(
+                "PreToolUse",
+                REPOSITORY_ROOT,
+                tool_name="aws___call_aws",
+                tool_input=hook_fixtures.aws_request("CreateStack"),
+            ),
+            root=REPOSITORY_ROOT,
+            doctor_report=hook_fixtures.report(
+                aws="AUTH-0001", external_authority=legacy_fast_dev
+            ),
+            envelope={
+                "AWS boundary": "MUTATE_LISTED_RESOURCES",
+                "GitHub boundary": "NONE",
+            },
+        )
+        self.assertIn(
+            "exact current mutation authority is absent",
+            legacy_denied["hookSpecificOutput"]["permissionDecisionReason"],
+        )
+
         lanes = (
-            ("FAST_DEV_GATE_B", "CreateStack", "AUTH-0001"),
             ("AWS_DEPLOYMENT", "UpdateStack", "AWS-AUTH-0001"),
             ("AWS_TEARDOWN", "DeleteStack", "TEARDOWN-AUTH-0001"),
         )
         for kind, operation, authorization_id in lanes:
             with self.subTest(kind=kind):
                 hook_fixtures.fastlane_hook._clear_transition(REPOSITORY_ROOT)
-                external = hook_fixtures.authority(
-                    kind,
-                    [f"cloudformation:{operation}"],
-                    authorization_id=authorization_id,
+                external = (
+                    hook_fixtures.deployment_authority([f"cloudformation:{operation}"])
+                    if kind == "AWS_DEPLOYMENT"
+                    else hook_fixtures.authority(
+                        kind,
+                        [f"cloudformation:{operation}"],
+                        authorization_id=authorization_id,
+                    )
                 )
                 current = hook_fixtures.report(
                     aws=authorization_id, external_authority=external

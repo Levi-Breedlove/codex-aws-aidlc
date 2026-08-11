@@ -924,7 +924,7 @@ def derive_external_authority(
         and AWS_PREFLIGHT_ID.fullmatch(clean_cell(preflight.get("preflight_id", "")))
         is not None
     )
-    if lane == "explicit-gate" and boundary == "MUTATE_LISTED_RESOURCES":
+    if lane in {"fast-dev", "explicit-gate"} and boundary == "MUTATE_LISTED_RESOURCES":
         if aws_progress_state != "WAITING_AWS_MUTATION_AUTH" or not preflight_ready:
             return empty
         candidates = [
@@ -957,65 +957,4 @@ def derive_external_authority(
         required["kind"] = "AWS_ACTION_RECEIPT_REQUIRED"
         required["validity"] = "REQUIRED" if not candidates else "CONFLICTING"
         return required
-    if boundary != "MUTATE_LISTED_RESOURCES" or lane != "fast-dev":
-        return empty
-    if aws_progress_state != "AWS_PREFLIGHT_READY" or not preflight_ready:
-        return empty
-    expiration = bounds.aws_authorization_expires_at
-    if expiration is None or expiration <= authority_input.observed_at:
-        return empty
-    environment_name = bounds.environment
-    account = bounds.account
-    region = bounds.region
-    role = bounds.role_or_profile
-    resources = list(bounds.resources)
-    allowed_operations = list(bounds.operations)
-    operations = [
-        operation
-        for operation in allowed_operations
-        if AWS_READ_ONLY_OPERATION.fullmatch(operation) is None
-    ]
-    if (
-        account is None
-        or not operations
-        or region is None
-        or role is None
-        or clean_cell(preflight.get("account", "")) != account
-        or clean_cell(preflight.get("region", "")) != region
-        or clean_cell(preflight.get("environment", "")) != environment_name
-        or not _receipt_artifact_matches_gate_b(bounds.active_artifact, bounds)
-        or not _receipt_scope_within_gate_b(resources, operations, bounds)
-    ):
-        return empty
-    kind = "FAST_DEV_GATE_B"
-    cost_ceiling = bounds.aws_cost_ceiling_raw
-    if not _mutation_cost_within_gate_b(cost_ceiling, bounds):
-        return empty
-    parsed_cost = _parse_cost_ceiling(cost_ceiling)
-    if parsed_cost is None:
-        return empty
-    currency, amount = parsed_cost
-    cost_ceiling = f"{currency}: {amount:.2f}"
-    return {
-        "kind": kind,
-        "validity": "CURRENT",
-        "authorization_id": construction_authorization,
-        "receipt_digest": "NONE",
-        "account": account,
-        "region": region,
-        "environment": environment_name,
-        "role_or_profile": role,
-        "resources": resources,
-        "operations": operations,
-        "artifact_plan_binding": {
-            "artifact": bounds.active_artifact,
-            "plan": bounds.stack_or_application,
-        },
-        "cost_ceiling": cost_ceiling,
-        "rollback_boundary": (
-            f"ROLLBACK: {bounds.rollback_boundary}"
-            if bounds.rollback_boundary
-            else "NONE"
-        ),
-        "expiration": expiration.isoformat(),
-    }
+    return empty

@@ -288,12 +288,15 @@ approval for an AWS action.
 |---|---|---|
 | `documentation-only` | AWS documentation and repository-only planning; no authenticated AWS access | Current AUTH boundary `DOCS_ONLY` |
 | `read-only` | Authenticated observation inside the named account, Region, environment, and resource scope | Current Gate B `READ_ONLY` maximum boundary plus the exact current owner-authored read-only preflight receipt; no mutation |
-| `fast-dev` | Listed mutations in a non-production development target | Current Gate B `MUTATE_LISTED_RESOURCES` envelope plus successful AWS-10 read-only preflight and an exact final match |
+| `fast-dev` | Listed mutations in a non-production development target | Current Gate B `MUTATE_LISTED_RESOURCES` maximum, successful AWS-10 read-only preflight, and one exact current action-specific AWS-20 authorization |
 | `explicit-gate` | Documentation or read-only work by default; one separately authorized mutation | Current Gate B `MUTATE_LISTED_RESOURCES` maximum for a planned mutation, successful AWS-10 preflight, and the current action-specific AWS-20 authorization |
 
 Prompt modes and project lanes are separate. Mutations remain serialized;
 production, destructive, IAM-broadening, public, shared, retained-data, drifted,
 or over-budget work uses `explicit-gate`. Teardown always has separate authority.
+Both mutation lanes require the same exact deployment receipt for every new
+attempt; Gate B never grants AWS mutation authority. Historical fast-dev
+`AUTH-*` / `NONE` journal rows remain reconciliation-only evidence.
 The compatibility adapter names the two supported execution forms
 `STRUCTURED_API` and `REVIEWED_SCRIPT`; these identifiers do not grant authority.
 

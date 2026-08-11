@@ -327,8 +327,6 @@ def derive_aws_delivery_route(
     progress_state = clean_cell(aws_execution.get("progress_state", ""))
     if progress_state == "WAITING_AWS_MUTATION_AUTH":
         return "WAITING_AWS_MUTATION_AUTH", "AWS-20"
-    if progress_state == "AWS_PREFLIGHT_READY" and lane == "fast-dev":
-        return "AWS_PREFLIGHT_READY", "AWS-20"
     if progress_state == "AWS_PREFLIGHT_READY":
         return "AWS_PREFLIGHT_READY", "STOP"
     return progress_state or "AWS_PREFLIGHT_REQUIRED", "AWS-10"
@@ -370,7 +368,7 @@ def derive_aws_execution_projection(
         progress = "AWS_READ_SCOPE_REQUIRED"
     elif preflight.get("status") != "READY":
         progress = "AWS_PREFLIGHT_RUNNING"
-    elif lane == "explicit-gate":
+    elif lane in {"fast-dev", "explicit-gate"}:
         progress = "WAITING_AWS_MUTATION_AUTH"
     else:
         progress = "AWS_PREFLIGHT_READY"

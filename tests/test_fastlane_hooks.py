@@ -145,6 +145,19 @@ def authority(
     }
 
 
+def deployment_authority(
+    operations: list[str], *, resources: list[str] | None = None
+) -> dict[str, object]:
+    current = authority(
+        "AWS_DEPLOYMENT",
+        operations,
+        authorization_id="AWS-AUTH-0001",
+        resources=resources,
+    )
+    current["receipt_digest"] = "sha256:" + "1" * 64
+    return current
+
+
 def read_preflight_document(
     *,
     receipt_artifact: str | None = None,
@@ -829,7 +842,7 @@ class FastlaneHookTests(unittest.TestCase):
         )
 
     def test_account_tools_are_classified_by_capability_not_product_name(self) -> None:
-        external = authority("FAST_DEV_GATE_B", ["cloudformation:CreateStack"])
+        external = deployment_authority(["cloudformation:CreateStack"])
         for tool_name in (
             "aws___invoke_operation",
             "mcp__aws-core__invoke_operation",
@@ -2562,10 +2575,8 @@ class FastlaneHookTests(unittest.TestCase):
 
     def test_hook_requires_the_doctor_normalized_authority_projection(self) -> None:
         raw_report = report(
-            aws="AUTH-0001",
-            external_authority=authority(
-                "FAST_DEV_GATE_B", ["cloudformation:CreateStack"]
-            ),
+            aws="AWS-AUTH-0001",
+            external_authority=deployment_authority(["cloudformation:CreateStack"]),
         )
         raw_report["external_authority"].pop("request_match")
         denied = fastlane_hook.handle_event(
@@ -2750,9 +2761,11 @@ class FastlaneHookTests(unittest.TestCase):
             },
         )
         self.assertIn(
-            "STARTED journal row",
+            "exact current mutation authority is absent",
             denied_fast_dev["hookSpecificOutput"]["decision"]["message"],
         )
+
+        current_deployment = deployment_authority(["cloudformation:CreateStack"])
 
         mismatches = (
             (
@@ -2779,7 +2792,10 @@ class FastlaneHookTests(unittest.TestCase):
                         tool_input=request,
                     ),
                     root=self.root,
-                    doctor_report=report(aws="AUTH-0001", external_authority=fast_dev),
+                    doctor_report=report(
+                        aws="AWS-AUTH-0001",
+                        external_authority=current_deployment,
+                    ),
                     envelope={
                         "AWS boundary": "MUTATE_LISTED_RESOURCES",
                         "GitHub boundary": "NONE",
@@ -2971,7 +2987,7 @@ class FastlaneHookTests(unittest.TestCase):
             )
 
     def test_shell_wrappers_powershell_and_mixed_chains_fail_closed(self) -> None:
-        external = authority("FAST_DEV_GATE_B", ["cloudformation:CreateStack"])
+        external = deployment_authority(["cloudformation:CreateStack"])
         commands = (
             "aws cloudformation create-stack --stack-name fastlane-stack; "
             "aws cloudformation delete-stack --stack-name fastlane-stack",
@@ -2992,7 +3008,9 @@ class FastlaneHookTests(unittest.TestCase):
                         tool_input={"command": command},
                     ),
                     root=self.root,
-                    doctor_report=report(aws="AUTH-0001", external_authority=external),
+                    doctor_report=report(
+                        aws="AWS-AUTH-0001", external_authority=external
+                    ),
                     envelope={
                         "AWS boundary": "MUTATE_LISTED_RESOURCES",
                         "GitHub boundary": "NONE",
@@ -3183,7 +3201,7 @@ class AwsActionTransitionHookTests(unittest.TestCase):
         dict[str, object],
         dict[str, str],
     ]:
-        external = authority("FAST_DEV_GATE_B", ["cloudformation:CreateStack"])
+        external = deployment_authority(["cloudformation:CreateStack"])
         current = self._report_for(external)
         match = current["external_authority"]["request_match"]
         attempt_id = "AWS-DEPLOY-9300"
@@ -3201,7 +3219,7 @@ class AwsActionTransitionHookTests(unittest.TestCase):
         self.assertIsNotNone(identity)
         state = fastlane_hook._empty_transition_state(
             stage="START_BOUND",
-            action_kind="FAST_DEV_GATE_B",
+            action_kind="AWS_DEPLOYMENT",
             identity=identity,
             tool_name="apply_patch",
             attempt_sha256=fastlane_hook._value_digest(attempt_id),
@@ -3213,7 +3231,7 @@ class AwsActionTransitionHookTests(unittest.TestCase):
             "schema_version": 1,
             "status": "BOUND",
             "attempt_id": attempt_id,
-            "authority_kind": "FAST_DEV_GATE_B",
+            "authority_kind": "AWS_DEPLOYMENT",
             "request_match_sha256": authority_digest,
             "request_match": match,
         }
@@ -3449,7 +3467,7 @@ class AwsActionTransitionHookTests(unittest.TestCase):
     def test_deployment_started_uses_observed_at_and_durable_source_columns(
         self,
     ) -> None:
-        external = authority("FAST_DEV_GATE_B", ["cloudformation:CreateStack"])
+        external = deployment_authority(["cloudformation:CreateStack"])
         current = self._report_for(external)
         match = current["external_authority"]["request_match"]
         row = _table_line(
@@ -3458,10 +3476,10 @@ class AwsActionTransitionHookTests(unittest.TestCase):
                 "AWS-DEPLOY-9100",
                 "AWS-20",
                 "REQ-0001 / DES-0001 / AUTH-0001",
-                "AUTH-0001",
-                "NONE",
+                "AWS-AUTH-0001",
+                "sha256:" + "1" * 64,
                 str(match["expires_at"]),
-                "Gate B fast-dev authority",
+                "owner-message MSG-AWS-0001",
                 "NONE",
                 "fastlane-role",
                 "NONE",
@@ -3490,7 +3508,7 @@ class AwsActionTransitionHookTests(unittest.TestCase):
         try:
             self.assertTrue(recognized)
             self.assertIsNone(reason)
-            self.assertEqual(candidate["action_kind"], "FAST_DEV_GATE_B")
+            self.assertEqual(candidate["action_kind"], "AWS_DEPLOYMENT")
         finally:
             temporary.cleanup()
 

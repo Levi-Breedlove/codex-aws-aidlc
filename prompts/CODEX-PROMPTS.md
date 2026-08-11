@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.36
+**Pack version:** 1.2.37
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -157,7 +157,7 @@ receipt; it reports authority and results but does not create them:
 AWS AUTHORITY AND EVIDENCE RECEIPT
 Prompt: <AWS-nn>
 Construction authorization: <AUTH-nnnn or NONE>
-AWS authorization: <AWS-AUTH-nnnn, TEARDOWN-AUTH-nnnn, Gate B fast-dev authority, or READ_ONLY scope>
+AWS authorization: <AWS-AUTH-nnnn, TEARDOWN-AUTH-nnnn, or READ_ONLY scope>
 Account: <12-digit account ID or approved alias>
 Region: <AWS Region>
 Environment: <exact environment>
@@ -575,7 +575,7 @@ Use the explicit AWS-operation skill and current Engine AWS progress state.
 
 **Preconditions:** AWS-10 is ready, final artifact/plan matches, no prior attempt is unreconciled, and current mutation authority is exact.
 
-**Authoritative inputs:** Engine mutation projection, current REQ/DES/AUTH, preflight evidence, reviewed operation binding, and exact deployment authority when required.
+**Authoritative inputs:** Engine mutation projection, current REQ/DES/AUTH, preflight evidence, reviewed operation binding, and the exact deployment receipt.
 
 **Permitted writes:** One AWS attempt plus append-only direct-result evidence and bounded local status updates.
 
@@ -583,7 +583,7 @@ Use the explicit AWS-operation skill and current Engine AWS progress state.
 
 **AWS mode:** MUTATION only for the exact current operation and resources.
 
-**Required authorization:** The complete current Engine-projected deployment authority, including the exact deployment receipt when required.
+**Required authorization:** The complete current Engine-projected `AWS_DEPLOYMENT` authority from one exact, unconsumed deployment receipt. Gate B alone never authorizes AWS mutation.
 
 **Stop conditions:** Any mismatch, unexpected change/cost, destructive effect, failed control, expired authority, or unreconciled prior attempt.
 

@@ -3662,7 +3662,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.36")
+        self.assertEqual(report["bootstrap_version"], "1.2.37")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -5519,6 +5519,23 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(request_match["allowed_execution_lanes"], ["STRUCTURED_API"])
         self.assertIsNone(request_match["reviewed_script"])
+
+        for lane in ("fast-dev", "explicit-gate"):
+            with self.subTest(lane=lane):
+                projected = doctor.derive_external_authority(
+                    ctx,
+                    envelope,
+                    lane,
+                    "AUTH-0001",
+                    cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
+                    aws_progress_state="WAITING_AWS_MUTATION_AUTH",
+                    active_artifact="sha256:" + "a" * 64,
+                    aws_action_phase="AWS-20",
+                    preflight=preflight,
+                )
+                self.assertEqual(projected["kind"], "AWS_DEPLOYMENT")
+                self.assertEqual(projected["authorization_id"], "AWS-AUTH-0001")
+                self.assertEqual(projected["receipt_digest"], receipt_digest)
 
         nonhuman_receipt = receipt.replace("Approver: alice", "Approver: Codex")
         nonhuman_digest = (
@@ -8156,33 +8173,15 @@ class BootstrapDoctorTests(unittest.TestCase):
             "fast-dev",
             "AUTH-0001",
             cost_posture="MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
-            aws_progress_state="AWS_PREFLIGHT_READY",
+            aws_progress_state="WAITING_AWS_MUTATION_AUTH",
             active_artifact="sha256:" + "2" * 64,
             aws_action_phase="AWS-20",
             preflight=ready_preflight(
                 account="123456789012", region="us-west-2", environment="dev"
             ),
         )
-        self.assertEqual(fast_dev_authority["kind"], "FAST_DEV_GATE_B")
-        self.assertEqual(fast_dev_authority["validity"], "CURRENT")
-        self.assertEqual(fast_dev_authority["account"], "123456789012")
-        self.assertEqual(fast_dev_authority["region"], "us-west-2")
-        self.assertEqual(fast_dev_authority["cost_ceiling"], "USD: 20.00")
-        request_match = doctor.derive_request_match(
-            fast_dev_context, fast_dev_authority
-        )
-        self.assertEqual(request_match["schema_version"], 1)
-        self.assertEqual(request_match["authority_kind"], "FAST_DEV_GATE_B")
-        self.assertEqual(request_match["account"], "123456789012")
-        self.assertEqual(request_match["region"], "us-west-2")
-        self.assertEqual(
-            request_match["cost_ceiling"],
-            {"currency": "USD", "amount": "20.00"},
-        )
-        self.assertNotIn("ACCOUNT:", request_match["account"])
-        self.assertNotIn("REGION:", request_match["region"])
-        self.assertEqual(request_match["allowed_execution_lanes"], ["STRUCTURED_API"])
-        self.assertIsNone(request_match["reviewed_script"])
+        self.assertEqual(fast_dev_authority["kind"], "AWS_ACTION_RECEIPT_REQUIRED")
+        self.assertEqual(fast_dev_authority["validity"], "REQUIRED")
         before_preflight = doctor.derive_external_authority(
             doctor.Context(PROJECT_ROOT),
             fast_dev_envelope,
@@ -8193,7 +8192,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             active_artifact="sha256:" + "2" * 64,
             aws_action_phase="AWS-20",
         )
-        self.assertNotEqual(before_preflight["kind"], "FAST_DEV_GATE_B")
+        self.assertNotEqual(before_preflight["kind"], "AWS_DEPLOYMENT")
         self.assertNotEqual(before_preflight["validity"], "CURRENT")
 
     def test_cost_posture_and_mutation_ceiling_are_canonical_and_bounded(self) -> None:

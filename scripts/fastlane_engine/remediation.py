@@ -630,9 +630,9 @@ def derive_interaction(
         formal_receipt = False
     elif aws_progress_state == "AWS_PREFLIGHT_READY":
         response_mode = "OWNER_UPDATE"
-        state = "WORKING" if aws_lane == "fast-dev" else "COMPLETE"
+        state = "COMPLETE"
         action_kind = "NONE_CONTINUE_AUTOMATICALLY"
-        automatic = aws_lane == "fast-dev"
+        automatic = False
         formal_receipt = False
     elif aws_progress_state == "WAITING_AWS_MUTATION_AUTH":
         response_mode = (

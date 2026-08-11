@@ -146,7 +146,7 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
 
         for lane, expected in (
             ("read-only", "AWS_PREFLIGHT_READY"),
-            ("fast-dev", "AWS_PREFLIGHT_READY"),
+            ("fast-dev", "WAITING_AWS_MUTATION_AUTH"),
             ("explicit-gate", "WAITING_AWS_MUTATION_AUTH"),
         ):
             with self.subTest(lane=lane):
@@ -1814,7 +1814,9 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         self.assertEqual(teardown["kind"], "AWS_TEARDOWN")
         self.assertEqual(deployment["kind"], "AWS_DEPLOYMENT")
 
-    def test_fast_dev_mutation_requires_observed_preflight_and_aws20(self) -> None:
+    def test_fast_dev_mutation_requires_observed_preflight_and_exact_receipt(
+        self,
+    ) -> None:
         artifact = "sha256:" + "a" * 64
         envelope = aws_authority_envelope(
             role="deploy-role",
@@ -1830,7 +1832,7 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
         context.texts[doctor.VERIFY_FILE] = "verification"
         common = {
             "cost_posture": "MINIMIZE_TOTAL_COST; HARD_CAP: USD 20.00",
-            "aws_progress_state": "AWS_PREFLIGHT_READY",
+            "aws_progress_state": "WAITING_AWS_MUTATION_AUTH",
             "active_artifact": artifact,
         }
         self.assertEqual(
@@ -1850,7 +1852,7 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             )["kind"],
             "NONE",
         )
-        authority = doctor.derive_external_authority(
+        required = doctor.derive_external_authority(
             context,
             envelope,
             "fast-dev",
@@ -1863,7 +1865,8 @@ class AwsExecutionContractRegressionTests(unittest.TestCase):
             ),
             **common,
         )
-        self.assertEqual(authority["kind"], "FAST_DEV_GATE_B")
+        self.assertEqual(required["kind"], "AWS_ACTION_RECEIPT_REQUIRED")
+        self.assertEqual(required["validity"], "REQUIRED")
 
 
 if __name__ == "__main__":

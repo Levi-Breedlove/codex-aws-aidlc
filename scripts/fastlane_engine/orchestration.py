@@ -699,12 +699,6 @@ def evaluate_project(
             **aws_execution,
             "progress_state": "WAITING_AWS_MUTATION_AUTH",
         }
-        if selections.get("aws_lane") == "fast-dev":
-            ctx.error(
-                "AWS_DEPLOYMENT_AUTHORITY_REPLAY",
-                "A fast-dev retry requires a freshly approved Gate B construction authorization",
-                PRD_FILE,
-            )
     aws_execution_planning_ready = preflight.get("status") == "READY"
     aws_delivery_route = derive_aws_delivery_route(
         release_decision,
