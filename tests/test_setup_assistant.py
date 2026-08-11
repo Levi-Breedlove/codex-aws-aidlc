@@ -521,6 +521,9 @@ Development budget: <amount or "minimize cost; no hard cap">"""
         report = setup.reduce_prerequisites(local_ready())
 
         self.assertEqual(setup.render_setup_response(report), expected)
+        with mock.patch("builtins.print") as printed:
+            self.assertEqual(setup.main(["welcome"]), 0)
+        printed.assert_called_once_with(expected)
 
     def test_final_onboarding_docs_and_instruction_headroom(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")

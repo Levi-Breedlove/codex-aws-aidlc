@@ -175,6 +175,7 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             scenario["id"]: scenario["expect"] for scenario in plan["scenarios"]
         }
         for scenario_id in (
+            "prerequisite-recovery",
             "onboarding-project-ready",
             "consultative-intake",
             "source-assisted-define",
@@ -182,6 +183,13 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             self.assertIn(scenario_id, scenarios)
         self.assertIn(
             "without repeating on resume", scenarios["onboarding-project-ready"]
+        )
+        self.assertIn(
+            "complete deterministic welcome is returned verbatim as the entire response",
+            scenarios["prerequisite-recovery"],
+        )
+        self.assertIn(
+            "before the three setup fields", scenarios["prerequisite-recovery"]
         )
         self.assertIn(
             "one valid naturally spaced reply", scenarios["consultative-intake"]

@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.37
+**Pack version:** 1.2.38
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -221,15 +221,19 @@ checkpoint and follows the resulting next action.
 
 **Stop conditions:** A real owner setup action, source-integrity conflict, unsafe collision, unsupported target, or Engine safety review.
 
-**Receipt:** One consolidated prerequisite checklist; the deterministic welcome;
-or, immediately after successful initialization, one `project-ready` handoff
-from the first Engine report.
+**Receipt:** One consolidated prerequisite checklist; the complete unmodified
+setup-assistant welcome; or, immediately after successful initialization, one
+`project-ready` handoff from the first Engine report.
 
 **Next:** Follow the Engine route, normally INTAKE-10 for a new project.
 
 ~~~text
 [BOOT-00]
 Use the Fastlane coordinator and Define procedure for the current Engine report.
+When prerequisites are ready, run
+`python scripts/setup_assistant.py welcome` and return its complete stdout
+verbatim as the entire owner response before accepting the three setup values.
+Do not summarize, abridge, preface, append to, or reformat it.
 After a new project is initialized, render `project-ready` exactly once before
 ordinary intake. Never render it during resume.
 ~~~
