@@ -1150,8 +1150,8 @@ locally inside the approved envelope.
 |---|---|
 | Application and runtime | [Selected architecture](#selected-architecture) and [component design](#15-component-design) |
 | Identity and data | [Interfaces](#16-interfaces-and-contracts), [data lifecycle](#17-data-model-and-lifecycle), and [AWS approach](#20-aws-implementation-approach) |
-| Reliability and operations | [Error handling](#19-error-handling-strategy), [release acceptance](#26-release-acceptance), and current project diagrams |
-| Validation and construction | [Validation strategy](#validation-strategy), readiness card, and the exact construction envelope |
+| Reliability and operations | [Error handling](#19-error-handling-strategy), [release acceptance](#26-release-acceptance), and [current project diagrams](#diagram-guide) |
+| Validation and construction | [Validation strategy](#validation-strategy), [Gate B readiness card](#gate-b--readiness-card), and the [exact construction envelope](#28-construction-envelope) |
 | Architecture diagrams | [Complete proposed architecture](#proposed-system-at-a-glance), [AWS implementation](#aws-implementation-at-a-glance), and the [diagram guide](#diagram-guide) |
 
 ## 27. Gate B agent review record
@@ -1328,9 +1328,9 @@ Use this index to open each singular project diagram. Every view describes plann
 |---|---|---|---|
 | Complete proposed architecture | The complete component, trust, data, AWS, operations, and recovery shape | Every current technical plan | [View complete architecture](#proposed-system-at-a-glance) |
 | AWS implementation | The applicable selected services; its exact table retains all eight concern decisions | Every current technical plan | [View AWS implementation](#aws-implementation-at-a-glance) |
-| First useful outcome | How the primary user result moves through the design | Every current technical plan | [View first useful outcome](#sequence-primary-outcome) |
+| First useful outcome | How the primary user result moves through the design | Every current technical plan | [View first useful outcome](#sequence--primary-outcome) |
 | Journey and alternate paths | Multi-actor, alternate, or rich-use-case flow | When the approved journeys make it material | [View journey paths](#journey-view) |
 | State lifecycle | Meaningful product states and transitions | When a current state model applies | [View state lifecycle](#state-view) |
 | Data lifecycle | Ownership, retention, deletion, backup, and recovery movement | When approved data requirements make it material | [View data lifecycle](#data-lifecycle-view) |
-| Failure and recovery | Material failure, retry, rollback, or recovery behavior | When reliability requirements make it material | [View failure and recovery](#sequence-failure-and-recovery) |
+| Failure and recovery | Material failure, retry, rollback, or recovery behavior | When reliability requirements make it material | [View failure and recovery](#sequence--failure-and-recovery) |
 | Migration | Existing-system preservation and cutover movement | For brownfield or migration work | [View migration](#migration-view) |

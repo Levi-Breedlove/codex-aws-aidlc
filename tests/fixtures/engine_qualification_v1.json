@@ -67,6 +67,20 @@
         "construction or AWS authorization change",
         "AWS access, execution, deployment, recovery, or teardown evidence claim"
       ]
+    },
+    {
+      "id": "OWNER_SOURCE_NAVIGATION_1_2_36",
+      "base_commit": "47e1e548e0ae429d47ff838b3ebd60e98a1a5e1e",
+      "scope": [
+        "owner-facing Technical decision index and diagram-guide links to existing canonical PRD sections",
+        "PRD snapshot and source-locator bytes changed only by those navigation labels",
+        "Fastlane patch-version mirrors and consequential manifest hashes"
+      ],
+      "prohibited": [
+        "requirement, design, diagram, lifecycle, routing, remediation, task, gate, authority, or receipt change",
+        "construction or AWS authorization change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "normalization": {
@@ -84,8 +98,8 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "d1d76d3dc1bb760881d829649c56b278ddf7a46b0fc98d4f021e2c75dae17b2a",
-    "task_ready": "e13a2ba7bc269320afe287f72608d08b45bc69c7468b07ef5bf0dc98224c8b2d"
+    "stale_gate_a_summary": "aae6f62a449c932db2d72f68f8f3a8512ac64b2b4212106a8df48935228690b5",
+    "task_ready": "190c4a2037948f95e47972f77529eda5473589a14f72aa2186aecf2b40965750"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -673,7 +687,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:294f5d52bf252cebf82eaa4d681c173a3e97533ecde4e58617b58e41509aee86"
+          "prd_snapshot_sha256": "sha256:b408f77dc083fb8aae015a6bc5a377036594b3fc1a9ae227c203f7cec53da5f5"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -3252,7 +3266,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:a1a3ee7a1bb5d0d259ccfb68d2e6ae02e64f8a20a08b2e9ee8a34dc2e632cd2b"
+          "prd_snapshot_sha256": "sha256:0aff1ef818fc0c9e9644a28496677a9a0ba5f93543eea6304401abc27230b1c2"
         },
         "document_summaries": {
           "schema_version": 1,

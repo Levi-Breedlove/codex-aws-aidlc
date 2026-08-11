@@ -45,8 +45,7 @@ WORKER_PERSISTENCE_STEP = "Worker->>Data: Persist approved data"
 def github_anchor(value: str) -> str:
     value = value.strip().casefold()
     value = re.sub(r"[^\w\- ]", "", value, flags=re.UNICODE)
-    value = re.sub(r"\s+", "-", value)
-    return re.sub(r"-+", "-", value).strip("-")
+    return re.sub(r"\s", "-", value).strip("-")
 
 
 def headings(path: Path) -> set[str]:
@@ -496,7 +495,7 @@ sequenceDiagram
         required = {
             "### Proposed system at a glance": "proposed-system-at-a-glance",
             "### AWS implementation at a glance": "aws-implementation-at-a-glance",
-            "### Sequence — primary outcome": "sequence-primary-outcome",
+            "### Sequence — primary outcome": "sequence--primary-outcome",
         }
         mermaid_fence = chr(96) * 3 + "mermaid"
         for heading, expected_anchor in required.items():
@@ -536,11 +535,7 @@ sequenceDiagram
                 self.assertEqual(lines[mermaid_index], lines[mermaid_index].lstrip())
                 self.assertFalse(lines[mermaid_index].startswith("|"))
                 self.assertEqual(depth_by_line[mermaid_index + 1], 0)
-            anchor = re.sub(
-                r"[\s-]+",
-                "-",
-                re.sub(r"[^\w -]", "", heading[4:].lower()),
-            ).strip("-")
+            anchor = github_anchor(heading[4:])
             self.assertEqual(anchor, expected_anchor)
 
     def test_prd_diagram_guide_links_without_copying_diagrams(self) -> None:
@@ -557,11 +552,11 @@ sequenceDiagram
             [
                 ("View complete architecture", "#proposed-system-at-a-glance"),
                 ("View AWS implementation", "#aws-implementation-at-a-glance"),
-                ("View first useful outcome", "#sequence-primary-outcome"),
+                ("View first useful outcome", "#sequence--primary-outcome"),
                 ("View journey paths", "#journey-view"),
                 ("View state lifecycle", "#state-view"),
                 ("View data lifecycle", "#data-lifecycle-view"),
-                ("View failure and recovery", "#sequence-failure-and-recovery"),
+                ("View failure and recovery", "#sequence--failure-and-recovery"),
                 ("View migration", "#migration-view"),
             ],
         )
@@ -578,6 +573,29 @@ sequenceDiagram
             gate_b.strip().endswith("<!-- bootstrap:gate-b-receipt:end -->"),
             gate_b[-500:],
         )
+
+    def test_gate_b_technical_index_links_each_owner_source(self) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        index = prd.split("## Technical decision index", 1)[1].split(
+            "## 27. Gate B agent review record", 1
+        )[0]
+        self.assertEqual(
+            github_anchor("Gate B — readiness card"),
+            "gate-b--readiness-card",
+        )
+        expected = {
+            "[current project diagrams](#diagram-guide)": "# Diagram guide",
+            "[Gate B readiness card](#gate-b--readiness-card)": (
+                "### Gate B — readiness card"
+            ),
+            "[exact construction envelope](#28-construction-envelope)": (
+                "## 28. Construction envelope"
+            ),
+        }
+        for link, heading in expected.items():
+            with self.subTest(link=link):
+                self.assertIn(link, index)
+                self.assertEqual(prd.count(heading), 1)
 
     def test_prd_disclosures_explain_and_contain_the_promised_records(self) -> None:
         prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")

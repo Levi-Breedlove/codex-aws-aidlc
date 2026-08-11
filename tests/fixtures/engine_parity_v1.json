@@ -67,6 +67,20 @@
         "construction or AWS authorization change",
         "AWS access, execution, deployment, recovery, or teardown evidence claim"
       ]
+    },
+    {
+      "id": "OWNER_SOURCE_NAVIGATION_1_2_36",
+      "base_commit": "47e1e548e0ae429d47ff838b3ebd60e98a1a5e1e",
+      "scope": [
+        "owner-facing Technical decision index and diagram-guide links to existing canonical PRD sections",
+        "PRD snapshot and source-locator bytes changed only by those navigation labels",
+        "Fastlane patch-version mirrors and consequential manifest hashes"
+      ],
+      "prohibited": [
+        "requirement, design, diagram, lifecycle, routing, remediation, task, gate, authority, or receipt change",
+        "construction or AWS authorization change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "summary_truth_compatibility": {
@@ -85,13 +99,13 @@
       "actual_initial_bytes"
     ],
     "report_case_digests": {
-      "template_source": "72e5b4dd65ebe31f39730ba7c9c2b95e7ca03d536893191c348f8e692bb3101e",
-      "unconfigured_template": "b89cbd72ea715d7e0da5a2f42212d6096e3e3e54b4c0be79bb05df8815facbec",
-      "rendered_intake": "ba1ca47026488e364b1fa9f9a08bb3d57aba32d839f2a98e96155df70cf8496b",
-      "gate_a_pending": "02c030ef10b8a084240abc6d899619596ea15229671ab535a41f706f497f09c0",
-      "gate_a_approved": "7f881338a0b7aabe4fc694605163deb759b4e518cadd1e989e1d1d89e2368c7b",
-      "gate_b_pending": "7fb8678a2716ea7012d00e268ed7067790a022218897ae85ca30b43c53cc7653",
-      "gate_b_approved": "9deb8e395b9bc3c019a72513c815ebb5aa25d74c68c6eda5e13d4ecb13822272"
+      "template_source": "93342ac776238cc2fb71393e51fb25e195bc70ef1c1561f2ec71988441a5dd7a",
+      "unconfigured_template": "547740ec1c6690da6ded36c63dd19e9f0ba5c0de3367dae6b4f96a8d6dde01eb",
+      "rendered_intake": "17238d5b1210b1a0957897155442ea231c77990d027dca1730102fa028ab05a4",
+      "gate_a_pending": "3d0fdb61d84576e7c4c7289e89c8a7a95933e2a79394a749c6c8e62a80e928cf",
+      "gate_a_approved": "124b78b0294ad05cb248c811ee548206a60cd16373012345510bc68c02fb44d5",
+      "gate_b_pending": "a9ca40e4b9eaa11e825ded65a62c0823ee6e175f6bce7a7d39192ed718775714",
+      "gate_b_approved": "7f71eb9a6b25af4de1e696ffcbea1f452a50049d5f19a242b40878fe274ab13b"
     }
   },
   "normalization": {
@@ -2186,13 +2200,13 @@
     }
   },
   "report_case_digests": {
-    "template_source": "2d27d00e247b80ec68b683b1267e66241620c3c919cefe1a1745c4a25d2c7d61",
-    "unconfigured_template": "afbd0c90b15c5099269e32df53bfaa26537b2a341692f2419169cdd8736b1a09",
-    "rendered_intake": "4f4ebb391fef0361b79357b8f8262f816934d098e62c468a8dd85b7849b681fe",
-    "gate_a_pending": "eb9fccfa1b27ab2ee57ced483ecbf6bee2f732729dec632e29692db07713f3e0",
-    "gate_a_approved": "8965087c223ca75330ba368a929e02c6b0415fe3eadb6b1b2e427062c2d22be0",
-    "gate_b_pending": "3e017ae3a7fc5a8b54423a09c8b9cab779bf6485fb1846b35725c40985418cab",
-    "gate_b_approved": "121f250d726a2ce42d9a54c424f1d441bf86f29102e560f35b38881a62d18160"
+    "template_source": "6b2a9bb5bcec3d1deddd530c5fe3ee3b2bd3afb26a424a142e2a2a17d48fcf87",
+    "unconfigured_template": "b2bc3a913224ac214d640b7281541f5cc1b48e4d932e04a5b42c33c4958299af",
+    "rendered_intake": "925156a0d7772dfbc4a30d18efa405c1373da0c0b8d43def609867366606784b",
+    "gate_a_pending": "65b807c4925833a1a944188331fc269163f0920731a286b0299f6e06a636ccd2",
+    "gate_a_approved": "f7221b240ba21c7005c3c61f332dfd20036651225bf9200bada11146587ac8d3",
+    "gate_b_pending": "2d4b04e1ed222992cfabcf1a43326bf1afdec6791ab66cd52264a0926e020775",
+    "gate_b_approved": "3dd2c33a27a046cffdd652deb5ffaa95fe24eb18ab843ddea7fa81d2086b1027"
   },
   "report_cases": {
     "template_source": {
@@ -2616,7 +2630,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:62d7b78a04fe26d82dbf455104449b0069f0f2d064379cbc964f58975c8148c2"
+          "prd_snapshot_sha256": "sha256:a498f0373f38d92bf06c2e7147efbd9f5112105fc0f807d6b3307690ddf50347"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -4513,7 +4527,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:62d7b78a04fe26d82dbf455104449b0069f0f2d064379cbc964f58975c8148c2"
+          "prd_snapshot_sha256": "sha256:a498f0373f38d92bf06c2e7147efbd9f5112105fc0f807d6b3307690ddf50347"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -6380,7 +6394,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:85b2849b860a69b5b4420b71ad46c7e4b418a6d09fff843987aa5048f1a798b3"
+          "prd_snapshot_sha256": "sha256:3f80cb3ee388b4d8fc9d1729f4dc502952289364d4d4756a3966d1f7d7578def"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -8531,7 +8545,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:294f5d52bf252cebf82eaa4d681c173a3e97533ecde4e58617b58e41509aee86"
+          "prd_snapshot_sha256": "sha256:b408f77dc083fb8aae015a6bc5a377036594b3fc1a9ae227c203f7cec53da5f5"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -11255,7 +11269,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:639d907045e204073beaa2c8066d4b8dad3ed97715df0f88b3399a5b5628084b"
+          "prd_snapshot_sha256": "sha256:8ffb915a0615a4f5cbe430fa837d21a7ecb398adaf6104081938e51e0ae043ae"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -12445,7 +12459,7 @@
               "heading": "Diagram guide",
               "start_line": 1368,
               "end_line": 1381,
-              "section_sha256": "sha256:e709867eb6908cbf618acdd0a0893edbee6c5a162f583d45ed3d1b34106aa014",
+              "section_sha256": "sha256:2329a034ec5fac44fa9b49305c3b34eaa116365dc09ac521d6b49ba5cf79ea5b",
               "required": true
             }
           ],
@@ -12458,7 +12472,7 @@
             ]
           },
           "formal_receipt_required": false,
-          "canonical_sha256": "sha256:971c97338ebea76616a7384b467cfebba93b1712b99a1c7bbfb679d72baf6fbe"
+          "canonical_sha256": "sha256:4b80e037a7c64a2f5f308c766ee8fbc0e2424fe472c3433b0c8e6c7af3b8e6d1"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -14289,7 +14303,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:fd5d7003037cbe7a2f19825af7cee5460b6c1fab4f2c85942a0aa18ff4b79e89"
+          "prd_snapshot_sha256": "sha256:7fd991c8c33bdbf6ff3870a12b78a6ed6acf9d7df7b1c0be61d01f60e899c5cf"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -15507,7 +15521,7 @@
               "heading": "Diagram guide",
               "start_line": 1551,
               "end_line": 1564,
-              "section_sha256": "sha256:e709867eb6908cbf618acdd0a0893edbee6c5a162f583d45ed3d1b34106aa014",
+              "section_sha256": "sha256:2329a034ec5fac44fa9b49305c3b34eaa116365dc09ac521d6b49ba5cf79ea5b",
               "required": true
             }
           ],
@@ -15520,7 +15534,7 @@
             ]
           },
           "formal_receipt_required": true,
-          "canonical_sha256": "sha256:7a3bd0911066db9e5c82f225926de61ac2b85c58f87d0dd8aad22edc80338b09"
+          "canonical_sha256": "sha256:0a1ca353d69086939a2992e9d43e10d31ae0da239428f6dc31a316e40a2b511c"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -17535,7 +17549,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:a1a3ee7a1bb5d0d259ccfb68d2e6ae02e64f8a20a08b2e9ee8a34dc2e632cd2b"
+          "prd_snapshot_sha256": "sha256:0aff1ef818fc0c9e9644a28496677a9a0ba5f93543eea6304401abc27230b1c2"
         },
         "document_summaries": {
           "schema_version": 1,
