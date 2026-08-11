@@ -806,6 +806,21 @@ def _current_contract_schema(
     )
 
 
+def _requirements_presentation_labels(
+    actors: ContractTable | None,
+    journeys: ContractTable | None,
+    use_cases: ContractTable | None,
+) -> tuple[tuple[str, str], ...]:
+    """Project canonical human names without entering requirements digests."""
+
+    labels = [
+        *((row[0], row[1]) for row in (actors.rows if actors else ())),
+        *((row[0], row[2]) for row in (journeys.rows if journeys else ())),
+        *((row[0], row[5]) for row in (use_cases.rows if use_cases else ())),
+    ]
+    return tuple((identifier, clean_cell(label)) for identifier, label in labels)
+
+
 def derive_requirements_contract(
     text: str,
     effective_risk: str | None,
@@ -1639,6 +1654,9 @@ def derive_requirements_contract(
         missing_records=tuple(dict.fromkeys(missing_records)),
         canonical_sha256=canonical_sha256,
         grandfathered_approved_gate_a=grandfather_schema_13,
+        presentation_labels=_requirements_presentation_labels(
+            actors, journeys, use_cases
+        ),
         canonical_bytes=canonical_bytes,
     ), issues
 

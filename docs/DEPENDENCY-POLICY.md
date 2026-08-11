@@ -35,6 +35,16 @@ Fastlane adopters do **not** install Ruff system-wide to initialize or use the
 template. Maintainers may run the pinned CI action or an ephemeral
 `uvx ruff==0.16.0` command. Ruff does not access AWS or change Fastlane state.
 
+## Mermaid rendering
+
+Maintainer CI uses `@mermaid-js/mermaid-cli` `11.16.0` with an exact Node.js
+version to parse and render the packaged diagram procedure plus synthetic
+Golden Project diagrams. Fastlane adopters do not install this renderer to use
+the template. CI uploads only 11 sanitized diagrams in two themes (22 SVG review artifacts) for 14
+days; it never uploads project files, machine paths, credentials, account data,
+session state, or authorization records. A successful render proves syntax and
+produces an inspectable artifact; it does not by itself prove visual quality.
+
 ## GitHub Actions
 
 Dependabot checks GitHub Actions dependencies weekly against `fast-lane`.

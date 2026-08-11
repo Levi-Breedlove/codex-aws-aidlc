@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence
 
 try:
     from fastlane_owner_briefs import (
+        GATE_B_NAVIGATION_LOCATOR_KEYS,
         finalize_owner_decision_brief,
         finalize_owner_decision_inventory,
     )
@@ -20,6 +21,7 @@ try:
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
     from scripts.fastlane_owner_briefs import (
+        GATE_B_NAVIGATION_LOCATOR_KEYS,
         finalize_owner_decision_brief,
         finalize_owner_decision_inventory,
     )
@@ -1112,13 +1114,13 @@ def _aws_lifecycle_intent_audit(
         )
     if choice == "INVESTIGATE":
         return (
-            f"Owner chose INVESTIGATE at {recorded_at}; this selects AWS-40 and "
-            "grants no AWS access or mutation."
+            f"Owner chose INVESTIGATE at {recorded_at}; this selects a read-only "
+            "residual review and grants no AWS access or mutation."
         )
     return (
         f"Owner chose REMOVE at {recorded_at}; this requests the teardown path but "
-        "grants no AWS access or mutation; AWS-50 still requires the exact teardown "
-        "authorization."
+        "grants no AWS access or mutation; a separate exact teardown authorization "
+        "is still required."
     )
 
 
@@ -1661,6 +1663,21 @@ def render_project_ready(report: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _current_diagram_kinds(report: Mapping[str, Any]) -> set[str]:
+    """Return only diagram views that the evaluated project says are current."""
+
+    design = report.get("design_contract")
+    diagram = design.get("diagram_contract") if isinstance(design, Mapping) else None
+    records = diagram.get("records") if isinstance(diagram, Mapping) else None
+    if not isinstance(records, list):
+        return set()
+    return {
+        str(record.get("kind"))
+        for record in records
+        if isinstance(record, Mapping) and record.get("status") == "CURRENT"
+    }
+
+
 def _post_gate_navigation(
     report: Mapping[str, Any], interaction: Mapping[str, Any]
 ) -> tuple[str, ...]:
@@ -1682,10 +1699,27 @@ def _post_gate_navigation(
             "- [Technical Plan](docs/project/PRD.md#technical-plan)",
         )
     if next_prompt == "TASK-10" and gates.get("gate_b") == "APPROVED_FOR_CONSTRUCTION":
-        return (
+        current_diagrams = _current_diagram_kinds(report)
+        links = [
             "- [Gate B decision](docs/project/PRD.md#gate-b-review)",
-            "- [Current construction progress](docs/project/TASKS.md#current-progress)",
+        ]
+        if "SYSTEM_CONTEXT" in current_diagrams:
+            links.append(
+                "- [View the complete proposed architecture]"
+                "(docs/project/PRD.md#proposed-system-at-a-glance)"
+            )
+        if "AWS_IMPLEMENTATION" in current_diagrams:
+            links.extend(
+                (
+                    "- [View the AWS implementation diagram]"
+                    "(docs/project/PRD.md#aws-implementation-at-a-glance)",
+                    "- [Browse all project diagrams](docs/project/PRD.md#diagram-guide)",
+                )
+            )
+        links.append(
+            "- [Current construction progress](docs/project/TASKS.md#current-progress)"
         )
+        return tuple(links)
     return ()
 
 
@@ -2154,6 +2188,25 @@ def _markdown_anchor(heading: str) -> str:
     return re.sub(r"[\s-]+", "-", value).strip("-")
 
 
+def _owner_source_link(
+    locator_by_key: Mapping[str, Mapping[str, Any]],
+    key: str,
+    *,
+    link_label: str | None = None,
+) -> str:
+    """Return one required content-bound owner-navigation link."""
+
+    locator = locator_by_key.get(key)
+    if locator is None:
+        raise PresentationError(f"Owner brief is missing required source {key}")
+    path = locator.get("path")
+    heading = locator.get("heading")
+    label = locator.get("label")
+    if not all(isinstance(value, str) and value for value in (path, heading, label)):
+        raise PresentationError(f"Owner brief source {key} is malformed")
+    return f"[{link_label or label}]({path}#{_markdown_anchor(heading)})"
+
+
 def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -> str:
     """Render one deterministic Gate A or Gate B owner decision view."""
 
@@ -2243,13 +2296,29 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
                     )
                     + " |"
                 )
+        architecture_links = [
+            _owner_source_link(
+                locator_by_key,
+                key,
+                link_label=label,
+            )
+            for key, label in zip(
+                GATE_B_NAVIGATION_LOCATOR_KEYS,
+                (
+                    "View the complete proposed architecture",
+                    "View the AWS implementation diagram",
+                    "Browse all project diagrams",
+                ),
+            )
+        ]
         lines.extend(
             (
                 "",
-                (
-                    "[View the complete architecture diagram]"
-                    "(docs/project/PRD.md#proposed-system-at-a-glance)"
-                ),
+                "## Architecture diagrams",
+                "",
+                f"- {architecture_links[0]}",
+                f"- {architecture_links[1]}",
+                f"- {architecture_links[2]}",
             )
         )
         lines.extend(
@@ -2324,6 +2393,8 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
 
     lines.extend(("", "## Review the exact sources"))
     for locator in brief["source_locators"]:
+        if locator["key"] in GATE_B_NAVIGATION_LOCATOR_KEYS:
+            continue
         anchor = _markdown_anchor(str(locator["heading"]))
         lines.append(
             f"- [{locator['label']}]({locator['path']}#{anchor}) "

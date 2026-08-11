@@ -41,6 +41,11 @@ TECHNICAL_DOMAIN_ORDER = (
     "validation/construction",
 )
 TECHNICAL_DOMAINS = frozenset(TECHNICAL_DOMAIN_ORDER)
+GATE_B_NAVIGATION_LOCATOR_KEYS = (
+    "complete-architecture-diagram",
+    "aws-implementation-diagram",
+    "diagram-guide",
+)
 GATE_A_DECISION_DOMAINS = frozenset(
     {"product", "scope", "success", "data/access", "operations", "assumption"}
 )
@@ -311,6 +316,13 @@ def validate_owner_decision_brief(projection: Mapping[str, Any]) -> list[str]:
             "technical decisions reference missing source locations: "
             + ", ".join(missing_locator_keys)
         )
+    if kind == "GATE_B" and status == "READY":
+        missing_navigation = sorted(set(GATE_B_NAVIGATION_LOCATOR_KEYS) - keys)
+        if missing_navigation:
+            issues.append(
+                "Gate B is missing required architecture navigation: "
+                + ", ".join(missing_navigation)
+            )
     serialized = json.dumps(projection, ensure_ascii=False)
     if SECRET_LIKE.search(serialized) is not None:
         issues.append("brief contains secret-like content")

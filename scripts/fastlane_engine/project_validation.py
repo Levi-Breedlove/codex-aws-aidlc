@@ -63,6 +63,7 @@ from .design import (
     validate_application_source_write_set,
     validate_aws_artifact,
 )
+from .design.diagrams import DIAGRAM_PRESENTATION_DIAGNOSTIC
 from .package.manifest import (
     validate_manifest as validate_package_manifest,
     validate_placeholders as validate_package_placeholders,
@@ -195,7 +196,9 @@ def derive_design_contract(
             clean_cell(document.get("Delivery profile", "")) or None,
             clean_cell(document.get("Effective risk", "")) or None,
             clean_cell(document.get("AWS lane", "")) or None,
-            required=required,
+            # A populated Design is interpreted against complete typed Define
+            # projections even when this compatibility API is called read-only.
+            required=True,
             grandfather_current_gate_a=grandfather_approved_v1,
             owner_work_context=coverage_intake_contract.owner_work_context,
         )
@@ -218,7 +221,7 @@ def derive_design_contract(
             text,
             clean_cell(requirements_document.get("Effective risk", "")) or None,
             intake_contract,
-            required=required,
+            required=True,
             grandfather_current_gate_a=grandfather_approved_v1,
         )
         if required:
@@ -1002,6 +1005,8 @@ def validate_prd(
         for issue in design_contract_issues:
             code, separator, message = issue.partition(": ")
             if separator and code in APPLICATION_SOURCE_DIAGNOSTIC_CODES:
+                ctx.error(code, message, PRD_FILE)
+            elif separator and code == DIAGRAM_PRESENTATION_DIAGNOSTIC:
                 ctx.error(code, message, PRD_FILE)
             else:
                 ctx.error("DESIGN_CONTRACT_INVALID", issue, PRD_FILE)

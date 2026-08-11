@@ -19,6 +19,8 @@ from .architecture import (
 from .diagrams import (
     DIAGRAM_CONTRACT_HEADERS,
     DIAGRAM_CONTRACT_HEADING,
+    diagram_remediation_headings,
+    diagram_patterns_required,
     derive_diagram_contract,
     required_diagram_kinds,
 )
@@ -163,6 +165,8 @@ __all__ = (
     "command_matches_prefix",
     "current_prd_basis_ids",
     "derive_design_contract",
+    "diagram_remediation_headings",
+    "diagram_patterns_required",
     "derive_diagram_contract",
     "derive_harness_contract",
     "derive_project_design_contract",

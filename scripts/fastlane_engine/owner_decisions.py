@@ -30,6 +30,7 @@ from .design import (
 
 try:
     from ..fastlane_owner_briefs import (
+        GATE_B_NAVIGATION_LOCATOR_KEYS,
         TECHNICAL_DOMAIN_ORDER,
         answer_confirmation,
         claim as owner_claim,
@@ -41,6 +42,7 @@ try:
     )
 except ImportError:  # Executed with scripts/ on sys.path.
     from fastlane_owner_briefs import (
+        GATE_B_NAVIGATION_LOCATOR_KEYS,
         TECHNICAL_DOMAIN_ORDER,
         answer_confirmation,
         claim as owner_claim,
@@ -70,6 +72,51 @@ OWNER_CONFIRMATION_FIELDS = {
     "INTAKE-0009": "initial audience",
     "INTAKE-0010": "operating geography",
 }
+
+
+GATE_B_LOCATOR_SPECS = (
+    ("technical-plan", "Technical plan", "14. Architecture overview"),
+    ("technology-register", "Technology decisions", "Technology decisions"),
+    ("selected-architecture", "Selected architecture", "Selected architecture"),
+    ("components", "Component design", "15. Component design"),
+    ("interfaces", "Interfaces and contracts", "16. Interfaces and contracts"),
+    ("data-lifecycle", "Data model and lifecycle", "17. Data model and lifecycle"),
+    (
+        "aws-implementation",
+        "AWS implementation approach",
+        "20. AWS implementation approach",
+    ),
+    ("validation-strategy", "Validation strategy", "Validation strategy"),
+    ("harness-profile", "Harness checks", "Validation strategy"),
+    ("release-acceptance", "Release acceptance", "26. Release acceptance"),
+    (
+        "first-wave",
+        "First construction wave",
+        "21. Implementation boundaries and order",
+    ),
+    ("gate-b-readiness", "Gate B readiness", "Gate B — readiness card"),
+    (
+        "construction-boundary",
+        "Construction boundary",
+        "Construction and authorization boundary",
+    ),
+    (
+        "gate-b-authorization",
+        "Gate B authorization record",
+        "29. Gate B owner authorization record",
+    ),
+    (
+        GATE_B_NAVIGATION_LOCATOR_KEYS[0],
+        "Complete proposed architecture",
+        "Proposed system at a glance",
+    ),
+    (
+        GATE_B_NAVIGATION_LOCATOR_KEYS[1],
+        "AWS implementation diagram",
+        "AWS implementation at a glance",
+    ),
+    (GATE_B_NAVIGATION_LOCATOR_KEYS[2], "Project diagram guide", "Diagram guide"),
+)
 
 
 def _owner_locator_for_heading(
@@ -892,42 +939,7 @@ def derive_owner_decision_brief(
                 ),
             )
         )
-        locator_specs = (
-            ("technical-plan", "Technical plan", "14. Architecture overview"),
-            ("technology-register", "Technology decisions", "Technology decisions"),
-            ("selected-architecture", "Selected architecture", "Selected architecture"),
-            ("components", "Component design", "15. Component design"),
-            ("interfaces", "Interfaces and contracts", "16. Interfaces and contracts"),
-            (
-                "data-lifecycle",
-                "Data model and lifecycle",
-                "17. Data model and lifecycle",
-            ),
-            (
-                "aws-implementation",
-                "AWS implementation approach",
-                "20. AWS implementation approach",
-            ),
-            ("validation-strategy", "Validation strategy", "Validation strategy"),
-            ("harness-profile", "Harness checks", "Validation strategy"),
-            ("release-acceptance", "Release acceptance", "26. Release acceptance"),
-            (
-                "first-wave",
-                "First construction wave",
-                "21. Implementation boundaries and order",
-            ),
-            ("gate-b-readiness", "Gate B readiness", "Gate B — readiness card"),
-            (
-                "construction-boundary",
-                "Construction boundary",
-                "Construction and authorization boundary",
-            ),
-            (
-                "gate-b-authorization",
-                "Gate B authorization record",
-                "29. Gate B owner authorization record",
-            ),
-        )
+        locator_specs = GATE_B_LOCATOR_SPECS
         authorization = {
             "approves": [
                 "The complete technical design and the exact bounded local construction envelope."

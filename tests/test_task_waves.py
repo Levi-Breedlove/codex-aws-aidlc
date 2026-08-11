@@ -477,12 +477,14 @@ def harness_evidence_row(
     observed_at: str,
     observed_result: str,
     harness_id: str = "HARNESS-001",
+    layer: str = "UNIT",
     command: str = "python -m unittest tests.test_unit",
+    artifact_environment: str = "Worktree abc1234",
 ) -> str:
     return (
-        f"| {evidence_id} | {harness_id} | UNIT | "
+        f"| {evidence_id} | {harness_id} | {layer} | "
         "TASK-001, REQ-0001, DES-0001, AUTH-0001, TECH-0001 | "
-        f"{command} | Worktree abc1234 | {observed_result} | {observed_at} | "
+        f"{command} | {artifact_environment} | {observed_result} | {observed_at} | "
         f"docs/project/VERIFY.md#{evidence_id.lower()} | {status} |"
     )
 

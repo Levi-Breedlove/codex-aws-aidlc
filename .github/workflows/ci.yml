@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FASTLANE_CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   repository-precheck:
     runs-on: ubuntu-latest
@@ -25,13 +28,22 @@ jobs:
       - name: Check out repository with comparison history
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          ref: ${{ env.FASTLANE_CANDIDATE_COMMIT }}
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Verify exact candidate checkout
+        run: test "$(git rev-parse HEAD)" = "${FASTLANE_CANDIDATE_COMMIT}"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
+
+      - name: Set up Node.js 22 for deterministic diagram rendering
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: "22.17.1"
 
       - name: Validate Python syntax and indentation
         run: |
@@ -68,6 +80,36 @@ jobs:
           tests.test_engine_parity
           -v
 
+      - name: Render sanitized published and Golden Project diagrams
+        run: |
+          python -m tests.render_mermaid_fixtures --output-dir "${RUNNER_TEMP}/fastlane-mermaid"
+          puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"
+          # GitHub-hosted Linux disables Chromium's usable sandbox; this process sees sanitized fixtures only.
+          printf '%s\n' '{"args":["--no-sandbox"]}' > "${puppeteer_config}"
+          for source in "${RUNNER_TEMP}"/fastlane-mermaid/*.mmd; do
+            for theme in default dark; do
+              background="white"
+              if [ "${theme}" = "dark" ]; then
+                background="#333333"
+              fi
+              npx --yes @mermaid-js/mermaid-cli@11.16.0 \
+                --puppeteerConfigFile "${puppeteer_config}" \
+                --theme "${theme}" \
+                --backgroundColor "${background}" \
+                -i "${source}" \
+                -o "${source%.mmd}.${theme}.svg"
+            done
+          done
+          test "$(find "${RUNNER_TEMP}/fastlane-mermaid" -name '*.svg' | wc -l)" -eq 22
+
+      - name: Preserve sanitized rendered-diagram review artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fastlane-mermaid-rendered-${{ env.FASTLANE_CANDIDATE_COMMIT }}
+          path: ${{ runner.temp }}/fastlane-mermaid/*.svg
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Verify template manifest hashes
         run: python scripts/update_manifest.py --check
 
@@ -97,7 +139,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          ref: ${{ env.FASTLANE_CANDIDATE_COMMIT }}
           persist-credentials: false
+
+      - name: Verify exact candidate checkout
+        run: test "$(git rev-parse HEAD)" = "${FASTLANE_CANDIDATE_COMMIT}"
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -132,7 +178,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          ref: ${{ env.FASTLANE_CANDIDATE_COMMIT }}
           persist-credentials: false
+
+      - name: Verify exact candidate checkout
+        shell: pwsh
+        run: if ((git rev-parse HEAD) -ne $env:FASTLANE_CANDIDATE_COMMIT) { exit 1 }
 
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -181,7 +232,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
+          ref: ${{ env.FASTLANE_CANDIDATE_COMMIT }}
           persist-credentials: false
+
+      - name: Verify exact candidate checkout
+        run: test "$(git rev-parse HEAD)" = "${FASTLANE_CANDIDATE_COMMIT}"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0

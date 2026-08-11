@@ -10,11 +10,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
 
 from scripts import fastlane_document_summaries as document_summaries
 from scripts.fastlane_adr import ADR_AUTHORITY
+from scripts.fastlane_engine.design.models import (
+    APPLICATION_SOURCE_INFRASTRUCTURE_ONLY,
+)
 from scripts.fastlane_engine.design.support import AWS_SERVICE_TECH_CONCERNS
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -563,8 +567,13 @@ def complete_requirements_contract(text: str) -> str:
     )
 
 
-def approve_gate_a(text: str) -> str:
-    text = complete_intake_foundation(text)
+def approve_gate_a(
+    text: str,
+    *,
+    work_context_choice: str = "A",
+    project_mode: str = "greenfield",
+) -> str:
+    text = complete_intake_foundation(text, work_context_choice=work_context_choice)
     replacements = {
         "| FR-001 | TODO | UBIQUITOUS | AC-FR-001 | TODO | MEASURABLE |": (
             "| FR-001 | The application SHALL display the current approved project outcome. "
@@ -591,7 +600,7 @@ def approve_gate_a(text: str) -> str:
     text = complete_requirements_contract(text)
 
     for field, value in {
-        "Project mode": "`greenfield`",
+        "Project mode": f"`{project_mode}`",
         "Delivery profile": "`quick-mvp`",
         "Effective risk": "`low`",
         "AWS lane": "`documentation-only`",
@@ -691,8 +700,14 @@ def approve_gate_a(text: str) -> str:
     )
 
 
-def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
-    text = complete_design_contract(text)
+def approve_gate_b(
+    text: str,
+    *,
+    baseline: str = "a" * 40,
+    design_builder: Callable[[str], str] | None = None,
+    envelope_overrides: Mapping[str, str] | None = None,
+) -> str:
+    text = (design_builder or complete_design_contract)(text)
     design_contract, design_issues = doctor.derive_design_contract(
         text, "DES-0001", required=True
     )
@@ -764,6 +779,7 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
                     *(f"TECH-{number:04d}" for number in range(1, 16)),
                     "PROP-001",
                     "HARNESS-004",
+                    "JOURNEY-001",
                     "API-001",
                     "BOUNDARY-001",
                     "WAVE-001",
@@ -799,6 +815,7 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
     )
     for field in doctor.AWS_DETAIL_FIELDS:
         envelope_values[field] = aws_not_applicable
+    envelope_values.update(envelope_overrides or {})
     for field, value in envelope_values.items():
         text = set_table_value(
             text,
@@ -852,12 +869,15 @@ def approve_gate_b(text: str, *, baseline: str = "a" * 40) -> str:
     )
 
 
-def rebind_gate_b_envelope(text: str) -> str:
+def rebind_gate_b_envelope(text: str, *, grandfather_approved_v1: bool = False) -> str:
     design_revision = doctor.table_after_heading(text, "## Document status")[
         "Current design revision"
     ]
     design_contract, design_issues = doctor.derive_design_contract(
-        text, design_revision, required=True
+        text,
+        design_revision,
+        required=True,
+        grandfather_approved_v1=grandfather_approved_v1,
     )
     if design_issues or design_contract.canonical_sha256 is None:
         raise AssertionError(
@@ -940,7 +960,7 @@ def accepted_runtime_adr(
 | Status | Accepted |
 | Design revision | {design_revision} |
 | Primary decision | TECH-0001 |
-| Decision value | Python |
+| Decision value | Python 3.12 on AWS Lambda |
 | Related basis IDs | DES-0001, FR-001 |
 | Canonical PRD section | Technology and toolchain decision register |
 | Evidence maturity | SOURCE_VERIFIED |
@@ -995,6 +1015,20 @@ def current_greenfield_state(state: dict[str, object], *, gate_b: bool = False) 
     lifecycle["gate_a"] = "APPROVED_FOR_DESIGN"
     if gate_b:
         lifecycle["gate_b"] = "APPROVED_FOR_CONSTRUCTION"
+
+
+MATERIAL_AWS_TECH_IDS = (
+    "TECH-0001",
+    "TECH-0002",
+    "TECH-0004",
+    "TECH-0008",
+    "TECH-0009",
+    "TECH-0010",
+    "TECH-0011",
+    "TECH-0013",
+    "TECH-0014",
+    "TECH-0015",
+)
 
 
 def record_aws_core_evidence(
@@ -1372,6 +1406,22 @@ def set_diagram_block(text: str, heading: str, next_heading: str, block: str) ->
 
 
 def complete_diagram_contract(text: str) -> str:
+    aws_tech_ids = (
+        "TECH-0001",
+        "TECH-0002",
+        "TECH-0004",
+        "TECH-0008",
+        "TECH-0009",
+        "TECH-0010",
+        "TECH-0011",
+        "TECH-0012",
+        "TECH-0013",
+        "TECH-0014",
+        "TECH-0015",
+    )
+    active_aws_tech_ids = tuple(
+        identifier for identifier in aws_tech_ids if identifier != "TECH-0012"
+    )
     rows = [
         (
             "DIAGRAM-0001",
@@ -1380,7 +1430,15 @@ def complete_diagram_contract(text: str) -> str:
             "CURRENT",
             "proposed-system-at-a-glance",
             "ARCH-0001, FR-001",
-            "ARCH-0001, API-001",
+            ", ".join(
+                (
+                    "ARCH-0001",
+                    "ACT-001",
+                    "API-001",
+                    "BOUNDARY-001",
+                    *active_aws_tech_ids,
+                )
+            ),
         ),
         (
             "DIAGRAM-0002",
@@ -1398,7 +1456,7 @@ def complete_diagram_contract(text: str) -> str:
             "CURRENT",
             "data-lifecycle-view",
             "ARCH-0001, DATA-001",
-            "API-001, DATA-001",
+            "API-001, TECH-0011",
         ),
         (
             "DIAGRAM-0004",
@@ -1407,7 +1465,7 @@ def complete_diagram_contract(text: str) -> str:
             "CURRENT",
             "sequence-failure-and-recovery",
             "ARCH-0001, REL-005",
-            "API-001, REL-005",
+            "API-001, TECH-0015",
         ),
         (
             "DIAGRAM-0005",
@@ -1436,6 +1494,15 @@ def complete_diagram_contract(text: str) -> str:
             "NONE",
             "NONE",
         ),
+        (
+            "DIAGRAM-0008",
+            "AWS_IMPLEMENTATION",
+            "REQUIRED",
+            "CURRENT",
+            "aws-implementation-at-a-glance",
+            "ARCH-0001, DES-0001",
+            ", ".join(("ARCH-0001", *active_aws_tech_ids)),
+        ),
     ]
     text = replace_contract_table(
         text, doctor.DIAGRAM_CONTRACT_HEADING, doctor.DIAGRAM_CONTRACT_HEADERS, rows
@@ -1445,10 +1512,108 @@ def complete_diagram_contract(text: str) -> str:
         "### Proposed system at a glance",
         "## 15. Component design",
         """```mermaid
-flowchart LR
-    ARCH-0001[\"Managed application\"]
-    API-001[\"Approved interface\"]
-    ARCH-0001 -->|serves| API-001
+flowchart TB
+    accTitle: Complete proposed review application architecture
+    accDescr: The project owner enters through a managed API and identity boundary, the review application runs on managed compute, and data, operations, encryption, deployment, and rollback services support the result.
+    subgraph PEOPLE[\"People\"]
+        ACT-001[\"Development user\"]:::actor
+    end
+    subgraph AWS_CLOUD[\"AWS Cloud · proposed architecture\"]
+        subgraph REGION[\"AWS Region · us-east-1\"]
+            subgraph ENTRY[\"Managed entry and identity\"]
+                TECH-0013[\"Amazon API Gateway<br/>regional HTTPS endpoint\"]:::entry
+                TECH-0010[\"Amazon Cognito with<br/>server-side authorization\"]:::entry
+            end
+            subgraph APPLICATION[\"Application and trust boundary\"]
+                BOUNDARY-001[\"Local client adapter to<br/>Application domain\"]:::entry
+                API-001[\"Local client to<br/>Trusted application service\"]:::compute
+                TECH-0002[\"FastAPI through a<br/>Lambda adapter\"]:::compute
+                TECH-0001[\"Python 3.12 on<br/>AWS Lambda\"]:::compute
+                ARCH-0001[\"Managed Serverless Baseline\"]:::compute
+            end
+            subgraph DATA[\"Owner data and safeguards\"]
+                TECH-0011[(\"Amazon DynamoDB with<br/>per-owner records\")]:::data
+                TECH-0008[\"Bandit static checks;<br/>AWS KMS-managed encryption;<br/>no application secrets stored\"]:::event
+            end
+            subgraph OPERATIONS[\"Operations, delivery, and recovery\"]
+                TECH-0014[\"Amazon CloudWatch<br/>logs, metrics, and alarms\"]:::ops
+                TECH-0004[\"AWS SAM<br/>infrastructure templates\"]:::ops
+                TECH-0009[\"AWS SAM CLI deployment<br/>and change sets\"]:::ops
+                TECH-0015[\"AWS SAM rollback to the<br/>last validated stack\"]:::ops
+            end
+        end
+    end
+    %% Primary request path
+    ACT-001 -->|sends a review request through| TECH-0013
+    TECH-0010 -. \"provides token issuer trust to\" .-> TECH-0013
+    TECH-0013 -->|routes authenticated requests into| BOUNDARY-001
+    BOUNDARY-001 -->|allows requests to| API-001
+    API-001 -->|invokes| TECH-0002
+    TECH-0002 -->|runs on| TECH-0001
+    TECH-0001 -->|implements| ARCH-0001
+    ARCH-0001 -->|stores owner records in| TECH-0011
+    %% Security, telemetry, delivery, and recovery
+    TECH-0008 -. \"protects code, data, and secrets posture for\" .-> ARCH-0001
+    ARCH-0001 -. \"emits operational signals to\" .-> TECH-0014
+    TECH-0004 -. "defines changes for" .-> TECH-0009
+    TECH-0009 -. "deploys" .-> TECH-0001
+    TECH-0015 -. "restores" .-> TECH-0001
+    classDef actor fill:#FFFFFF,stroke:#232F3E,color:#232F3E,stroke-width:2px;
+    classDef entry fill:#EAF3FF,stroke:#147EBA,color:#232F3E;
+    classDef compute fill:#FFF1E8,stroke:#D86613,color:#232F3E;
+    classDef data fill:#EDF7ED,stroke:#248814,color:#232F3E;
+    classDef event fill:#F3ECFF,stroke:#8C4FFF,color:#232F3E;
+    classDef ops fill:#FFF7DF,stroke:#D38B00,color:#232F3E;
+```""",
+    )
+    text = set_diagram_block(
+        text,
+        "### AWS implementation at a glance",
+        "<details>\n<summary>Exact AWS service decision records</summary>",
+        """```mermaid
+flowchart TB
+    accTitle: Proposed AWS implementation
+    accDescr: Requests move through the selected edge, identity, compute, and data services while managed observability, encryption, deployment, and rollback controls support the application.
+    subgraph AWS_CLOUD[\"AWS Cloud · proposed implementation\"]
+        subgraph REGION[\"AWS Region · us-east-1\"]
+            subgraph ENTRY[\"Managed entry and identity\"]
+                TECH-0013[\"Amazon API Gateway<br/>regional HTTPS endpoint\"]:::entry
+                TECH-0010[\"Amazon Cognito with<br/>server-side authorization\"]:::entry
+            end
+            subgraph APPLICATION[\"Application compute\"]
+                TECH-0002[\"FastAPI through a<br/>Lambda adapter\"]:::compute
+                TECH-0001[\"Python 3.12 on<br/>AWS Lambda\"]:::compute
+                ARCH-0001[\"Managed Serverless Baseline\"]:::compute
+            end
+            subgraph DATA[\"Data and request coordination\"]
+                TECH-0011[(\"Amazon DynamoDB with<br/>per-owner records\")]:::data
+            end
+            subgraph OPERATE[\"Operations and safeguards\"]
+                TECH-0008[\"Bandit static checks;<br/>AWS KMS-managed encryption;<br/>no application secrets stored\"]:::event
+                TECH-0014[\"Amazon CloudWatch<br/>logs, metrics, and alarms\"]:::ops
+                TECH-0004[\"AWS SAM<br/>infrastructure templates\"]:::ops
+                TECH-0009[\"AWS SAM CLI deployment<br/>and change sets\"]:::ops
+                TECH-0015[\"AWS SAM rollback to the<br/>last validated stack\"]:::ops
+            end
+        end
+    end
+    %% Primary request and data path
+    TECH-0010 -. \"provides token issuer trust to\" .-> TECH-0013
+    TECH-0013 -->|routes authenticated requests to| TECH-0002
+    TECH-0002 -->|runs on| TECH-0001
+    TECH-0001 -->|implements| ARCH-0001
+    ARCH-0001 -->|reads and writes| TECH-0011
+    %% Coordination, security, telemetry, delivery, and recovery
+    TECH-0008 -. \"protects\" .-> ARCH-0001
+    ARCH-0001 -. \"emits signals to\" .-> TECH-0014
+    TECH-0004 -. "defines changes for" .-> TECH-0009
+    TECH-0009 -. "deploys" .-> TECH-0001
+    TECH-0015 -. "restores" .-> TECH-0001
+    classDef entry fill:#EAF3FF,stroke:#147EBA,color:#232F3E;
+    classDef compute fill:#FFF1E8,stroke:#D86613,color:#232F3E;
+    classDef data fill:#EDF7ED,stroke:#248814,color:#232F3E;
+    classDef event fill:#F3ECFF,stroke:#8C4FFF,color:#232F3E;
+    classDef ops fill:#FFF7DF,stroke:#D38B00,color:#232F3E;
 ```""",
     )
     text = set_diagram_block(
@@ -1457,9 +1622,11 @@ flowchart LR
         "## 18. Detailed sequence diagrams",
         """```mermaid
 flowchart LR
-    API-001[\"Approved interface\"]
-    DATA-001[\"Approved data lifecycle\"]
-    API-001 -->|stores approved data| DATA-001
+    accTitle: Owner record data lifecycle
+    accDescr: The review API validates each request before storing an owner-scoped record.
+    API-001[\"Local client to<br/>Trusted application service\"]
+    TECH-0011[(\"Amazon DynamoDB with<br/>per-owner records\")]
+    API-001 -->|validates and stores in| TECH-0011
 ```""",
     )
     text = set_diagram_block(
@@ -1468,10 +1635,12 @@ flowchart LR
         "### Sequence — failure and recovery",
         """```mermaid
 flowchart LR
+    accTitle: First useful owner outcome
+    accDescr: The project owner submits one review request and receives the validated result through the review API.
     ACT-001[\"Development user\"]
-    API-001[\"Approved interface\"]
-    ACT-001 -->|requests approved outcome| API-001
-    API-001 -->|returns approved outcome| ACT-001
+    API-001[\"Local client to<br/>Trusted application service\"]
+    ACT-001 -->|submits a review request to| API-001
+    API-001 -->|returns the validated review to| ACT-001
 ```""",
     )
     return set_diagram_block(
@@ -1480,9 +1649,117 @@ flowchart LR
         "## 19. Error handling strategy",
         """```mermaid
 flowchart LR
-    API-001[\"Approved interface\"]
-    REL-005[\"Rollback requirement\"]
-    API-001 -->|fails health checks and invokes| REL-005
+    accTitle: Review failure and recovery path
+    accDescr: A failed review request preserves the approved state and uses the planned rollback and recovery path.
+    API-001[\"Local client to<br/>Trusted application service\"]
+    TECH-0015[\"AWS SAM rollback to the<br/>last validated stack\"]
+    API-001 -->|fails safely and invokes| TECH-0015
+```""",
+    )
+
+
+def complete_state_diagrams(text: str, *, actorless_primary: bool = False) -> str:
+    table = doctor.contract_table_after_heading(
+        text,
+        doctor.DIAGRAM_CONTRACT_HEADING,
+        doctor.DIAGRAM_CONTRACT_HEADERS,
+    )
+    if table is None:
+        raise AssertionError("Project diagram contract is missing")
+    rows = [list(row) for row in table.rows]
+    for row in rows:
+        if row[1] == "SYSTEM_CONTEXT":
+            referenced_ids = [item.strip() for item in row[6].split(",")]
+            if actorless_primary:
+                referenced_ids = [item for item in referenced_ids if item != "ACT-001"]
+            if "STATE-001" not in referenced_ids:
+                referenced_ids.append("STATE-001")
+            row[6] = ", ".join(referenced_ids)
+        elif row[1] == "PRIMARY_OUTCOME" and actorless_primary:
+            row[5] = "ARCH-0001, FR-001"
+            row[6] = "API-001, STATE-001"
+        elif row[1] == "STATE":
+            row[3] = "CURRENT"
+            row[5] = "ARCH-0001, FR-001"
+            row[6] = "STATE-001"
+    text = replace_contract_table(
+        text,
+        doctor.DIAGRAM_CONTRACT_HEADING,
+        doctor.DIAGRAM_CONTRACT_HEADERS,
+        [tuple(row) for row in rows],
+    )
+    interface_node = (
+        '                API-001["Local client to<br/>Trusted application service"]'
+        ":::compute"
+    )
+    if interface_node not in text:
+        raise AssertionError("Complete system diagram interface node is missing")
+    text = text.replace(
+        interface_node,
+        interface_node + '\n                STATE-001["PENDING, READY"]:::event',
+        1,
+    )
+    boundary_edge = "    BOUNDARY-001 -->|allows requests to| API-001"
+    if boundary_edge not in text:
+        raise AssertionError("Complete system diagram boundary edge is missing")
+    text = text.replace(
+        boundary_edge,
+        boundary_edge + "\n    API-001 -->|advances the review state to| STATE-001",
+        1,
+    )
+    text = set_diagram_block(
+        text,
+        "### State view",
+        "### Data lifecycle view",
+        """```mermaid
+flowchart LR
+    accTitle: Review lifecycle state
+    accDescr: The planned review moves from pending to ready only through the validated project transition.
+    STATE-001["PENDING, READY"]
+    STATE-001 -->|permits only recorded transitions| STATE-001
+```""",
+    )
+    if not actorless_primary:
+        return text
+    people = """    subgraph PEOPLE["People"]
+        ACT-001["Development user"]:::actor
+    end
+"""
+    if people not in text:
+        raise AssertionError("Complete system diagram actor group is missing")
+    text = text.replace(people, "", 1)
+    actor_edge = "    ACT-001 -->|sends a review request through| TECH-0013\n"
+    if actor_edge not in text:
+        raise AssertionError("Complete system diagram actor edge is missing")
+    text = text.replace(actor_edge, "", 1)
+    actor_style = (
+        "    classDef actor fill:#FFFFFF,stroke:#232F3E,color:#232F3E,"
+        "stroke-width:2px;\n"
+    )
+    if actor_style not in text:
+        raise AssertionError("Complete system diagram actor style is missing")
+    text = text.replace(actor_style, "", 1)
+    primary_heading = next(
+        line
+        for line in text.splitlines()
+        if line.startswith("### Sequence") and "primary outcome" in line
+    )
+    failure_heading = next(
+        line
+        for line in text.splitlines()
+        if line.startswith("### Sequence") and "failure and recovery" in line
+    )
+    return set_diagram_block(
+        text,
+        primary_heading,
+        failure_heading,
+        """```mermaid
+flowchart LR
+    accTitle: First useful legacy-project outcome
+    accDescr: The existing project interface advances the approved review lifecycle without inventing an actor that the legacy requirements never recorded.
+    API-001["Local client to<br/>Trusted application service"]
+    STATE-001["PENDING, READY"]
+    API-001 -->|advances the review state to| STATE-001
 ```""",
     )
 
@@ -1564,8 +1841,13 @@ def complete_design_contract(text: str) -> str:
         [
             "| Evidence ID | Discovery ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |",
             "|---|---|---|---|---|---|---|",
-            "| AWS-EV-0001 | AWS-DISC-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001 | AWS managed serverless services support bounded pay-per-use execution patterns | retrieve_skill | https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html | 2026-07-17 |",
-            "| AWS-EV-0002 | AWS-DISC-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0004 | AWS documentation defines current serverless security and operational guidance | search_documentation | https://docs.aws.amazon.com/lambda/latest/dg/security.html | 2026-07-17 |",
+            "| AWS-EV-0001 | AWS-DISC-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001, TECH-0002 | AWS Lambda supports the selected bounded Python and FastAPI execution model | retrieve_skill | https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html | 2026-07-17 |",
+            "| AWS-EV-0002 | AWS-DISC-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0013 | Amazon API Gateway provides the selected managed regional HTTPS entry point | search_documentation | https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html | 2026-07-17 |",
+            "| AWS-EV-0003 | AWS-DISC-0002 | TECH-0010 | Amazon Cognito supports the selected authenticated user boundary | retrieve_skill | https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools.html | 2026-07-17 |",
+            "| AWS-EV-0004 | AWS-DISC-0002 | TECH-0011 | Amazon DynamoDB supports owner-scoped records with managed persistence | search_documentation | https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html | 2026-07-17 |",
+            "| AWS-EV-0005 | AWS-DISC-0002 | TECH-0014 | Amazon CloudWatch provides the selected logs, metrics, and alarms | search_documentation | https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html | 2026-07-17 |",
+            "| AWS-EV-0006 | AWS-DISC-0002 | TECH-0004, TECH-0009, TECH-0015 | AWS SAM supports reviewable infrastructure, change sets, deployment, and bounded rollback | retrieve_skill | https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html | 2026-07-17 |",
+            "| AWS-EV-0007 | AWS-DISC-0002 | TECH-0008 | AWS KMS supports managed encryption controls for the selected application data path | search_documentation | https://docs.aws.amazon.com/kms/latest/developerguide/overview.html | 2026-07-17 |",
         ]
     )
     change_impact_table = "\n".join(
@@ -1606,15 +1888,30 @@ def complete_design_contract(text: str) -> str:
         ],
     )
     technology_rows = (
-        ("TECH-0001", "APPLICATION_RUNTIME", "Python", "CURRENT_LTS_AS_OF: 2026-07-01"),
-        ("TECH-0002", "APPLICATION_FRAMEWORK", "FastAPI", "COMPATIBLE_MAJOR: 1"),
+        (
+            "TECH-0001",
+            "APPLICATION_RUNTIME",
+            "Python 3.12 on AWS Lambda",
+            "CURRENT_LTS_AS_OF: 2026-07-01",
+        ),
+        (
+            "TECH-0002",
+            "APPLICATION_FRAMEWORK",
+            "FastAPI through a Lambda adapter",
+            "COMPATIBLE_MAJOR: 1",
+        ),
         (
             "TECH-0003",
             "FRONTEND_FRAMEWORK",
             "NOT_APPLICABLE — server-rendered interface",
             "NOT_APPLICABLE — server-rendered interface",
         ),
-        ("TECH-0004", "INFRASTRUCTURE_AS_CODE", "AWS SAM", "COMPATIBLE_MAJOR: 1"),
+        (
+            "TECH-0004",
+            "INFRASTRUCTURE_AS_CODE",
+            "AWS SAM infrastructure templates",
+            "COMPATIBLE_MAJOR: 1",
+        ),
         ("TECH-0005", "PACKAGE_BUILD_TOOLING", "pip", "MINIMUM: 24.0"),
         (
             "TECH-0006",
@@ -1623,18 +1920,28 @@ def complete_design_contract(text: str) -> str:
             "ORG_MANAGED: Python standard library",
         ),
         ("TECH-0007", "PROPERTY_TESTING", "Hypothesis", "MINIMUM: 6.0"),
-        ("TECH-0008", "SECURITY_VALIDATION", "Bandit", "EXACT: 1.7.9"),
-        ("TECH-0009", "DEPLOYMENT_TOOLING", "AWS SAM CLI", "MINIMUM: 1.120"),
+        (
+            "TECH-0008",
+            "SECURITY_VALIDATION",
+            "Bandit static checks; AWS KMS-managed encryption; no application secrets stored",
+            "EXACT: 1.7.9",
+        ),
+        (
+            "TECH-0009",
+            "DEPLOYMENT_TOOLING",
+            "AWS SAM CLI deployment and change sets",
+            "MINIMUM: 1.120",
+        ),
         (
             "TECH-0010",
             "IDENTITY_AUTHORIZATION",
-            "Local development identity with server-side authorization",
+            "Amazon Cognito with server-side authorization",
             "ORG_MANAGED: approved design contract",
         ),
         (
             "TECH-0011",
             "DATA_STORAGE",
-            "Local JSON store with per-owner records",
+            "Amazon DynamoDB with per-owner records",
             "ORG_MANAGED: approved design contract",
         ),
         (
@@ -1646,29 +1953,29 @@ def complete_design_contract(text: str) -> str:
         (
             "TECH-0013",
             "EDGE_NETWORKING",
-            "NOT_APPLICABLE — local-only development surface",
-            "NOT_APPLICABLE — local-only development surface",
+            "Amazon API Gateway regional HTTPS endpoint",
+            "ORG_MANAGED: approved design contract",
         ),
         (
             "TECH-0014",
             "OBSERVABILITY_INCIDENT_RESPONSE",
-            "Structured local logs and failure counters",
+            "Amazon CloudWatch logs, metrics, and alarms",
             "ORG_MANAGED: approved design contract",
         ),
         (
             "TECH-0015",
             "RELIABILITY_RECOVERY",
-            "Baseline commit restore with explicit rollback checks",
+            "AWS SAM rollback to the last validated stack",
             "ORG_MANAGED: approved design contract",
         ),
     )
     reasoning = {
         "APPLICATION_RUNTIME": (
-            "It is current, supported, and fits the approved local slice",
+            "The managed runtime fits the bounded workload and current Python support",
             "A second runtime would add packaging and operations cost",
         ),
         "APPLICATION_FRAMEWORK": (
-            "It provides the smallest typed HTTP surface for the approved journey",
+            "It provides the smallest typed HTTP surface on the selected managed runtime",
             "A larger framework adds features the first release does not need",
         ),
         "FRONTEND_FRAMEWORK": (
@@ -1692,7 +1999,7 @@ def complete_design_contract(text: str) -> str:
             "Example-only checks miss important input combinations",
         ),
         "SECURITY_VALIDATION": (
-            "Static checks provide a repeatable local security baseline",
+            "Static checks and managed encryption protect code and stored records",
             "Manual review alone is not reproducible",
         ),
         "DEPLOYMENT_TOOLING": (
@@ -1700,28 +2007,28 @@ def complete_design_contract(text: str) -> str:
             "An unrelated deployment tool would duplicate configuration",
         ),
         "IDENTITY_AUTHORIZATION": (
-            "It preserves server-side access decisions in the local slice",
+            "It preserves server-side access decisions with a managed user boundary",
             "Client-only authorization would not enforce the boundary",
         ),
         "DATA_STORAGE": (
-            "It is sufficient for the bounded local journey and preserves ownership",
-            "A network database adds setup without current value",
+            "It preserves owner-scoped records without database operations",
+            "A relational database adds operations not required by the access pattern",
         ),
         "MESSAGING_RETRIES": (
             "The approved outcome completes synchronously",
             "A queue adds delayed-state complexity without a requirement",
         ),
         "EDGE_NETWORKING": (
-            "The release is local and has no public edge",
-            "A public endpoint would widen exposure before authorization",
+            "A regional managed HTTPS entry point bounds the public interface",
+            "A separate CDN adds a layer the current access pattern does not need",
         ),
         "OBSERVABILITY_INCIDENT_RESPONSE": (
-            "Structured logs and counters expose local failures without sensitive content",
+            "Managed logs, metrics, and alarms expose failures without sensitive content",
             "Unstructured console output is harder to verify",
         ),
         "RELIABILITY_RECOVERY": (
-            "The authorized baseline provides a bounded local rollback",
-            "A separate recovery service is unnecessary before deployment",
+            "The selected deployment path can restore the last validated stack",
+            "A multi-Region recovery design exceeds the current recovery requirement",
         ),
     }
     technology_table = "\n".join(
@@ -1874,56 +2181,56 @@ def complete_design_contract(text: str) -> str:
             (
                 "Compute",
                 "TECH-0001, TECH-0002",
-                "AWS Lambda behind the approved application interface",
+                "Python 3.12 on AWS Lambda; FastAPI through a Lambda adapter",
                 "Pay-per-use compute fits the bounded workload",
                 "Managed runtime limits become revisit triggers",
             ),
             (
                 "API and edge",
                 "TECH-0002, TECH-0013",
-                "Amazon API Gateway without a separate public edge layer",
+                "FastAPI through a Lambda adapter; Amazon API Gateway regional HTTPS endpoint",
                 "One managed entry point keeps the interface bounded",
                 "A public endpoint requires separate deployment authorization",
             ),
             (
                 "Identity",
                 "TECH-0010",
-                "Server-side application authorization at the trusted service",
+                "Amazon Cognito with server-side authorization",
                 "The local release preserves the approved identity boundary",
                 "An AWS identity provider is deferred until deployment design needs it",
             ),
             (
                 "Data",
                 "TECH-0011",
-                "Per-owner records behind the trusted data adapter",
+                "Amazon DynamoDB with per-owner records",
                 "The adapter preserves ownership and supports later migration",
                 "A managed AWS store is not locally observed",
             ),
             (
                 "Messaging",
                 "TECH-0012",
-                "NOT_APPLICABLE - the approved path completes synchronously",
+                "NOT_APPLICABLE — synchronous local request flow",
                 "No background delivery is required by the approved journey",
                 "A queue is reconsidered if asynchronous work becomes material",
             ),
             (
                 "Observability",
                 "TECH-0014",
-                "Structured application logs and bounded failure counters",
+                "Amazon CloudWatch logs, metrics, and alarms",
                 "The local evidence can verify useful signals without secrets",
                 "AWS-native signals remain unobserved before deployment",
             ),
             (
                 "Deployment",
-                "TECH-0004, TECH-0009",
-                "AWS SAM template and deployment plan",
+                "TECH-0004, TECH-0009, TECH-0015",
+                "AWS SAM infrastructure templates; AWS SAM CLI deployment and change sets; AWS SAM rollback to the last validated stack",
                 "The selected tools keep planned infrastructure reproducible",
                 "Account-side planning still requires separate authority",
             ),
             (
                 "Secrets and encryption",
-                "TECH-0008, TECH-0010",
-                "No stored secret in the local release and least-privilege planned access",
+                "TECH-0008",
+                "Bandit static checks; AWS KMS-managed encryption; no application secrets stored",
                 "The design avoids introducing a secret before it is required",
                 "Deployed encryption controls remain unobserved",
             ),
@@ -1971,6 +2278,196 @@ def complete_design_contract(text: str) -> str:
     return complete_diagram_contract(complete_project_design_contract(text))
 
 
+def complete_brownfield_foundation(
+    text: str,
+    *,
+    baseline: str = "a" * 40,
+) -> str:
+    text = complete_intake_foundation(text, work_context_choice="B")
+    values = {
+        "Repository and baseline commit": f"`{baseline}`",
+        "Deployed environments and observed versions": (
+            "`development; version 1 observed`"
+        ),
+        "Existing architecture and ownership": "`single service; owner alice`",
+        "Current interfaces, schemas, and consumers": (
+            "`HTTP API v1; schema v1; internal users`"
+        ),
+        "Current data stores and migration constraints": (
+            "`local JSON; preserve records; no migration`"
+        ),
+        "Existing security and compliance controls": (
+            "`owner access; least privilege; no regulated data`"
+        ),
+        "Baseline verification commands": "`python -m unittest`",
+        "Baseline evidence location": "`docs/project/VERIFY.md`",
+        "Known defects and accepted debt": "`NONE_OBSERVED`",
+        "Repository-to-environment drift": "`NONE_OBSERVED`",
+        "Dirty or user-owned working-tree changes": "`NONE`",
+        "Protected files and components": "`legacy/**`",
+        "Unresolved bootstrap overlay collisions": "`NONE`",
+    }
+    if set(values) != set(doctor.BROWNFIELD_BASELINE_FIELDS):
+        raise AssertionError(
+            "Brownfield fixture fields do not match the Engine contract"
+        )
+    for field, value in values.items():
+        text = set_table_value(
+            text,
+            "### 1.2 Brownfield baseline and preservation contract",
+            "## Product requirements",
+            field,
+            value,
+        )
+    unresolved = "| PRES-001 | TODO | TODO | TODO | TODO |"
+    current = (
+        "| PRES-001 | Preserve legacy/** behavior | Baseline verification commands | "
+        "Narrow changes only | Parallel application roots or replacement without owner approval |"
+    )
+    if unresolved in text:
+        text = text.replace(unresolved, current, 1)
+    elif current not in text:
+        raise AssertionError("Brownfield fixture PRES-001 row is missing")
+    return set_table_value(
+        text,
+        "## Document status",
+        "## 1. Workload profile",
+        "Project mode",
+        "`brownfield`",
+    )
+
+
+def complete_existing_design_contract(
+    text: str,
+    *,
+    work_kind: str,
+    baseline: str = "a" * 40,
+) -> str:
+    if work_kind not in {"FEATURE", "INFRASTRUCTURE"}:
+        raise AssertionError(
+            "Existing-project fixture work kind must be FEATURE or INFRASTRUCTURE"
+        )
+
+    text = complete_brownfield_foundation(text, baseline=baseline)
+    text = complete_design_contract(text)
+    text = complete_coverage_plan(text, work_kind=work_kind, disposition="AMEND")
+    text = replace_contract_table_with_sentinel(
+        text,
+        doctor.FIRST_WAVE_HEADING,
+        f"{work_kind} work does not define a greenfield walking skeleton",
+    )
+    wave_basis = "DES-0001, FR-001, JOURNEY-001, WAVE-001"
+    if wave_basis not in text:
+        raise AssertionError(
+            "Existing-project fixture walking-skeleton basis is missing"
+        )
+    text = text.replace(wave_basis, "DES-0001, FR-001", 1)
+    impact_table = "\n".join(
+        [
+            "| Change ID | Changed basis IDs | Affected IDs | Preserved IDs | Required revalidation |",
+            "|---|---|---|---|---|",
+            "| CHANGE-0001 | FR-001 | ARCH-0001 | TECH-0001 | ARCH-0001 |",
+        ]
+    )
+    text = put_contract_table(
+        text,
+        doctor.CHANGE_IMPACT_HEADING,
+        impact_table,
+        "## 14. Architecture overview",
+    )
+    text = set_table_value(
+        text,
+        "## Document status",
+        "## 1. Workload profile",
+        "Project mode",
+        "`brownfield`",
+    )
+    source_disposition = (
+        APPLICATION_SOURCE_INFRASTRUCTURE_ONLY
+        if work_kind == "INFRASTRUCTURE"
+        else "BROWNFIELD_PRESERVE: legacy/**"
+    )
+    text = set_table_value(
+        text,
+        "## 28. Construction envelope",
+        "## 29. Gate B owner authorization record",
+        "Application source disposition",
+        f"`{source_disposition}`",
+    )
+
+    table = doctor.contract_table_after_heading(
+        text,
+        doctor.DIAGRAM_CONTRACT_HEADING,
+        doctor.DIAGRAM_CONTRACT_HEADERS,
+    )
+    if table is None:
+        raise AssertionError("Existing-project diagram contract is missing")
+    rows = [list(row) for row in table.rows]
+    for row in rows:
+        if row[1] == "MIGRATION":
+            row[3] = "CURRENT"
+            row[5] = "PRES-001, ARCH-0001"
+            row[6] = "BOUNDARY-001, ARCH-0001, TECH-0011, TECH-0015"
+    text = replace_contract_table(
+        text,
+        doctor.DIAGRAM_CONTRACT_HEADING,
+        doctor.DIAGRAM_CONTRACT_HEADERS,
+        [tuple(row) for row in rows],
+    )
+    text = set_diagram_block(
+        text,
+        "### Migration view",
+        "## 14. Architecture overview",
+        """```mermaid
+flowchart LR
+    accTitle: Existing application compatibility and rollback
+    accDescr: Existing requests cross the project boundary into the selected architecture, which keeps compatible owner records and a failure recovery path.
+    BOUNDARY-001["Local client adapter to<br/>Application domain"]:::entry
+    ARCH-0001["Managed Serverless Baseline"]:::compute
+    TECH-0011[("Amazon DynamoDB with<br/>per-owner records")]:::data
+    TECH-0015["AWS SAM rollback to the<br/>last validated stack"]:::ops
+    BOUNDARY-001 -->|routes existing requests to| ARCH-0001
+    ARCH-0001 -->|keeps compatible records in| TECH-0011
+    TECH-0015 -. "restores" .-> ARCH-0001
+    classDef entry fill:#EAF3FF,stroke:#147EBA,color:#232F3E;
+    classDef compute fill:#FFF1E8,stroke:#D86613,color:#232F3E;
+    classDef data fill:#EDF7ED,stroke:#248814,color:#232F3E;
+    classDef ops fill:#FFF7DF,stroke:#D38B00,color:#232F3E;
+```""",
+    )
+    if work_kind == "INFRASTRUCTURE":
+        replacements = {
+            "accTitle: Proposed AWS implementation": (
+                "accTitle: Infrastructure-only AWS implementation"
+            ),
+            "accDescr: Requests move through the selected edge, identity, compute, and data services while managed observability, encryption, deployment, and rollback controls support the application.": (
+                "accDescr: Existing application traffic keeps its selected edge, "
+                "identity, compute, and data services while infrastructure work is "
+                "limited to managed operations, deployment, and rollback controls."
+            ),
+        }
+        for before, after in replacements.items():
+            if text.count(before) != 1:
+                raise AssertionError(
+                    f"Expected one infrastructure diagram marker: {before}"
+                )
+            text = text.replace(before, after, 1)
+
+    design_revision = doctor.table_after_heading(text, "## Document status")[
+        "Current design revision"
+    ]
+    contract, issues = doctor.derive_design_contract(
+        text,
+        design_revision,
+        required=True,
+    )
+    if issues or contract.status != "READY":
+        raise AssertionError(
+            "Existing-project design fixture is invalid: " + "; ".join(issues)
+        )
+    return text
+
+
 def complete_legacy_design_bridge(text: str) -> str:
     text = exact_legacy_requirements_projection(
         complete_design_contract(approve_gate_a(text))
@@ -2004,7 +2501,7 @@ def complete_legacy_design_bridge(text: str) -> str:
             )
         ],
     )
-    return replace_contract_table(
+    text = replace_contract_table(
         text,
         doctor.FIRST_WAVE_HEADING,
         doctor.FIRST_WAVE_HEADERS,
@@ -2018,6 +2515,43 @@ def complete_legacy_design_bridge(text: str) -> str:
                 "HARNESS-004",
                 "NONE",
             )
+        ],
+    )
+    return complete_state_diagrams(text, actorless_primary=True)
+
+
+def schema_six_design_projection(text: str) -> str:
+    """Project a modern test design into the exact pre-AWS schema-six shape."""
+
+    text = text.replace(
+        "| Project design contract schema | `7` |",
+        "| Project design contract schema | `6` |",
+        1,
+    )
+    text = re.sub(
+        r"(?m)^\| Application source disposition \|.*\r?\n",
+        "",
+        text,
+        count=1,
+    )
+    table = doctor.contract_table_after_heading(
+        text, doctor.DIAGRAM_CONTRACT_HEADING, doctor.DIAGRAM_CONTRACT_HEADERS
+    )
+    assert table is not None
+    legacy_endpoints = {
+        "SYSTEM_CONTEXT": "ACT-001, TECH-0013, BOUNDARY-001, API-001, TECH-0002, TECH-0001, ARCH-0001, TECH-0011",
+        "PRIMARY_OUTCOME": "ACT-001, API-001",
+        "DATA_LIFECYCLE": "API-001, TECH-0011",
+        "FAILURE_RECOVERY": "API-001, TECH-0015",
+    }
+    return replace_contract_table(
+        text,
+        doctor.DIAGRAM_CONTRACT_HEADING,
+        doctor.DIAGRAM_CONTRACT_HEADERS,
+        [
+            (*row[:6], legacy_endpoints.get(row[1], row[6]))
+            for row in table.rows
+            if row[1] != "AWS_IMPLEMENTATION"
         ],
     )
 
@@ -2722,9 +3256,117 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
             verify_path = project / "docs/project/VERIFY.md"
             verify_text = record_aws_core_evidence(
-                verify_path.read_text(encoding="utf-8"), "DESIGN-10"
+                verify_path.read_text(encoding="utf-8"),
+                "DESIGN-10",
+                advisory_design_binding=(
+                    "DES-0001; TECH: " + ", ".join(MATERIAL_AWS_TECH_IDS)
+                ),
             )
             verify_path.write_text(verify_text, encoding="utf-8")
+
+    def approve_existing_project(self, project: Path, *, work_kind: str) -> str:
+        if work_kind not in {"FEATURE", "INFRASTRUCTURE"}:
+            raise AssertionError(
+                "Existing-project fixture work kind must be FEATURE or INFRASTRUCTURE"
+            )
+
+        prd_path = project / "docs/project/PRD.md"
+        tasks_path = project / "docs/project/TASKS.md"
+        source_prd = prd_path.read_text(encoding="utf-8")
+        source_tasks = tasks_path.read_text(encoding="utf-8")
+
+        self.approve_project(project, gate_b=True)
+        baseline = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+        text = complete_brownfield_foundation(source_prd, baseline=baseline)
+        text = approve_gate_a(text)
+        text = approve_gate_b(
+            text,
+            baseline=baseline,
+            design_builder=lambda candidate: complete_existing_design_contract(
+                candidate,
+                work_kind=work_kind,
+                baseline=baseline,
+            ),
+        )
+        text = set_table_value(
+            text,
+            "### Gate B — readiness card",
+            "## 28. Construction envelope",
+            "Brownfield compatibility/migration",
+            "`PRES-001; CURRENT migration and rollback view`",
+        )
+        if work_kind == "INFRASTRUCTURE":
+            in_scope = "`infrastructure and tests in development`"
+            write_set = "`PATHS: infrastructure/**; tests/**`"
+            source_disposition = f"`{APPLICATION_SOURCE_INFRASTRUCTURE_ONLY}`"
+        else:
+            in_scope = "`legacy service and tests in development`"
+            write_set = "`PATHS: legacy/**; tests/**`"
+            source_disposition = "`BROWNFIELD_PRESERVE: legacy/**`"
+
+        scope_ids = (
+            *MODERN_APPROVED_REQUIREMENT_IDS,
+            "ARCH-0001",
+            *(f"TECH-{number:04d}" for number in range(1, 16)),
+            "PROP-001",
+            "HARNESS-004",
+            "JOURNEY-001",
+            "API-001",
+            "BOUNDARY-001",
+            "PRES-001",
+        )
+        envelope_values = {
+            "Project mode": "`brownfield`",
+            "Authorized requirement and design IDs": (
+                "`REQ: REQ-0001; DES: DES-0001; SCOPE_IDS: "
+                + ", ".join(scope_ids)
+                + "`"
+            ),
+            "In-scope components and environments": in_scope,
+            "Allowed repository write set": write_set,
+            "Application source disposition": source_disposition,
+        }
+        for field, value in envelope_values.items():
+            text = set_table_value(
+                text,
+                "## 28. Construction envelope",
+                "## 29. Gate B owner authorization record",
+                field,
+                value,
+            )
+        text = rebind_gate_b_envelope(text)
+        prd_path.write_text(text, encoding="utf-8")
+
+        tasks_path.write_text(
+            current_task_snapshot(source_tasks, baseline=baseline),
+            encoding="utf-8",
+        )
+        state_path = project / "bootstrap.yaml"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["project"].update(
+            {
+                "mode": "brownfield",
+                "delivery_profile": "quick-mvp",
+                "effective_risk": "low",
+                "aws_lane": "documentation-only",
+                "brownfield_baseline": "RECORDED",
+            }
+        )
+        state["lifecycle"].update(
+            {
+                "gate_a": "APPROVED_FOR_DESIGN",
+                "gate_b": "APPROVED_FOR_CONSTRUCTION",
+            }
+        )
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        refresh_document_summaries(project)
+        return baseline
 
     def set_non_material_req_evidence(self, project: Path) -> None:
         prd_path = project / "docs/project/PRD.md"
@@ -3020,7 +3662,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.34")
+        self.assertEqual(report["bootstrap_version"], "1.2.35")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -3791,6 +4433,64 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(ready_issues, [])
         self.assertEqual(ready.status, "READY")
+        support_changes = {
+            "error behavior": (
+                "Reject the request with a safe explanation",
+                "Reject the request and explain the approved input boundary",
+            ),
+            "AWS rationale": (
+                "Pay-per-use compute fits the bounded workload",
+                "Pay-per-use compute fits the approved request volume",
+            ),
+            "IaC validation": (
+                "sam validate, selected lint, and policy checks",
+                "sam validate, selected lint, policy checks, and template review",
+            ),
+        }
+        for label, (before, after) in support_changes.items():
+            with self.subTest(support_digest=label):
+                candidate = complete.replace(before, after, 1)
+                self.assertNotEqual(candidate, complete)
+                changed, changed_issues = doctor.derive_design_contract(
+                    candidate, "DES-0001", required=True
+                )
+                self.assertEqual(changed_issues, [])
+                self.assertEqual(changed.status, "READY")
+                self.assertNotEqual(changed.canonical_sha256, ready.canonical_sha256)
+                self.assertEqual(
+                    changed.architecture.canonical_sha256,
+                    ready.architecture.canonical_sha256,
+                )
+                self.assertEqual(
+                    changed.project_contract.canonical_sha256,
+                    ready.project_contract.canonical_sha256,
+                )
+                self.assertEqual(
+                    changed.diagram_contract.canonical_sha256,
+                    ready.diagram_contract.canonical_sha256,
+                )
+        approved_projection, approved_projection_issues = doctor.derive_design_contract(
+            complete,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(approved_projection_issues, [])
+        self.assertEqual(approved_projection.canonical_sha256, ready.canonical_sha256)
+        approved_invalid, approved_invalid_issues = doctor.derive_design_contract(
+            complete.replace("Reject the request with a safe explanation", "TODO", 1),
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(approved_invalid.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                "error-handling field must be concrete" in issue
+                for issue in approved_invalid_issues
+            ),
+            approved_invalid_issues,
+        )
 
         cases = {
             "missing required error class": (
@@ -3825,11 +4525,19 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
             "unresolved AWS mechanism": (
                 complete.replace(
-                    "AWS Lambda behind the approved application interface",
+                    "Python 3.12 on AWS Lambda; FastAPI through a Lambda adapter",
                     "TODO",
                     1,
                 ),
                 "Compute: AWS service or mechanism is unresolved",
+            ),
+            "conflicting concrete AWS mechanism": (
+                complete.replace(
+                    "Python 3.12 on AWS Lambda; FastAPI through a Lambda adapter",
+                    "Python 3.12 on Amazon ECS; FastAPI behind an Application Load Balancer",
+                    1,
+                ),
+                "Compute: AWS service or mechanism must exactly reproduce the controlling TECH selections",
             ),
             "unknown AWS technology decision": (
                 complete.replace(
@@ -3845,7 +4553,31 @@ class BootstrapDoctorTests(unittest.TestCase):
                     "| Identity | TECH-0011 |",
                     1,
                 ),
-                "AWS decision IDs do not bind the relevant technology concern",
+                "AWS decision IDs must exactly match the ordered controlling decisions",
+            ),
+            "deployment omits recovery decision": (
+                complete.replace(
+                    "| Deployment | TECH-0004, TECH-0009, TECH-0015 |",
+                    "| Deployment | TECH-0004, TECH-0009 |",
+                    1,
+                ),
+                "Deployment: AWS decision IDs must exactly match the ordered controlling decisions",
+            ),
+            "missing material AWS evidence": (
+                complete.replace(
+                    "CAND-0002, ARCH-0001, TECH-0013",
+                    "CAND-0002, ARCH-0001",
+                    1,
+                ),
+                "API and edge: applicable TECH decisions lack current material AWS evidence: TECH-0013",
+            ),
+            "bare not applicable": (
+                complete.replace(
+                    "| Messaging | TECH-0012 | NOT_APPLICABLE — synchronous local request flow |",
+                    "| Messaging | TECH-0012 | NOT_APPLICABLE |",
+                    1,
+                ),
+                "Messaging: NOT_APPLICABLE requires a concrete reason",
             ),
             "unrelated IaC technology binding": (
                 complete.replace(
@@ -3867,6 +4599,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         }
         for label, (changed, expected) in cases.items():
             with self.subTest(label=label):
+                self.assertNotEqual(changed, complete, label)
                 blocked, issues = doctor.derive_design_contract(
                     changed,
                     "DES-0001",
@@ -4319,10 +5052,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
             "missing AWS Core capability": (
                 re.sub(
-                    r"(?m)^\| AWS-EV-0002 \|.*\r?\n",
+                    r"(?m)^\| AWS-EV-\d+ \|.*\| search_documentation \|.*\r?\n",
                     "",
                     complete,
-                    count=1,
                 ),
                 "Material AWS evidence is missing AWS Core capabilities: search_documentation",
             ),
@@ -4344,8 +5076,8 @@ class BootstrapDoctorTests(unittest.TestCase):
                     "CAND-0002, TECH-0001",
                     1,
                 ).replace(
-                    "CAND-0002, ARCH-0001, TECH-0004",
-                    "CAND-0002, TECH-0004",
+                    "CAND-0002, ARCH-0001, TECH-0013",
+                    "CAND-0002, TECH-0013",
                     1,
                 ),
                 "Selected architecture has no bound material AWS evidence",
@@ -10057,6 +10789,37 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(migration.status, "BLOCKED")
         self.assertEqual(migration.project_contract.status, "MIGRATION_REQUIRED")
         self.assertTrue(migration_issues)
+        design_path = ".agents/skills/fastlane/references/design.md"
+        patterns_path = ".agents/skills/fastlane/references/diagram-patterns.md"
+        migration_plan = doctor.derive_context_plan(
+            {
+                "owner_stage": "DESIGN",
+                "route_reason_code": "DESIGN_REQUIRED",
+                "blocking_ids": [],
+            },
+            doctor.TaskSummary(),
+            doctor.CoverageContract(status="READY", work_kind="NEW_BUILD"),
+            next_prompt="DESIGN-10",
+            source_texts={
+                doctor.PRD_FILE: legacy,
+                doctor.VERIFY_FILE: (PROJECT_ROOT / doctor.VERIFY_FILE).read_text(
+                    encoding="utf-8"
+                ),
+                design_path: (PROJECT_ROOT / design_path).read_text(encoding="utf-8"),
+                patterns_path: (PROJECT_ROOT / patterns_path).read_text(
+                    encoding="utf-8"
+                ),
+            },
+            design_contract=migration,
+            diagram_remediation_required=True,
+        )
+        self.assertEqual(migration_plan["budget_status"], "WITHIN_LIMIT")
+        self.assertEqual(migration_plan.get("resolution_issues", []), [])
+        self.assertIn(patterns_path, migration_plan["on_demand_slices"])
+        self.assertNotIn(
+            f"{doctor.PRD_FILE}#Project diagram contract",
+            migration_plan["on_demand_slices"],
+        )
 
     def test_approved_schema_six_design_is_grandfathered_without_source_disposition(
         self,
@@ -10066,17 +10829,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
             )
         )
-        legacy = source.replace(
-            "| Project design contract schema | `7` |",
-            "| Project design contract schema | `6` |",
-            1,
-        )
-        legacy = re.sub(
-            r"(?m)^\| Application source disposition \|.*\r?\n",
-            "",
-            legacy,
-            count=1,
-        )
+        legacy = schema_six_design_projection(source)
         grandfathered, issues = doctor.derive_design_contract(
             legacy,
             "DES-0001",
@@ -10087,6 +10840,9 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(grandfathered.status, "READY")
         self.assertEqual(grandfathered.schema_version, 6)
         self.assertTrue(grandfathered.project_contract.grandfathered_v6)
+        self.assertFalse(grandfathered.diagram_contract.grandfathered_schema5)
+        self.assertIsNotNone(grandfathered.diagram_contract.canonical_sha256)
+        self.assertIsNotNone(grandfathered.canonical_sha256)
         self.assertIsNone(grandfathered.project_contract.application_source_disposition)
 
         migration, migration_issues = doctor.derive_design_contract(
@@ -10098,6 +10854,267 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(migration.status, "BLOCKED")
         self.assertEqual(migration.project_contract.status, "MIGRATION_REQUIRED")
         self.assertTrue(migration_issues)
+
+    def test_genuine_1234_design_keeps_exact_schema_seven_and_six_digests(
+        self,
+    ) -> None:
+        # Frozen from 66bcf1de via its historical complete_design_contract(approve_gate_a(PRD)).
+        fixture = PROJECT_ROOT / "tests/fixtures/legacy_1234_pre_aws_prd.md"
+        source_bytes = fixture.read_bytes()
+        self.assertEqual(
+            hashlib.sha256(source_bytes).hexdigest(),
+            "d7a86f7a7ea0128b8b8a3ed95dab4b9e4567de242a211adec3d47d426ec53016",
+        )
+        source = source_bytes.decode("utf-8")
+        schema_seven, issues = doctor.derive_design_contract(
+            source,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(schema_seven.status, "READY")
+        self.assertEqual(schema_seven.schema_version, 7)
+        self.assertEqual(
+            schema_seven.diagram_contract.canonical_sha256,
+            "sha256:ce8b2dfed3fb6cb3967244bfe2f11265c440e1ae03c2bb92b0ede1966cc5d9d8",
+        )
+        self.assertEqual(
+            schema_seven.canonical_sha256,
+            "sha256:9e925fbaf47a328ab9ea327d6d7f1058d9945154d8ecabe27384a9115bf23cbc",
+        )
+
+        schema_six_source = source.replace(
+            "| Project design contract schema | `7` |",
+            "| Project design contract schema | `6` |",
+            1,
+        )
+        schema_six_source = re.sub(
+            r"(?m)^\| Application source disposition \|.*\r?\n",
+            "",
+            schema_six_source,
+            count=1,
+        )
+        self.assertNotEqual(schema_six_source, source)
+        schema_six, issues = doctor.derive_design_contract(
+            schema_six_source,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(schema_six.status, "READY")
+        self.assertEqual(schema_six.schema_version, 6)
+        self.assertEqual(
+            schema_six.diagram_contract.canonical_sha256,
+            "sha256:ce8b2dfed3fb6cb3967244bfe2f11265c440e1ae03c2bb92b0ede1966cc5d9d8",
+        )
+        self.assertEqual(
+            schema_six.canonical_sha256,
+            "sha256:edae7e371e9cb8408d3954207c810b9027ad8577ecf028f3f09e540d32dffcf1",
+        )
+
+    def test_genuine_schema_six_approved_design_keeps_its_historical_digest(
+        self,
+    ) -> None:
+        # Frozen from a7222753 via its historical approve_gate_b(approve_gate_a(PRD)).
+        fixture = PROJECT_ROOT / "tests/fixtures/legacy_schema6_approved_prd.md"
+        source_bytes = fixture.read_bytes()
+        self.assertEqual(
+            hashlib.sha256(source_bytes).hexdigest(),
+            "a19d24c797c8bb1c2c12034ae061b4cf9100f6f0e7fdf61afb41e9e344d90138",
+        )
+        contract, issues = doctor.derive_design_contract(
+            source_bytes.decode("utf-8"),
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+
+        self.assertEqual(issues, [])
+        self.assertEqual(contract.status, "READY")
+        self.assertEqual(contract.schema_version, 6)
+        self.assertEqual(
+            contract.diagram_contract.canonical_sha256,
+            "sha256:ce8b2dfed3fb6cb3967244bfe2f11265c440e1ae03c2bb92b0ede1966cc5d9d8",
+        )
+        self.assertEqual(
+            contract.canonical_sha256,
+            "sha256:7a912283b2f0dfd5270ef00cf5dfcff174bd657b45eed359fa16b8cbc1ac4680",
+        )
+
+        false_claim = source_bytes.decode("utf-8").replace(
+            'ARCH-0001["Managed application"]',
+            'ARCH-0001["Deployment live in AWS"]',
+            1,
+        )
+        self.assertNotEqual(false_claim, source_bytes.decode("utf-8"))
+        drifted, drift_issues = doctor.derive_design_contract(
+            false_claim,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(drifted.status, "READY")
+        self.assertEqual(drifted.canonical_sha256, contract.canonical_sha256)
+        self.assertEqual(
+            drifted.diagram_contract.canonical_sha256,
+            contract.diagram_contract.canonical_sha256,
+        )
+        self.assertEqual(len(drift_issues), 1)
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", drift_issues[0])
+        self.assertIn("must not claim", drift_issues[0])
+
+        unquoted_claim = source_bytes.decode("utf-8").replace(
+            'ARCH-0001["Managed application"]',
+            "ARCH-0001[Deployment live in AWS]",
+            1,
+        )
+        unquoted, unquoted_issues = doctor.derive_design_contract(
+            unquoted_claim,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(unquoted.status, "READY")
+        self.assertEqual(unquoted.canonical_sha256, contract.canonical_sha256)
+        self.assertEqual(len(unquoted_issues), 1)
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", unquoted_issues[0])
+
+        dotted_claim = source_bytes.decode("utf-8").replace(
+            "    ARCH-0001 -->|serves| API-001",
+            "    ARCH-0001 -. Deployment live in AWS .-> API-001\n"
+            "    ARCH-0001 -->|serves| API-001",
+            1,
+        )
+        dotted, dotted_issues = doctor.derive_design_contract(
+            dotted_claim,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(dotted.status, "READY")
+        self.assertEqual(dotted.canonical_sha256, contract.canonical_sha256)
+        self.assertEqual(len(dotted_issues), 1)
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", dotted_issues[0])
+
+        benign_unquoted = source_bytes.decode("utf-8").replace(
+            'API-001["Approved interface"]',
+            "API-001[Successful outcome]",
+            1,
+        )
+        benign, benign_issues = doctor.derive_design_contract(
+            benign_unquoted,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(benign.status, "READY")
+        self.assertEqual(benign.canonical_sha256, contract.canonical_sha256)
+        self.assertEqual(benign_issues, [])
+
+        encoded_claim = source_bytes.decode("utf-8").replace(
+            'ARCH-0001["Managed application"]',
+            'ARCH-0001["Deployment l&#105;ve in AWS"]',
+            1,
+        )
+        encoded, encoded_issues = doctor.derive_design_contract(
+            encoded_claim,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(encoded.status, "READY")
+        self.assertEqual(encoded.canonical_sha256, contract.canonical_sha256)
+        self.assertEqual(len(encoded_issues), 1)
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", encoded_issues[0])
+
+        for unsafe_statement in (
+            'click ARCH-0001 "javascript:alert(1)"',
+            'click ARCH-0001 "https://example.invalid/collect"',
+            '%%{init: {"securityLevel": "loose"}}%%',
+            "classDef unsafe fill:url(https://example.invalid/pixel);",
+            'ARCH-0001["Managed application<img src=x>"]',
+        ):
+            with self.subTest(unsafe_statement=unsafe_statement):
+                unsafe_source = source_bytes.decode("utf-8").replace(
+                    "    ARCH-0001 -->|serves| API-001",
+                    f"    {unsafe_statement}\n    ARCH-0001 -->|serves| API-001",
+                    1,
+                )
+                unsafe, unsafe_issues = doctor.derive_design_contract(
+                    unsafe_source,
+                    "DES-0001",
+                    required=True,
+                    grandfather_approved_v1=True,
+                )
+                self.assertEqual(unsafe.status, "READY")
+                self.assertEqual(unsafe.canonical_sha256, contract.canonical_sha256)
+                self.assertEqual(len(unsafe_issues), 1)
+                self.assertIn("DIAGRAM_PRESENTATION_STALE", unsafe_issues[0])
+                self.assertIn("active directives", unsafe_issues[0])
+
+    def test_approved_schema_six_gate_b_keeps_its_design_digest_current(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            refresh_control_hashes(project)
+            self.approve_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            legacy = schema_six_design_projection(prd_path.read_text(encoding="utf-8"))
+            legacy = rebind_gate_b_envelope(legacy, grandfather_approved_v1=True)
+            prd_path.write_text(legacy, encoding="utf-8")
+            refresh_document_summaries(project)
+            report = doctor.inspect_project(project)
+            false_claim = legacy.replace(
+                'ARCH-0001["Managed Serverless Baseline"]:::compute',
+                'ARCH-0001["Deployment live in AWS"]:::compute',
+                1,
+            )
+            self.assertNotEqual(false_claim, legacy)
+            prd_path.write_text(false_claim, encoding="utf-8")
+            refresh_document_summaries(project)
+            drifted = doctor.inspect_project(project)
+
+        self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
+        self.assertEqual(report["design_contract"]["status"], "READY")
+        self.assertIsNotNone(report["design_contract"]["canonical_sha256"])
+        self.assertNotIn("GATE_B_DESIGN_CONTRACT_HASH", codes(report))
+        self.assertFalse(drifted["ok"])
+        self.assertEqual(drifted["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
+        self.assertEqual(drifted["design_contract"]["status"], "READY")
+        self.assertEqual(
+            drifted["design_contract"]["canonical_sha256"],
+            report["design_contract"]["canonical_sha256"],
+        )
+        self.assertEqual(codes(drifted), {"DIAGRAM_PRESENTATION_STALE"})
+        self.assertNotIn("GATE_B_DESIGN_CONTRACT_HASH", codes(drifted))
+        self.assertEqual(
+            drifted["authorizations"], {"construction": "NONE", "aws": "NONE"}
+        )
+        self.assertEqual(
+            (drifted["lifecycle_state"], drifted["next_prompt"]),
+            ("BLOCKED", "STOP"),
+        )
+        self.assertEqual(drifted["context_plan"]["budget_status"], "WITHIN_LIMIT")
+        self.assertEqual(drifted["context_plan"].get("resolution_issues", []), [])
+        self.assertIn(
+            f"{doctor.PRD_FILE}#Proposed system at a glance",
+            drifted["context_plan"]["on_demand_slices"],
+        )
+        self.assertNotIn(
+            f"{doctor.PRD_FILE}#AWS implementation at a glance",
+            drifted["context_plan"]["on_demand_slices"],
+        )
+        item = drifted["remediation"]["items"][0]
+        self.assertEqual(item["responsible_party"], "CODEX")
+        self.assertEqual(item["category"], "AGENT_CORRECTION")
+        self.assertEqual(
+            drifted["remediation"]["next_action"]["action_kind"],
+            "CORRECT_AND_REVALIDATE",
+        )
 
     def test_diagram_semantics_and_rendering_are_bound_separately(self) -> None:
         source = complete_design_contract(
@@ -10117,8 +11134,8 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         relabeled, relabeled_issues = doctor.derive_design_contract(
             source.replace(
-                "Managed application",
-                "Managed Fastlane application",
+                "Managed Serverless Baseline",
+                "Managed Serverless<br/>Baseline",
                 1,
             ),
             "DES-0001",
@@ -10140,8 +11157,64 @@ class BootstrapDoctorTests(unittest.TestCase):
             relabeled_record.rendered_sha256,
         )
 
+        presentation_variants = (
+            source.replace('subgraph PEOPLE["People"]', "subgraph PEOPLE", 1),
+            source.replace(
+                'ACT-001["Development user"]:::actor',
+                "ACT-001[Development user]:::actor",
+                1,
+            ),
+        )
+        for candidate in presentation_variants:
+            self.assertNotEqual(candidate, source)
+            presented, presentation_issues = doctor.derive_design_contract(
+                candidate,
+                "DES-0001",
+                required=True,
+            )
+            self.assertEqual(presented.status, "READY")
+            self.assertTrue(presentation_issues)
+            self.assertTrue(
+                all(
+                    issue.startswith("DIAGRAM_PRESENTATION_STALE: ")
+                    for issue in presentation_issues
+                ),
+                presentation_issues,
+            )
+            presented_record = next(
+                record
+                for record in presented.diagram_contract.records
+                if record.diagram_id == "DIAGRAM-0001"
+            )
+            self.assertEqual(baseline.canonical_sha256, presented.canonical_sha256)
+            self.assertEqual(
+                baseline_record.semantic_sha256,
+                presented_record.semantic_sha256,
+            )
+            self.assertNotEqual(
+                baseline_record.rendered_sha256,
+                presented_record.rendered_sha256,
+            )
+
+        long_relationship = source.replace(
+            "ACT-001 -->|sends a review request through| TECH-0013",
+            "ACT-001 -->|sends one deliberately overlong owner request through the selected public entry service for processing| TECH-0013",
+            1,
+        )
+        self.assertNotEqual(long_relationship, source)
+        long_contract, long_issues = doctor.derive_design_contract(
+            long_relationship,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(long_contract.status, "BLOCKED")
+        self.assertTrue(
+            any("relationship label exceeds 72" in issue for issue in long_issues),
+            long_issues,
+        )
+
         semantic, semantic_issues = doctor.derive_design_contract(
-            source.replace("-->|serves|", "-->|routes through|", 1),
+            source.replace("-->|implements|", "-->|routes through|", 1),
             "DES-0001",
             required=True,
         )
@@ -10151,6 +11224,230 @@ class BootstrapDoctorTests(unittest.TestCase):
             baseline.diagram_contract.canonical_sha256,
             semantic.diagram_contract.canonical_sha256,
         )
+
+        moved_data = source.replace(
+            '                TECH-0011[("Amazon DynamoDB with<br/>per-owner records")]:::data\n',
+            "",
+            1,
+        ).replace(
+            '                TECH-0010["Amazon Cognito with<br/>server-side authorization"]:::entry\n',
+            '                TECH-0010["Amazon Cognito with<br/>server-side authorization"]:::entry\n'
+            '                TECH-0011[("Amazon DynamoDB with<br/>per-owner records")]:::data\n',
+            1,
+        )
+        self.assertNotEqual(moved_data, source)
+        regrouped, regrouped_issues = doctor.derive_design_contract(
+            moved_data,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(regrouped_issues, [])
+        self.assertNotEqual(
+            baseline.diagram_contract.canonical_sha256,
+            regrouped.diagram_contract.canonical_sha256,
+        )
+        self.assertNotEqual(baseline.canonical_sha256, regrouped.canonical_sha256)
+
+        edge_kind, edge_kind_issues = doctor.derive_design_contract(
+            source.replace(
+                "TECH-0013 -->|routes authenticated requests to| TECH-0002",
+                'TECH-0013 -. "routes authenticated requests to" .-> TECH-0002',
+                1,
+            ),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(edge_kind_issues, [])
+        baseline_aws = next(
+            record
+            for record in baseline.diagram_contract.records
+            if record.kind == "AWS_IMPLEMENTATION"
+        )
+        changed_aws = next(
+            record
+            for record in edge_kind.diagram_contract.records
+            if record.kind == "AWS_IMPLEMENTATION"
+        )
+        self.assertNotEqual(baseline_aws.semantic_sha256, changed_aws.semantic_sha256)
+        self.assertNotEqual(baseline.canonical_sha256, edge_kind.canonical_sha256)
+
+        diagram_table = doctor.contract_table_after_heading(
+            source, doctor.DIAGRAM_CONTRACT_HEADING, doctor.DIAGRAM_CONTRACT_HEADERS
+        )
+        self.assertIsNotNone(diagram_table)
+        reordered_source = replace_contract_table(
+            source,
+            doctor.DIAGRAM_CONTRACT_HEADING,
+            doctor.DIAGRAM_CONTRACT_HEADERS,
+            list(reversed(diagram_table.rows)),
+        )
+        reordered, reordered_issues = doctor.derive_design_contract(
+            reordered_source, "DES-0001", required=True
+        )
+        self.assertEqual(reordered_issues, [])
+        self.assertEqual(
+            baseline.diagram_contract.canonical_sha256,
+            reordered.diagram_contract.canonical_sha256,
+        )
+        self.assertEqual(baseline.canonical_sha256, reordered.canonical_sha256)
+
+    def test_golden_diagram_edges_are_independently_authored_and_exact(self) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        expected = {
+            "SYSTEM_CONTEXT": frozenset(
+                {
+                    ("ACT-001", "SOLID", "TECH-0013"),
+                    ("TECH-0010", "DASHED", "TECH-0013"),
+                    ("TECH-0013", "SOLID", "BOUNDARY-001"),
+                    ("BOUNDARY-001", "SOLID", "API-001"),
+                    ("API-001", "SOLID", "TECH-0002"),
+                    ("TECH-0002", "SOLID", "TECH-0001"),
+                    ("TECH-0001", "SOLID", "ARCH-0001"),
+                    ("ARCH-0001", "SOLID", "TECH-0011"),
+                    ("TECH-0008", "DASHED", "ARCH-0001"),
+                    ("ARCH-0001", "DASHED", "TECH-0014"),
+                    ("TECH-0004", "DASHED", "TECH-0009"),
+                    ("TECH-0009", "DASHED", "TECH-0001"),
+                    ("TECH-0015", "DASHED", "TECH-0001"),
+                }
+            ),
+            "AWS_IMPLEMENTATION": frozenset(
+                {
+                    ("TECH-0010", "DASHED", "TECH-0013"),
+                    ("TECH-0013", "SOLID", "TECH-0002"),
+                    ("TECH-0002", "SOLID", "TECH-0001"),
+                    ("TECH-0001", "SOLID", "ARCH-0001"),
+                    ("ARCH-0001", "SOLID", "TECH-0011"),
+                    ("TECH-0008", "DASHED", "ARCH-0001"),
+                    ("ARCH-0001", "DASHED", "TECH-0014"),
+                    ("TECH-0004", "DASHED", "TECH-0009"),
+                    ("TECH-0009", "DASHED", "TECH-0001"),
+                    ("TECH-0015", "DASHED", "TECH-0001"),
+                }
+            ),
+            "PRIMARY_OUTCOME": frozenset(
+                {
+                    ("ACT-001", "SOLID", "API-001"),
+                    ("API-001", "SOLID", "ACT-001"),
+                }
+            ),
+            "DATA_LIFECYCLE": frozenset({("API-001", "SOLID", "TECH-0011")}),
+            "FAILURE_RECOVERY": frozenset({("API-001", "SOLID", "TECH-0015")}),
+        }
+        primary_heading = next(
+            line
+            for line in source.splitlines()
+            if line.startswith("### Sequence") and "primary outcome" in line
+        )
+        failure_heading = next(
+            line
+            for line in source.splitlines()
+            if line.startswith("### Sequence") and "failure and recovery" in line
+        )
+        sections = {
+            "SYSTEM_CONTEXT": ("### Proposed system at a glance", "## 15."),
+            "AWS_IMPLEMENTATION": (
+                "### AWS implementation at a glance",
+                "<details>",
+            ),
+            "PRIMARY_OUTCOME": (primary_heading, failure_heading),
+            "DATA_LIFECYCLE": ("### Data lifecycle view", "## 18."),
+            "FAILURE_RECOVERY": (failure_heading, "## 19."),
+        }
+        solid = re.compile(
+            r"^\s*([A-Z][A-Z0-9_]*-\d{3,})\s*-->\|[^|]+\|\s*"
+            r"([A-Z][A-Z0-9_]*-\d{3,})\s*$"
+        )
+        dashed = re.compile(
+            r'^\s*([A-Z][A-Z0-9_]*-\d{3,})\s*-\.\s*"[^"]+"\s*\.->\s*'
+            r"([A-Z][A-Z0-9_]*-\d{3,})\s*$"
+        )
+
+        def independently_observed_edges(
+            candidate: str, heading: str, next_marker: str
+        ) -> frozenset[tuple[str, str, str]]:
+            start = candidate.index(heading) + len(heading)
+            end = candidate.index(next_marker, start)
+            section = candidate[start:end]
+            fence_start = section.index("```mermaid")
+            fence_end = section.index("```", fence_start + len("```mermaid"))
+            lines = section[fence_start:fence_end].splitlines()
+            observed: set[tuple[str, str, str]] = set()
+            edge_lines = 0
+            for line in lines:
+                match = solid.fullmatch(line)
+                if match is not None:
+                    edge_lines += 1
+                    observed.add((match.group(1), "SOLID", match.group(2)))
+                    continue
+                match = dashed.fullmatch(line)
+                if match is not None:
+                    edge_lines += 1
+                    observed.add((match.group(1), "DASHED", match.group(2)))
+            self.assertEqual(edge_lines, len(observed))
+            return frozenset(observed)
+
+        for kind, (heading, next_marker) in sections.items():
+            with self.subTest(kind=kind):
+                self.assertEqual(
+                    independently_observed_edges(source, heading, next_marker),
+                    expected[kind],
+                )
+
+        reversed_cases = (
+            (
+                "AWS_IMPLEMENTATION",
+                "TECH-0013 -->|routes authenticated requests to| TECH-0002",
+                "TECH-0002 -->|routes authenticated requests to| TECH-0013",
+            ),
+            (
+                "DATA_LIFECYCLE",
+                "API-001 -->|validates and stores in| TECH-0011",
+                "TECH-0011 -->|validates and stores in| API-001",
+            ),
+            (
+                "FAILURE_RECOVERY",
+                "API-001 -->|fails safely and invokes| TECH-0015",
+                "TECH-0015 -->|fails safely and invokes| API-001",
+            ),
+            (
+                "AWS_IMPLEMENTATION",
+                'TECH-0010 -. "provides token issuer trust to" .-> TECH-0013',
+                'TECH-0013 -. "provides token issuer trust to" .-> TECH-0010',
+            ),
+            (
+                "AWS_IMPLEMENTATION",
+                'ARCH-0001 -. "emits signals to" .-> TECH-0014',
+                'TECH-0014 -. "emits signals to" .-> ARCH-0001',
+            ),
+            (
+                "AWS_IMPLEMENTATION",
+                'TECH-0009 -. "deploys" .-> TECH-0001',
+                'TECH-0001 -. "deploys" .-> TECH-0009',
+            ),
+            (
+                "AWS_IMPLEMENTATION",
+                "ARCH-0001 -->|reads and writes| TECH-0011",
+                "TECH-0011 -->|reads and writes| ARCH-0001",
+            ),
+            (
+                "AWS_IMPLEMENTATION",
+                'TECH-0015 -. "restores" .-> TECH-0001',
+                'TECH-0001 -. "restores" .-> TECH-0015',
+            ),
+        )
+        for kind, current, reversed_edge in reversed_cases:
+            heading, next_marker = sections[kind]
+            section_start = source.index(heading)
+            candidate = source[:section_start] + source[section_start:].replace(
+                current, reversed_edge, 1
+            )
+            self.assertNotEqual(
+                independently_observed_edges(candidate, heading, next_marker),
+                expected[kind],
+            )
 
     def test_moving_unchanged_diagram_preserves_approved_gate_b(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -10178,7 +11475,10 @@ class BootstrapDoctorTests(unittest.TestCase):
             end = source.index("## 15. Component design", start)
             section = source[start:end]
             without_section = source[:start] + source[end:]
-            insertion = without_section.index("# Gate B Review")
+            architecture_section = "## 14. Architecture overview\n\n"
+            insertion = without_section.index(architecture_section) + len(
+                architecture_section
+            )
             moved = (
                 without_section[:insertion]
                 + section.rstrip()
@@ -10194,7 +11494,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertNotEqual(
                 baseline_locator["start_line"], moved_locator["start_line"]
             )
-            self.assertEqual(
+            self.assertNotEqual(
                 baseline_locator["section_sha256"], moved_locator["section_sha256"]
             )
             prd_path.write_text(moved, encoding="utf-8")
@@ -10216,7 +11516,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             item["kind"]: item
             for item in relocated["design_contract"]["diagram_contract"]["records"]
         }
-        for kind in ("SYSTEM_CONTEXT", "PRIMARY_OUTCOME"):
+        for kind in ("SYSTEM_CONTEXT", "PRIMARY_OUTCOME", "AWS_IMPLEMENTATION"):
             self.assertEqual(
                 relocated_records[kind]["semantic_sha256"],
                 baseline_records[kind]["semantic_sha256"],
@@ -10234,12 +11534,326 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertNotIn("<details>", selected)
         self.assertEqual(moved_locator["heading"], "Proposed system at a glance")
 
+    def test_label_only_diagram_polish_preserves_approved_gate_b(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project)
+            self.set_non_material_req_evidence(project)
+            refresh_control_hashes(project)
+            baseline = doctor.inspect_project(project)
+            self.assertTrue(baseline["ok"], baseline["diagnostics"])
+            baseline_record = next(
+                item
+                for item in baseline["design_contract"]["diagram_contract"]["records"]
+                if item["kind"] == "SYSTEM_CONTEXT"
+            )
+
+            prd_path = project / "docs/project/PRD.md"
+            source = prd_path.read_text(encoding="utf-8")
+            relabeled_source = source.replace(
+                'ARCH-0001["Managed Serverless Baseline"]:::compute',
+                'ARCH-0001["Managed Serverless<br/>Baseline"]:::compute',
+                1,
+            )
+            self.assertNotEqual(relabeled_source, source)
+            prd_path.write_text(relabeled_source, encoding="utf-8")
+            refresh_control_hashes(project)
+            relabeled = doctor.inspect_project(project)
+            locator = doctor._owner_locator_for_heading(
+                relabeled_source,
+                key="complete-architecture-diagram",
+                label="Complete architecture",
+                heading="Proposed system at a glance",
+            )
+            mislabeled_source = source.replace(
+                'TECH-0013["Amazon API Gateway<br/>regional HTTPS endpoint"]:::entry',
+                'TECH-0013["Unrelated edge service"]:::entry',
+                1,
+            )
+            self.assertNotEqual(mislabeled_source, source)
+            prd_path.write_text(mislabeled_source, encoding="utf-8")
+            refresh_control_hashes(project)
+            mislabeled = doctor.inspect_project(project)
+            decorative_source = source.replace(
+                'subgraph PEOPLE["People"]',
+                'subgraph PEOPLE["People"]\n'
+                '        EXTRA-999["Decorative legend node"]:::actor',
+                1,
+            )
+            self.assertNotEqual(decorative_source, source)
+            prd_path.write_text(decorative_source, encoding="utf-8")
+            refresh_control_hashes(project)
+            decorative = doctor.inspect_project(project)
+            contained_actor_source = source.replace(
+                '    subgraph PEOPLE["People"]\n'
+                '        ACT-001["Development user"]:::actor\n'
+                "    end\n"
+                '    subgraph AWS_CLOUD["AWS Cloud · proposed architecture"]',
+                '    subgraph AWS_CLOUD["AWS Cloud · proposed architecture"]\n'
+                '        ACT-001["Development user"]:::actor',
+                1,
+            )
+            self.assertNotEqual(contained_actor_source, source)
+            prd_path.write_text(contained_actor_source, encoding="utf-8")
+            refresh_control_hashes(project)
+            contained_actor = doctor.inspect_project(project)
+
+        self.assertTrue(relabeled["ok"], relabeled["diagnostics"])
+        self.assertEqual(relabeled["gates"], baseline["gates"])
+        self.assertEqual(
+            relabeled["design_contract"]["canonical_sha256"],
+            baseline["design_contract"]["canonical_sha256"],
+        )
+        relabeled_record = next(
+            item
+            for item in relabeled["design_contract"]["diagram_contract"]["records"]
+            if item["kind"] == "SYSTEM_CONTEXT"
+        )
+        self.assertEqual(
+            relabeled_record["semantic_sha256"],
+            baseline_record["semantic_sha256"],
+        )
+        self.assertNotEqual(
+            relabeled_record["rendered_sha256"],
+            baseline_record["rendered_sha256"],
+        )
+        self.assertEqual(locator["heading"], "Proposed system at a glance")
+        self.assertTrue(locator["section_sha256"].startswith("sha256:"))
+        self.assertFalse(mislabeled["ok"])
+        self.assertEqual(mislabeled["gates"], baseline["gates"])
+        self.assertEqual(
+            mislabeled["design_contract"]["canonical_sha256"],
+            baseline["design_contract"]["canonical_sha256"],
+        )
+        mislabeled_codes = codes(mislabeled)
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", mislabeled_codes)
+        self.assertNotIn("GATE_B_DESIGN_CONTRACT_HASH", mislabeled_codes)
+        repair = next(
+            item
+            for item in mislabeled["remediation"]["items"]
+            if item["diagnostic_code"] == "DIAGRAM_PRESENTATION_STALE"
+        )
+        self.assertEqual(repair["responsible_party"], "CODEX")
+        self.assertTrue(repair["automatic_correction_allowed"])
+        self.assertIn(
+            ".agents/skills/fastlane/references/diagram-patterns.md",
+            mislabeled["context_plan"]["on_demand_slices"],
+        )
+        self.assertIn(
+            f"{doctor.PRD_FILE}#Project diagram contract",
+            mislabeled["context_plan"]["on_demand_slices"],
+        )
+        self.assertIn(
+            f"{doctor.PRD_FILE}#Proposed system at a glance",
+            mislabeled["context_plan"]["on_demand_slices"],
+        )
+        resolved_diagram = next(
+            item
+            for item in mislabeled["context_plan"]["resolved_on_demand_slices"]
+            if item["path"] == doctor.PRD_FILE
+            and item["selector"] == "Proposed system at a glance"
+        )
+        selected_diagram = "\n".join(
+            mislabeled_source.splitlines()[
+                resolved_diagram["start_line"] - 1 : resolved_diagram["end_line"]
+            ]
+        )
+        self.assertIn("Unrelated edge service", selected_diagram)
+        self.assertFalse(decorative["ok"])
+        self.assertEqual(decorative["gates"], baseline["gates"])
+        self.assertEqual(
+            decorative["design_contract"]["canonical_sha256"],
+            baseline["design_contract"]["canonical_sha256"],
+        )
+        decorative_record = next(
+            item
+            for item in decorative["design_contract"]["diagram_contract"]["records"]
+            if item["kind"] == "SYSTEM_CONTEXT"
+        )
+        self.assertEqual(
+            decorative_record["semantic_sha256"],
+            baseline_record["semantic_sha256"],
+        )
+        self.assertNotEqual(
+            decorative_record["rendered_sha256"],
+            baseline_record["rendered_sha256"],
+        )
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", codes(decorative))
+        self.assertNotIn("GATE_B_DESIGN_CONTRACT_HASH", codes(decorative))
+        contained_codes = codes(contained_actor)
+        self.assertFalse(contained_actor["ok"])
+        self.assertIn("DESIGN_CONTRACT_INVALID", contained_codes)
+        self.assertIn("GATE_B_DESIGN_CONTRACT_HASH", contained_codes)
+        self.assertNotIn("DIAGRAM_PRESENTATION_STALE", contained_codes)
+
+    def test_false_diagram_claim_cannot_reach_the_gate_b_owner_brief(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.pending_gate_b(project)
+            baseline = doctor.inspect_project(project)
+            prd_path = project / "docs/project/PRD.md"
+            source = prd_path.read_text(encoding="utf-8")
+            changed = source.replace(
+                "The project owner submits one review request and receives the validated result through the review API.",
+                "Proposed system is live in AWS.",
+                1,
+            )
+            self.assertNotEqual(changed, source)
+            prd_path.write_text(changed, encoding="utf-8")
+            refresh_document_summaries(project)
+            observed = doctor.inspect_project(project)
+            reverse_changed = source.replace(
+                "The project owner submits one review request and receives the validated result through the review API.",
+                "Successful planned deployment.",
+                1,
+            )
+            self.assertNotEqual(reverse_changed, source)
+            prd_path.write_text(reverse_changed, encoding="utf-8")
+            refresh_document_summaries(project)
+            reverse_observed = doctor.inspect_project(project)
+            encoded_changed = source.replace(
+                "The project owner submits one review request and receives the validated result through the review API.",
+                "Proposed deployment l&#105;ve in AWS.",
+                1,
+            )
+            self.assertNotEqual(encoded_changed, source)
+            prd_path.write_text(encoded_changed, encoding="utf-8")
+            refresh_document_summaries(project)
+            encoded_observed = doctor.inspect_project(project)
+            future_plan = source.replace(
+                "The project owner submits one review request and receives the validated result through the review API.",
+                "Deployment will be validated before release.",
+                1,
+            )
+            self.assertNotEqual(future_plan, source)
+            prd_path.write_text(future_plan, encoding="utf-8")
+            refresh_document_summaries(project)
+            future_observed = doctor.inspect_project(project)
+
+        self.assertFalse(observed["ok"])
+        self.assertEqual(observed["gates"], baseline["gates"])
+        self.assertEqual(observed["design_contract"]["status"], "READY")
+        self.assertEqual(
+            observed["design_contract"]["canonical_sha256"],
+            baseline["design_contract"]["canonical_sha256"],
+        )
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", codes(observed))
+        self.assertEqual(observed["owner_decision_brief"]["status"], "BLOCKED")
+        self.assertEqual(
+            observed["authorizations"], {"construction": "NONE", "aws": "NONE"}
+        )
+        self.assertIn(
+            f"{doctor.PRD_FILE}#Sequence — primary outcome",
+            observed["context_plan"]["on_demand_slices"],
+        )
+        self.assertFalse(reverse_observed["ok"])
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", codes(reverse_observed))
+        self.assertEqual(reverse_observed["owner_decision_brief"]["status"], "BLOCKED")
+        self.assertFalse(encoded_observed["ok"])
+        self.assertIn("DIAGRAM_PRESENTATION_STALE", codes(encoded_observed))
+        self.assertEqual(encoded_observed["owner_decision_brief"]["status"], "BLOCKED")
+        self.assertTrue(future_observed["ok"], future_observed["diagnostics"])
+        self.assertEqual(future_observed["owner_decision_brief"]["status"], "READY")
+        self.assertEqual(future_observed["gates"], baseline["gates"])
+
+    def test_semantic_diagram_repair_loads_the_bounded_design_procedure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.pending_gate_b(project)
+            prd_path = project / "docs/project/PRD.md"
+            source = prd_path.read_text(encoding="utf-8")
+            malformed = source.replace(
+                "ACT-001 -->|sends a review request through| TECH-0013",
+                "ACT-001 --> TECH-0013",
+                1,
+            )
+            self.assertNotEqual(malformed, source)
+            prd_path.write_text(malformed, encoding="utf-8")
+            refresh_document_summaries(project)
+
+            report = doctor.inspect_project(project)
+
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["gates"]["gate_a"], "APPROVED_FOR_DESIGN")
+        self.assertIn("DESIGN_CONTRACT_INVALID", codes(report))
+        repair = next(
+            item
+            for item in report["remediation"]["items"]
+            if item["diagnostic_code"] == "DESIGN_CONTRACT_INVALID"
+        )
+        self.assertEqual(repair["responsible_party"], "CODEX")
+        self.assertTrue(repair["automatic_correction_allowed"])
+        self.assertEqual(
+            report["remediation"]["next_action"]["action_kind"],
+            "CORRECT_AND_REVALIDATE",
+        )
+        self.assertIn(
+            ".agents/skills/fastlane/references/diagram-patterns.md",
+            report["context_plan"]["on_demand_slices"],
+        )
+        self.assertIn(
+            f"{doctor.PRD_FILE}#Project diagram contract",
+            report["context_plan"]["on_demand_slices"],
+        )
+        self.assertIn(
+            f"{doctor.PRD_FILE}#Proposed system at a glance",
+            report["context_plan"]["on_demand_slices"],
+        )
+
+    def test_stale_diagram_repair_loads_its_exact_owner_section(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.pending_gate_b(project)
+            prd_path = project / "docs/project/PRD.md"
+            source = prd_path.read_text(encoding="utf-8")
+            stale = source.replace(
+                "| DIAGRAM-0003 | DATA_LIFECYCLE | CONDITIONAL | CURRENT |",
+                "| DIAGRAM-0003 | DATA_LIFECYCLE | CONDITIONAL | STALE |",
+                1,
+            )
+            self.assertNotEqual(stale, source)
+            prd_path.write_text(stale, encoding="utf-8")
+            refresh_document_summaries(project)
+            report = doctor.inspect_project(project)
+
+        self.assertFalse(report["ok"])
+        self.assertIn(
+            f"{doctor.PRD_FILE}#Data lifecycle view",
+            report["context_plan"]["on_demand_slices"],
+        )
+        resolved = next(
+            item
+            for item in report["context_plan"]["resolved_on_demand_slices"]
+            if item["path"] == doctor.PRD_FILE
+            and item["selector"] == "Data lifecycle view"
+        )
+        selected = "\n".join(
+            stale.splitlines()[resolved["start_line"] - 1 : resolved["end_line"]]
+        )
+        self.assertTrue(selected.startswith("### Data lifecycle view"))
+        self.assertIn("```mermaid", selected)
+
     def test_required_project_diagrams_fail_closed_when_stale_or_generic(
         self,
     ) -> None:
         source = complete_design_contract(
             (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         )
+        actor_inside_cloud = source.replace(
+            '    subgraph PEOPLE["People"]\n'
+            '        ACT-001["Development user"]:::actor\n'
+            "    end\n"
+            '    subgraph AWS_CLOUD["AWS Cloud · proposed architecture"]',
+            '    subgraph AWS_CLOUD["AWS Cloud · proposed architecture"]\n'
+            '        ACT-001["Development user"]:::actor',
+            1,
+        )
+        hidden_architecture = source.replace(
+            "### Proposed system at a glance",
+            "<details>\n<summary>Hidden architecture</summary>\n\n"
+            "### Proposed system at a glance",
+            1,
+        ).replace("## 15. Component design", "</details>\n\n## 15. Component design", 1)
         cases = {
             "stale": (
                 source.replace(
@@ -10248,21 +11862,531 @@ class BootstrapDoctorTests(unittest.TestCase):
                     1,
                 ),
                 "required SYSTEM_CONTEXT diagram is not CURRENT",
+                "BLOCKED",
             ),
             "generic": (
-                source.replace("Managed application", "TODO", 1),
+                source.replace(
+                    'ARCH-0001["Managed Serverless Baseline"]:::compute',
+                    'ARCH-0001["TODO"]:::compute',
+                    1,
+                ),
                 "generic placeholder content",
+                "BLOCKED",
+            ),
+            "raw ID label": (
+                source.replace(
+                    'ARCH-0001["Managed Serverless Baseline"]:::compute',
+                    'ARCH-0001["ARCH-0001"]:::compute',
+                    1,
+                ),
+                "label must not expose a canonical record ID",
+                "READY",
+            ),
+            "wrong complete orientation": (
+                source.replace("flowchart TB", "flowchart LR", 1),
+                "SYSTEM_CONTEXT must use one top-to-bottom flowchart",
+                "READY",
+            ),
+            "unlabeled grouping": (
+                source.replace(
+                    'subgraph PEOPLE["People"]',
+                    "subgraph PEOPLE",
+                    1,
+                ),
+                "every subgraph requires one quoted human label",
+                "READY",
+            ),
+            "missing accessibility title": (
+                source.replace(
+                    "    accTitle: Complete proposed review application architecture\n",
+                    "",
+                    1,
+                ),
+                "Mermaid requires one meaningful accTitle",
+                "READY",
+            ),
+            "AWS label differs from selected technology": (
+                source.replace(
+                    'TECH-0013["Amazon API Gateway<br/>regional HTTPS endpoint"]:::entry',
+                    'TECH-0013["Unrelated edge service"]:::entry',
+                    1,
+                ),
+                "label must match its selected technical value",
+                "READY",
+            ),
+            "interactive Mermaid directive": (
+                source.replace(
+                    '        ACT-001["Development user"]:::actor',
+                    '        ACT-001["Development user"]:::actor\n'
+                    '        click ACT-001 "https://example.invalid"',
+                    1,
+                ),
+                "unsupported Mermaid statement",
+                "READY",
+            ),
+            "unsafe label markup": (
+                source.replace(
+                    'ACT-001["Development user"]:::actor',
+                    'ACT-001["Development user<img src=https://example.invalid>"]:::actor',
+                    1,
+                ),
+                "may use only plain text and supported line breaks",
+                "READY",
+            ),
+            "active Windows file URI": (
+                source.replace(
+                    'ACT-001["Development user"]:::actor',
+                    'ACT-001["Development user file:C:\\\\sensitive.txt"]:::actor',
+                    1,
+                ),
+                "must not contain an external or active URI",
+                "READY",
+            ),
+            "wrong semantic color role": (
+                source.replace(
+                    'ACT-001["Development user"]:::actor',
+                    'ACT-001["Development user"]:::entry',
+                    1,
+                ),
+                "color role that conflicts with canonical meaning",
+                "READY",
+            ),
+            "external actor inside cloud boundary": (
+                actor_inside_cloud,
+                "external actors must remain outside the system boundary",
+                "BLOCKED",
+            ),
+            "observed deployment claim": (
+                source.replace(
+                    "AWS Cloud · proposed architecture",
+                    "AWS Cloud · proposed architecture · was deployed and verified",
+                    1,
+                ),
+                "subgraph label must not claim approval, authorization, access, or observed execution evidence",
+                "READY",
+            ),
+            "focused accessibility authority claim": (
+                source.replace(
+                    "The project owner submits one review request and receives the validated result through the review API.",
+                    "The owner authorized AWS deployment and the result was deployed and verified.",
+                    1,
+                ),
+                "accDescr must not claim approval, authorization, access, or observed execution evidence",
+                "READY",
+            ),
+            "focused authorization claim": (
+                source.replace(
+                    "ACT-001 -->|submits a review request to| API-001",
+                    "ACT-001 -->|owner authorized AWS deployment| API-001",
+                    1,
+                ),
+                "relationship label must not claim approval, authorization, access, or observed execution evidence",
+                "BLOCKED",
+            ),
+            "broad observed relationship claim": (
+                source.replace(
+                    "TECH-0013 -->|routes authenticated requests into| BOUNDARY-001",
+                    "TECH-0013 -->|was deployed and verified through| BOUNDARY-001",
+                    1,
+                ),
+                "relationship label must not claim approval, authorization, access, or observed execution evidence",
+                "BLOCKED",
+            ),
+            "node access grant claim": (
+                source.replace(
+                    'ACT-001["Development user"]:::actor',
+                    'ACT-001["Owner granted AWS access"]:::actor',
+                    1,
+                ),
+                "ACT-001 label must not claim approval, authorization, access, or observed execution evidence",
+                "READY",
+            ),
+            "focused accessibility access grant claim": (
+                source.replace(
+                    "The project owner submits one review request and receives the validated result through the review API.",
+                    "The owner granted AWS access.",
+                    1,
+                ),
+                "accDescr must not claim approval, authorization, access, or observed execution evidence",
+                "READY",
+            ),
+            "focused relationship access grant claim": (
+                source.replace(
+                    "ACT-001 -->|submits a review request to| API-001",
+                    "ACT-001 -->|owner granted AWS access| API-001",
+                    1,
+                ),
+                "relationship label must not claim approval, authorization, access, or observed execution evidence",
+                "BLOCKED",
+            ),
+            "subgraph access grant claim": (
+                source.replace(
+                    "AWS Cloud · proposed architecture",
+                    "AWS Cloud · owner granted AWS access · proposed architecture",
+                    1,
+                ),
+                "subgraph label must not claim approval, authorization, access, or observed execution evidence",
+                "READY",
+            ),
+            "hidden required architecture": (
+                hidden_architecture,
+                "must remain visible outside disclosures",
+                "READY",
+            ),
+            "duplicate palette override": (
+                source.replace(
+                    "classDef actor fill:#FFFFFF,stroke:#232F3E,color:#232F3E,stroke-width:2px;",
+                    "classDef actor fill:#FFFFFF,fill:#000000,stroke:#232F3E,color:#232F3E,stroke-width:2px;",
+                    1,
+                ),
+                "actor classDef must use the approved readable semantic palette",
+                "READY",
+            ),
+            "unused unsafe style": (
+                source.replace(
+                    "classDef actor fill:#FFFFFF,stroke:#232F3E,color:#232F3E,stroke-width:2px;",
+                    "classDef actor fill:#FFFFFF,stroke:#232F3E,color:#232F3E,stroke-width:2px;\n"
+                    "    classDef tracker fill:url(https://example.invalid),stroke:#000000,color:#000000;",
+                    1,
+                ),
+                "classDef styles must be used by displayed nodes",
+                "READY",
+            ),
+            "empty organizational group": (
+                source.replace(
+                    '        subgraph REGION["',
+                    '        subgraph EMPTY["Unused group"]\n        end\n'
+                    '        subgraph REGION["',
+                    1,
+                ),
+                "broad architecture contains empty subgraphs",
+                "READY",
+            ),
+            "disconnected deployment island": (
+                source.replace(
+                    'TECH-0009 -. "deploys" .-> TECH-0001',
+                    'TECH-0009 -. "returns deployment metadata to" .-> TECH-0004',
+                    1,
+                ),
+                "must present one connected owner view",
+                "BLOCKED",
+            ),
+            "architecture self-loop": (
+                source.replace(
+                    "ARCH-0001 -->|stores owner records in| TECH-0011",
+                    "ARCH-0001 -->|stores owner records in| TECH-0011\n"
+                    "    ARCH-0001 -->|implements itself| ARCH-0001",
+                    1,
+                ),
+                "must not contain self-loop ARCH-0001",
+                "BLOCKED",
+            ),
+            "system view without requirement basis": (
+                source.replace(
+                    "proposed-system-at-a-glance | ARCH-0001, FR-001 |",
+                    "proposed-system-at-a-glance | ARCH-0001 |",
+                    1,
+                ),
+                "lacks its canonical purpose basis",
+                "BLOCKED",
+            ),
+            "unsupported unlabeled relationship": (
+                source.replace(
+                    "ACT-001 -->|sends a review request through| TECH-0013",
+                    "ACT-001 -->|sends a review request through| TECH-0013\n"
+                    "    ACT-001 --> TECH-0013",
+                    1,
+                ),
+                "every visible relationship must connect labeled canonical component nodes",
+                "BLOCKED",
+            ),
+            "empty relationship meaning": (
+                source.replace(
+                    "API-001 -->|invokes| TECH-0002",
+                    "API-001 -->|   | TECH-0002",
+                    1,
+                ),
+                "relationship labels must not be empty",
+                "BLOCKED",
+            ),
+            "AWS component omitted": (
+                source.replace(
+                    'TECH-0015 -. "restores" .-> TECH-0001',
+                    "",
+                    1,
+                ),
+                "Referenced IDs must exactly match Mermaid relationship endpoints",
+                "BLOCKED",
             ),
         }
-        for label, (candidate, expected) in cases.items():
+        for label, (candidate, expected, expected_status) in cases.items():
             with self.subTest(case=label):
+                self.assertNotEqual(candidate, source, label)
                 blocked, issues = doctor.derive_design_contract(
                     candidate,
                     "DES-0001",
                     required=True,
                 )
+                self.assertEqual(blocked.status, expected_status)
+                self.assertTrue(any(expected in issue for issue in issues), issues)
+                if expected_status == "READY":
+                    self.assertTrue(
+                        all(
+                            issue.startswith("DIAGRAM_PRESENTATION_STALE: ")
+                            for issue in issues
+                        ),
+                        issues,
+                    )
+                    self.assertIsNotNone(blocked.canonical_sha256)
+
+    def test_focused_diagrams_must_match_their_owner_purpose(self) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        table = doctor.contract_table_after_heading(
+            source, doctor.DIAGRAM_CONTRACT_HEADING, doctor.DIAGRAM_CONTRACT_HEADERS
+        )
+        self.assertIsNotNone(table)
+        false_view = """```mermaid
+flowchart LR
+    accTitle: Incorrect technical view
+    accDescr: This intentionally unrelated graph proves each view retains its project purpose.
+    TECH-0004["AWS SAM<br/>infrastructure templates"]
+    TECH-0014["Amazon CloudWatch<br/>logs, metrics, and alarms"]
+    TECH-0004 -->|sends to| TECH-0014
+```"""
+        primary_heading = next(
+            line
+            for line in source.splitlines()
+            if line.startswith("### Sequence") and "primary outcome" in line
+        )
+        failure_heading = next(
+            line
+            for line in source.splitlines()
+            if line.startswith("### Sequence") and "failure and recovery" in line
+        )
+        cases = {
+            "PRIMARY_OUTCOME": (
+                "DIAGRAM-0002",
+                primary_heading,
+                failure_heading,
+                "must show an approved actor",
+            ),
+            "DATA_LIFECYCLE": (
+                "DIAGRAM-0003",
+                "### Data lifecycle view",
+                "## 18. Detailed sequence diagrams",
+                "must show the selected data-storage mechanism",
+            ),
+            "FAILURE_RECOVERY": (
+                "DIAGRAM-0004",
+                failure_heading,
+                "## 19. Error handling strategy",
+                "must show the selected recovery mechanism",
+            ),
+        }
+        for kind, (diagram_id, heading, next_heading, expected) in cases.items():
+            with self.subTest(kind=kind):
+                changed = replace_contract_table(
+                    source,
+                    doctor.DIAGRAM_CONTRACT_HEADING,
+                    doctor.DIAGRAM_CONTRACT_HEADERS,
+                    [
+                        (*row[:6], "TECH-0004, TECH-0014")
+                        if row[0] == diagram_id
+                        else row
+                        for row in table.rows
+                    ],
+                )
+                changed = set_diagram_block(changed, heading, next_heading, false_view)
+                blocked, issues = doctor.derive_design_contract(
+                    changed, "DES-0001", required=True
+                )
                 self.assertEqual(blocked.status, "BLOCKED")
                 self.assertTrue(any(expected in issue for issue in issues), issues)
+
+    def test_focused_diagram_styles_are_optional_but_never_active_or_false(
+        self,
+    ) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        baseline, baseline_issues = doctor.derive_design_contract(
+            source, "DES-0001", required=True
+        )
+        self.assertEqual(baseline_issues, [])
+        data_start = source.index("### Data lifecycle view")
+        data_section = (
+            source[data_start:]
+            .replace(
+                'TECH-0011[("Amazon DynamoDB with<br/>per-owner records")]',
+                'TECH-0011[("Amazon DynamoDB with<br/>per-owner records")]:::tracker',
+                1,
+            )
+            .replace(
+                "API-001 -->|validates and stores in| TECH-0011",
+                "API-001 -->|validates and stores in| TECH-0011\n"
+                "    classDef tracker fill:url(https://example.invalid/pixel),stroke:#000000,color:#000000;",
+                1,
+            )
+        )
+        styled = source[:data_start] + data_section
+        self.assertNotEqual(styled, source)
+        candidate, issues = doctor.derive_design_contract(
+            styled, "DES-0001", required=True
+        )
+        self.assertEqual(candidate.status, "READY")
+        self.assertEqual(candidate.canonical_sha256, baseline.canonical_sha256)
+        self.assertTrue(issues)
+        self.assertTrue(
+            all(issue.startswith("DIAGRAM_PRESENTATION_STALE: ") for issue in issues),
+            issues,
+        )
+        self.assertTrue(
+            any("unsupported Mermaid classDef 'tracker'" in issue for issue in issues),
+            issues,
+        )
+
+    def test_approved_pre_aws_design_seven_remains_current_until_revision(
+        self,
+    ) -> None:
+        legacy = (PROJECT_ROOT / "tests/fixtures/legacy_1234_pre_aws_prd.md").read_text(
+            encoding="utf-8"
+        )
+
+        grandfathered, issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=True,
+        )
+        self.assertEqual(issues, [])
+        self.assertEqual(grandfathered.status, "READY")
+        self.assertEqual(
+            grandfathered.diagram_contract.canonical_sha256,
+            "sha256:ce8b2dfed3fb6cb3967244bfe2f11265c440e1ae03c2bb92b0ede1966cc5d9d8",
+        )
+        self.assertEqual(
+            grandfathered.canonical_sha256,
+            "sha256:9e925fbaf47a328ab9ea327d6d7f1058d9945154d8ecabe27384a9115bf23cbc",
+        )
+
+        revised, revised_issues = doctor.derive_design_contract(
+            legacy,
+            "DES-0001",
+            required=True,
+            grandfather_approved_v1=False,
+        )
+        self.assertEqual(revised.status, "BLOCKED")
+        self.assertTrue(
+            any(
+                "Missing required diagram kinds: AWS_IMPLEMENTATION" in issue
+                for issue in revised_issues
+            ),
+            revised_issues,
+        )
+
+    def test_pre_aws_projection_envelope_remains_current_after_upgrade(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.copy_project(Path(directory))
+            self.approve_project(project)
+            self.set_non_material_req_evidence(project)
+            prd_path = project / "docs/project/PRD.md"
+            text = prd_path.read_text(encoding="utf-8")
+            diagram_table = doctor.contract_table_after_heading(
+                text,
+                doctor.DIAGRAM_CONTRACT_HEADING,
+                doctor.DIAGRAM_CONTRACT_HEADERS,
+            )
+            self.assertIsNotNone(diagram_table)
+            assert diagram_table is not None
+            text = replace_contract_table(
+                text,
+                doctor.DIAGRAM_CONTRACT_HEADING,
+                doctor.DIAGRAM_CONTRACT_HEADERS,
+                [
+                    (
+                        row[0],
+                        row[1],
+                        row[2],
+                        "NOT_YET_CREATED",
+                        row[4],
+                        "NONE",
+                        "NONE",
+                    )
+                    if row[1] == "AWS_IMPLEMENTATION"
+                    else row
+                    for row in diagram_table.rows
+                ],
+            )
+            text = set_diagram_block(
+                text,
+                "### AWS implementation at a glance",
+                "<details>\n<summary>Exact AWS service decision records</summary>",
+                "No AWS implementation diagram was required by this approved legacy design.",
+            )
+            legacy_contract, legacy_issues = doctor.derive_design_contract(
+                text,
+                "DES-0001",
+                required=True,
+                grandfather_approved_v1=True,
+            )
+            self.assertEqual(legacy_issues, [])
+            self.assertIsNotNone(legacy_contract.canonical_sha256)
+            frozen_design_sha256 = legacy_contract.canonical_sha256
+            assert frozen_design_sha256 is not None
+            text = set_table_value(
+                text,
+                "## 28. Construction envelope",
+                "## 29. Gate B owner authorization record",
+                "Design contract SHA-256",
+                f"`{frozen_design_sha256}`",
+            )
+            envelope_digest = doctor.canonical_envelope_sha256(text)
+            text = set_table_value(
+                text,
+                "## 27. Gate B agent review record",
+                "## 28. Construction envelope",
+                "Construction envelope SHA-256 reviewed",
+                f"`{envelope_digest}`",
+            )
+            text = set_table_value(
+                text,
+                "## 29. Gate B owner authorization record",
+                "## 30. Gate B validation and invalidation rules",
+                "Authorized construction envelope SHA-256",
+                f"`{envelope_digest}`",
+            )
+            text = set_receipt(
+                text,
+                "gate-b",
+                "\n".join(
+                    [
+                        "APPROVE PRD AND CONSTRUCTION GATE B",
+                        "Requirements revision: REQ-0001",
+                        "Design revision: DES-0001",
+                        "Construction authorization: AUTH-0001",
+                        f"Construction envelope SHA-256: {envelope_digest}",
+                        "Use the proposed construction envelope above.",
+                        "Approver: alice",
+                    ]
+                ),
+            )
+            prd_path.write_text(text, encoding="utf-8")
+            refresh_document_summaries(project)
+            report = doctor.inspect_project(project)
+
+        self.assertTrue(report["ok"], report["diagnostics"])
+        self.assertEqual(report["diagnostics"], [])
+        self.assertEqual(
+            report["design_contract"]["canonical_sha256"],
+            frozen_design_sha256,
+        )
+        self.assertEqual(report["gates"]["gate_b"], "APPROVED_FOR_CONSTRUCTION")
+        self.assertEqual(report["lifecycle_state"], "TASK_PLAN_REQUIRED")
+        self.assertEqual(report["next_prompt"], "TASK-10")
 
     def test_schema_five_project_design_is_digest_bound_and_fail_closed(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -10403,6 +12527,25 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
             migration_issues,
         )
+
+    def test_truthful_standard_and_plain_colon_actor_labels_remain_current(
+        self,
+    ) -> None:
+        source = complete_design_contract(
+            (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        self.assertEqual(source.count("Development user"), 3)
+        for label in ("ISO-27001 reviewer", "Data: owner"):
+            with self.subTest(label=label):
+                changed = source.replace("Development user", label)
+                self.assertEqual(changed.count(label), 3)
+                contract, issues = doctor.derive_design_contract(
+                    changed,
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertEqual(contract.status, "READY")
+                self.assertEqual(issues, [])
 
     def test_exact_schema_four_shape_is_the_only_project_design_bridge(self) -> None:
         legacy_text = """## Document status
@@ -10764,7 +12907,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 doctor.STATE_APPLICABILITY_HEADERS,
                 [("RESOURCE-001", "APPLICABLE", trigger_basis, "STATE-001")],
             )
-            return replace_contract_table(
+            text = replace_contract_table(
                 text,
                 doctor.STATE_REGISTER_HEADING,
                 doctor.STATE_REGISTER_HEADERS,
@@ -10782,6 +12925,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                     )
                 ],
             )
+            return complete_state_diagrams(text)
 
         for category in doctor.STATE_MODEL_TRIGGERS:
             with self.subTest(category=category):

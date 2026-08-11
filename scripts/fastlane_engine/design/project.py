@@ -34,7 +34,8 @@ from .architecture import _derive_architecture_contract
 from .diagrams import (
     DIAGRAM_CONTRACT_HEADERS,
     DIAGRAM_CONTRACT_HEADING,
-    derive_diagram_contract,
+    _derive_current_diagram_contract,
+    is_diagram_presentation_issue,
 )
 from .harness import HARNESS_ID, derive_harness_contract
 from .models import (
@@ -71,8 +72,8 @@ from .support import (
     _exact_property_ids,
     architecture_trace_declaration_issues,
     current_prd_basis_ids,
+    derive_design_support_records,
     derive_example_scenario_contract,
-    design_support_record_issues,
     machine_comparable_property_version_policy,
     parse_property_run_target,
     technology_contract_value_is_unresolved,
@@ -502,6 +503,27 @@ def _project_schema_state(
             ],
         ),
     )
+
+
+def _project_presentation_labels(
+    interfaces: ContractTable | None,
+    boundaries: ContractTable | None,
+    states: ContractTable | None,
+) -> tuple[tuple[str, str], ...]:
+    """Project concise component names without entering Design digests."""
+
+    labels = [
+        *(
+            (row[0], f"{row[3]} to {row[4]}")
+            for row in (interfaces.rows if interfaces else ())
+        ),
+        *(
+            (row[0], f"{row[1]} to {row[2]}")
+            for row in (boundaries.rows if boundaries else ())
+        ),
+        *((row[0], row[2]) for row in (states.rows if states else ())),
+    ]
+    return tuple((identifier, clean_cell(label)) for identifier, label in labels)
 
 
 def derive_project_design_contract(
@@ -1092,6 +1114,9 @@ def derive_project_design_contract(
             interface_ids=tuple(interface_ids),
             boundary_ids=tuple(boundary_ids),
             state_ids=tuple(state_ids),
+            presentation_labels=_project_presentation_labels(
+                interfaces, boundaries, states
+            ),
             first_wave=first_wave,
             spike=spike,
             missing_records=tuple(dict.fromkeys(missing_records)),
@@ -1101,6 +1126,104 @@ def derive_project_design_contract(
             canonical_bytes=canonical_bytes,
         ),
         issues,
+    )
+
+
+def _current_design_support_records(
+    text: str,
+    technology_by_id: dict[str, TechnologyDecision],
+    architecture: Any,
+) -> tuple[tuple[Any, ...], bytes | None, list[str]]:
+    """Return exact modern support inputs before compatibility policy is applied."""
+
+    return derive_design_support_records(text, technology_by_id, architecture)
+
+
+def _current_diagram_contract(
+    text: str,
+    architecture: Any,
+    requirements: Any,
+    coverage: Any,
+    project_contract: ProjectDesignContract,
+    aws_decisions: tuple[Any, ...],
+    technology_by_id: dict[str, TechnologyDecision],
+    current_ids: set[str],
+    *,
+    required: bool,
+    grandfathered: bool,
+) -> tuple[Any, list[str]]:
+    """Evaluate current project diagrams with legacy Design compatibility."""
+
+    return _derive_current_diagram_contract(
+        text,
+        architecture,
+        requirements,
+        coverage,
+        project_contract,
+        aws_decisions,
+        technology_by_id,
+        current_ids,
+        required=required,
+        grandfathered_schema5=(
+            project_contract.grandfathered_v4 or project_contract.grandfathered_v5
+        ),
+        grandfathered_pre_aws_diagrams=grandfathered,
+        legacy_public_compatibility=project_contract.grandfathered_v6,
+    )
+
+
+def _bind_current_design_support(
+    project_contract: ProjectDesignContract,
+    diagram_contract: Any,
+    *,
+    grandfathered: bool,
+) -> bool:
+    """Keep pre-support schema-six Design bytes exact while binding modern rows."""
+
+    return not project_contract.grandfathered_v6 and (
+        not grandfathered
+        or any(
+            record.kind == "AWS_IMPLEMENTATION" and record.status == "CURRENT"
+            for record in diagram_contract.records
+        )
+    )
+
+
+def _current_project_contract(
+    text: str,
+    requirements: Any,
+    coverage: Any,
+    requirement_ids: set[str],
+    allowed_basis_ids: set[str],
+    technology_by_id: dict[str, TechnologyDecision],
+    executions: list[PropertyExecution],
+    harness: HarnessContract,
+    architecture: Any,
+    state_trigger_mapper: Callable[[str, str], dict[str, tuple[str, ...]]],
+    *,
+    required: bool,
+    grandfathered: bool,
+) -> tuple[ProjectDesignContract, list[str]]:
+    """Derive project Design records from the current validated support IDs."""
+
+    available_ids = (
+        set(technology_by_id)
+        | {execution.property_id for execution in executions}
+        | {row.harness_id for row in harness.rows}
+    )
+    if architecture.selection is not None:
+        available_ids.add(architecture.selection.architecture_id)
+    return derive_project_design_contract(
+        text,
+        requirements,
+        coverage,
+        requirement_ids,
+        allowed_basis_ids | set(technology_by_id),
+        harness,
+        available_ids,
+        state_trigger_mapper,
+        required=required,
+        grandfather_approved_v4=grandfathered,
     )
 
 
@@ -1118,7 +1241,6 @@ def derive_design_contract(
     initial_issues: Sequence[str] = (),
 ) -> tuple[DesignContract, list[str]]:
     """SAFETY: Derive one complete Design result from explicit Define inputs."""
-
     issues = list(initial_issues)
     try:
         technology_table = contract_table_after_heading(
@@ -1297,8 +1419,25 @@ def derive_design_contract(
                 )
 
     technology_by_id = {decision.decision_id: decision for decision in technologies}
-    if required and not grandfather_approved_v1:
-        issues.extend(design_support_record_issues(text, technology_by_id))
+    architecture, architecture_issues = _derive_architecture_contract(
+        text,
+        design_revision,
+        set(technology_by_id),
+        authoritative_requirement_ids,
+        required=required,
+        grandfather_approved_v1=grandfather_approved_v1,
+        architecture_disposition=coverage_contract.architecture_disposition,
+    )
+    support_issue_index = len(issues)
+    (
+        aws_implementation_decisions,
+        design_support_bytes,
+        aws_support_issues,
+    ) = _current_design_support_records(
+        text,
+        technology_by_id,
+        architecture,
+    )
     for execution in executions:
         property_technology = technology_by_id.get(execution.framework_tech_id)
         if (
@@ -1457,15 +1596,6 @@ def derive_design_contract(
     declared_property_ids = applicable_property_ids & set(definitions) & execution_ids
     declared_property_test_ids = declared_property_ids | example_ids
 
-    architecture, architecture_issues = _derive_architecture_contract(
-        text,
-        design_revision,
-        set(technology_by_id),
-        authoritative_requirement_ids,
-        required=required,
-        grandfather_approved_v1=grandfather_approved_v1,
-        architecture_disposition=coverage_contract.architecture_disposition,
-    )
     issues.extend(architecture_issues)
     harness, harness_issues = derive_harness_contract(
         text,
@@ -1484,41 +1614,43 @@ def derive_design_contract(
     )
     if required:
         issues.extend(change_impact_issues)
-    project_contract, project_contract_issues = derive_project_design_contract(
+    project_contract, project_contract_issues = _current_project_contract(
         text,
         requirements_contract,
         coverage_contract,
         authoritative_requirement_ids,
-        allowed_basis_ids | set(technology_by_id),
+        allowed_basis_ids,
+        technology_by_id,
+        executions,
         harness,
-        (
-            set(technology_by_id)
-            | {execution.property_id for execution in executions}
-            | {row.harness_id for row in harness.rows}
-            | (
-                {architecture.selection.architecture_id}
-                if architecture.selection is not None
-                else set()
-            )
-        ),
+        architecture,
         state_trigger_mapper,
         required=required,
-        grandfather_approved_v4=grandfather_approved_v1,
+        grandfathered=grandfather_approved_v1,
     )
     if required:
         issues.extend(project_contract_issues)
-    diagram_contract, diagram_issues = derive_diagram_contract(
+    diagram_contract, diagram_issues = _current_diagram_contract(
         text,
         architecture,
         requirements_contract,
         coverage_contract,
+        project_contract,
+        aws_implementation_decisions,
+        technology_by_id,
+        allowed_basis_ids | set(technology_by_id),
         required=required,
-        grandfathered_schema5=(
-            project_contract.grandfathered_v4 or project_contract.grandfathered_v5
-        ),
+        grandfathered=grandfather_approved_v1,
     )
     if required:
         issues.extend(diagram_issues)
+    bind_design_support = _bind_current_design_support(
+        project_contract,
+        diagram_contract,
+        grandfathered=grandfather_approved_v1,
+    )
+    if bind_design_support:
+        issues[support_issue_index:support_issue_index] = aws_support_issues
 
     if not project_contract.grandfathered_v4:
         issues.extend(example_issues)
@@ -1549,6 +1681,7 @@ def derive_design_contract(
             or project_contract.grandfathered_v4
             or project_contract.grandfathered_v5
         )
+        and (design_support_bytes is not None or not bind_design_support)
     ):
         architecture_bytes = architecture.canonical_bytes or b""
         harness_bytes = harness.canonical_bytes or b""
@@ -1568,13 +1701,21 @@ def derive_design_contract(
                 + applicability_table.canonical_bytes
                 + definition_table.canonical_bytes
                 + execution_table.canonical_bytes
+                + (
+                    design_support_bytes
+                    if bind_design_support and design_support_bytes is not None
+                    else b""
+                )
             ).hexdigest()
         )
+    blocking_issues = [
+        issue for issue in issues if not is_diagram_presentation_issue(issue)
+    ]
     status = (
         "UNINITIALIZED"
         if both_missing and not required
         else "READY"
-        if not issues
+        if not blocking_issues
         else "BLOCKED"
     )
     return (

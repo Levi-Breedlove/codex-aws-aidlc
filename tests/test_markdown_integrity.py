@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import re
+import tempfile
 import unittest
 from pathlib import Path
 from urllib.parse import unquote
+
+from tests import render_mermaid_fixtures
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -262,6 +265,9 @@ sequenceDiagram
             "DATA_LIFECYCLE",
             "FAILURE_RECOVERY",
             "MIGRATION",
+            "JOURNEY",
+            "STATE",
+            "AWS_IMPLEMENTATION",
         ):
             self.assertRegex(
                 prd,
@@ -284,10 +290,86 @@ sequenceDiagram
             / "references"
             / "diagram-patterns.md"
         ).read_text(encoding="utf-8")
-        self.assertEqual(len(MERMAID_BLOCK.findall(patterns)), 4)
+        blocks = MERMAID_BLOCK.findall(patterns)
+        self.assertEqual(len(blocks), 4)
         self.assertIn("Load only during Design", patterns)
         self.assertIn("not application architecture", patterns)
-        self.assertIn("Never imply that a planned diagram was deployed", patterns)
+        self.assertIn(
+            "Never imply that a planned diagram was deployed",
+            " ".join(patterns.split()),
+        )
+
+        expected_roles = (
+            {
+                "ACT-000": "actor",
+                "API-000": "compute",
+                "BOUNDARY-000": "entry",
+                "ARCH-0000": "compute",
+                "TECH-0004": "data",
+                "TECH-0005": "ops",
+            },
+            {
+                "TECH-0001": "compute",
+                "TECH-0002": "entry",
+                "TECH-0003": "entry",
+                "TECH-0004": "data",
+                "TECH-0005": "event",
+                "TECH-0006": "ops",
+                "TECH-0007": "ops",
+                "TECH-0008": "event",
+                "ARCH-0000": "compute",
+            },
+        )
+        node = re.compile(r"^\s*([A-Z][A-Z0-9_]*-\d{3,}).*:::([a-z][a-z0-9_-]*)\s*$")
+        class_def = re.compile(r"^\s*classDef\s+([a-z][a-z0-9_-]*)\s+")
+        solid = re.compile(
+            r"^\s*[A-Z][A-Z0-9_]*-\d{3,}\s*-->\|[^|]+\|\s*"
+            r"[A-Z][A-Z0-9_]*-\d{3,}\s*$"
+        )
+        dashed = re.compile(
+            r'^\s*[A-Z][A-Z0-9_]*-\d{3,}\s*-\.\s*"[^"]+"\s*\.->\s*'
+            r"[A-Z][A-Z0-9_]*-\d{3,}\s*$"
+        )
+        for index, block in enumerate(blocks):
+            with self.subTest(block=index + 1):
+                first = next(
+                    line.strip() for line in block.splitlines() if line.strip()
+                )
+                self.assertEqual(first, "flowchart TB" if index < 2 else "flowchart LR")
+                self.assertEqual(block.count("accTitle:"), 1)
+                self.assertEqual(block.count("accDescr:"), 1)
+                for line in block.splitlines():
+                    if "-->" in line or "-." in line:
+                        self.assertTrue(
+                            solid.fullmatch(line) or dashed.fullmatch(line),
+                            line,
+                        )
+        for index, roles in enumerate(expected_roles):
+            with self.subTest(broad_block=index + 1):
+                observed_roles = {
+                    match.group(1): match.group(2)
+                    for line in blocks[index].splitlines()
+                    if (match := node.fullmatch(line)) is not None
+                }
+                declared = {
+                    match.group(1)
+                    for line in blocks[index].splitlines()
+                    if (match := class_def.match(line)) is not None
+                }
+                self.assertEqual(observed_roles, roles)
+                self.assertEqual(declared, set(roles.values()))
+        self.assertIn(
+            'TECH-0003 -. "provides token issuer trust to" .-> TECH-0002',
+            blocks[1],
+        )
+        self.assertIn(
+            'TECH-0005 -. "restores" .-> ARCH-0000',
+            blocks[0],
+        )
+        self.assertIn(
+            'TECH-0007 -. "delivers and rolls back" .-> TECH-0001',
+            blocks[1],
+        )
 
     def test_prd_binds_project_specific_diagram_semantics_and_rendering(self) -> None:
         prd = (REPOSITORY_ROOT / "docs" / "project" / "PRD.md").read_text(
@@ -301,8 +383,10 @@ sequenceDiagram
         ).read_text(encoding="utf-8")
         for phrase in (
             "project-specific Mermaid block",
+            "complete top-to-bottom architecture",
+            "concise top-to-bottom AWS implementation map",
             "semantic digest",
-            "rendered digest",
+            "presentation-source digest",
             "Diagrams never prove implementation, deployment, or authority",
         ):
             self.assertIn(phrase, design)
@@ -411,6 +495,7 @@ sequenceDiagram
         depth_by_line = {number: depth for number, _line, depth in annotated}
         required = {
             "### Proposed system at a glance": "proposed-system-at-a-glance",
+            "### AWS implementation at a glance": "aws-implementation-at-a-glance",
             "### Sequence — primary outcome": "sequence-primary-outcome",
         }
         mermaid_fence = chr(96) * 3 + "mermaid"
@@ -418,7 +503,11 @@ sequenceDiagram
             empty_slot_text = (
                 "No project architecture diagram has been created yet."
                 if expected_anchor == "proposed-system-at-a-glance"
-                else "No primary-outcome sequence has been created yet."
+                else (
+                    "No AWS implementation diagram has been created yet."
+                    if expected_anchor == "aws-implementation-at-a-glance"
+                    else "No primary-outcome sequence has been created yet."
+                )
             )
             self.assertEqual(lines.count(heading), 1, heading)
             heading_index = lines.index(heading)
@@ -453,6 +542,42 @@ sequenceDiagram
                 re.sub(r"[^\w -]", "", heading[4:].lower()),
             ).strip("-")
             self.assertEqual(anchor, expected_anchor)
+
+    def test_prd_diagram_guide_links_without_copying_diagrams(self) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        self.assertEqual(prd.count("# Diagram guide"), 1)
+        self.assertGreater(
+            prd.index("# Diagram guide"), prd.index("# Contract Appendices")
+        )
+        guide = prd.split("# Diagram guide", 1)[1]
+        self.assertNotIn("```mermaid", guide)
+        links = re.findall(r"\[([^]]+)\]\((#[^)]+)\)", guide)
+        self.assertEqual(
+            links,
+            [
+                ("View complete architecture", "#proposed-system-at-a-glance"),
+                ("View AWS implementation", "#aws-implementation-at-a-glance"),
+                ("View first useful outcome", "#sequence-primary-outcome"),
+                ("View journey paths", "#journey-view"),
+                ("View state lifecycle", "#state-view"),
+                ("View data lifecycle", "#data-lifecycle-view"),
+                ("View failure and recovery", "#sequence-failure-and-recovery"),
+                ("View migration", "#migration-view"),
+            ],
+        )
+        targets = [target for _label, target in links]
+        self.assertEqual(len(targets), len(set(targets)))
+        h1_headings = re.findall(r"(?m)^# [^#].+$", prd)
+        self.assertEqual(h1_headings[-1], "# Diagram guide")
+        self.assertTrue(prd.rstrip().endswith("[View migration](#migration-view) |"))
+
+    def test_gate_b_decision_surface_keeps_the_exact_receipt_last(self) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        gate_b = prd.split("# Gate B Review", 1)[1].split("# Contract Appendices", 1)[0]
+        self.assertTrue(
+            gate_b.strip().endswith("<!-- bootstrap:gate-b-receipt:end -->"),
+            gate_b[-500:],
+        )
 
     def test_prd_disclosures_explain_and_contain_the_promised_records(self) -> None:
         prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -879,6 +1004,98 @@ sequenceDiagram
 
         shared_lines = substantial_lines(readme) & substantial_lines(workflow)
         self.assertLessEqual(len(shared_lines), 12, msg=sorted(shared_lines))
+
+    def test_render_review_inputs_are_exact_sanitized_and_organized(self) -> None:
+        fixtures = render_mermaid_fixtures.collect_mermaid_fixtures(REPOSITORY_ROOT)
+        self.assertEqual(
+            tuple(fixtures),
+            (
+                *render_mermaid_fixtures.PUBLISHED_NAMES,
+                *render_mermaid_fixtures.GOLDEN_NAMES,
+                *render_mermaid_fixtures.VARIANT_NAMES,
+            ),
+        )
+        self.assertEqual(len(fixtures), 11)
+        expected_golden_markers = {
+            "golden-complete-architecture": (
+                "accTitle: Complete proposed review application architecture",
+                "ACT-001 -->|sends a review request through| TECH-0013",
+            ),
+            "golden-primary-outcome": (
+                "accTitle: First useful owner outcome",
+                "ACT-001 -->|submits a review request to| API-001",
+            ),
+            "golden-data-lifecycle": (
+                "accTitle: Owner record data lifecycle",
+                "API-001 -->|validates and stores in| TECH-0011",
+            ),
+            "golden-failure-recovery": (
+                "accTitle: Review failure and recovery path",
+                "API-001 -->|fails safely and invokes| TECH-0015",
+            ),
+            "golden-aws-implementation": (
+                "accTitle: Proposed AWS implementation",
+                'TECH-0010 -. "provides token issuer trust to" .-> TECH-0013',
+            ),
+            "golden-brownfield-migration": (
+                "accTitle: Existing application compatibility and rollback",
+                "BOUNDARY-001 -->|routes existing requests to| ARCH-0001",
+                'TECH-0015 -. "restores" .-> ARCH-0001',
+            ),
+            "golden-infrastructure-aws": (
+                "accTitle: Infrastructure-only AWS implementation",
+                'TECH-0004 -. "defines changes for" .-> TECH-0009',
+                'TECH-0009 -. "deploys" .-> TECH-0001',
+            ),
+        }
+        for name, markers in expected_golden_markers.items():
+            for marker in markers:
+                self.assertIn(marker, fixtures[name], name)
+        with tempfile.TemporaryDirectory() as directory:
+            synthetic_root = Path(directory) / "initialized-adopter"
+            pattern_path = (
+                synthetic_root
+                / ".agents/skills/fastlane/references/diagram-patterns.md"
+            )
+            pattern_path.parent.mkdir(parents=True)
+            pattern_path.write_text(
+                (
+                    REPOSITORY_ROOT
+                    / ".agents/skills/fastlane/references/diagram-patterns.md"
+                ).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            adopter_prd = synthetic_root / "docs/project/PRD.md"
+            adopter_prd.parent.mkdir(parents=True)
+            adopter_prd.write_text(
+                "SECRET_CUSTOMER_MARKER\n```mermaid\nflowchart LR\nA --> B\n```\n",
+                encoding="utf-8",
+            )
+            adopter_fixtures = render_mermaid_fixtures.collect_mermaid_fixtures(
+                synthetic_root
+            )
+            self.assertEqual(adopter_fixtures, fixtures)
+            self.assertNotIn(
+                "SECRET_CUSTOMER_MARKER",
+                "\n".join(adopter_fixtures.values()),
+            )
+
+            output_dir = Path(directory) / "rendered-inputs"
+            outputs = render_mermaid_fixtures.write_mermaid_fixtures(output_dir)
+            self.assertEqual(len(outputs), 11)
+            self.assertEqual(
+                {path.name for path in outputs},
+                {f"{name}.mmd" for name in fixtures},
+            )
+            for path in outputs:
+                source = path.read_text(encoding="utf-8")
+                self.assertTrue(source.startswith("flowchart "), path.name)
+                self.assertTrue(source.endswith("\n"), path.name)
+                self.assertNotIn("TODO", source)
+                self.assertNotIn("PLACEHOLDER", source)
+                self.assertNotRegex(source, r"(?i)arn:aws|aws_access_key|secret_key")
+                self.assertNotRegex(source, r"[A-Z]:\\|/(?:Users|home)/")
+                self.assertNotRegex(source, r"(?<!\d)\d{12}(?!\d)")
 
 
 if __name__ == "__main__":

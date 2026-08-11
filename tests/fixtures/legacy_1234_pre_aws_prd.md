@@ -55,13 +55,13 @@ status above explains the practical project state.
 | Workflow mode | `codex-native` |
 | Project contract schema | `1.4` |
 | Project design contract schema | `7` |
-| Project mode | `greenfield` / `brownfield` |
-| Delivery profile | `quick-mvp` / `standard` / `high-risk` |
-| Effective risk | `low` / `moderate` / `high` / `critical` |
-| AWS lane | `documentation-only` / `read-only` / `fast-dev` / `explicit-gate` |
+| Project mode | `greenfield` |
+| Delivery profile | `quick-mvp` |
+| Effective risk | `low` |
+| AWS lane | `documentation-only` |
 | Specification status | Draft |
 | Current requirements revision | `REQ-0001` |
-| Gate A derived status | `BLOCKED` |
+| Gate A derived status | `APPROVED_FOR_DESIGN` |
 | Current design revision | `DES-0001` |
 | Current construction authorization ID | `AUTH-0001` |
 | Gate B derived status | `BLOCKED` |
@@ -82,7 +82,7 @@ status above explains the practical project state.
 
 | Work kind | Delivery profile | Architecture disposition | Required sections | Omitted sections and reasons | Basis IDs |
 |---|---|---|---|---|---|
-| TODO | TODO | TODO | TODO | TODO | TODO |
+| NEW_BUILD | quick-mvp | SELECT | REQUIREMENTS, ARCHITECTURE_COMPARISON, AWS_EVIDENCE, DATA, SECURITY_PRIVACY, RELIABILITY_RECOVERY, COST, HARNESS, TASKS, OPERATIONS | NONE | REQ-0001, COST-001, COST-002, COST-003, COST-004, COST-005, DATA-001, DATA-002, DATA-003, DATA-004, DATA-005, FR-001, FR-002, OPS-001, OPS-002, OPS-003, OPS-004, OPS-005, PERF-001, PERF-002, PERF-003, PERF-004, REL-001, REL-002, REL-003, REL-004, REL-005, SEC-001, SEC-002, SEC-003, SEC-004, SEC-005, SEC-006, SEC-007, SUS-001, SUS-002, SUS-003, SUS-004 |
 
 </details>
 
@@ -155,27 +155,37 @@ storing raw conversation transcripts.
 
 | Intake ID | Field | Value | Basis | Status | Owner response |
 |---|---|---|---|---|---|
-| INTAKE-0001 | OWNER_WORK_CONTEXT | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0002 | PRIMARY_USERS | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0003 | OWNER_STATED_PROBLEM | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0004 | OBSERVABLE_OUTCOME | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0005 | FIRST_RELEASE_BOUNDARY | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0006 | SUCCESS_MEASURE | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0007 | DATA_TYPES | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0008 | DATA_SENSITIVITY | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0009 | RELEASE_AUDIENCE | TODO | OPEN_QUESTION | OPEN | NONE |
-| INTAKE-0010 | OPERATING_GEOGRAPHY | TODO | OPEN_QUESTION | OPEN | NONE |
+| INTAKE-0001 | OWNER_WORK_CONTEXT | NEW_APPLICATION | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0001; CARD: INTAKE-CARD-0001; REVISION: 1; SHA256: sha256:510346f7084fa4fbe1c4ac166386f39dcb8f1893778334bb8758da85d115e05f; QUESTION: INTAKE-Q-0001; ANSWER: A |
+| INTAKE-0002 | PRIMARY_USERS | Development teams | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0002; CARD: INTAKE-CARD-0002; REVISION: 1; SHA256: sha256:be92f480e16f0af4bc7c31b79ab1e8152eb217c18afd43fccb3bf670647ae959; QUESTION: INTAKE-Q-0002; ANSWER: RESPONSE |
+| INTAKE-0003 | OWNER_STATED_PROBLEM | They need a clear view of approved project outcomes. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0003; CARD: INTAKE-CARD-0003; REVISION: 1; SHA256: sha256:7aa09ae65f4f1efd937d6bbeb8cfa86014a05ca48e1b4e24ca5bbcc656c6990c; QUESTION: INTAKE-Q-0003; ANSWER: RESPONSE |
+| INTAKE-0004 | OBSERVABLE_OUTCOME | See the current approved project outcome. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0004; CARD: INTAKE-CARD-0004; REVISION: 1; SHA256: sha256:699350c73442f3cdbb2d258ce0390b13914175db34e9d66f3b04e782ecbcaab4; QUESTION: INTAKE-Q-0004; ANSWER: RESPONSE |
+| INTAKE-0005 | FIRST_RELEASE_BOUNDARY | Include one local outcome view; defer external integrations. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0005; CARD: INTAKE-CARD-0005; REVISION: 1; SHA256: sha256:53bb21a2e80d17b399aa77cafe6414ecf915dbec738b08aa24f48457ad6a042b; QUESTION: INTAKE-Q-0005; ANSWER: RESPONSE |
+| INTAKE-0006 | SUCCESS_MEASURE | An invited tester can view the approved outcome without help. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0006; CARD: INTAKE-CARD-0006; REVISION: 1; SHA256: sha256:83d81fca1077576ca2a3394ef58a843fade7766ec80c6c09f0b100f84404058a; QUESTION: INTAKE-Q-0006; ANSWER: RESPONSE |
+| INTAKE-0007 | DATA_TYPES | Synthetic project names, status, and outcome summaries. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0007; CARD: INTAKE-CARD-0007; REVISION: 1; SHA256: sha256:36e9aa4a210d2e1875708f465b6969b0a7d2e77fa5b79256f816d34c8e4b0cf0; QUESTION: INTAKE-Q-0007; ANSWER: RESPONSE |
+| INTAKE-0008 | DATA_SENSITIVITY | No sensitive data in the first trial. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0008; CARD: INTAKE-CARD-0008; REVISION: 1; SHA256: sha256:df2e2248c132fc578152e329d2bef95176bc8cd1519e934036232ea8b94af625; QUESTION: INTAKE-Q-0008; ANSWER: RESPONSE |
+| INTAKE-0009 | RELEASE_AUDIENCE | Invited development testers only. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0009; CARD: INTAKE-CARD-0009; REVISION: 1; SHA256: sha256:640cfaaed6cc87c470585d1a459774e0946dbf9a143fa8a4f540fb3e9c57a4a6; QUESTION: INTAKE-Q-0009; ANSWER: RESPONSE |
+| INTAKE-0010 | OPERATING_GEOGRAPHY | United States users; data remains in us-west-2. | OWNER_FACT | CONFIRMED | OWNER_RESPONSE: OWNER-MSG-0010; CARD: INTAKE-CARD-0010; REVISION: 1; SHA256: sha256:039454ea11066a0f5b9ac617397c232edfe0cc42ce27c4f4d15e48b4b9b6d574; QUESTION: INTAKE-Q-0010; ANSWER: RESPONSE |
 
 #### Normalized owner response register
 
 | Owner response ID | Card ID | Revision | Presented card digest | Reply key | Question ID | Selection | Selection detail | Basis IDs |
 |---|---|---|---|---|---|---|---|---|
+| OWNER-MSG-0001 | INTAKE-CARD-0001 | 1 | sha256:510346f7084fa4fbe1c4ac166386f39dcb8f1893778334bb8758da85d115e05f | 1 | INTAKE-Q-0001 | A | NONE | INTAKE-0001 |
+| OWNER-MSG-0002 | INTAKE-CARD-0002 | 1 | sha256:be92f480e16f0af4bc7c31b79ab1e8152eb217c18afd43fccb3bf670647ae959 | 1 | INTAKE-Q-0002 | RESPONSE | Development teams | INTAKE-0002 |
+| OWNER-MSG-0003 | INTAKE-CARD-0003 | 1 | sha256:7aa09ae65f4f1efd937d6bbeb8cfa86014a05ca48e1b4e24ca5bbcc656c6990c | 1 | INTAKE-Q-0003 | RESPONSE | They need a clear view of approved project outcomes. | INTAKE-0003 |
+| OWNER-MSG-0004 | INTAKE-CARD-0004 | 1 | sha256:699350c73442f3cdbb2d258ce0390b13914175db34e9d66f3b04e782ecbcaab4 | 1 | INTAKE-Q-0004 | RESPONSE | See the current approved project outcome. | INTAKE-0004 |
+| OWNER-MSG-0005 | INTAKE-CARD-0005 | 1 | sha256:53bb21a2e80d17b399aa77cafe6414ecf915dbec738b08aa24f48457ad6a042b | 1 | INTAKE-Q-0005 | RESPONSE | Include one local outcome view; defer external integrations. | INTAKE-0005 |
+| OWNER-MSG-0006 | INTAKE-CARD-0006 | 1 | sha256:83d81fca1077576ca2a3394ef58a843fade7766ec80c6c09f0b100f84404058a | 1 | INTAKE-Q-0006 | RESPONSE | An invited tester can view the approved outcome without help. | INTAKE-0006 |
+| OWNER-MSG-0007 | INTAKE-CARD-0007 | 1 | sha256:36e9aa4a210d2e1875708f465b6969b0a7d2e77fa5b79256f816d34c8e4b0cf0 | 1 | INTAKE-Q-0007 | RESPONSE | Synthetic project names, status, and outcome summaries. | INTAKE-0007 |
+| OWNER-MSG-0008 | INTAKE-CARD-0008 | 1 | sha256:df2e2248c132fc578152e329d2bef95176bc8cd1519e934036232ea8b94af625 | 1 | INTAKE-Q-0008 | RESPONSE | No sensitive data in the first trial. | INTAKE-0008 |
+| OWNER-MSG-0009 | INTAKE-CARD-0009 | 1 | sha256:640cfaaed6cc87c470585d1a459774e0946dbf9a143fa8a4f540fb3e9c57a4a6 | 1 | INTAKE-Q-0009 | RESPONSE | Invited development testers only. | INTAKE-0009 |
+| OWNER-MSG-0010 | INTAKE-CARD-0010 | 1 | sha256:039454ea11066a0f5b9ac617397c232edfe0cc42ce27c4f4d15e48b4b9b6d574 | 1 | INTAKE-Q-0010 | RESPONSE | United States users; data remains in us-west-2. | INTAKE-0010 |
 
 #### Current intake decision card
 
 | Card ID | Revision | Reply key | Question ID | Kind | Basis IDs | Prompt | Option A | Option B | Option C | Recommended | Required detail for | Detail prompt | Selection | Selection detail | Owner response |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| INTAKE-CARD-0001 | 1 | 1 | INTAKE-Q-0001 | DECISION | INTAKE-0001 | What are you starting with? | A new application; no existing product behavior is assumed. | A change to an existing application; preserve its users, data, and behavior unless you approve otherwise. | A repair, replacement, or migration; assess continuity and migration risk first. | NONE | B, C | Name the existing application or system. | PENDING | NONE | NONE |
+| INTAKE-CARD-0010 | 1 | 1 | INTAKE-Q-0010 | FACT | INTAKE-0010 | Where will the first users be, and are there places the data must stay? | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NONE | RESPONSE | Name the user geography and any data-location rule. | RESPONSE | United States users; data remains in us-west-2. | OWNER_RESPONSE: OWNER-MSG-0010; CARD: INTAKE-CARD-0010; REVISION: 1; SHA256: sha256:039454ea11066a0f5b9ac617397c232edfe0cc42ce27c4f4d15e48b4b9b6d574; QUESTION: INTAKE-Q-0010; ANSWER: RESPONSE |
 
 ### 1.2 Brownfield baseline and preservation contract
 
@@ -225,7 +235,7 @@ person needs, and the data or permission boundary that protects them.
 
 | Actor ID | Actor or external system | Kind | Desired outcome or responsibility | Permission/data boundary | Intake basis IDs |
 |---|---|---|---|---|---|
-| ACT-001 | TODO | TODO | TODO | TODO | TODO |
+| ACT-001 | Development user | PRIMARY_USER | See the approved project outcome | May access only the local synthetic development outcome | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0007 |
 
 ## 5. Goals and non-goals
 
@@ -271,8 +281,8 @@ approved outcome.
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
-| FR-001 | TODO | UBIQUITOUS | AC-FR-001 | TODO | MEASURABLE |
-| FR-002 | TODO | UNWANTED_BEHAVIOR | AC-FR-002 | TODO | GHERKIN |
+| FR-001 | The application SHALL display the current approved project outcome. | UBIQUITOUS | AC-FR-001 | A rendered-output test confirms the approved outcome is displayed. | MEASURABLE |
+| FR-002 | IF input violates approved constraints, THEN the application SHALL reject it without changing approved state. | UNWANTED_BEHAVIOR | AC-FR-002 | GIVEN input outside approved constraints, WHEN the application receives it, THEN the input is rejected and approved state is unchanged. | GHERKIN |
 
 </details>
 
@@ -294,7 +304,7 @@ links for each approved journey.
 
 | Journey ID | Actor IDs | Goal | Trigger | Main success outcome | Alternate/failure behavior | Requirement IDs | Rich-use-case triggers |
 |---|---|---|---|---|---|---|---|
-| JOURNEY-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| JOURNEY-001 | ACT-001 | See the approved project outcome | The development user requests the local result | The current approved outcome is displayed | Invalid input is rejected without changing approved state | COST-001, COST-002, COST-003, COST-004, COST-005, DATA-001, DATA-002, DATA-003, DATA-004, DATA-005, FR-001, FR-002, OPS-001, OPS-002, OPS-003, OPS-004, OPS-005, PERF-001, PERF-002, PERF-003, PERF-004, REL-001, REL-002, REL-003, REL-004, REL-005, SEC-001, SEC-002, SEC-003, SEC-004, SEC-005, SEC-006, SEC-007, SUS-001, SUS-002, SUS-003, SUS-004 | NONE |
 
 </details>
 
@@ -320,7 +330,7 @@ for every journey that needs that additional depth.
 
 | Applicability | Trigger basis | Use-case IDs |
 |---|---|---|
-| TODO | TODO | TODO |
+| NOT_APPLICABLE | NOT_APPLICABLE - low-risk single-actor synchronous fixture | NONE |
 
 ### Rich use cases
 
@@ -510,13 +520,49 @@ to the scenario or journey that demonstrates its coverage.
 
 | QAS ID | Requirement IDs | Source | Stimulus | Environment | Artifact | Response | Response measure |
 |---|---|---|---|---|---|---|---|
-| QAS-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| QAS-001 | REL-004 | Operator | Primary data store becomes unavailable | Development recovery rehearsal | Durable data store | Restore the latest approved backup | A timed restore rehearsal meets RTO 60 minutes and RPO 15 minutes. |
 
 ### Requirement coverage
 
 | Requirement ID | Intake basis IDs | Actor IDs | Journey IDs | Acceptance/test IDs | Approved success measure ID |
 |---|---|---|---|---|---|
-| FR-001 | TODO | TODO | TODO | AC-FR-001 | INTAKE-0006 |
+| COST-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-COST-001 | INTAKE-0006 |
+| COST-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-COST-002 | INTAKE-0006 |
+| COST-003 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-COST-003 | INTAKE-0006 |
+| COST-004 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-COST-004 | INTAKE-0006 |
+| COST-005 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-COST-005 | INTAKE-0006 |
+| DATA-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-DATA-001 | INTAKE-0006 |
+| DATA-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-DATA-002 | INTAKE-0006 |
+| DATA-003 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-DATA-003 | INTAKE-0006 |
+| DATA-004 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-DATA-004 | INTAKE-0006 |
+| DATA-005 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-DATA-005 | INTAKE-0006 |
+| FR-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-FR-001 | INTAKE-0006 |
+| FR-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-FR-002 | INTAKE-0006 |
+| OPS-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-OPS-001 | INTAKE-0006 |
+| OPS-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-OPS-002 | INTAKE-0006 |
+| OPS-003 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-OPS-003 | INTAKE-0006 |
+| OPS-004 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-OPS-004 | INTAKE-0006 |
+| OPS-005 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-OPS-005 | INTAKE-0006 |
+| PERF-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-PERF-001 | INTAKE-0006 |
+| PERF-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-PERF-002 | INTAKE-0006 |
+| PERF-003 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-PERF-003 | INTAKE-0006 |
+| PERF-004 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-PERF-004 | INTAKE-0006 |
+| REL-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-REL-001 | INTAKE-0006 |
+| REL-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-REL-002 | INTAKE-0006 |
+| REL-003 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-REL-003 | INTAKE-0006 |
+| REL-004 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-REL-004 | INTAKE-0006 |
+| REL-005 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-REL-005 | INTAKE-0006 |
+| SEC-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SEC-001 | INTAKE-0006 |
+| SEC-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SEC-002 | INTAKE-0006 |
+| SEC-003 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SEC-003 | INTAKE-0006 |
+| SEC-004 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SEC-004 | INTAKE-0006 |
+| SEC-005 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SEC-005 | INTAKE-0006 |
+| SEC-006 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SEC-006 | INTAKE-0006 |
+| SEC-007 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SEC-007 | INTAKE-0006 |
+| SUS-001 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SUS-001 | INTAKE-0006 |
+| SUS-002 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SUS-002 | INTAKE-0006 |
+| SUS-003 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SUS-003 | INTAKE-0006 |
+| SUS-004 | INTAKE-0002, INTAKE-0003, INTAKE-0004, INTAKE-0005, INTAKE-0006, INTAKE-0007 | ACT-001 | JOURNEY-001 | AC-SUS-004 | INTAKE-0006 |
 
 </details>
 
@@ -548,13 +594,12 @@ behind the Gate A recommendation and the current AWS-guidance basis.
 
 | Current revision | Prior revision | Trigger | Added IDs | Changed IDs | Removed IDs | Preserved IDs | Stale reason | Required revalidation |
 |---|---|---|---|---|---|---|---|---|
-| REQ-0001 | NONE | INITIAL_DEFINITION | TODO | NONE | NONE | NONE | NONE - first definition | FULL_REVALIDATION |
+| REQ-0001 | NONE | INITIAL_DEFINITION | COST-001, COST-002, COST-003, COST-004, COST-005, DATA-001, DATA-002, DATA-003, DATA-004, DATA-005, FR-001, FR-002, OPS-001, OPS-002, OPS-003, OPS-004, OPS-005, PERF-001, PERF-002, PERF-003, PERF-004, REL-001, REL-002, REL-003, REL-004, REL-005, SEC-001, SEC-002, SEC-003, SEC-004, SEC-005, SEC-006, SEC-007, SUS-001, SUS-002, SUS-003, SUS-004 | NONE | NONE | NONE | NONE - first definition | FULL_REVALIDATION |
 
 ### Assumption lifecycle
 
 | Assumption ID | Assumption | Status | Basis IDs | Validation or successor |
 |---|---|---|---|---|
-| ASM-001 | TODO | PROPOSED | TODO | PENDING_OWNER_DECISION |
 
 ### Open decisions
 
@@ -566,18 +611,18 @@ behind the Gate A recommendation and the current AWS-guidance basis.
 
 | Field | Agent-recorded value |
 |---|---|
-| Requirements revision analyzed | TODO |
+| Requirements revision analyzed | `REQ-0001` |
 | Reviewed commit (optional) | TODO / `NOT_RECORDED` |
 | Analysis performed by | TODO |
 | Analysis completed at | TODO (ISO 8601 with timezone) |
-| Open blocking finding IDs | TODO / `NONE` |
-| Proposed assumption IDs required to proceed | TODO / `NONE` |
-| Open blocking decision IDs | TODO / `NONE` |
+| Open blocking finding IDs | `NONE` |
+| Proposed assumption IDs required to proceed | `NONE` |
+| Open blocking decision IDs | `NONE` |
 | AWS Core materiality | `REQUIRED` / `OPTIONAL` / `NOT_MATERIAL` |
 | AWS materiality basis IDs | TODO (current REQ plus affected requirement IDs) / `NONE — <reason>` |
 | AWS Core discovery IDs | TODO (current `AWS-DISC-*` IDs) / `NONE — <reason>` |
 | Unresolved material AWS fact IDs | TODO (open `RA-*` / `DEC-*` IDs) / `NONE` |
-| Agent recommendation | `BLOCKED` / `READY_WITH_PROPOSED_ASSUMPTIONS` / `READY_FOR_OWNER_APPROVAL` |
+| Agent recommendation | `READY_FOR_OWNER_APPROVAL` |
 | Recommendation rationale | TODO |
 
 </details>
@@ -586,16 +631,16 @@ behind the Gate A recommendation and the current AWS-guidance basis.
 
 | Field | Current requirements decision basis |
 |---|---|
-| Outcome | TODO |
-| Owner and users | TODO |
-| Scope and non-goals | TODO |
-| Measurable requirement/acceptance IDs | TODO |
-| Data boundary | TODO |
-| Identity/security boundary | TODO |
-| Environment/Region | TODO |
-| Failure/recovery | TODO |
-| Cost posture | TODO - explain the approved cost-minimization posture and any owner budget ceiling |
-| Intake provenance | TODO |
+| Outcome | `OUT-001 — Deliver FR-001` |
+| Owner and users | `alice; development users` |
+| Scope and non-goals | `FR-001 in scope; production is out of scope` |
+| Measurable requirement/acceptance IDs | `FR-001, EX-001` |
+| Data boundary | `Synthetic internal test data only` |
+| Identity/security boundary | `Local development identity; no public access` |
+| Environment/Region | `Development; us-west-2` |
+| Failure/recovery | `Fail closed; local rollback to baseline` |
+| Cost posture | `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED` |
+| Intake provenance | `owner message MSG-000` |
 
 ### Gate A — owner acceptance record
 
@@ -607,16 +652,16 @@ the accepted assumptions, and the source of the owner's approval.
 
 | Field | Owner-provided value |
 |---|---|
-| Approver | TODO |
-| Owner decision | `PENDING` / `CHANGES_REQUESTED` / `APPROVED` / `STALE` |
-| Authorized requirements revision | TODO |
-| Authorized cost posture | TODO (approved Gate A cost posture) |
-| Explicitly accepted assumption IDs | TODO / `NONE` |
+| Approver | alice |
+| Owner decision | `APPROVED` |
+| Authorized requirements revision | `REQ-0001` |
+| Authorized cost posture | `MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED` |
+| Explicitly accepted assumption IDs | `NONE` |
 | Explicitly rejected assumption IDs and resolution | TODO / `NONE` |
-| Authorization provided at | TODO (ISO 8601 with timezone) |
-| Authorization source | TODO (message, issue, meeting record, or commit link) |
-| Verbatim owner receipt | `RECORDED_BELOW` / `TODO` |
-| Derived Gate A state | `BLOCKED` / `PENDING_OWNER_APPROVAL` / `APPROVED_FOR_DESIGN` / `STALE` |
+| Authorization provided at | `2026-07-17T10:00:00-07:00` |
+| Authorization source | `owner message MSG-001` |
+| Verbatim owner receipt | `RECORDED_BELOW` |
+| Derived Gate A state | `APPROVED_FOR_DESIGN` |
 
 </details>
 
@@ -632,10 +677,10 @@ values substituted:
 <!-- bootstrap:gate-a-receipt:start -->
 ```text
 APPROVE REQUIREMENTS GATE A
-Requirements revision: <REQ-nnnn>
-Cost posture: <exact-Gate-A-cost-posture>
-Accepted assumptions: <assumption-IDs-or-NONE>
-Approver: <name/handle>
+Requirements revision: REQ-0001
+Cost posture: MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED
+Accepted assumptions: NONE
+Approver: alice
 ```
 <!-- bootstrap:gate-a-receipt:end -->
 
@@ -671,33 +716,34 @@ considered, and source basis behind the recommendation.
 
 | Decision ID | Concern | Selection | Version policy | Source | Basis IDs | Alternatives and rationale | Compatibility/migration | Validation |
 |---|---|---|---|---|---|---|---|---|
-| TECH-0001 | APPLICATION_RUNTIME | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0002 | APPLICATION_FRAMEWORK | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0003 | FRONTEND_FRAMEWORK | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0004 | INFRASTRUCTURE_AS_CODE | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0005 | PACKAGE_BUILD_TOOLING | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0006 | TEST_TOOLING | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0007 | PROPERTY_TESTING | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0008 | SECURITY_VALIDATION | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0009 | DEPLOYMENT_TOOLING | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0010 | IDENTITY_AUTHORIZATION | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0011 | DATA_STORAGE | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0012 | MESSAGING_RETRIES | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0013 | EDGE_NETWORKING | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0014 | OBSERVABILITY_INCIDENT_RESPONSE | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
-| TECH-0015 | RELIABILITY_RECOVERY | TODO | TODO | TODO | TODO | RATIONALE: TODO; REJECTED: TODO | TODO | TODO |
+| TECH-0001 | APPLICATION_RUNTIME | Python | CURRENT_LTS_AS_OF: 2026-07-01 | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It is current, supported, and fits the approved local slice; REJECTED: A second runtime would add packaging and operations cost | No migration required | Validate with the task command |
+| TECH-0002 | APPLICATION_FRAMEWORK | FastAPI | COMPATIBLE_MAJOR: 1 | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It provides the smallest typed HTTP surface for the approved journey; REJECTED: A larger framework adds features the first release does not need | No migration required | Validate with the task command |
+| TECH-0003 | FRONTEND_FRAMEWORK | NOT_APPLICABLE — server-rendered interface | NOT_APPLICABLE — server-rendered interface | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: The approved slice uses a server-rendered interface; REJECTED: A separate browser framework adds a second build surface | No migration required | Validate with the task command |
+| TECH-0004 | INFRASTRUCTURE_AS_CODE | AWS SAM | COMPATIBLE_MAJOR: 1 | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It keeps the planned AWS shape reviewable and reversible; REJECTED: Hand-written account changes are not deterministic | No migration required | Validate with the task command |
+| TECH-0005 | PACKAGE_BUILD_TOOLING | pip | MINIMUM: 24.0 | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It matches the selected Python runtime; REJECTED: A second package manager adds lock and setup ambiguity | No migration required | Validate with the task command |
+| TECH-0006 | TEST_TOOLING | unittest | ORG_MANAGED: Python standard library | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It is available with the runtime and fits the bounded slice; REJECTED: A second unit-test runner adds no current benefit | No migration required | Validate with the task command |
+| TECH-0007 | PROPERTY_TESTING | Hypothesis | MINIMUM: 6.0 | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: Generated boundary cases protect the approved invariant; REJECTED: Example-only checks miss important input combinations | No migration required | Validate with the task command |
+| TECH-0008 | SECURITY_VALIDATION | Bandit | EXACT: 1.7.9 | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: Static checks provide a repeatable local security baseline; REJECTED: Manual review alone is not reproducible | No migration required | Validate with the task command |
+| TECH-0009 | DEPLOYMENT_TOOLING | AWS SAM CLI | MINIMUM: 1.120 | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It matches the selected reversible infrastructure definition; REJECTED: An unrelated deployment tool would duplicate configuration | No migration required | Validate with the task command |
+| TECH-0010 | IDENTITY_AUTHORIZATION | Local development identity with server-side authorization | ORG_MANAGED: approved design contract | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It preserves server-side access decisions in the local slice; REJECTED: Client-only authorization would not enforce the boundary | No migration required | Validate with the task command |
+| TECH-0011 | DATA_STORAGE | Local JSON store with per-owner records | ORG_MANAGED: approved design contract | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: It is sufficient for the bounded local journey and preserves ownership; REJECTED: A network database adds setup without current value | No migration required | Validate with the task command |
+| TECH-0012 | MESSAGING_RETRIES | NOT_APPLICABLE — synchronous local request flow | NOT_APPLICABLE — synchronous local request flow | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: The approved outcome completes synchronously; REJECTED: A queue adds delayed-state complexity without a requirement | No migration required | Validate with the task command |
+| TECH-0013 | EDGE_NETWORKING | NOT_APPLICABLE — local-only development surface | NOT_APPLICABLE — local-only development surface | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: The release is local and has no public edge; REJECTED: A public endpoint would widen exposure before authorization | No migration required | Validate with the task command |
+| TECH-0014 | OBSERVABILITY_INCIDENT_RESPONSE | Structured local logs and failure counters | ORG_MANAGED: approved design contract | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: Structured logs and counters expose local failures without sensitive content; REJECTED: Unstructured console output is harder to verify | No migration required | Validate with the task command |
+| TECH-0015 | RELIABILITY_RECOVERY | Baseline commit restore with explicit rollback checks | ORG_MANAGED: approved design contract | AGENT_RECOMMENDATION | DES-0001, FR-001 | RATIONALE: The authorized baseline provides a bounded local rollback; REJECTED: A separate recovery service is unnecessary before deployment | No migration required | Validate with the task command |
 
 ### Architecture drivers
 
 | Driver ID | Requirement basis | Class | Decision implication | Validation |
 |---|---|---|---|---|
-| DRV-0001 | TODO | TODO | TODO | TODO |
+| DRV-0001 | COST-001, COST-002, COST-003, COST-004, COST-005, DATA-001, DATA-002, DATA-003, DATA-004, DATA-005, FR-001, FR-002, OPS-001, OPS-002, OPS-003, OPS-004, OPS-005, PERF-001, PERF-002, PERF-003, PERF-004, REL-001, REL-002, REL-003, REL-004, REL-005, SEC-001, SEC-002, SEC-003, SEC-004, SEC-005, SEC-006, SEC-007, SUS-001, SUS-002, SUS-003, SUS-004 | HARD_CONSTRAINT | Preserve complete approved requirement coverage with the lowest operational burden | Compare every candidate against all requirement IDs |
 
 ### Whole-system candidates
 
 | Candidate ID | Architecture summary | Requirement coverage | AWS evidence | Eligibility | Failed constraints | Tradeoffs |
 |---|---|---|---|---|---|---|
-| CAND-0001 | TODO | TODO | TODO | TODO | TODO | TODO |
+| CAND-0001 | MANAGED_SERVERLESS_BASELINE: bounded managed entry, compute, and data services | COST-001, COST-002, COST-003, COST-004, COST-005, DATA-001, DATA-002, DATA-003, DATA-004, DATA-005, FR-001, FR-002, OPS-001, OPS-002, OPS-003, OPS-004, OPS-005, PERF-001, PERF-002, PERF-003, PERF-004, REL-001, REL-002, REL-003, REL-004, REL-005, SEC-001, SEC-002, SEC-003, SEC-004, SEC-005, SEC-006, SEC-007, SUS-001, SUS-002, SUS-003, SUS-004 | AWS-EV-0001, AWS-EV-0002 | ELIGIBLE | NONE | Lowest idle cost and operations; service limits remain revisit triggers |
+| CAND-0002 | Container service with continuously provisioned compute | COST-001, COST-002, COST-003, COST-004, COST-005, DATA-001, DATA-002, DATA-003, DATA-004, DATA-005, FR-001, FR-002, OPS-001, OPS-002, OPS-003, OPS-004, OPS-005, PERF-001, PERF-002, PERF-003, PERF-004, REL-001, REL-002, REL-003, REL-004, REL-005, SEC-001, SEC-002, SEC-003, SEC-004, SEC-005, SEC-006, SEC-007, SUS-001, SUS-002, SUS-003, SUS-004 | AWS-EV-0001, AWS-EV-0002 | INELIGIBLE | DRV-0001 | More runtime control but unnecessary fixed operations for this bounded workload |
 
 </details>
 
@@ -714,7 +760,7 @@ risks, safeguards, operating burden, and conditions for reconsideration.
 
 | Architecture ID | Selected candidate | Requirement and driver basis | Rationale | Rejected alternatives | Risks | Mitigations | Security impact | Reliability impact | Operational burden | Cost effect | Breakpoints | Migration path | Revisit triggers | Validation |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| ARCH-0001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| ARCH-0001 | CAND-0001 | COST-001, COST-002, COST-003, COST-004, COST-005, DATA-001, DATA-002, DATA-003, DATA-004, DATA-005, FR-001, FR-002, OPS-001, OPS-002, OPS-003, OPS-004, OPS-005, PERF-001, PERF-002, PERF-003, PERF-004, REL-001, REL-002, REL-003, REL-004, REL-005, SEC-001, SEC-002, SEC-003, SEC-004, SEC-005, SEC-006, SEC-007, SUS-001, SUS-002, SUS-003, SUS-004, DRV-0001 | Meets every hard constraint with the smallest managed surface | CAND-0002 | Managed-service limits | Validate quotas and alarms before deployment | Retains server-side authorization and least-privilege controls | Managed services bound failure domains with tested recovery | No continuously provisioned compute to operate | Pay per request with no intentional idle compute | Reassess at sustained utilization where containers are cheaper | Use versioned APIs and reversible IaC for any later migration | Reassess on quota, residency, or latency changes | Requirement trace and integration tests |
 
 </details>
 
@@ -728,33 +774,67 @@ current AWS guidance, affected decisions, and the project diagrams below.
 
 | Requirement ID | ARCH / API / EVENT / CLI / FILE / BOUNDARY / STATE IDs | Property/test IDs | Evidence IDs |
 |---|---|---|---|
-| TODO | TODO | TODO | TODO |
+| COST-001 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| COST-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| COST-003 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| COST-004 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| COST-005 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| DATA-001 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| DATA-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| DATA-003 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| DATA-004 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| DATA-005 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| FR-001 | ARCH-0001, API-001 | PROP-001 | AWS-EV-0001, AWS-EV-0002 |
+| FR-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| OPS-001 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| OPS-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| OPS-003 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| OPS-004 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| OPS-005 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| PERF-001 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| PERF-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| PERF-003 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| PERF-004 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| REL-001 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| REL-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| REL-003 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| REL-004 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| REL-005 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SEC-001 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SEC-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SEC-003 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SEC-004 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SEC-005 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SEC-006 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SEC-007 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SUS-001 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SUS-002 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SUS-003 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
+| SUS-004 | ARCH-0001, API-001 | EX-001 | AWS-EV-0001, AWS-EV-0002 |
 
 ### Material AWS evidence
 
 | Evidence ID | Discovery ID | Design IDs | Material claim | AWS Core capability | Official reference | Observed date |
 |---|---|---|---|---|---|---|
-| AWS-EV-0001 | AWS-DISC-0002 | TODO | TODO | `retrieve_skill` | TODO | TODO |
-| AWS-EV-0002 | AWS-DISC-0002 | TODO | TODO | `search_documentation` | TODO | TODO |
+| AWS-EV-0001 | AWS-DISC-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0001 | AWS managed serverless services support bounded pay-per-use execution patterns | retrieve_skill | https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html | 2026-07-17 |
+| AWS-EV-0002 | AWS-DISC-0002 | DRV-0001, CAND-0001, CAND-0002, ARCH-0001, TECH-0004 | AWS documentation defines current serverless security and operational guidance | search_documentation | https://docs.aws.amazon.com/lambda/latest/dg/security.html | 2026-07-17 |
 
 ### Change impact record
 
 | Change ID | Changed basis IDs | Affected IDs | Preserved IDs | Required revalidation |
 |---|---|---|---|---|
-| CHANGE-0001 | TODO | TODO | TODO | TODO |
 
 ### Project diagram contract
 
 | Diagram ID | Kind | Applicability | Status | Anchor | Basis IDs | Referenced IDs |
 |---|---|---|---|---|---|---|
-| DIAGRAM-0001 | SYSTEM_CONTEXT | REQUIRED | NOT_YET_CREATED | proposed-system-at-a-glance | NONE | NONE |
-| DIAGRAM-0002 | PRIMARY_OUTCOME | REQUIRED | NOT_YET_CREATED | sequence-primary-outcome | NONE | NONE |
-| DIAGRAM-0003 | DATA_LIFECYCLE | CONDITIONAL | NOT_YET_CREATED | data-lifecycle-view | NONE | NONE |
-| DIAGRAM-0004 | FAILURE_RECOVERY | CONDITIONAL | NOT_YET_CREATED | sequence-failure-and-recovery | NONE | NONE |
+| DIAGRAM-0001 | SYSTEM_CONTEXT | REQUIRED | CURRENT | proposed-system-at-a-glance | ARCH-0001, FR-001 | ARCH-0001, API-001 |
+| DIAGRAM-0002 | PRIMARY_OUTCOME | REQUIRED | CURRENT | sequence-primary-outcome | ARCH-0001, JOURNEY-001 | ACT-001, API-001 |
+| DIAGRAM-0003 | DATA_LIFECYCLE | CONDITIONAL | CURRENT | data-lifecycle-view | ARCH-0001, DATA-001 | API-001, DATA-001 |
+| DIAGRAM-0004 | FAILURE_RECOVERY | CONDITIONAL | CURRENT | sequence-failure-and-recovery | ARCH-0001, REL-005 | API-001, REL-005 |
 | DIAGRAM-0005 | MIGRATION | CONDITIONAL | NOT_YET_CREATED | migration-view | NONE | NONE |
 | DIAGRAM-0006 | JOURNEY | CONDITIONAL | NOT_YET_CREATED | journey-view | NONE | NONE |
 | DIAGRAM-0007 | STATE | CONDITIONAL | NOT_YET_CREATED | state-view | NONE | NONE |
-| DIAGRAM-0008 | AWS_IMPLEMENTATION | REQUIRED | NOT_YET_CREATED | aws-implementation-at-a-glance | NONE | NONE |
 
 The diagram records identify which project facts each view represents. Diagrams
 describe planned design and are not evidence that the application is built or
@@ -764,7 +844,8 @@ deployed.
 
 ### Migration view
 
-No project-specific migration diagram has been created yet. After Gate A, Fastlane adds one when existing-system or migration work makes it useful.
+No project-specific migration diagram has been created yet. After Gate A,
+Fastlane adds one when existing-system or migration work makes it useful.
 
 ## 14. Architecture overview
 
@@ -773,7 +854,12 @@ dependencies, and important failure boundaries in one place.
 
 ### Proposed system at a glance
 
-No project architecture diagram has been created yet. After Gate A, Fastlane places the selected components, trust boundaries, data movement, dependencies, and failure boundaries here. The diagram describes planned design, not proof of implementation or deployment.
+```mermaid
+flowchart LR
+    ARCH-0001["Managed application"]
+    API-001["Approved interface"]
+    ARCH-0001 -->|serves| API-001
+```
 
 ## 15. Component design
 
@@ -794,7 +880,7 @@ that keep external details separate from the product's core behavior.
 
 | Boundary ID | Outer adapter/layer | Inner domain layer | Boundary DTO/schema | Explicit mapping | Dependency direction | Authorization enforcement | External anti-corruption adapter | Requirement IDs | Validation IDs |
 |---|---|---|---|---|---|---|---|---|---|
-| BOUNDARY-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| BOUNDARY-001 | Local client adapter | Application domain | Approved request and outcome DTOs | Explicit adapter-to-domain mapping | INWARD - adapter depends on the domain contract | SERVER_SIDE - trusted service enforces authorization | NOT_APPLICABLE - no external provider object crosses the boundary | FR-001, FR-002 | AC-FR-001, AC-FR-002 |
 
 </details>
 
@@ -811,7 +897,7 @@ failure, concurrency, and performance boundary for each material interface.
 
 | Contract ID | Kind | Requirement basis | Producer | Consumer | Schema or protocol | Authentication | Authorization | Input validation | Success output/status | Error and recovery behavior | Compatibility/versioning | Idempotency/concurrency | Timeout bound | Rate bound | Performance bound |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| API-001 | API | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| API-001 | API | FR-001 | Local client | Trusted application service | Versioned request/response schema | NOT_APPLICABLE - local development fixture | Server verifies the caller may request the local outcome | Reject values outside the approved schema | Return the approved outcome with success status | Return a safe error and preserve approved state | Compatible schema additions only | One idempotent read per request | 2 seconds | 100 requests per minute | p95 response within 2 seconds |
 
 </details>
 
@@ -830,23 +916,28 @@ the valid states, transitions, and safeguards for each one.
 
 | Subject ID | Applicability | Trigger basis IDs | State model IDs |
 |---|---|---|---|
-| RESOURCE-001 | TODO | TODO | TODO |
+| RESOURCE-001 | NOT_APPLICABLE | NOT_APPLICABLE - synchronous read has no meaningful lifecycle transition | NONE |
 
 ### State register
 
 | State model ID | Subject ID | States | Initial state | Allowed transitions | Terminal states | Invalid-transition behavior | Requirement IDs | Validation IDs |
 |---|---|---|---|---|---|---|---|---|
-| STATE-001 | RESOURCE-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
 </details>
 
 ### State view
 
-No project-specific state diagram has been created yet. After Gate A, Fastlane adds one when an important product lifecycle benefits from a visual view.
+No project-specific state diagram has been created yet. After Gate A, Fastlane
+adds one when an important product lifecycle benefits from a visual view.
 
 ### Data lifecycle view
 
-No project-specific data lifecycle diagram has been created yet. After Gate A, Fastlane adds one when approved retention, deletion, backup, or recovery requirements make it useful.
+```mermaid
+flowchart LR
+    API-001["Approved interface"]
+    DATA-001["Approved data lifecycle"]
+    API-001 -->|stores approved data| DATA-001
+```
 
 ## 18. Detailed sequence diagrams
 
@@ -855,11 +946,22 @@ user outcome and respond safely when a material step fails.
 
 ### Sequence — primary outcome
 
-No primary-outcome sequence has been created yet. After the design selects its components and interfaces, Fastlane shows the first useful result end to end.
+```mermaid
+flowchart LR
+    ACT-001["Development user"]
+    API-001["Approved interface"]
+    ACT-001 -->|requests approved outcome| API-001
+    API-001 -->|returns approved outcome| ACT-001
+```
 
 ### Sequence — failure and recovery
 
-No failure-and-recovery sequence has been created yet. Fastlane adds one when the approved design includes material retry, background work, or recovery.
+```mermaid
+flowchart LR
+    API-001["Approved interface"]
+    REL-005["Rollback requirement"]
+    API-001 -->|fails health checks and invokes| REL-005
+```
 
 ## 19. Error handling strategy
 
@@ -874,11 +976,11 @@ retry is safe, what operators can observe, and how the product recovers.
 
 | Error class | Example | Retry? | User-visible behavior | Logging or metric | Recovery |
 |---|---|---|---|---|---|
-| Validation | TODO | No | Safe 4xx or equivalent | Counter without sensitive input | User corrects request |
-| Transient dependency | TODO | Bounded | Safe temporary failure | Error metric and correlation ID | Retry or queue |
-| Permanent dependency | TODO | No | Reviewable terminal state | Alarm | Manual remediation |
-| Concurrency conflict | TODO | No or retry with fresh state | Conflict response | Conflict metric | Re-read and retry |
-| Internal defect | TODO | No uncontrolled retry | Generic safe error | Alert and trace | Rollback or fix |
+| Validation | Request exceeds the approved input shape | No | Reject the request with a safe explanation | Validation error counter without request content | The user corrects the request |
+| Transient dependency | A dependency times out temporarily | Bounded to 3 attempts | Ask the user to try again later | Retry count and dependency timeout trace | Stop at the retry bound and preserve state |
+| Permanent dependency | A dependency rejects the approved operation | No | Explain that the operation could not complete | Permanent dependency failure counter | Correct the dependency configuration before retry |
+| Concurrency conflict | A request uses a stale record version | No or retry with fresh state | Return a conflict response | Conflict counter with the record category | Re-read the current record before retry |
+| Internal defect | Unexpected application failure | No uncontrolled retry | Return a generic safe error | Alert and trace without sensitive content | Roll back or correct the defect |
 
 </details>
 
@@ -891,10 +993,6 @@ requirements and constraints, then Codex completes this approach and the full
 architecture diagram for Gate B; AWS Core informs the recommendation, while
 only the owner can approve it or separately authorize account work.
 
-### AWS implementation at a glance
-
-No AWS implementation diagram has been created yet. After Gate A, Fastlane places the applicable selected services and mechanisms here in a concise top-to-bottom view; the exact table retains all eight concern decisions, including justified non-applicability. It describes the proposed design, not observed AWS behavior.
-
 <details>
 <summary>Exact AWS service decision records</summary>
 
@@ -904,14 +1002,14 @@ decisions and current AWS evidence preserve the complete basis.
 
 | Concern | Decision IDs | AWS service or mechanism | Rationale | Tradeoff |
 |---|---|---|---|---|
-| Compute | TODO | TODO | TODO | TODO |
-| API and edge | TODO | TODO | TODO | TODO |
-| Identity | TODO | TODO | TODO | TODO |
-| Data | TODO | TODO | TODO | TODO |
-| Messaging | TODO | TODO | TODO | TODO |
-| Observability | TODO | TODO | TODO | TODO |
-| Deployment | TODO | TODO | TODO | TODO |
-| Secrets and encryption | TODO | TODO | TODO | TODO |
+| Compute | TECH-0001, TECH-0002 | AWS Lambda behind the approved application interface | Pay-per-use compute fits the bounded workload | Managed runtime limits become revisit triggers |
+| API and edge | TECH-0002, TECH-0013 | Amazon API Gateway without a separate public edge layer | One managed entry point keeps the interface bounded | A public endpoint requires separate deployment authorization |
+| Identity | TECH-0010 | Server-side application authorization at the trusted service | The local release preserves the approved identity boundary | An AWS identity provider is deferred until deployment design needs it |
+| Data | TECH-0011 | Per-owner records behind the trusted data adapter | The adapter preserves ownership and supports later migration | A managed AWS store is not locally observed |
+| Messaging | TECH-0012 | NOT_APPLICABLE - the approved path completes synchronously | No background delivery is required by the approved journey | A queue is reconsidered if asynchronous work becomes material |
+| Observability | TECH-0014 | Structured application logs and bounded failure counters | The local evidence can verify useful signals without secrets | AWS-native signals remain unobserved before deployment |
+| Deployment | TECH-0004, TECH-0009 | AWS SAM template and deployment plan | The selected tools keep planned infrastructure reproducible | Account-side planning still requires separate authority |
+| Secrets and encryption | TECH-0008, TECH-0010 | No stored secret in the local release and least-privilege planned access | The design avoids introducing a secret before it is required | Deployed encryption controls remain unobserved |
 
 </details>
 
@@ -945,16 +1043,14 @@ investigation appears only when a blocking technical unknown must be resolved.
 
 | Wave contract ID | Work kind | Walking-skeleton journey ID | Requirement IDs | Acceptance/test IDs | End-to-end Harness ID | Blocking spike ID |
 |---|---|---|---|---|---|---|
-| WAVE-0001 | TODO | TODO | TODO | TODO | TODO | NONE |
+| WAVE-001 | NEW_BUILD | JOURNEY-001 | FR-001 | AC-FR-001 | HARNESS-004 | NONE |
 
 For a new application, this row identifies the first tested end-to-end outcome
 that construction will prove.
 
 ### Blocking spike
 
-| Spike ID | Blocking technical unknown | Time box | Disposable output boundary | Exit criterion | Required next action |
-|---|---|---|---|---|---|
-| SPIKE-0001 | TODO | TODO | TODO | TODO | DISCARD_AND_BUILD_WALKING_SKELETON |
+NOT_APPLICABLE - no prerequisite discovery is needed before the walking skeleton
 
 </details>
 
@@ -1002,22 +1098,16 @@ they run, and where their results will be recorded.
 
 | Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | Exact command or API | Evidence destination | Required or conditional status |
 |---|---|---|---|---|---|---|---|
-| HARNESS-001 | Static | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-002 | Unit | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-003 | Integration | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-004 | End-to-end | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-005 | Property | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-006 | Security and privacy | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-007 | Reliability and recovery | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-008 | Performance and scalability | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-009 | IaC and policy | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-010 | AWS environment and operations | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-011 | End-to-end | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-012 | End-to-end | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-013 | Unit | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-014 | Static | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-015 | Security and privacy | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
-| HARNESS-016 | Property | TODO | TODO | TODO | TODO | docs/project/VERIFY.md#harness-execution-evidence | TODO |
+| HARNESS-001 | Static | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-002 | Unit | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-003 | Integration | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-004 | End-to-end | unittest journey validation | NEW_BUILD first outcome | DES-0001, FR-001, JOURNEY-001, WAVE-001 | python -m unittest tests.test_product_journeys | docs/project/VERIFY.md#harness-execution-evidence | REQUIRED |
+| HARNESS-005 | Property | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-006 | Security and privacy | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-007 | Reliability and recovery | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-008 | Performance and scalability | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-009 | IaC and policy | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
+| HARNESS-010 | AWS environment and operations | NOT_APPLICABLE | The focused fixture does not exercise this harness layer | DES-0001, FR-001 | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE - the focused fixture validates other contracts |
 
 The profile is complete only when each selected check has a project reason, a
 repeatable command or API, and a clear evidence destination. The tool set is
@@ -1037,10 +1127,10 @@ planning evidence required for technical review.
 
 | Validation path | Applicability | TECH binding | Required local/static validation | AWS planning validation | Evidence destination |
 |---|---|---|---|---|---|
-| CloudFormation / SAM / CDK | TODO | TODO | Synth or template validation, selected lint, and selected Guard or policy checks | Review an authorized existing change set; creating one is an AWS mutation | `docs/project/VERIFY.md#iac-validation-evidence` |
-| Terraform | TODO | TODO | Formatting, validation, selected policy checks, and a deterministic plan boundary | Bind the reviewed plan to exact inputs, state/refresh mode, target, and digest | `docs/project/VERIFY.md#iac-validation-evidence` |
-| Container delivery | TODO | TODO | Dependency/lock validation, SBOM generation, and selected image/configuration checks | Bind the immutable image digest and deployment target | `docs/project/VERIFY.md#iac-validation-evidence` |
-| Other approved delivery path | TODO | TODO | Exact equivalent checks selected by current TECH decisions | Exact equivalent immutable plan and target binding | `docs/project/VERIFY.md#iac-validation-evidence` |
+| CloudFormation / SAM / CDK | APPLICABLE | TECH-0004, TECH-0008, TECH-0009 | sam validate, selected lint, and policy checks | Review a separately authorized change set bound to the template digest | docs/project/VERIFY.md#iac-validation-evidence |
+| Terraform | NOT_APPLICABLE - AWS SAM is the selected infrastructure tool | NOT_APPLICABLE - no Terraform technology decision is active | NOT_APPLICABLE - no Terraform configuration is approved | NOT_APPLICABLE - no Terraform plan is approved | docs/project/VERIFY.md#iac-validation-evidence |
+| Container delivery | NOT_APPLICABLE - no container delivery path is approved | NOT_APPLICABLE - no container technology decision is active | NOT_APPLICABLE - no container artifact is approved | NOT_APPLICABLE - no image deployment is approved | docs/project/VERIFY.md#iac-validation-evidence |
+| Other approved delivery path | NOT_APPLICABLE - no additional delivery path is approved | NOT_APPLICABLE - no additional delivery technology is active | NOT_APPLICABLE - no additional local validation is needed | NOT_APPLICABLE - no additional AWS planning is approved | docs/project/VERIFY.md#iac-validation-evidence |
 
 </details>
 
@@ -1057,8 +1147,8 @@ and failure behavior at the selected validation layer.
 
 | Test ID | Scenario | Expected result | Layer |
 |---|---|---|---|
-| EX-001 | Known happy path | TODO | Integration |
-| EX-002 | Known boundary or failure | TODO | Unit |
+| EX-001 | Known happy path | Approved outcome is returned | Integration |
+| EX-002 | Known boundary or failure | Safe rejection preserves approved state | Unit |
 
 </details>
 
@@ -1077,21 +1167,53 @@ stable expected result, the run boundary, and the replayable evidence path.
 
 | Requirement ID | Applicability | Reason or property IDs |
 |---|---|---|
-| TODO | `APPLICABLE` / `NOT_APPLICABLE` | TODO |
+| COST-001 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| COST-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| COST-003 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| COST-004 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| COST-005 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| DATA-001 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| DATA-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| DATA-003 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| DATA-004 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| DATA-005 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| FR-001 | APPLICABLE | PROP-001 |
+| FR-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| OPS-001 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| OPS-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| OPS-003 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| OPS-004 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| OPS-005 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| PERF-001 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| PERF-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| PERF-003 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| PERF-004 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| REL-001 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| REL-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| REL-003 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| REL-004 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| REL-005 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SEC-001 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SEC-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SEC-003 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SEC-004 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SEC-005 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SEC-006 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SEC-007 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SUS-001 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SUS-002 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SUS-003 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
+| SUS-004 | NOT_APPLICABLE | No stable generated-input oracle is approved for this requirement |
 
 | Property ID | Requirement IDs | Invariant | Generated inputs or state | Preconditions | Oracle | Boundary or shrink focus | Layer |
 |---|---|---|---|---|---|---|---|
-| PROP-001 | SEC-002 | An actor never observes another actor's protected resource. | Actors, resources, roles, identifiers | Valid authenticated actors | Access allowed only when policy relation holds | Cross-tenant IDs, missing ownership, role changes | Integration |
-| PROP-002 | REL-002 | Repeating the same event produces one effective state transition. | Duplicate counts, orderings, retry timing | Same idempotency identity | Final state and side effects equal one delivery | Reordered and repeated events | Integration |
-| PROP-003 | SEC-003 | No generated secret appears in emitted telemetry. | Secret-like values and payload positions | Telemetry enabled | Search of logs/events contains no secret | Unicode, long values, encoded forms | Unit / integration |
-| PROP-004 | REL-001 | Retry attempts never exceed the configured bound. | Failure sequences and transient/permanent classifications | Dependency fails | Attempts <= configured maximum | Zero, one, maximum, permanent transition | Unit |
-| PROP-005 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| PROP-001 | FR-001 | An actor never observes another actor's protected resource. | Actors, resources, roles, identifiers | Valid authenticated actors | Access allowed only when policy relation holds | Cross-tenant IDs, missing ownership, role changes | Integration |
 
 ### Property execution contract
 
 | Property ID | Framework TECH ID | Exact command | Run target/time bound | Seed or reproduction format | Evidence destination |
 |---|---|---|---|---|---|
-| PROP-001 | TODO | TODO | TODO | TODO | TODO |
+| PROP-001 | TECH-0007 | python -m unittest tests.test_properties | MIN_CASES: 100; MAX_SECONDS: 30 | integer seed; reproduce with the recorded --seed value | docs/project/VERIFY.md#property-based-test-evidence |
 
 Each applicable property binds one approved framework decision, exact command,
 run bound, replay format, and evidence destination. Observed results belong in
@@ -1152,7 +1274,6 @@ locally inside the approved envelope.
 | Identity and data | [Interfaces](#16-interfaces-and-contracts), [data lifecycle](#17-data-model-and-lifecycle), and [AWS approach](#20-aws-implementation-approach) |
 | Reliability and operations | [Error handling](#19-error-handling-strategy), [release acceptance](#26-release-acceptance), and current project diagrams |
 | Validation and construction | [Validation strategy](#validation-strategy), readiness card, and the exact construction envelope |
-| Architecture diagrams | [Complete proposed architecture](#proposed-system-at-a-glance), [AWS implementation](#aws-implementation-at-a-glance), and the [diagram guide](#diagram-guide) |
 
 ## 27. Gate B agent review record
 
@@ -1233,7 +1354,7 @@ repository, GitHub, or AWS action outside it remains unauthorized.
 | In-scope components and environments | TODO |
 | Allowed repository write set | `PATHS: exact/path; narrow/**` |
 | Excluded or owner-only write set | `NONE` / `PATHS: exact/path; narrow/**` |
-| Application source disposition | `GREENFIELD_APP_ROOT: app/**` / `BROWNFIELD_PRESERVE: path/**; another/path/**` / `NOT_APPLICABLE — INFRASTRUCTURE_ONLY` |
+| Application source disposition | `GREENFIELD_APP_ROOT: app/**` |
 | Allowed external-state targets | `NONE` / `TARGETS: exact-target; exact-target` |
 | Task boundary | `DERIVED_FROM_AUTHORIZED_IDS_AND_WRITE_SET` / `TASK_IDS: TASK-0001, TASK-0002` |
 | Maximum generated tasks | TODO (positive integer) |
@@ -1319,18 +1440,3 @@ Gate B remains current only while its requirements, design, validation plan,
 and construction boundary still match the approved record. A material change
 returns the project to the appropriate owner review; evidence gathered within
 the approved boundary does not create new authority.
-
-# Diagram guide
-
-Use this index to open each singular project diagram. Every view describes planned design unless its supporting evidence explicitly records an observed result.
-
-| Diagram | What it explains | When it appears | Open diagram |
-|---|---|---|---|
-| Complete proposed architecture | The complete component, trust, data, AWS, operations, and recovery shape | Every current technical plan | [View complete architecture](#proposed-system-at-a-glance) |
-| AWS implementation | The applicable selected services; its exact table retains all eight concern decisions | Every current technical plan | [View AWS implementation](#aws-implementation-at-a-glance) |
-| First useful outcome | How the primary user result moves through the design | Every current technical plan | [View first useful outcome](#sequence-primary-outcome) |
-| Journey and alternate paths | Multi-actor, alternate, or rich-use-case flow | When the approved journeys make it material | [View journey paths](#journey-view) |
-| State lifecycle | Meaningful product states and transitions | When a current state model applies | [View state lifecycle](#state-view) |
-| Data lifecycle | Ownership, retention, deletion, backup, and recovery movement | When approved data requirements make it material | [View data lifecycle](#data-lifecycle-view) |
-| Failure and recovery | Material failure, retry, rollback, or recovery behavior | When reliability requirements make it material | [View failure and recovery](#sequence-failure-and-recovery) |
-| Migration | Existing-system preservation and cutover movement | For brownfield or migration work | [View migration](#migration-view) |

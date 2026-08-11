@@ -158,7 +158,9 @@ class PackageReleaseTests(unittest.TestCase):
         expected_identities = [
             "actions/checkout",
             "actions/setup-python",
+            "actions/setup-node",
             "astral-sh/ruff-action",
+            "actions/upload-artifact",
         ] + ["actions/checkout", "actions/setup-python"] * 3
         self.assertEqual(action_identities(workflow), expected_identities)
 
@@ -178,13 +180,23 @@ class PackageReleaseTests(unittest.TestCase):
         for forbidden in (
             "self-hosted",
             "secrets.",
-            "upload-artifact",
             "pull_request_target",
             "contents: write",
             "actions: write",
             "id-token: write",
         ):
             self.assertNotIn(forbidden, workflow)
+        self.assertEqual(workflow.count("actions/upload-artifact@"), 1)
+        self.assertIn(
+            "name: fastlane-mermaid-rendered-${{ env.FASTLANE_CANDIDATE_COMMIT }}",
+            workflow,
+        )
+        self.assertIn(
+            "path: ${{ runner.temp }}/fastlane-mermaid/*.svg",
+            workflow,
+        )
+        self.assertIn("if-no-files-found: error", workflow)
+        self.assertIn("retention-days: 14", workflow)
 
     def test_ci_push_branches_and_precheck_order_are_exact(self) -> None:
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(
@@ -208,6 +220,14 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertNotIn("      - Legacy\n", workflow)
         self.assertNotIn("      - main\n", workflow)
         self.assertEqual(workflow.count("needs: repository-precheck"), 3)
+        self.assertIn(
+            "FASTLANE_CANDIDATE_COMMIT: "
+            "${{ github.event.pull_request.head.sha || github.sha }}",
+            workflow,
+        )
+        self.assertEqual(workflow.count("ref: ${{ env.FASTLANE_CANDIDATE_COMMIT }}"), 4)
+        self.assertEqual(workflow.count("name: Verify exact candidate checkout"), 4)
+        self.assertEqual(workflow.count("git rev-parse HEAD"), 4)
         self.assertEqual(workflow.count("if: ${{ always() }}"), 3)
         self.assertEqual(
             workflow.count("name: Require successful repository precheck"), 3
@@ -238,6 +258,8 @@ class PackageReleaseTests(unittest.TestCase):
             "Verify Ruff formatting",
             "Run repository governance monitors",
             "Run Engine characterization contracts",
+            "Render sanitized published and Golden Project diagrams",
+            "Preserve sanitized rendered-diagram review artifacts",
             "Verify template manifest hashes",
             "Enforce customer package version identity",
             "Verify deterministic release package",
@@ -263,9 +285,27 @@ class PackageReleaseTests(unittest.TestCase):
             "git tag",
             "git push",
             "gh release",
-            "upload-artifact",
         ):
             self.assertNotIn(forbidden, workflow)
+        self.assertIn("@mermaid-js/mermaid-cli@11.16.0", workflow)
+        self.assertIn('node-version: "22.17.1"', workflow)
+        self.assertIn("python -m tests.render_mermaid_fixtures", workflow)
+        self.assertIn(
+            'puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"',
+            workflow,
+        )
+        self.assertEqual(workflow.count('{"args":["--no-sandbox"]}'), 1)
+        self.assertEqual(
+            workflow.count('--puppeteerConfigFile "${puppeteer_config}"'), 1
+        )
+        self.assertNotIn("--disable-setuid-sandbox", workflow)
+        self.assertIn("for theme in default dark", workflow)
+        self.assertIn('--theme "${theme}"', workflow)
+        self.assertIn('background="white"', workflow)
+        self.assertIn('background="#333333"', workflow)
+        self.assertIn('--backgroundColor "${background}"', workflow)
+        self.assertIn('"${source%.mmd}.${theme}.svg"', workflow)
+        self.assertIn("-name '*.svg' | wc -l)\" -eq 22", workflow)
 
     def test_active_project_documents_are_grouped_under_docs_project(self) -> None:
         document_names = ("BUGFIX.md", "PRD.md", "RUNBOOK.md", "TASKS.md", "VERIFY.md")
@@ -313,7 +353,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.34")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.35")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())

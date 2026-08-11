@@ -9,6 +9,7 @@ from __future__ import annotations
 
 
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Mapping
@@ -154,15 +155,33 @@ AWS_SERVICE_DECISION_HEADERS = (
 
 
 AWS_SERVICE_TECH_CONCERNS = {
-    "Compute": {"APPLICATION_RUNTIME", "APPLICATION_FRAMEWORK"},
-    "API and edge": {"APPLICATION_FRAMEWORK", "EDGE_NETWORKING"},
-    "Identity": {"IDENTITY_AUTHORIZATION"},
-    "Data": {"DATA_STORAGE"},
-    "Messaging": {"MESSAGING_RETRIES"},
-    "Observability": {"OBSERVABILITY_INCIDENT_RESPONSE"},
-    "Deployment": {"INFRASTRUCTURE_AS_CODE", "DEPLOYMENT_TOOLING"},
-    "Secrets and encryption": {"SECURITY_VALIDATION", "IDENTITY_AUTHORIZATION"},
+    "Compute": ("APPLICATION_RUNTIME", "APPLICATION_FRAMEWORK"),
+    "API and edge": ("APPLICATION_FRAMEWORK", "EDGE_NETWORKING"),
+    "Identity": ("IDENTITY_AUTHORIZATION",),
+    "Data": ("DATA_STORAGE",),
+    "Messaging": ("MESSAGING_RETRIES",),
+    "Observability": ("OBSERVABILITY_INCIDENT_RESPONSE",),
+    "Deployment": (
+        "INFRASTRUCTURE_AS_CODE",
+        "DEPLOYMENT_TOOLING",
+        "RELIABILITY_RECOVERY",
+    ),
+    "Secrets and encryption": ("SECURITY_VALIDATION",),
 }
+
+
+@dataclass(frozen=True)
+class AwsImplementationDecision:
+    """Private validated input for owner-facing AWS design diagrams."""
+
+    concern: str
+    decision_ids: tuple[str, ...]
+    mechanism: str
+    rationale: str
+    tradeoff: str
+    applicable_decision_ids: tuple[str, ...]
+    evidence_ids: tuple[str, ...]
+    decision_labels: tuple[tuple[str, str], ...]
 
 
 IAC_VALIDATION_HEADING = "### IaC and delivery validation contract"
@@ -533,7 +552,7 @@ def _not_applicable_reason(value: str) -> str | None:
     return match.group(1)
 
 
-def _error_handling_issues(text: str) -> list[str]:
+def _error_handling_contract(text: str) -> tuple[ContractTable | None, list[str]]:
     issues: list[str] = []
     try:
         error_table = contract_table_after_heading(
@@ -575,81 +594,263 @@ def _error_handling_issues(text: str) -> list[str]:
         unexpected = sorted(set(counts) - set(REQUIRED_ERROR_CLASSES))
         if unexpected:
             issues.append("Unexpected error classes: " + ", ".join(unexpected))
-    return issues
+    return error_table, issues
 
 
-def _aws_decision_issues(
-    text: str, technology_by_id: Mapping[str, TechnologyDecision]
-) -> list[str]:
-    """SAFETY: Require complete AWS decisions and exact technology bindings."""
+def _aws_evidence_by_design_id(
+    architecture: ArchitectureContract,
+) -> dict[str, set[str]]:
+    """Index current material AWS evidence by its normalized Design binding."""
+
+    result: dict[str, set[str]] = {}
+    for evidence in architecture.aws_evidence:
+        for identifier in clean_cell(evidence.design_ids).split(", "):
+            if STABLE_CONTRACT_ID.fullmatch(identifier) is not None:
+                result.setdefault(identifier, set()).add(evidence.evidence_id)
+    return result
+
+
+def _aws_row_bindings(
+    concern: str,
+    decision_ids: str,
+    technology_by_id: Mapping[str, TechnologyDecision],
+    technology_by_concern: Mapping[str, TechnologyDecision],
+) -> tuple[tuple[str, ...], tuple[TechnologyDecision, ...], list[str]]:
+    """Return exact row IDs and their canonical controlling decisions."""
 
     issues: list[str] = []
     try:
-        aws_table = contract_table_after_heading(
+        identifiers = tuple(
+            canonical_id_list(
+                decision_ids,
+                TECHNOLOGY_DECISION_ID,
+                f"{concern} AWS decision IDs",
+            )
+        )
+    except ValueError as exc:
+        issues.append(str(exc))
+        identifiers = ()
+    unknown = [item for item in identifiers if item not in technology_by_id]
+    if unknown:
+        issues.append(
+            f"{concern}: AWS decision IDs are not current technology IDs: "
+            + ", ".join(unknown)
+        )
+    controlling = tuple(
+        technology_by_concern[item]
+        for item in AWS_SERVICE_TECH_CONCERNS.get(concern, ())
+        if item in technology_by_concern
+    )
+    expected_ids = tuple(decision.decision_id for decision in controlling)
+    if identifiers != expected_ids:
+        issues.append(
+            f"{concern}: AWS decision IDs must exactly match the ordered "
+            "controlling decisions: "
+            + (", ".join(expected_ids) if expected_ids else "NONE")
+        )
+    return identifiers, controlling, issues
+
+
+def _aws_row_value_issues(
+    concern: str,
+    mechanism: str,
+    rationale: str,
+    tradeoff: str,
+    controlling: tuple[TechnologyDecision, ...],
+) -> list[str]:
+    """Validate concrete owner wording and its selected mechanism binding."""
+
+    issues: list[str] = []
+    for label, value in (
+        ("AWS service or mechanism", mechanism),
+        ("Rationale", rationale),
+        ("Tradeoff", tradeoff),
+    ):
+        if not _support_value_is_concrete(value):
+            issues.append(f"{concern or 'AWS decision row'}: {label} is unresolved")
+    expected_mechanism = "; ".join(decision.selection for decision in controlling)
+    if expected_mechanism and clean_cell(mechanism) != expected_mechanism:
+        issues.append(
+            f"{concern}: AWS service or mechanism must exactly reproduce "
+            f"the controlling TECH selections: {expected_mechanism}"
+        )
+    return issues
+
+
+def _aws_applicability_issues(
+    concern: str,
+    mechanism: str,
+    controlling: tuple[TechnologyDecision, ...],
+) -> tuple[tuple[TechnologyDecision, ...], list[str]]:
+    """Require AWS-row applicability to match its controlling decisions."""
+
+    issues: list[str] = []
+    applicable = tuple(
+        decision
+        for decision in controlling
+        if not technology_value_is_not_applicable(decision.selection)
+    )
+    not_applicable_reason = _not_applicable_reason(mechanism)
+    if clean_cell(mechanism).startswith("NOT_APPLICABLE") and not not_applicable_reason:
+        issues.append(f"{concern}: NOT_APPLICABLE requires a concrete reason")
+    if applicable and not_applicable_reason:
+        issues.append(
+            f"{concern}: an applicable TECH selection cannot use a "
+            "NOT_APPLICABLE AWS mechanism"
+        )
+    if controlling and not applicable and not not_applicable_reason:
+        issues.append(
+            f"{concern}: all controlling TECH selections are NOT_APPLICABLE, "
+            "so the AWS mechanism must also be NOT_APPLICABLE"
+        )
+    return applicable, issues
+
+
+def _aws_evidence_issues(
+    concern: str,
+    applicable: tuple[TechnologyDecision, ...],
+    evidence_by_design_id: Mapping[str, set[str]],
+) -> list[str]:
+    """Require current AWS evidence for every applicable selection."""
+
+    issues: list[str] = []
+    missing_evidence = [
+        decision.decision_id
+        for decision in applicable
+        if not evidence_by_design_id.get(decision.decision_id)
+    ]
+    if missing_evidence:
+        issues.append(
+            f"{concern}: applicable TECH decisions lack current material "
+            "AWS evidence: " + ", ".join(missing_evidence)
+        )
+    return issues
+
+
+def _aws_row_content_issues(
+    concern: str,
+    mechanism: str,
+    rationale: str,
+    tradeoff: str,
+    controlling: tuple[TechnologyDecision, ...],
+    evidence_by_design_id: Mapping[str, set[str]],
+) -> tuple[tuple[TechnologyDecision, ...], list[str]]:
+    """Validate one owner-readable AWS row against selected Design truth."""
+
+    applicable, applicability_issues = _aws_applicability_issues(
+        concern, mechanism, controlling
+    )
+    return applicable, [
+        *_aws_row_value_issues(concern, mechanism, rationale, tradeoff, controlling),
+        *applicability_issues,
+        *_aws_evidence_issues(concern, applicable, evidence_by_design_id),
+    ]
+
+
+def _aws_row_projection(
+    row: tuple[str, ...],
+    technology_by_id: Mapping[str, TechnologyDecision],
+    technology_by_concern: Mapping[str, TechnologyDecision],
+    evidence_by_design_id: Mapping[str, set[str]],
+) -> tuple[AwsImplementationDecision, list[str]]:
+    """Build one deterministic diagram input from a canonical section-20 row."""
+
+    concern, decision_ids, mechanism, rationale, tradeoff = row
+    identifiers, controlling, issues = _aws_row_bindings(
+        concern, decision_ids, technology_by_id, technology_by_concern
+    )
+    applicable, content_issues = _aws_row_content_issues(
+        concern,
+        mechanism,
+        rationale,
+        tradeoff,
+        controlling,
+        evidence_by_design_id,
+    )
+    issues.extend(content_issues)
+    evidence_ids = {
+        evidence_id
+        for decision in applicable
+        for evidence_id in evidence_by_design_id.get(decision.decision_id, set())
+    }
+    labels = tuple(
+        (
+            decision.decision_id,
+            (
+                f"{_not_applicable_reason(decision.selection)} (not applicable)"
+                if _not_applicable_reason(decision.selection)
+                else clean_cell(decision.selection)
+            ),
+        )
+        for decision in controlling
+    )
+    return (
+        AwsImplementationDecision(
+            concern=concern,
+            decision_ids=identifiers,
+            mechanism=clean_cell(mechanism),
+            rationale=clean_cell(rationale),
+            tradeoff=clean_cell(tradeoff),
+            applicable_decision_ids=tuple(item.decision_id for item in applicable),
+            evidence_ids=tuple(sorted(evidence_ids)),
+            decision_labels=labels,
+        ),
+        issues,
+    )
+
+
+def derive_aws_implementation_decisions(
+    text: str,
+    technology_by_id: Mapping[str, TechnologyDecision],
+    architecture: ArchitectureContract,
+) -> tuple[ContractTable | None, tuple[AwsImplementationDecision, ...], list[str]]:
+    """SAFETY: Normalize AWS rows from exact TECH and current evidence bindings."""
+
+    issues: list[str] = []
+    try:
+        table = contract_table_after_heading(
             text, AWS_SERVICE_DECISION_HEADING, AWS_SERVICE_DECISION_HEADERS
         )
     except ValueError as exc:
-        aws_table = None
+        table = None
         issues.append(f"AWS service decision contract: {exc}")
-    if aws_table is None:
-        issues.append(f"Missing {AWS_SERVICE_DECISION_HEADING}")
-    else:
-        counts: dict[str, int] = {}
-        for concern, decision_ids, mechanism, rationale, tradeoff in aws_table.rows:
-            counts[concern] = counts.get(concern, 0) + 1
-            for label, value in (
-                ("AWS service or mechanism", mechanism),
-                ("Rationale", rationale),
-                ("Tradeoff", tradeoff),
-            ):
-                if not _support_value_is_concrete(value):
-                    issues.append(
-                        f"{concern or 'AWS decision row'}: {label} is unresolved"
-                    )
-            try:
-                identifiers = canonical_id_list(
-                    decision_ids,
-                    TECHNOLOGY_DECISION_ID,
-                    f"{concern} AWS decision IDs",
-                )
-            except ValueError as exc:
-                issues.append(str(exc))
-                identifiers = []
-            decisions = [technology_by_id.get(identifier) for identifier in identifiers]
-            unknown = [
-                identifier
-                for identifier, decision in zip(identifiers, decisions)
-                if decision is None
-            ]
-            if unknown:
-                issues.append(
-                    f"{concern}: AWS decision IDs are not current technology IDs: "
-                    + ", ".join(unknown)
-                )
-            allowed_concerns = AWS_SERVICE_TECH_CONCERNS.get(concern, set())
-            if decisions and not any(
-                decision is not None and decision.concern in allowed_concerns
-                for decision in decisions
-            ):
-                issues.append(
-                    f"{concern}: AWS decision IDs do not bind the relevant "
-                    "technology concern"
-                )
-        for concern in AWS_SERVICE_TECH_CONCERNS:
-            count = counts.get(concern, 0)
-            if count != 1:
-                issues.append(
-                    f"AWS concern {concern} must appear exactly once; found {count}"
-                )
-        unexpected = sorted(set(counts) - set(AWS_SERVICE_TECH_CONCERNS))
-        if unexpected:
-            issues.append("Unexpected AWS decision concerns: " + ", ".join(unexpected))
-    return issues
+    if table is None:
+        return None, (), [*issues, f"Missing {AWS_SERVICE_DECISION_HEADING}"]
+    technology_by_concern = {
+        decision.concern: decision for decision in technology_by_id.values()
+    }
+    evidence_by_design_id = _aws_evidence_by_design_id(architecture)
+    projections: list[AwsImplementationDecision] = []
+    for row in table.rows:
+        projection, row_issues = _aws_row_projection(
+            row,
+            technology_by_id,
+            technology_by_concern,
+            evidence_by_design_id,
+        )
+        projections.append(projection)
+        issues.extend(row_issues)
+    observed = tuple(item.concern for item in projections)
+    for concern in AWS_SERVICE_TECH_CONCERNS:
+        count = observed.count(concern)
+        if count != 1:
+            issues.append(
+                f"AWS concern {concern} must appear exactly once; found {count}"
+            )
+    unexpected = sorted(set(observed) - set(AWS_SERVICE_TECH_CONCERNS))
+    if unexpected:
+        issues.append("Unexpected AWS decision concerns: " + ", ".join(unexpected))
+    expected_order = tuple(AWS_SERVICE_TECH_CONCERNS)
+    if observed != expected_order:
+        issues.append(
+            "AWS concerns must use the canonical order: " + ", ".join(expected_order)
+        )
+    return table, tuple(projections), issues
 
 
 def _iac_validation_issues(
     text: str, technology_by_id: Mapping[str, TechnologyDecision]
-) -> list[str]:
+) -> tuple[ContractTable | None, list[str]]:
     """SAFETY: Bind infrastructure validation to the selected delivery design."""
 
     issues: list[str] = []
@@ -755,20 +956,32 @@ def _iac_validation_issues(
         unexpected = sorted(set(counts) - set(IAC_VALIDATION_PATHS))
         if unexpected:
             issues.append("Unexpected IaC validation paths: " + ", ".join(unexpected))
-    return issues
+    return iac_table, issues
 
 
-def design_support_record_issues(
+def derive_design_support_records(
     text: str,
     technology_by_id: Mapping[str, TechnologyDecision],
-) -> list[str]:
-    """Validate design support records that block modern Gate B readiness."""
+    architecture: ArchitectureContract,
+) -> tuple[tuple[AwsImplementationDecision, ...], bytes | None, list[str]]:
+    """Return normalized AWS decisions, exact support bytes, and ordered issues."""
 
-    return [
-        *_error_handling_issues(text),
-        *_aws_decision_issues(text, technology_by_id),
-        *_iac_validation_issues(text, technology_by_id),
-    ]
+    error_table, error_issues = _error_handling_contract(text)
+    aws_table, decisions, aws_issues = derive_aws_implementation_decisions(
+        text, technology_by_id, architecture
+    )
+    iac_table, iac_issues = _iac_validation_issues(text, technology_by_id)
+    tables = (error_table, aws_table, iac_table)
+    canonical_bytes = (
+        b"".join(table.canonical_bytes for table in tables if table is not None)
+        if all(table is not None for table in tables)
+        else None
+    )
+    return (
+        () if aws_issues else decisions,
+        canonical_bytes,
+        [*error_issues, *aws_issues, *iac_issues],
+    )
 
 
 def architecture_trace_declaration_issues(

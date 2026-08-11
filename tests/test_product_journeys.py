@@ -159,6 +159,17 @@ class ProductJourneyTests(unittest.TestCase):
         )
         return completed.returncode, json.loads(completed.stdout)
 
+    def append_checkpoint_row(self, tasks_path: Path, row: str) -> None:
+        text = tasks_path.read_text(encoding="utf-8")
+        heading_start = text.index("## Checkpoints and resume")
+        table_start = text.index("| Checkpoint |", heading_start)
+        table_end = text.index("\n\n", table_start)
+        table = text[table_start:table_end]
+        tasks_path.write_text(
+            text[:table_start] + table.rstrip() + "\n" + row + text[table_end:],
+            encoding="utf-8",
+        )
+
     def test_extracted_template_setup_initializes_once_and_resumes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
@@ -470,11 +481,45 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
-            self.assertIn(
-                "[View the complete architecture diagram]"
-                "(docs/project/PRD.md#proposed-system-at-a-glance)",
-                rendered_gate_b,
+            navigation_keys = set(briefs.GATE_B_NAVIGATION_LOCATOR_KEYS)
+            self.assertTrue(
+                navigation_keys.issubset(
+                    {locator["key"] for locator in gate_b_brief["source_locators"]}
+                )
             )
+            expected_diagram_links = (
+                "[View the complete proposed architecture]"
+                "(docs/project/PRD.md#proposed-system-at-a-glance)",
+                "[View the AWS implementation diagram]"
+                "(docs/project/PRD.md#aws-implementation-at-a-glance)",
+                "[Browse all project diagrams](docs/project/PRD.md#diagram-guide)",
+            )
+            link_positions = [
+                rendered_gate_b.index(link) for link in expected_diagram_links
+            ]
+            self.assertEqual(link_positions, sorted(link_positions))
+            for link in expected_diagram_links:
+                self.assertEqual(rendered_gate_b.count(link), 1)
+            extracted_presenter = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/fastlane_presenter.py",
+                    "gate-b-brief",
+                    "--input-stdin",
+                ],
+                cwd=gate_b_project,
+                input=json.dumps({"report": gate_b}),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                extracted_presenter.returncode, 0, extracted_presenter.stderr
+            )
+            self.assertEqual(extracted_presenter.stderr, "")
+            for link in expected_diagram_links:
+                self.assertIn(link, extracted_presenter.stdout)
+            self.assertFalse((gate_b_project / ".codex/hooks.json").exists())
             self.assertIn(
                 "(docs/project/PRD.md#20-aws-implementation-approach)",
                 rendered_gate_b,
@@ -531,7 +576,7 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertEqual(diagram_contract["schema_version"], 1)
             self.assertEqual(diagram_contract["status"], "CURRENT")
             records = {item["kind"]: item for item in diagram_contract["records"]}
-            for kind in ("SYSTEM_CONTEXT", "PRIMARY_OUTCOME"):
+            for kind in ("SYSTEM_CONTEXT", "PRIMARY_OUTCOME", "AWS_IMPLEMENTATION"):
                 self.assertEqual(records[kind]["applicability"], "REQUIRED")
                 self.assertEqual(records[kind]["status"], "CURRENT")
                 self.assertRegex(
@@ -540,6 +585,188 @@ class ProductJourneyTests(unittest.TestCase):
                 self.assertRegex(
                     records[kind]["rendered_sha256"], r"^sha256:[0-9a-f]{64}$"
                 )
+            prd_text = (gate_b_project / "docs/project/PRD.md").read_text(
+                encoding="utf-8"
+            )
+            for forbidden_label in (
+                '["ACT-001"]',
+                '["API-001"]',
+                '["STATE-001"]',
+                '["TECH-0001"]',
+            ):
+                self.assertNotIn(forbidden_label, prd_text)
+            for selected_service in (
+                "Python 3.12 on AWS Lambda",
+                "Amazon API Gateway regional HTTPS endpoint",
+                "Amazon Cognito with server-side authorization",
+                "Amazon DynamoDB with per-owner records",
+                "Amazon CloudWatch logs, metrics, and alarms",
+            ):
+                self.assertIn(selected_service, prd_text)
+
+    def test_extracted_brownfield_and_infrastructure_only_reach_task_readiness(
+        self,
+    ) -> None:
+        fixture = doctor_fixtures.BootstrapDoctorTests()
+        cases = (
+            (
+                "brownfield-feature",
+                "FEATURE",
+                "legacy/existing.txt",
+                "preserved legacy behavior\n",
+                {"kind": "BROWNFIELD_PRESERVE", "paths": ["legacy/**"]},
+                ["legacy/**", "tests/**"],
+            ),
+            (
+                "infrastructure-only",
+                "INFRASTRUCTURE",
+                "infrastructure/template.yaml",
+                "Resources: {}\n",
+                {"kind": "NOT_APPLICABLE", "paths": []},
+                ["infrastructure/**", "tests/**"],
+            ),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            for (
+                name,
+                work_kind,
+                protected_path,
+                protected_source,
+                expected_disposition,
+                expected_roots,
+            ) in cases:
+                with self.subTest(work_kind=work_kind):
+                    project = self.extract_template(temporary, name)
+                    self.initialize(project)
+                    protected = project / protected_path
+                    protected.parent.mkdir(parents=True, exist_ok=True)
+                    protected.write_text(protected_source, encoding="utf-8")
+
+                    baseline = fixture.approve_existing_project(
+                        project,
+                        work_kind=work_kind,
+                    )
+                    exit_code, report = self.run_doctor_cli(project)
+
+                    self.assertEqual(exit_code, 0, report["diagnostics"])
+                    self.assertTrue(report["ok"], report["diagnostics"])
+                    self.assertEqual(report["classification"], "ACTIVE_BROWNFIELD")
+                    self.assertEqual(report["lifecycle_state"], "TASK_PLAN_REQUIRED")
+                    self.assertEqual(report["next_prompt"], "TASK-10")
+                    self.assertEqual(report["diagnostics"], [])
+                    self.assertEqual(report["coverage_plan"]["work_kind"], work_kind)
+                    design = report["design_contract"]
+                    self.assertEqual(design["status"], "READY")
+                    self.assertEqual(design["change_impact"]["status"], "READY")
+                    self.assertEqual(
+                        design["diagram_contract"]["status"],
+                        "CURRENT",
+                    )
+                    self.assertIsNone(design["project_contract"]["first_wave"])
+                    self.assertEqual(
+                        design["application_source_disposition"],
+                        expected_disposition,
+                    )
+                    self.assertEqual(
+                        report["write_authority"]["approved_write_roots"],
+                        expected_roots,
+                    )
+                    self.assertNotIn(
+                        "app/**",
+                        report["write_authority"]["approved_write_roots"],
+                    )
+                    self.assertEqual(report["authorizations"]["aws"], "NONE")
+                    self.assertEqual(report["external_authority"]["kind"], "NONE")
+                    self.assertEqual(
+                        protected.read_text(encoding="utf-8"), protected_source
+                    )
+                    self.assertEqual(
+                        subprocess.run(
+                            ["git", "-C", str(project), "rev-parse", "HEAD"],
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        ).stdout.strip(),
+                        baseline,
+                    )
+
+                    task_path = (
+                        "infrastructure/template.yaml"
+                        if work_kind == "INFRASTRUCTURE"
+                        else "legacy/change.py"
+                    )
+                    task_design = (
+                        "DES-0001; TECH: TECH-0004, TECH-0007, TECH-0009, TECH-0015"
+                        if work_kind == "INFRASTRUCTURE"
+                        else "DES-0001; TECH: TECH-0001, TECH-0007"
+                    )
+                    fixture.initialize_task_plan(
+                        project,
+                        doctor_fixtures.ready_task(
+                            task_path,
+                            requirements=(
+                                f"{doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE}; "
+                                "PROP-001"
+                            ),
+                            design=task_design,
+                            command="python -m unittest tests.test_properties",
+                            property_projection=(
+                                doctor_fixtures.property_execution_projection()
+                            ),
+                        ),
+                    )
+                    doctor_fixtures.refresh_document_summaries(project)
+                    build_exit, build_report = self.run_doctor_cli(project)
+
+                    self.assertEqual(build_exit, 0, build_report["diagnostics"])
+                    self.assertTrue(build_report["ok"], build_report["diagnostics"])
+                    self.assertEqual(
+                        (build_report["lifecycle_state"], build_report["next_prompt"]),
+                        ("CONSTRUCTION_SINGLE", "BUILD-10"),
+                    )
+                    self.assertEqual(build_report["tasks"]["ready"], 1)
+                    self.assertEqual(build_report["tasks"]["ready_ids"], ["TASK-001"])
+                    self.assertEqual(
+                        build_report["authorizations"]["construction"], "AUTH-0001"
+                    )
+                    self.assertEqual(build_report["authorizations"]["aws"], "NONE")
+                    self.assertEqual(build_report["external_authority"]["kind"], "NONE")
+                    self.assertEqual(
+                        build_report["write_authority"]["approved_write_roots"],
+                        expected_roots,
+                    )
+                    self.assertEqual(
+                        build_report["design_contract"][
+                            "application_source_disposition"
+                        ],
+                        expected_disposition,
+                    )
+                    self.assertEqual(
+                        build_report["design_contract"]["diagram_contract"]["status"],
+                        "CURRENT",
+                    )
+                    migration = next(
+                        record
+                        for record in build_report["design_contract"][
+                            "diagram_contract"
+                        ]["records"]
+                        if record["kind"] == "MIGRATION"
+                    )
+                    self.assertEqual(migration["status"], "CURRENT")
+                    self.assertIn("PRES-001", migration["basis_ids"])
+                    self.assertEqual(
+                        protected.read_text(encoding="utf-8"), protected_source
+                    )
+                    self.assertEqual(
+                        subprocess.run(
+                            ["git", "-C", str(project), "rev-parse", "HEAD"],
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        ).stdout.strip(),
+                        baseline,
+                    )
 
     def test_gate_evidence_and_construction_routes_use_real_project_artifacts(
         self,
@@ -588,6 +815,15 @@ class ProductJourneyTests(unittest.TestCase):
             )
             self.assertIn("(docs/project/PRD.md#gate-b-review)", after_gate_b_update)
             self.assertIn(
+                "(docs/project/PRD.md#proposed-system-at-a-glance)",
+                after_gate_b_update,
+            )
+            self.assertIn(
+                "(docs/project/PRD.md#aws-implementation-at-a-glance)",
+                after_gate_b_update,
+            )
+            self.assertIn("(docs/project/PRD.md#diagram-guide)", after_gate_b_update)
+            self.assertIn(
                 "(docs/project/TASKS.md#current-progress)", after_gate_b_update
             )
 
@@ -627,15 +863,30 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertTrue(recovered["ok"], recovered["diagnostics"])
             self.assertEqual(recovered["next_prompt"], "TASK-10")
 
+            harness_projection = "\n".join(
+                [
+                    "| Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | Exact command or API | Evidence destination | Required or conditional status |",
+                    "|---|---|---|---|---|---|---|---|",
+                    "| HARNESS-004 | End-to-end | unittest journey validation | NEW_BUILD first outcome | DES-0001, FR-001, JOURNEY-001, WAVE-001 | python -m unittest tests.test_product_journeys | docs/project/VERIFY.md#harness-execution-evidence | REQUIRED |",
+                ]
+            )
             fixture.initialize_task_plan(
                 deliver_project,
                 doctor_fixtures.ready_task(
                     requirements=(
-                        f"{doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE}; PROP-001"
+                        f"{doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE}; "
+                        "JOURNEY-001; WAVE-001; PROP-001"
                     ),
                     design="DES-0001; TECH: TECH-0001, TECH-0007",
-                    command="python -m unittest tests.test_properties",
-                    property_projection=doctor_fixtures.property_execution_projection(),
+                    command=(
+                        "python -m unittest tests.test_properties\n"
+                        "python -m unittest tests.test_product_journeys"
+                    ),
+                    property_projection=(
+                        doctor_fixtures.property_execution_projection()
+                        + "\n\n"
+                        + harness_projection
+                    ),
                 ),
             )
             construction = doctor.inspect_project(deliver_project)
@@ -679,6 +930,253 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertTrue(
                 after_repair["interaction"]["automatic_continuation_allowed"]
             )
+
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(deliver_project),
+                    "add",
+                    "docs/project/PRD.md",
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(deliver_project),
+                    "commit",
+                    "-qm",
+                    "record approved product and design",
+                ],
+                check=True,
+            )
+            known_green = subprocess.run(
+                ["git", "-C", str(deliver_project), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            tasks_text = tasks_path.read_text(encoding="utf-8")
+            tasks_path.write_text(
+                doctor_fixtures.set_table_value(
+                    tasks_text,
+                    "## Active execution snapshot",
+                    "## Dependencies, waivers, and waves",
+                    "Last known-green commit",
+                    f"`{known_green}`",
+                ),
+                encoding="utf-8",
+            )
+
+            task_waves.mutate_run_snapshot(
+                tasks_path,
+                operation="start",
+                run_id="RUN-0001",
+                coordinator="codex-coordinator",
+                run_mode="SINGLE_TASK",
+            )
+            task_waves.claim_task_file(
+                tasks_path,
+                "TASK-001",
+                owner="codex-coordinator",
+                coordinator="codex-coordinator",
+                run_id="RUN-0001",
+                checkpoint="CP-0000",
+            )
+            claimed_tasks = tasks_path.read_text(encoding="utf-8")
+            task_start = claimed_tasks.index("### TASK-001")
+            tasks_path.write_text(
+                claimed_tasks[:task_start]
+                + task_fixtures.observed_task_text(claimed_tasks[task_start:]),
+                encoding="utf-8",
+            )
+
+            verify_text = verify_path.read_text(encoding="utf-8")
+            completion_placeholder = (
+                "| EV-0001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | "
+                "`NOT_STARTED` |"
+            )
+            property_placeholder = (
+                "| EV-0001 | TASK-0001 | REQ-0001 / DES-0001 / AUTH-0001 | "
+                "PROP-001 | TECH-0007 | TODO | TODO | TODO | TODO | TODO | `NONE` | "
+                "`NONE` | `NOT_STARTED` | TODO | TODO | TODO |"
+            )
+            harness_placeholder = (
+                "| EV-0401 | HARNESS-001 | TODO | TODO | TODO | TODO | TODO | "
+                "TODO | TODO | `NOT_STARTED` |"
+            )
+            self.assertIn(completion_placeholder, verify_text)
+            self.assertIn(property_placeholder, verify_text)
+            self.assertIn(harness_placeholder, verify_text)
+            verify_text = (
+                verify_text.replace(
+                    completion_placeholder,
+                    "\n".join(
+                        [
+                            task_fixtures.completion_evidence_row(
+                                evidence_id="EV-0001",
+                                command_or_observation=(
+                                    "python -m unittest tests.test_properties"
+                                ),
+                                result="exit=0; property validation passed",
+                                material=(
+                                    "Worktree: abc1234; artifact: "
+                                    "tests/artifacts/property-PROP-001.json"
+                                ),
+                                durable_source=(
+                                    "tests/artifacts/property-PROP-001.json"
+                                ),
+                            ),
+                            task_fixtures.completion_evidence_row(
+                                evidence_id="EV-0401",
+                                command_or_observation=(
+                                    "python -m unittest tests.test_product_journeys"
+                                ),
+                                result="exit=0; journey validation passed",
+                                material=f"Commit: {known_green}",
+                                durable_source="docs/project/VERIFY.md#ev-0401",
+                            ),
+                        ]
+                    ),
+                    1,
+                )
+                .replace(
+                    property_placeholder,
+                    task_fixtures.property_evidence_row(evidence_id="EV-0001"),
+                    1,
+                )
+                .replace(
+                    harness_placeholder,
+                    task_fixtures.harness_evidence_row(
+                        evidence_id="EV-0401",
+                        status="LOCAL_PASS",
+                        observed_at="2026-07-17T00:00:00+00:00",
+                        observed_result="exit=0; journey validation passed",
+                        harness_id="HARNESS-004",
+                        layer="End-to-end",
+                        command="python -m unittest tests.test_product_journeys",
+                        artifact_environment=f"Commit: {known_green}",
+                    ),
+                    1,
+                )
+            )
+            verify_path.write_text(verify_text, encoding="utf-8")
+            task_waves.update_task_file(
+                tasks_path,
+                "TASK-001",
+                coordinator="codex-coordinator",
+                status="DONE",
+                evidence="EV-0001, EV-0401",
+                run_id="RUN-0001",
+                checkpoint="CP-0001",
+            )
+
+            self.append_checkpoint_row(
+                tasks_path,
+                task_fixtures.checkpoint_row(
+                    "CP-0002",
+                    commit=known_green,
+                    outcomes="TASK-001 DONE attempts=1/3",
+                    evidence="EV-0001, EV-0401",
+                    next_action="resume the checkpointed run",
+                ),
+            )
+            with verify_path.open("a", encoding="utf-8") as file:
+                file.write("\n\n### CP-0002\n\nPause checkpoint evidence recorded.\n")
+            task_waves.mutate_run_snapshot(
+                tasks_path,
+                operation="pause",
+                run_id="RUN-0001",
+                coordinator="codex-coordinator",
+                checkpoint="CP-0002",
+            )
+            checkpointed_state = json.loads(
+                (deliver_project / "bootstrap.yaml").read_text(encoding="utf-8")
+            )
+            self.assertEqual(checkpointed_state["execution"]["state"], "CHECKPOINTED")
+            self.assertEqual(
+                checkpointed_state["execution"]["last_checkpoint"]["id"],
+                "CP-0002",
+            )
+            paused_exit, paused_report = self.run_doctor_cli(deliver_project)
+            self.assertEqual(paused_exit, 0, paused_report)
+            self.assertTrue(paused_report["ok"], paused_report["diagnostics"])
+            self.assertEqual(
+                paused_report["authorizations"]["construction"], "AUTH-0001"
+            )
+            self.assertEqual(paused_report["authorizations"]["aws"], "NONE")
+            self.assertFalse(paused_report["interaction"]["owner_action_required"])
+            self.assertTrue(paused_report["resume_safe"])
+            self.assertEqual(
+                (paused_report["lifecycle_state"], paused_report["next_prompt"]),
+                ("RELEASE_REVIEW", "RELEASE-10"),
+            )
+
+            task_waves.mutate_run_snapshot(
+                tasks_path,
+                operation="resume",
+                run_id="RUN-0001",
+                coordinator="codex-coordinator",
+            )
+            self.assertEqual(
+                json.loads(
+                    (deliver_project / "bootstrap.yaml").read_text(encoding="utf-8")
+                )["execution"]["state"],
+                "RUNNING",
+            )
+            self.assertEqual(
+                task_waves.parse_snapshot(tasks_path.read_text(encoding="utf-8")).get(
+                    "Run state"
+                ),
+                "RUNNING",
+            )
+            self.append_checkpoint_row(
+                tasks_path,
+                task_fixtures.checkpoint_row(
+                    "CP-0003",
+                    commit=known_green,
+                    outcomes="TASK-001 DONE attempts=1/3",
+                    evidence="EV-0001, EV-0401",
+                    next_action="review release readiness",
+                ),
+            )
+            with verify_path.open("a", encoding="utf-8") as file:
+                file.write(
+                    "\n### CP-0003\n\nCompletion checkpoint evidence recorded.\n"
+                )
+            task_waves.mutate_run_snapshot(
+                tasks_path,
+                operation="complete",
+                run_id="RUN-0001",
+                coordinator="codex-coordinator",
+                checkpoint="CP-0003",
+            )
+            release_ready = doctor.inspect_project(deliver_project)
+            self.assertTrue(release_ready["ok"], release_ready["diagnostics"])
+            self.assertEqual(
+                (release_ready["lifecycle_state"], release_ready["next_prompt"]),
+                ("RELEASE_REVIEW", "RELEASE-10"),
+            )
+            self.assertTrue(release_ready["resume_safe"])
+            self.assertEqual(
+                release_ready["interaction"]["owner_action_kind"],
+                "NONE_CONTINUE_AUTOMATICALLY",
+            )
+            self.assertEqual(release_ready["authorizations"]["aws"], "NONE")
+            self.assertEqual(
+                (
+                    release_ready["evidence_state"],
+                    release_ready["external_authority"]["kind"],
+                ),
+                ("NOT_READY", "NONE"),
+            )
+            final_execution = json.loads(
+                (deliver_project / "bootstrap.yaml").read_text(encoding="utf-8")
+            )["execution"]
+            self.assertEqual(final_execution["state"], "COMPLETE")
+            self.assertEqual(final_execution["last_checkpoint"]["id"], "CP-0003")
 
     def test_gate_review_summaries_match_the_canonical_owner_action(self) -> None:
         fixture = doctor_fixtures.BootstrapDoctorTests()

@@ -7,6 +7,37 @@ from scripts import fastlane_presenter as presenter
 
 
 class OwnerBriefProjectionTests(unittest.TestCase):
+    def gate_b_navigation_locators(self) -> list[dict[str, object]]:
+        specifications = (
+            (
+                briefs.GATE_B_NAVIGATION_LOCATOR_KEYS[0],
+                "Complete proposed architecture",
+                "Proposed system at a glance",
+            ),
+            (
+                briefs.GATE_B_NAVIGATION_LOCATOR_KEYS[1],
+                "AWS implementation diagram",
+                "AWS implementation at a glance",
+            ),
+            (
+                briefs.GATE_B_NAVIGATION_LOCATOR_KEYS[2],
+                "Project diagram guide",
+                "Diagram guide",
+            ),
+        )
+        return [
+            briefs.source_locator(
+                key=key,
+                label=label,
+                path="docs/project/PRD.md",
+                heading=heading,
+                start_line=31 + index,
+                end_line=31 + index,
+                section_text=f"## {heading}\n",
+            )
+            for index, (key, label, heading) in enumerate(specifications)
+        ]
+
     def ready_gate_a(self) -> dict[str, object]:
         projection = {
             "schema_version": 1,
@@ -253,7 +284,8 @@ class OwnerBriefProjectionTests(unittest.TestCase):
                 start_line=20,
                 end_line=30,
                 section_text="## Selected architecture\n\nARCH-0001\n",
-            )
+            ),
+            *self.gate_b_navigation_locators(),
         ]
         inventory = self.ready_gate_b_inventory()
         projection["technical_decision_groups"] = [
@@ -300,6 +332,23 @@ class OwnerBriefProjectionTests(unittest.TestCase):
             self.assertIn(label, rendered)
         self.assertIn("Change the design: <correction>.", rendered)
         self.assertIn("docs/project/PRD.md#selected-architecture", rendered)
+        expected_links = (
+            "[View the complete proposed architecture]"
+            "(docs/project/PRD.md#proposed-system-at-a-glance)",
+            "[View the AWS implementation diagram]"
+            "(docs/project/PRD.md#aws-implementation-at-a-glance)",
+            "[Browse all project diagrams](docs/project/PRD.md#diagram-guide)",
+        )
+        positions = [rendered.index(link) for link in expected_links]
+        self.assertEqual(positions, sorted(positions))
+        for link in expected_links:
+            self.assertEqual(rendered.count(link), 1)
+        for anchor in (
+            "#proposed-system-at-a-glance",
+            "#aws-implementation-at-a-glance",
+            "#diagram-guide",
+        ):
+            self.assertEqual(rendered.count(anchor), 1)
         self.assertEqual(
             [item["domain"] for item in inventory["decisions"]],
             list(briefs.TECHNICAL_DOMAIN_ORDER),
@@ -307,6 +356,21 @@ class OwnerBriefProjectionTests(unittest.TestCase):
         self.assertLessEqual(
             len([line for line in rendered.splitlines() if line.strip()]), 140
         )
+
+        for missing_key in briefs.GATE_B_NAVIGATION_LOCATOR_KEYS:
+            with self.subTest(missing_navigation=missing_key):
+                missing = dict(projection)
+                missing.pop("canonical_sha256", None)
+                missing["source_locators"] = [
+                    locator
+                    for locator in projection["source_locators"]
+                    if locator["key"] != missing_key
+                ]
+                _blocked, missing_issues = briefs.finalize_owner_decision_brief(missing)
+                self.assertTrue(
+                    any(missing_key in issue for issue in missing_issues),
+                    missing_issues,
+                )
 
     def test_gate_b_inventory_fails_when_any_promised_domain_is_missing(self) -> None:
         complete = self.ready_gate_b_inventory()
