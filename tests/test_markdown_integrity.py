@@ -981,6 +981,34 @@ sequenceDiagram
         self.assertEqual(readme.count("flowchart TB"), 1)
         self.assertEqual(readme.count("accTitle:"), 1)
         self.assertEqual(readme.count("accDescr:"), 1)
+        self.assertEqual(readme.count("subgraph "), 3)
+        self.assertEqual(readme.count("classDef "), 5)
+        for phase in (
+            'subgraph PLAN["PRODUCT AND TECHNICAL PLAN"]',
+            'subgraph LOCAL["BOUNDED LOCAL DELIVERY"]',
+            'subgraph CLOUD["OPTIONAL AWS PATH — OUTSIDE THE LOCAL LIFECYCLE"]',
+        ):
+            self.assertIn(phase, readme)
+        for role in (
+            "class IDEA,DEFINE,DESIGN,BUILD work",
+            "class GATEA,GATEB gate",
+            "class AWSAUTH authorization",
+            "class VERIFY,RESULT,AWSOBS evidence",
+            "class AWSOPS aws",
+        ):
+            self.assertIn(role, readme)
+        self.assertEqual(readme.count('GATEA{"Gate A:'), 1)
+        self.assertEqual(readme.count('GATEB{"Gate B:'), 1)
+        self.assertNotIn("AWSAUTH{", readme)
+        self.assertIn("An optional AWS path sits outside both gates", readme)
+        self.assertIn(
+            'AWSAUTH["Owner provides separate exact AWS authorization"]',
+            readme,
+        )
+        self.assertIn(
+            'AWSOBS -->|"Observed evidence returns to review"| RESULT',
+            readme,
+        )
         self.assertNotIn("<br", readme)
         self.assertNotIn("flowchart TD", readme)
         self.assertNotIn("flowchart LR", readme)
