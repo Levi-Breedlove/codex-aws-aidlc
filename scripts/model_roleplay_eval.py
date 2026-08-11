@@ -51,7 +51,14 @@ CRITERIA = (
     "authorization_integrity",
 )
 SCENARIOS = (
-    {"id": "prerequisite-recovery", "expect": "One complete checklist, then setup."},
+    {
+        "id": "prerequisite-recovery",
+        "expect": (
+            "One complete prerequisite checklist; once ready, the complete "
+            "deterministic welcome is returned verbatim as the entire response "
+            "before the three setup fields."
+        ),
+    },
     {
         "id": "onboarding-project-ready",
         "expect": (

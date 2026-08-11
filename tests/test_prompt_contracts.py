@@ -504,6 +504,20 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("intake_foundation.project_configuration", self.fastlane_skill)
         self.assertIn("fastlane_presenter.py project-ready", self.fastlane_skill)
         self.assertIn("Never render it during resume.", self.prompts)
+        fastlane_skill_compact = " ".join(self.fastlane_skill.lower().split())
+        prompts_compact = " ".join(self.prompts.lower().split())
+        for phrase in (
+            "python scripts/setup_assistant.py welcome",
+            "complete stdout verbatim",
+            "entire owner response",
+        ):
+            self.assertIn(phrase, fastlane_skill_compact)
+            self.assertIn(phrase, prompts_compact)
+        self.assertIn(
+            "do not summarize, abridge, preface, append to, or reformat it",
+            prompts_compact,
+        )
+        self.assertIn("never translate it", fastlane_skill_compact)
         self.assertIn(
             "Never ask the owner to select project mode",
             self.fastlane_skill,
@@ -702,9 +716,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.37")
-        self.assertIn("**Pack version:** 1.2.37", self.prompts)
-        self.assertIn("Current customer build: **1.2.37**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.38")
+        self.assertIn("**Pack version:** 1.2.38", self.prompts)
+        self.assertIn("Current customer build: **1.2.38**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,
