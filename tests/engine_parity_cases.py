@@ -43,6 +43,7 @@ SUMMARY_TRUTH_BASE_COMMIT = "8dbb11fd0e54af392ac073ce597cdb26fc336fcc"
 ADAPTIVE_KICKOFF_BASE_COMMIT = "204b1b7477413425114deaa54a9ece8f9fc14e53"
 AWS_DESIGN_COVERAGE_BASE_COMMIT = "e31d60bec32dd52b3ec29f36abfad2096e9ef867"
 HUMAN_DIAGRAM_SUPPORT_DIGEST_BASE_COMMIT = "66bcf1de7e5e06feb3dcf84fae2081d515c881a4"
+OWNER_SOURCE_NAVIGATION_BASE_COMMIT = "47e1e548e0ae429d47ff838b3ebd60e98a1a5e1e"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -112,28 +113,42 @@ APPROVED_BEHAVIOR_CHANGES = [
             "AWS access, execution, deployment, recovery, or teardown evidence claim",
         ],
     },
+    {
+        "id": "OWNER_SOURCE_NAVIGATION_1_2_36",
+        "base_commit": OWNER_SOURCE_NAVIGATION_BASE_COMMIT,
+        "scope": [
+            "owner-facing Technical decision index and diagram-guide links to existing canonical PRD sections",
+            "PRD snapshot and source-locator bytes changed only by those navigation labels",
+            "Fastlane patch-version mirrors and consequential manifest hashes",
+        ],
+        "prohibited": [
+            "requirement, design, diagram, lifecycle, routing, remediation, task, gate, authority, or receipt change",
+            "construction or AWS authorization change",
+            "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        ],
+    },
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
-        "72e5b4dd65ebe31f39730ba7c9c2b95e7ca03d536893191c348f8e692bb3101e"
+        "93342ac776238cc2fb71393e51fb25e195bc70ef1c1561f2ec71988441a5dd7a"
     ),
     "unconfigured_template": (
-        "b89cbd72ea715d7e0da5a2f42212d6096e3e3e54b4c0be79bb05df8815facbec"
+        "547740ec1c6690da6ded36c63dd19e9f0ba5c0de3367dae6b4f96a8d6dde01eb"
     ),
     "rendered_intake": (
-        "ba1ca47026488e364b1fa9f9a08bb3d57aba32d839f2a98e96155df70cf8496b"
+        "17238d5b1210b1a0957897155442ea231c77990d027dca1730102fa028ab05a4"
     ),
     "gate_a_pending": (
-        "02c030ef10b8a084240abc6d899619596ea15229671ab535a41f706f497f09c0"
+        "3d0fdb61d84576e7c4c7289e89c8a7a95933e2a79394a749c6c8e62a80e928cf"
     ),
     "gate_a_approved": (
-        "7f881338a0b7aabe4fc694605163deb759b4e518cadd1e989e1d1d89e2368c7b"
+        "124b78b0294ad05cb248c811ee548206a60cd16373012345510bc68c02fb44d5"
     ),
     "gate_b_pending": (
-        "7fb8678a2716ea7012d00e268ed7067790a022218897ae85ca30b43c53cc7653"
+        "a9ca40e4b9eaa11e825ded65a62c0823ee6e175f6bce7a7d39192ed718775714"
     ),
     "gate_b_approved": (
-        "9deb8e395b9bc3c019a72513c815ebb5aa25d74c68c6eda5e13d4ecb13822272"
+        "7f71eb9a6b25af4de1e696ffcbea1f452a50049d5f19a242b40878fe274ab13b"
     ),
 }
 

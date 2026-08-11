@@ -6,7 +6,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
 
-Current customer build: **1.2.35**.
+Current customer build: **1.2.36**.
 
 Fastlane is a repository-native governance platform that turns Codex into a technical guide, AWS architecture consultant, implementation partner, and evidence-driven verifier.
 
@@ -36,33 +36,33 @@ Bring an idea, an existing product brief, or a bounded change to an established 
 ```mermaid
 flowchart TB
     accTitle: Fastlane governed delivery at a glance
-    accDescr: The owner defines the product and approves two boundaries. Fastlane designs, builds, and verifies locally. AWS work requires separate exact authorization and returns observed evidence to release review.
-
-    IDEA["Outcome, constraints, or bounded change"]
-    DEFINE["Define: tailored product consultation"]
-    GATEA{"Gate A: approve the Product Agreement?"}
-    DESIGN["Design: compare complete AWS-informed solutions"]
-    GATEB{"Gate B: approve the plan and local build boundary?"}
-    BUILD["Build: bounded local construction"]
-    VERIFY["Verify: tests and evidence"]
-    RESULT["Release state: ready, blocked, failed, stale, or unobserved"]
-    AWSAUTH{"Separate exact AWS authorization?"}
-    AWSOPS["Bounded AWS operation and reconciliation"]
-
-    IDEA --> DEFINE --> GATEA
-    GATEA -->|"Approve"| DESIGN
-    GATEA -. "Request changes" .-> DEFINE
-
-    DESIGN --> GATEB
-    GATEB -->|"Approve"| BUILD
-    GATEB -. "Request changes" .-> DESIGN
-
-    BUILD --> VERIFY --> RESULT
-    VERIFY -->|"Safe in-scope correction"| BUILD
-
-    RESULT -. "Optional AWS path" .-> AWSAUTH
-    AWSAUTH -->|"Authorized scope only"| AWSOPS
-    AWSOPS -->|"Observed evidence"| RESULT
+    accDescr: The governed local journey contains Gate A and Gate B. An optional AWS path sits outside both gates, requires separate exact authorization from the owner, and returns observed evidence to release review.
+    subgraph PLAN["PRODUCT AND TECHNICAL PLAN"]
+        IDEA["Outcome, constraints, or bounded change"] --> DEFINE["Guided product consultation"] --> GATEA{"Gate A: approve the Product Agreement?"}
+        GATEA -->|"Approved"| DESIGN["Compare complete AWS-informed designs"] --> GATEB{"Gate B: approve the design and local build boundary?"}
+        GATEA -. "Request changes" .-> DEFINE
+        GATEB -. "Request changes" .-> DESIGN
+    end
+    subgraph LOCAL["BOUNDED LOCAL DELIVERY"]
+        BUILD["Bounded local construction"] --> VERIFY["Tests and evidence"] --> RESULT["Release review: ready, blocked, failed, stale, or unobserved"]
+        VERIFY -. "Safe in-scope correction" .-> BUILD
+    end
+    subgraph CLOUD["OPTIONAL AWS PATH — OUTSIDE THE LOCAL LIFECYCLE"]
+        AWSAUTH["Owner provides separate exact AWS authorization"] -->|"Authorized scope only"| AWSOPS["Bounded AWS operation"] --> AWSOBS["Reconcile observed evidence"]
+    end
+    GATEB -->|"Approved local boundary"| BUILD
+    RESULT -. "Optional path" .-> AWSAUTH
+    AWSOBS -->|"Observed evidence returns to review"| RESULT
+    class IDEA,DEFINE,DESIGN,BUILD work
+    class GATEA,GATEB gate
+    class AWSAUTH authorization
+    class VERIFY,RESULT,AWSOBS evidence
+    class AWSOPS aws
+    classDef work fill:#EAF3FF,stroke:#147EBA,color:#232F3E,stroke-width:2px
+    classDef gate fill:#FFF7DF,stroke:#D38B00,color:#232F3E,stroke-width:2px
+    classDef authorization fill:#F3E8FF,stroke:#805AD5,color:#232F3E,stroke-width:2px
+    classDef evidence fill:#EDF7ED,stroke:#248814,color:#232F3E,stroke-width:2px
+    classDef aws fill:#FFF1E8,stroke:#D86613,color:#232F3E,stroke-width:2px
 ```
 
 This is the owner journey. The [complete lifecycle and technical control plane](docs/WORKFLOW.md#customer-delivery-lifecycle) show how canonical records, deterministic evaluation, bounded execution, and evidence feedback enforce these promises.
