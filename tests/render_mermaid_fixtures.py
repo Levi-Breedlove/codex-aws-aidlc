@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import argparse
 import ast
-import inspect
+import base64
+import binascii
+import hashlib
+import json
 import os
 import re
 import tempfile
-import textwrap
+import zlib
 from pathlib import Path
 from unittest import mock
 
@@ -28,6 +31,22 @@ from tests.test_bootstrap_doctor import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+GOLDEN_RECORD_SEED = REPOSITORY_ROOT / "tests/fixtures/golden_project_records_v1.bin"
+GOLDEN_RECORD_PATHS = (
+    "bootstrap.yaml",
+    "docs/project/BUGFIX.md",
+    "docs/project/PRD.md",
+    "docs/project/README.md",
+    "docs/project/RUNBOOK.md",
+    "docs/project/TASKS.md",
+    "docs/project/VERIFY.md",
+)
+GOLDEN_PATTERN_PATH = ".agents/skills/fastlane/references/diagram-patterns.md"
+GOLDEN_HELPER_PATH = "tests/test_bootstrap_doctor.py"
+_GOLDEN_RECORD_HEADER = b"FASTLANE-GOLDEN-RECORDS-V1\n"
+_MAX_GOLDEN_SEED_BYTES = 64 * 1024
+_MAX_GOLDEN_RECORD_BYTES = 256 * 1024
+_MAX_GOLDEN_PROCEDURE_BYTES = 1024 * 1024
 MERMAID_BLOCK = re.compile(r"(?ms)^```mermaid\r?\n(.*?)\r?\n```\s*$")
 PUBLISHED_NAMES = (
     "published-complete-architecture",
@@ -99,13 +118,21 @@ def _blocks(source: str, *, expected: int, label: str) -> tuple[str, ...]:
     return blocks
 
 
-def _literal_golden_blocks() -> dict[str, str]:
+def _literal_golden_blocks(helper_source: str) -> dict[str, str]:
     """Bind five synthetic literals by heading, never customer canonical state."""
 
-    tree = ast.parse(textwrap.dedent(inspect.getsource(complete_diagram_contract)))
+    tree = ast.parse(helper_source)
+    functions = tuple(
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == complete_diagram_contract.__name__
+    )
+    if len(functions) != 1:
+        raise ValueError("Golden Project fixture helper is not singular")
     by_heading: dict[str, str] = {}
     expected_headings = {heading for _name, heading in GOLDEN_BINDINGS}
-    for node in ast.walk(tree):
+    for node in ast.walk(functions[0]):
         if not isinstance(node, ast.Call) or len(node.args) < 4:
             continue
         heading_node, body_node = node.args[1], node.args[3]
@@ -141,7 +168,7 @@ def _block_after_heading(source: str, heading: str) -> str:
 def _variant_golden_blocks() -> dict[str, str]:
     """Build sanitized brownfield and infrastructure Design-stage records."""
 
-    template = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+    template = _golden_record_overrides()["docs/project/PRD.md"].decode("utf-8")
     variants: dict[str, str] = {}
     for name, work_kind, heading in VARIANT_BINDINGS:
         design = complete_existing_design_contract(
@@ -163,44 +190,168 @@ def _inspect_prd(project: Path) -> tuple[str, dict[str, object]]:
     return (project / "docs/project/PRD.md").read_text(encoding="utf-8"), report
 
 
+def _manifest() -> dict[str, object]:
+    return json.loads(
+        (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
+    )
+
+
+def _manifest_bound_text(relative: str) -> str:
+    """Read one packaged procedure only when its exact manifest hash is current."""
+
+    pure = Path(relative)
+    if pure.is_absolute() or pure.as_posix() != relative or ".." in pure.parts:
+        raise ValueError("Golden procedure path is invalid")
+    manifest = _manifest()
+    required = manifest.get("required_files", [])
+    stored = manifest.get("source_sha256", {}).get(relative)
+    path = REPOSITORY_ROOT.joinpath(*pure.parts)
+    if relative not in required or not isinstance(stored, str):
+        raise ValueError("Golden procedure is not package-manifest bound")
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Golden procedure is missing or unsafe")
+    raw = path.read_bytes()
+    if (
+        len(raw) > _MAX_GOLDEN_PROCEDURE_BYTES
+        or hashlib.sha256(raw).hexdigest() != stored
+    ):
+        raise ValueError("Golden procedure differs from its package-manifest binding")
+    try:
+        source = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Golden procedure is not UTF-8") from exc
+    if "\r" in source:
+        raise ValueError("Golden procedure is not canonical LF text")
+    return source
+
+
+def _golden_record_overrides() -> dict[str, bytes]:
+    """Load one bounded immutable seed, never live project record bytes."""
+
+    if GOLDEN_RECORD_SEED.is_symlink() or not GOLDEN_RECORD_SEED.is_file():
+        raise ValueError("Golden record seed is missing or unsafe")
+    raw = GOLDEN_RECORD_SEED.read_bytes()
+    if not raw.endswith(b"\n") or not raw.startswith(_GOLDEN_RECORD_HEADER):
+        raise ValueError("Golden record seed envelope is invalid")
+    encoded = raw[len(_GOLDEN_RECORD_HEADER) : -1]
+    if not encoded or len(raw) > _MAX_GOLDEN_SEED_BYTES:
+        raise ValueError("Golden record seed exceeds its bounded envelope")
+    manifest = _manifest()
+    stored = manifest.get("source_sha256", {}).get(
+        "tests/fixtures/golden_project_records_v1.bin"
+    )
+    if stored != hashlib.sha256(raw).hexdigest():
+        raise ValueError("Golden record seed is not bound by the package manifest")
+    try:
+        compressed = base64.b64decode(encoded, validate=True)
+        inflater = zlib.decompressobj()
+        decoded = inflater.decompress(compressed, _MAX_GOLDEN_RECORD_BYTES + 1)
+    except (binascii.Error, ValueError, zlib.error) as exc:
+        raise ValueError("Golden record seed payload is invalid") from exc
+    if (
+        len(decoded) > _MAX_GOLDEN_RECORD_BYTES
+        or not inflater.eof
+        or inflater.unused_data
+        or inflater.unconsumed_tail
+    ):
+        raise ValueError("Golden record seed contract is invalid")
+    try:
+        decoded += inflater.flush()
+        payload = json.loads(decoded.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError, zlib.error) as exc:
+        raise ValueError("Golden record seed payload is invalid") from exc
+    if (
+        len(decoded) > _MAX_GOLDEN_RECORD_BYTES
+        or not isinstance(payload, dict)
+        or set(payload) != {"schema_version", "bootstrap_version", "records"}
+        or payload.get("schema_version") != 1
+    ):
+        raise ValueError("Golden record seed contract is invalid")
+    if payload.get("bootstrap_version") != manifest.get("bootstrap_version"):
+        raise ValueError("Golden record seed version is stale")
+    records = payload.get("records")
+    if (
+        not isinstance(records, list)
+        or not all(isinstance(row, dict) for row in records)
+        or [row.get("path") for row in records] != list(GOLDEN_RECORD_PATHS)
+    ):
+        raise ValueError("Golden record seed inventory is invalid")
+    overrides: dict[str, bytes] = {}
+    for row in records:
+        if not isinstance(row, dict) or set(row) != {"path", "sha256", "text"}:
+            raise ValueError("Golden record seed row is invalid")
+        path, expected, text = row["path"], row["sha256"], row["text"]
+        if (
+            not isinstance(text, str)
+            or "\r" in text
+            or not isinstance(expected, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected) is None
+        ):
+            raise ValueError(f"Golden record seed text is invalid: {path}")
+        content = text.encode("utf-8")
+        if hashlib.sha256(content).hexdigest() != expected:
+            raise ValueError(f"Golden record seed hash is invalid: {path}")
+        overrides[path] = content
+    return overrides
+
+
 def collect_prd_fixtures() -> dict[str, tuple[str, dict[str, object]]]:
     """Build four complete sanitized PRD records through real fixture routes."""
 
+    _manifest_bound_text(GOLDEN_HELPER_PATH)
     fixture = BootstrapDoctorTests()
+    record_overrides = _golden_record_overrides()
+    baseline_paths = tuple(record_overrides)
     git_environment = {
-        "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+00:00",
-        "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+00:00",
+        key: value
+        for key, value in os.environ.items()
+        if not key.upper().startswith("GIT_")
     }
+    git_environment.update(
+        {
+            "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+00:00",
+            "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+00:00",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
+        }
+    )
     with (
         tempfile.TemporaryDirectory() as directory,
-        mock.patch.dict(os.environ, git_environment),
+        mock.patch.dict(os.environ, git_environment, clear=True),
     ):
         projects: dict[str, Path] = {}
         for name in PRD_NAMES:
             destination = Path(directory) / name
             destination.mkdir()
-            projects[name] = fixture.copy_project(destination)
+            projects[name] = fixture.copy_project(
+                destination, source_overrides=record_overrides
+            )
         refresh_document_summaries(projects[PRD_NAMES[0]])
-        fixture.pending_gate_b(projects[PRD_NAMES[1]])
-        fixture.approve_existing_project(projects[PRD_NAMES[2]], work_kind="FEATURE")
+        fixture.pending_gate_b(projects[PRD_NAMES[1]], baseline_paths=baseline_paths)
         fixture.approve_existing_project(
-            projects[PRD_NAMES[3]], work_kind="INFRASTRUCTURE"
+            projects[PRD_NAMES[2]],
+            work_kind="FEATURE",
+            baseline_paths=baseline_paths,
+        )
+        fixture.approve_existing_project(
+            projects[PRD_NAMES[3]],
+            work_kind="INFRASTRUCTURE",
+            baseline_paths=baseline_paths,
         )
         return {name: _inspect_prd(projects[name]) for name in PRD_NAMES}
 
 
-def collect_mermaid_fixtures(root: Path = REPOSITORY_ROOT) -> dict[str, str]:
+def collect_mermaid_fixtures(_root: Path | None = None) -> dict[str, str]:
     """Return the exact sanitized Mermaid sources rendered in CI."""
 
-    pattern_source = (
-        root / ".agents/skills/fastlane/references/diagram-patterns.md"
-    ).read_text(encoding="utf-8")
+    helper_source = _manifest_bound_text(GOLDEN_HELPER_PATH)
+    pattern_source = _manifest_bound_text(GOLDEN_PATTERN_PATH)
     published = _blocks(
         pattern_source,
         expected=len(PUBLISHED_NAMES),
         label="Published diagram procedure",
     )
-    golden = _literal_golden_blocks()
+    golden = _literal_golden_blocks(helper_source)
     variants = _variant_golden_blocks()
     return {
         **dict(zip(PUBLISHED_NAMES, published, strict=True)),

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from unittest import mock
 from urllib.parse import unquote
 
-from tests import render_mermaid_fixtures
+from tests import render_mermaid_fixtures, test_bootstrap_doctor
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -1212,6 +1214,10 @@ sequenceDiagram
         mermaid = render_mermaid_fixtures.collect_mermaid_fixtures(REPOSITORY_ROOT)
         prds = render_mermaid_fixtures.collect_prd_fixtures()
         self.assertEqual(tuple(prds), render_mermaid_fixtures.PRD_NAMES)
+        self.assertEqual(
+            tuple(render_mermaid_fixtures._golden_record_overrides()),
+            render_mermaid_fixtures.GOLDEN_RECORD_PATHS,
+        )
         with tempfile.TemporaryDirectory() as directory:
             outputs = render_mermaid_fixtures.write_review_fixtures(Path(directory))
             self.assertEqual(len(outputs), 15)
@@ -1224,6 +1230,91 @@ sequenceDiagram
                     (Path(directory) / f"{name}.md").read_text(encoding="utf-8"),
                     source.rstrip() + "\n",
                 )
+            fixture = test_bootstrap_doctor.BootstrapDoctorTests()
+            adopter_root = Path(directory) / "initialized-adopter"
+            adopter_root.mkdir()
+            adopter = fixture.copy_project(adopter_root)
+            marker = b"\nSECRET_CUSTOMER_MARKER\n"
+            for relative in render_mermaid_fixtures.GOLDEN_RECORD_PATHS:
+                path = adopter.joinpath(*PurePosixPath(relative).parts)
+                path.write_bytes(path.read_bytes() + marker)
+            unrelated = adopter / "app/README.md"
+            unrelated.write_bytes(unrelated.read_bytes() + marker)
+            pattern = adopter.joinpath(
+                *PurePosixPath(render_mermaid_fixtures.GOLDEN_PATTERN_PATH).parts
+            )
+            canonical_pattern = pattern.read_bytes()
+            pattern.write_bytes(canonical_pattern + marker)
+            helper = adopter.joinpath(
+                *PurePosixPath(render_mermaid_fixtures.GOLDEN_HELPER_PATH).parts
+            )
+            canonical_helper = helper.read_bytes()
+            isolated_output = Path(directory) / "isolated-review"
+            with (
+                mock.patch.object(test_bootstrap_doctor, "PROJECT_ROOT", adopter),
+                mock.patch.object(
+                    render_mermaid_fixtures,
+                    "REPOSITORY_ROOT",
+                    adopter,
+                ),
+                mock.patch.object(
+                    render_mermaid_fixtures,
+                    "GOLDEN_RECORD_SEED",
+                    adopter / "tests/fixtures/golden_project_records_v1.bin",
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "package-manifest binding"):
+                    render_mermaid_fixtures.write_review_fixtures(isolated_output)
+                self.assertFalse(any(isolated_output.iterdir()))
+                pattern.write_bytes(canonical_pattern)
+                helper.write_bytes(canonical_helper + marker)
+                with self.assertRaisesRegex(ValueError, "package-manifest binding"):
+                    render_mermaid_fixtures.write_review_fixtures(isolated_output)
+                self.assertFalse(any(isolated_output.iterdir()))
+                helper.write_bytes(canonical_helper)
+                isolated = render_mermaid_fixtures.write_review_fixtures(
+                    isolated_output
+                )
+            self.assertEqual(len(isolated), 15)
+            for name, source in mermaid.items():
+                rendered = (isolated_output / f"{name}.mmd").read_text(encoding="utf-8")
+                self.assertEqual(rendered, source.rstrip() + "\n")
+                self.assertNotIn(marker.decode().strip(), rendered)
+            for name, (source, _report) in prds.items():
+                rendered = (isolated_output / f"{name}.md").read_text(encoding="utf-8")
+                self.assertEqual(rendered, source.rstrip() + "\n")
+                self.assertNotIn(marker.decode().strip(), rendered)
+            hooks = Path(directory) / "hostile-hooks"
+            hooks.mkdir()
+            hook_marker = "SECRET_GIT_HOOK_MARKER"
+            (hooks / "pre-commit").write_text(
+                "#!/bin/sh\n"
+                f"printf '\\n{hook_marker}\\n' >> docs/project/PRD.md\n"
+                "git add -f -- docs/project/PRD.md\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            git_config = Path(directory) / "hostile-gitconfig"
+            git_config.write_text(
+                f"[core]\n\thooksPath = {hooks.as_posix()}\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "GIT_CONFIG_GLOBAL": str(git_config),
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                },
+            ):
+                hook_isolated = render_mermaid_fixtures.collect_prd_fixtures()
+            self.assertFalse(
+                [
+                    name
+                    for name, (source, _report) in hook_isolated.items()
+                    if hook_marker in source
+                ]
+            )
         expected_contract = {
             "DIAGRAM-0001": (
                 "SYSTEM_CONTEXT",

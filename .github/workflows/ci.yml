@@ -80,6 +80,9 @@ jobs:
           tests.test_engine_parity
           -v
 
+      - name: Verify template manifest hashes
+        run: python scripts/update_manifest.py --check
+
       - name: Render sanitized published and Golden Project diagrams
         run: |
           python -m tests.render_mermaid_fixtures --output-dir "${RUNNER_TEMP}/fastlane-mermaid"
@@ -112,9 +115,6 @@ jobs:
             ${{ runner.temp }}/fastlane-mermaid/*.svg
           if-no-files-found: error
           retention-days: 14
-
-      - name: Verify template manifest hashes
-        run: python scripts/update_manifest.py --check
 
       - name: Enforce customer package version identity
         if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'fast-lane') || (github.event_name == 'push' && github.ref_name == 'fast-lane') }}

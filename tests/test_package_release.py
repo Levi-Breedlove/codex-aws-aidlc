@@ -258,9 +258,9 @@ class PackageReleaseTests(unittest.TestCase):
             "Verify Ruff formatting",
             "Run repository governance monitors",
             "Run Engine characterization contracts",
+            "Verify template manifest hashes",
             "Render sanitized published and Golden Project diagrams",
             "Preserve sanitized Golden Project review artifacts",
-            "Verify template manifest hashes",
             "Enforce customer package version identity",
             "Verify deterministic release package",
         )
