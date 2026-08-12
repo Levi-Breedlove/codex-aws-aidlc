@@ -3177,17 +3177,31 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
         )
 
-    def copy_project(self, destination: Path) -> Path:
+    def copy_project(
+        self,
+        destination: Path,
+        *,
+        source_overrides: Mapping[str, bytes] | None = None,
+    ) -> Path:
         project = destination / "project"
         project.mkdir()
         manifest = json.loads(
             (PROJECT_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
+        overrides = dict(source_overrides or {})
+        unexpected = sorted(set(overrides) - set(manifest["required_files"]))
+        if unexpected:
+            raise AssertionError(
+                "Fixture overrides are not manifest-required: " + ", ".join(unexpected)
+            )
         for relative in manifest["required_files"]:
-            source = PROJECT_ROOT.joinpath(*PurePosixPath(relative).parts)
             target = project.joinpath(*PurePosixPath(relative).parts)
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+            if relative in overrides:
+                target.write_bytes(overrides[relative])
+            else:
+                source = PROJECT_ROOT.joinpath(*PurePosixPath(relative).parts)
+                shutil.copy2(source, target)
         values = dict(bootstrap_runtime.PLACEHOLDERS)
         values.update(
             {
@@ -3207,14 +3221,59 @@ class BootstrapDoctorTests(unittest.TestCase):
                 path.write_bytes(rendered)
         return project
 
-    def approve_project(self, project: Path, *, gate_b: bool = True) -> None:
+    def approve_project(
+        self,
+        project: Path,
+        *,
+        gate_b: bool = True,
+        baseline_paths: tuple[str, ...] | None = None,
+    ) -> None:
         baseline = "a" * 40
         if gate_b:
+            if baseline_paths is not None:
+                normalized = tuple(
+                    PurePosixPath(path).as_posix() for path in baseline_paths
+                )
+                if (
+                    not normalized
+                    or len(normalized) != len(set(normalized))
+                    or normalized != baseline_paths
+                    or any(
+                        PurePosixPath(path).is_absolute()
+                        or "." in PurePosixPath(path).parts
+                        or ".." in PurePosixPath(path).parts
+                        or not project.joinpath(*PurePosixPath(path).parts).is_file()
+                        for path in normalized
+                    )
+                ):
+                    raise AssertionError("Fixture baseline paths are invalid")
             subprocess.run(["git", "init", "-q", str(project)], check=True)
             subprocess.run(
                 ["git", "-C", str(project), "config", "maintenance.auto", "false"],
                 check=True,
             )
+            if baseline_paths is not None:
+                empty_hooks = project / ".git/fastlane-empty-hooks"
+                empty_hooks.mkdir()
+                (project / ".git/info/attributes").write_text(
+                    "* -text -filter -ident -working-tree-encoding\n",
+                    encoding="utf-8",
+                )
+                subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(project),
+                        "config",
+                        "core.hooksPath",
+                        str(empty_hooks),
+                    ],
+                    check=True,
+                )
+                subprocess.run(
+                    ["git", "-C", str(project), "config", "commit.gpgsign", "false"],
+                    check=True,
+                )
             subprocess.run(
                 ["git", "-C", str(project), "config", "user.name", "Doctor Test"],
                 check=True,
@@ -3230,7 +3289,23 @@ class BootstrapDoctorTests(unittest.TestCase):
                 ],
                 check=True,
             )
-            subprocess.run(["git", "-C", str(project), "add", "."], check=True)
+            if baseline_paths is None:
+                subprocess.run(["git", "-C", str(project), "add", "."], check=True)
+            else:
+                excluded = project / ".git/info/exclude"
+                excluded.write_text("*\n", encoding="utf-8")
+                subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(project),
+                        "add",
+                        "-f",
+                        "--",
+                        *baseline_paths,
+                    ],
+                    check=True,
+                )
             subprocess.run(
                 ["git", "-C", str(project), "commit", "-qm", "baseline"], check=True
             )
@@ -3267,7 +3342,13 @@ class BootstrapDoctorTests(unittest.TestCase):
             )
             verify_path.write_text(verify_text, encoding="utf-8")
 
-    def approve_existing_project(self, project: Path, *, work_kind: str) -> str:
+    def approve_existing_project(
+        self,
+        project: Path,
+        *,
+        work_kind: str,
+        baseline_paths: tuple[str, ...] | None = None,
+    ) -> str:
         if work_kind not in {"FEATURE", "INFRASTRUCTURE"}:
             raise AssertionError(
                 "Existing-project fixture work kind must be FEATURE or INFRASTRUCTURE"
@@ -3278,7 +3359,11 @@ class BootstrapDoctorTests(unittest.TestCase):
         source_prd = prd_path.read_text(encoding="utf-8")
         source_tasks = tasks_path.read_text(encoding="utf-8")
 
-        self.approve_project(project, gate_b=True)
+        self.approve_project(
+            project,
+            gate_b=True,
+            baseline_paths=baseline_paths,
+        )
         baseline = subprocess.run(
             ["git", "-C", str(project), "rev-parse", "HEAD"],
             check=True,
@@ -3445,8 +3530,13 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(report["next_prompt"], "INTAKE-20")
         return proposal.replace("<name/handle>", "alice")
 
-    def pending_gate_b(self, project: Path) -> str:
-        self.approve_project(project)
+    def pending_gate_b(
+        self,
+        project: Path,
+        *,
+        baseline_paths: tuple[str, ...] | None = None,
+    ) -> str:
+        self.approve_project(project, baseline_paths=baseline_paths)
         self.set_non_material_req_evidence(project)
         prd_path = project / "docs/project/PRD.md"
         text = prd_path.read_text(encoding="utf-8")
@@ -3665,7 +3755,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.40")
+        self.assertEqual(report["bootstrap_version"], "1.2.41")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)

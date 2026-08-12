@@ -40,10 +40,11 @@ template. Maintainers may run the pinned CI action or an ephemeral
 Maintainer CI uses `@mermaid-js/mermaid-cli` `11.16.0` with an exact Node.js
 version to parse and render the packaged diagram procedure plus synthetic
 Golden Project diagrams. Fastlane adopters do not install this renderer to use
-the template. CI uploads only 11 sanitized diagrams in two themes (22 SVG review artifacts) for 14
-days; it never uploads project files, machine paths, credentials, account data,
-session state, or authorization records. A successful render proves syntax and
-produces an inspectable artifact; it does not by itself prove visual quality.
+the template. CI preserves four sanitized synthetic PRDs, 11 deduplicated
+Mermaid sources, and both themes (22 SVG review artifacts) for 14 days. It never
+reads or uploads adopter project files, machine paths, credentials, account
+data, or session state. A successful render proves syntax and produces an
+inspectable artifact; it does not by itself prove visual quality.
 
 ## GitHub Actions
 
