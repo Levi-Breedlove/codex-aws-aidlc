@@ -3556,7 +3556,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.initialize_task_plan(
             project,
             ready_task(
-                requirements="REQ-0001; FR-001; PROP-001",
+                requirements=f"{MODERN_TASK_REQUIREMENT_TRACE}; PROP-001",
                 design="DES-0001; TECH: TECH-0001, TECH-0007",
                 command="python -m unittest tests.test_properties",
                 property_projection=property_execution_projection(),
@@ -3665,7 +3665,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.39")
+        self.assertEqual(report["bootstrap_version"], "1.2.40")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -8813,6 +8813,11 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertNotIn("CONSTRUCTION_GIT_UNVERIFIED", codes(paused_report))
         self.assertNotIn("CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(paused_report))
         self.assertNotIn("CONSTRUCTION_WORKTREE_DRIFT", codes(paused_report))
+        self.assertNotIn("TASK_REQUIREMENT_COVERAGE", codes(paused_report))
+        self.assertNotEqual(
+            paused_report["interaction"]["route_reason_code"],
+            "TASK_REPLAN_REQUIRED",
+        )
         self.assertIn(
             "CONSTRUCTION_CHECKPOINT_UNVERIFIED", codes(evidence_prefix_report)
         )

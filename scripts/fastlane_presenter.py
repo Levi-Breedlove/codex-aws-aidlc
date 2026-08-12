@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any, Mapping, Sequence
 
 try:
+    from fastlane_engine.core.ids import TASK_ID
     from fastlane_owner_briefs import (
         GATE_B_NAVIGATION_LOCATOR_KEYS,
         finalize_owner_decision_brief,
@@ -20,6 +21,7 @@ try:
     from intake_response import intake_reply_token
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
+    from scripts.fastlane_engine.core.ids import TASK_ID
     from scripts.fastlane_owner_briefs import (
         GATE_B_NAVIGATION_LOCATOR_KEYS,
         finalize_owner_decision_brief,
@@ -43,6 +45,7 @@ STATUS_TEXT = {
     "DESIGN_STALE": "The technical design must be refreshed.",
     "WAITING_GATE_B": "The design is ready for your Gate B decision.",
     "TASK_PLAN_REQUIRED": "The approved design is ready for task planning.",
+    "TASK_REPLAN_REQUIRED": "The current task plan needs a bounded correction.",
     "CONSTRUCTION_SINGLE": "Approved local construction can continue.",
     "CONSTRUCTION_AUTONOMOUS": "Approved local construction is in progress.",
     "RELEASE_REVIEW": "Local construction is ready for release review.",
@@ -127,6 +130,9 @@ NEXT_TEXT = {
     "DESIGN_STALE": "Codex will refresh design evidence and the proposal.",
     "WAITING_GATE_B": "After approval, Codex will generate tasks and build locally.",
     "TASK_PLAN_REQUIRED": "Codex will generate the dependency-aware task plan.",
+    "TASK_REPLAN_REQUIRED": (
+        "Codex will replan the affected tasks while preserving completed evidence."
+    ),
     "CONSTRUCTION_SINGLE": "Codex will execute the next ready local task.",
     "CONSTRUCTION_AUTONOMOUS": "Codex will continue approved local tasks.",
     "RELEASE_REVIEW": "Codex will validate evidence and release readiness.",
@@ -738,6 +744,17 @@ def _remediation_text(report: Mapping[str, Any]) -> tuple[str | None, str | None
     action_kind = str(next_action.get("action_kind", ""))
     party = str(next_action.get("responsible_party", ""))
     automatic = next_action.get("automatic_continuation_allowed") is True
+    if action_kind == "REPLAN_TASKS":
+        if (
+            party != "CODEX"
+            or not automatic
+            or next_action.get("preserve_done_evidence") is not True
+        ):
+            raise PresentationError("unsafe automatic task-replan state")
+        return (
+            "Fastlane found a task-plan coverage defect.",
+            "Codex will replan only the affected tasks and preserve completed evidence.",
+        )
     if action_kind == "CORRECT_AND_REVALIDATE":
         if party != "CODEX" or not automatic:
             raise PresentationError("unsafe automatic remediation state")
@@ -770,7 +787,7 @@ def _task_details(report: Mapping[str, Any]) -> Mapping[str, Any] | None:
     return value if isinstance(value, Mapping) else None
 
 
-TASK_ID_PATTERN = re.compile(r"TASK-\d{4,}")
+TASK_ID_PATTERN = TASK_ID
 AWS_DISCOVERY_ID_PATTERN = re.compile(r"AWS-DISC-\d{4,}")
 AWS_SKILL_IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")
 AWS_OFFICIAL_REFERENCE_PATTERN = re.compile(
