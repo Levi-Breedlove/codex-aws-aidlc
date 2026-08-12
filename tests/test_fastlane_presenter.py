@@ -1513,6 +1513,79 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("Status: 3 of 7 tasks complete; working on TASK-0004.", rendered)
         self.assertIn("Next: Codex will finish and validate TASK-0004.", rendered)
 
+    def test_delivery_progress_accepts_the_engine_task_id_grammar(self) -> None:
+        current = report(
+            owner_stage="DELIVER",
+            state="WORKING",
+            route_reason_code="CONSTRUCTION_SINGLE",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+        )
+        current["tasks"] = {
+            "total": 1,
+            "completed": 0,
+            "skipped": 0,
+            "blocked": 0,
+            "ready": 1,
+            "in_progress": 0,
+            "ready_ids": ["TASK-1"],
+            "active_ids": [],
+            "blocked_ids": [],
+        }
+
+        rendered = presenter.render_owner_update(current)
+
+        self.assertIn("TASK-1 is ready next", rendered)
+        self.assertIn("Next: Codex will continue with TASK-1.", rendered)
+
+    def test_agent_replan_preserves_done_evidence_and_continues(self) -> None:
+        current = report(
+            owner_stage="DELIVER",
+            response_mode="OWNER_UPDATE",
+            state="WORKING",
+            route_reason_code="TASK_REPLAN_REQUIRED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+        )
+        current["remediation"] = {
+            "items": [],
+            "next_action": {
+                "responsible_party": "CODEX",
+                "action_kind": "REPLAN_TASKS",
+                "automatic_continuation_allowed": True,
+                "preserve_done_evidence": True,
+            },
+        }
+
+        rendered = presenter.render_owner_update(current)
+
+        self.assertIn("Status: Fastlane found a task-plan coverage defect.", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertIn("preserve completed evidence", rendered)
+        side_answer = presenter.render_side_question_response(
+            current,
+            answer="The affected task coverage will be corrected locally.",
+        )
+        self.assertIn("Pending next action: Nothing.", side_answer)
+        self.assertIn("preserve completed evidence", side_answer)
+
+        for field, value in (
+            ("responsible_party", "OWNER"),
+            ("automatic_continuation_allowed", False),
+            ("preserve_done_evidence", False),
+        ):
+            with self.subTest(field=field):
+                invalid = json.loads(json.dumps(current))
+                invalid["remediation"]["next_action"][field] = value
+                with self.assertRaises(presenter.PresentationError):
+                    presenter.render_owner_update(invalid)
+        missing_preservation = json.loads(json.dumps(current))
+        del missing_preservation["remediation"]["next_action"]["preserve_done_evidence"]
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_owner_update(missing_preservation)
+
     def test_invalid_delivery_progress_fails_closed(self) -> None:
         current = report(
             owner_stage="DELIVER",

@@ -727,6 +727,12 @@ class ProductJourneyTests(unittest.TestCase):
                     )
                     self.assertEqual(build_report["tasks"]["ready"], 1)
                     self.assertEqual(build_report["tasks"]["ready_ids"], ["TASK-001"])
+                    owner_update = presenter.render_owner_update(build_report)
+                    self.assertIn("TASK-001 is ready next", owner_update)
+                    self.assertIn("Need from you: Nothing.", owner_update)
+                    self.assertIn(
+                        "Next: Codex will continue with TASK-001.", owner_update
+                    )
                     self.assertEqual(
                         build_report["authorizations"]["construction"], "AUTH-0001"
                     )
@@ -767,6 +773,63 @@ class ProductJourneyTests(unittest.TestCase):
                         ).stdout.strip(),
                         baseline,
                     )
+
+    def test_extracted_task_coverage_gap_renders_automatic_replan(self) -> None:
+        fixture = doctor_fixtures.BootstrapDoctorTests()
+        with tempfile.TemporaryDirectory() as directory:
+            project = self.extract_template(Path(directory), "task-replan")
+            self.initialize(project)
+            protected = project / "legacy/existing.txt"
+            protected.parent.mkdir(parents=True, exist_ok=True)
+            protected.write_text("preserved legacy behavior\n", encoding="utf-8")
+            fixture.approve_existing_project(project, work_kind="FEATURE")
+            fixture.initialize_task_plan(
+                project,
+                doctor_fixtures.ready_task(
+                    "legacy/change.py",
+                    requirements=(
+                        f"{doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE}; PROP-001"
+                    ),
+                    design="DES-0001; TECH: TECH-0001, TECH-0007",
+                    command="python -m unittest tests.test_properties",
+                    property_projection=(
+                        doctor_fixtures.property_execution_projection()
+                    ),
+                ),
+            )
+            doctor_fixtures.refresh_document_summaries(project)
+            current = doctor.inspect_project(project)
+            self.assertTrue(current["ok"], current["diagnostics"])
+            self.assertEqual(current["authorizations"]["construction"], "AUTH-0001")
+
+            tasks_path = project / "docs/project/TASKS.md"
+            tasks = tasks_path.read_text(encoding="utf-8")
+            coverage_gap = tasks.replace(
+                f"{doctor_fixtures.MODERN_TASK_REQUIREMENT_TRACE}; PROP-001",
+                "REQ-0001; PROP-001",
+                1,
+            )
+            self.assertNotEqual(coverage_gap, tasks)
+            tasks_path.write_text(coverage_gap, encoding="utf-8")
+            doctor_fixtures.refresh_document_summaries(project)
+            replan = doctor.inspect_project(project)
+
+        self.assertFalse(replan["ok"])
+        self.assertEqual(
+            replan["interaction"]["route_reason_code"],
+            "TASK_REPLAN_REQUIRED",
+        )
+        self.assertEqual(
+            replan["remediation"]["next_action"]["action_kind"],
+            "REPLAN_TASKS",
+        )
+        self.assertTrue(replan["remediation"]["next_action"]["preserve_done_evidence"])
+        self.assertEqual(replan["authorizations"]["construction"], "NONE")
+        self.assertEqual(replan["authorizations"]["aws"], "NONE")
+        self.assertEqual(replan["external_authority"]["kind"], "NONE")
+        replan_update = presenter.render_owner_update(replan)
+        self.assertIn("Need from you: Nothing.", replan_update)
+        self.assertIn("preserve completed evidence", replan_update)
 
     def test_gate_evidence_and_construction_routes_use_real_project_artifacts(
         self,
