@@ -97,6 +97,22 @@
         "AWS access, execution, deployment, recovery, or teardown evidence claim",
         "release, GitHub, or teardown authority broadening"
       ]
+    },
+    {
+      "id": "MERMAID_PRESENTATION_1_2_39",
+      "base_commit": "2af6a7911e8b72bafb87102bbc8ae70e6b82c9bb",
+      "scope": [
+        "compact state-diagram presentation and exact rendered-review fixture coverage",
+        "bounded node and relationship line-break presentation validation",
+        "relationship line breaks excluded from modern diagram semantic digests",
+        "dark and default render guidance with the existing restrained semantic palette",
+        "context-locator bytes changed only by the updated Design procedure"
+      ],
+      "prohibited": [
+        "requirement, design, containment, relationship, lifecycle, routing, task, gate, authority, or receipt semantic change",
+        "construction or AWS authorization change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "normalization": {

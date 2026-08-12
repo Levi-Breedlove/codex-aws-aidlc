@@ -549,6 +549,13 @@ def _plain_mermaid_label(value: str) -> str:
     return clean_cell(without_tags)
 
 
+DIAGRAM_RELATIONSHIP_LABEL_NORMALIZERS = (clean_cell, _plain_mermaid_label)
+
+
+def _mermaid_visible_lines(value: str) -> tuple[str, ...]:
+    return tuple(clean_cell(item) for item in re.split(r"<br\s*/?>", value, flags=re.I))
+
+
 def _exposed_current_contract_id(
     value: str,
     current_ids: Iterable[str],
@@ -594,11 +601,7 @@ def _unsafe_visible_mermaid_issues(
 def _diagram_node_label(match: re.Match[str]) -> str:
     """Return the quoted label from one supported Mermaid node shape."""
 
-    return next(
-        value
-        for name in ("rect", "data", "round")
-        if (value := match.group(name)) is not None
-    )
+    return match.group("rect") or match.group("data") or match.group("round") or ""
 
 
 def _mermaid_label_issues(
@@ -618,6 +621,11 @@ def _mermaid_label_issues(
             *issues,
             f"{diagram_id}: {identifier} has no owner-visible label",
         ]
+    visual_lines = _mermaid_visible_lines(raw_label)
+    if len(visual_lines) > 3:
+        issues.append(
+            f"{diagram_id}: {identifier} label may use at most three visual lines"
+        )
     if _exposed_current_contract_id(label, current_ids) is not None:
         return label, [
             *issues,
@@ -707,22 +715,40 @@ def _mermaid_node_issues(
 
 def _mermaid_relationship_issues(
     diagram_id: str,
-    relationships: tuple[tuple[str, str, str], ...],
+    lines: Iterable[str],
     current_ids: Iterable[str] = (),
+    *,
+    presentation_only: bool = False,
 ) -> list[str]:
     """Validate concise human relationship labels and explicit containment."""
 
     issues: list[str] = []
-    for _source, relation, _target in relationships:
+    for line in lines:
+        match = DIAGRAM_RELATIONSHIP.fullmatch(line)
+        if match is None:
+            continue
+        raw_relation = match.group("solid") or match.group("dotted")
+        visual_lines = _mermaid_visible_lines(raw_relation)
+        if presentation_only:
+            if len(visual_lines) > 2:
+                issues.append(
+                    f"{diagram_id}: relationship label may use at most two visual lines"
+                )
+            if any(not item or len(item) > 48 for item in visual_lines):
+                issues.append(
+                    f"{diagram_id}: relationship label lines must contain 1 to 48 visible characters"
+                )
+            continue
         issues.extend(
             _unsafe_visible_mermaid_issues(
-                diagram_id, "relationship label", relation, allow_breaks=False
+                diagram_id, "relationship label", raw_relation, allow_breaks=True
             )
         )
-        if _exposed_current_contract_id(relation, current_ids) is not None:
+        if _exposed_current_contract_id(raw_relation, current_ids) is not None:
             issues.append(
                 f"{diagram_id}: relationship labels must not expose canonical record IDs"
             )
+        relation = _plain_mermaid_label(raw_relation)
         if len(relation) > 72:
             issues.append(
                 f"{diagram_id}: relationship label exceeds 72 visible characters"
@@ -1222,6 +1248,7 @@ def _mermaid_presentation_issues(
     )
     return [
         *node_issues,
+        *_mermaid_relationship_issues(diagram_id, lines, presentation_only=True),
         *_mermaid_accessibility_issues(diagram_id, lines, current_ids),
         *_planned_diagram_language_issues(diagram_id, kind, lines),
         *_mermaid_structure_issues(diagram_id, kind, lines, current_ids),
@@ -1265,39 +1292,25 @@ def _diagram_kind_requirements(
 ) -> tuple[tuple[tuple[str, frozenset[str]], ...], frozenset[str]]:
     """Return declarative endpoint groups and basis records for one focused view."""
 
-    project_entry = (
-        set(context.interface_ids)
-        | set(context.boundary_ids)
-        | ({context.architecture_id} if context.architecture_id else set())
+    architecture = frozenset(
+        {context.architecture_id} if context.architecture_id else set()
     )
+    architecture_group = ("the selected architecture", architecture)
+    project_entry = (
+        set(context.interface_ids) | set(context.boundary_ids) | set(architecture)
+    )
+
+    def current_basis(prefix: str) -> frozenset[str]:
+        return frozenset(
+            identifier
+            for identifier in context.current_ids
+            if identifier.startswith(prefix)
+        )
+
     if kind == "SYSTEM_CONTEXT":
-        return (
-            (
-                (
-                    "the selected architecture",
-                    frozenset(
-                        {context.architecture_id} if context.architecture_id else set()
-                    ),
-                ),
-            ),
-            frozenset(context.requirement_ids),
-        )
+        return ((architecture_group,), frozenset(context.requirement_ids))
     if kind == "AWS_IMPLEMENTATION":
-        return (
-            (
-                (
-                    "the selected architecture",
-                    frozenset(
-                        {context.architecture_id} if context.architecture_id else set()
-                    ),
-                ),
-            ),
-            frozenset(
-                identifier
-                for identifier in context.current_ids
-                if identifier.startswith("DES-")
-            ),
-        )
+        return ((architecture_group,), current_basis("DES-"))
     if kind == "PRIMARY_OUTCOME":
         if not any((context.actor_ids, context.journey_ids, context.use_case_ids)):
             return (
@@ -1332,28 +1345,15 @@ def _diagram_kind_requirements(
                     context.technology_ids_by_concern.get(concern, frozenset()),
                 ),
             ),
-            frozenset(
-                identifier
-                for identifier in context.current_ids
-                if identifier.startswith(basis_prefix)
-            ),
+            current_basis(basis_prefix),
         )
     if kind == "MIGRATION":
         return (
             (
                 ("a project boundary", frozenset(context.boundary_ids)),
-                (
-                    "the selected architecture",
-                    frozenset(
-                        {context.architecture_id} if context.architecture_id else set()
-                    ),
-                ),
+                architecture_group,
             ),
-            frozenset(
-                identifier
-                for identifier in context.current_ids
-                if identifier.startswith("PRES-")
-            ),
+            current_basis("PRES-"),
         )
     return (), frozenset()
 
@@ -1387,7 +1387,7 @@ def _diagram_connectivity_issues(
 ) -> list[str]:
     """Require one connected owner story where the diagram kind promises one view."""
 
-    if kind == "STATE" or not endpoint_ids:
+    if not endpoint_ids:
         return []
     self_loops = sorted(
         source for source, _relation, target in relationships if source == target
@@ -1397,7 +1397,7 @@ def _diagram_connectivity_issues(
         if self_loops
         else []
     )
-    if kind == "JOURNEY":
+    if kind in {"JOURNEY", "STATE"}:
         return issues
     adjacent = {identifier: set() for identifier in endpoint_ids}
     for source, _relation, target in relationships:
@@ -1531,7 +1531,7 @@ def _modern_diagram_issues(
     lines = body.splitlines()
     semantic_issues = [
         *_unsupported_mermaid_edge_issues(diagram_id, lines),
-        *_mermaid_relationship_issues(diagram_id, relationships, context.current_ids),
+        *_mermaid_relationship_issues(diagram_id, lines, context.current_ids),
         *_semantic_mermaid_membership_issues(diagram_id, kind, lines, expected_styles),
     ]
     if any(not relation for _source, relation, _target in relationships):
@@ -1560,7 +1560,7 @@ def _modern_diagram_issues(
             diagram_id, kind, basis_ids, endpoint_ids, context
         )
     )
-    semantic_issues.extend(
+    (presentation_issues if kind == "STATE" else semantic_issues).extend(
         _diagram_connectivity_issues(diagram_id, kind, endpoint_ids, relationships)
     )
     return semantic_issues, presentation_issues
@@ -2012,7 +2012,7 @@ def _derive_current_diagram_contract(
                     (
                         match.group("from"),
                         "SOLID" if match.group("solid") is not None else "DASHED",
-                        clean_cell(
+                        DIAGRAM_RELATIONSHIP_LABEL_NORMALIZERS[modern_contract](
                             match.group("solid") or match.groupdict().get("dotted")
                         ),
                         match.group("to"),

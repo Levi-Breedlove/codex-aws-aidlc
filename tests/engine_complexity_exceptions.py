@@ -13,7 +13,7 @@ REVIEWED_MODULE_SIZE_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "maximum_lines": 2_182,
         "reviewed_lines": 2_182,
         "reason": "One cohesive diagram contract owns legacy compatibility, semantic binding, portable Mermaid validation, claim safety, and presentation-only repair without a second architecture graph.",
-        "reviewed_in": "1.2.35",
+        "reviewed_in": "1.2.39",
         "expires": "1.3.0",
     },
 }

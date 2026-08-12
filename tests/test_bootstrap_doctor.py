@@ -1681,7 +1681,7 @@ def complete_state_diagrams(text: str, *, actorless_primary: bool = False) -> st
         elif row[1] == "STATE":
             row[3] = "CURRENT"
             row[5] = "ARCH-0001, FR-001"
-            row[6] = "STATE-001"
+            row[6] = "ARCH-0001, STATE-001"
     text = replace_contract_table(
         text,
         doctor.DIAGRAM_CONTRACT_HEADING,
@@ -1696,7 +1696,7 @@ def complete_state_diagrams(text: str, *, actorless_primary: bool = False) -> st
         raise AssertionError("Complete system diagram interface node is missing")
     text = text.replace(
         interface_node,
-        interface_node + '\n                STATE-001["PENDING, READY"]:::event',
+        interface_node + '\n                STATE-001["PENDING,<br/>READY"]:::event',
         1,
     )
     boundary_edge = "    BOUNDARY-001 -->|allows requests to| API-001"
@@ -1712,11 +1712,14 @@ def complete_state_diagrams(text: str, *, actorless_primary: bool = False) -> st
         "### State view",
         "### Data lifecycle view",
         """```mermaid
-flowchart LR
+flowchart TB
     accTitle: Review lifecycle state
-    accDescr: The planned review moves from pending to ready only through the validated project transition.
-    STATE-001["PENDING, READY"]
-    STATE-001 -->|permits only recorded transitions| STATE-001
+    accDescr: The selected application points to one canonical review-state model and names its exact recorded transition.
+    ARCH-0001["Managed Serverless Baseline"]:::compute
+    STATE-001["PENDING,<br/>READY"]:::event
+    ARCH-0001 -->|permits PENDING<br/>to READY| STATE-001
+    classDef compute fill:#FFF1E8,stroke:#D86613,color:#232F3E;
+    classDef event fill:#F3ECFF,stroke:#8C4FFF,color:#232F3E;
 ```""",
     )
     if not actorless_primary:
@@ -3662,7 +3665,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.38")
+        self.assertEqual(report["bootstrap_version"], "1.2.39")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -11154,6 +11157,196 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertNotEqual(
             baseline_record.rendered_sha256,
             relabeled_record.rendered_sha256,
+        )
+
+        wrapped_relation, wrapped_issues = doctor.derive_design_contract(
+            source.replace(
+                "ACT-001 -->|sends a review request through| TECH-0013",
+                "ACT-001 -->|sends a review<br/>request through| TECH-0013",
+                1,
+            ),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(wrapped_issues, [])
+        wrapped_record = next(
+            item
+            for item in wrapped_relation.diagram_contract.records
+            if item.diagram_id == "DIAGRAM-0001"
+        )
+        self.assertEqual(baseline.canonical_sha256, wrapped_relation.canonical_sha256)
+        self.assertEqual(
+            baseline_record.semantic_sha256,
+            wrapped_record.semantic_sha256,
+        )
+        self.assertNotEqual(
+            baseline_record.rendered_sha256,
+            wrapped_record.rendered_sha256,
+        )
+
+        overwrapped, overwrapped_issues = doctor.derive_design_contract(
+            source.replace(
+                "ACT-001 -->|sends a review request through| TECH-0013",
+                "ACT-001 -->|sends a<br/>review request<br/>through| TECH-0013",
+                1,
+            ),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(overwrapped.status, "READY")
+        self.assertTrue(overwrapped_issues)
+        self.assertTrue(
+            all(
+                issue.startswith("DIAGRAM_PRESENTATION_STALE: ")
+                for issue in overwrapped_issues
+            ),
+            overwrapped_issues,
+        )
+        overwrapped_record = next(
+            item
+            for item in overwrapped.diagram_contract.records
+            if item.diagram_id == "DIAGRAM-0001"
+        )
+        self.assertEqual(baseline.canonical_sha256, overwrapped.canonical_sha256)
+        self.assertEqual(
+            baseline_record.semantic_sha256,
+            overwrapped_record.semantic_sha256,
+        )
+        self.assertNotEqual(
+            baseline_record.rendered_sha256,
+            overwrapped_record.rendered_sha256,
+        )
+
+        stateful_source = replace_contract_table(
+            source,
+            doctor.STATE_APPLICABILITY_HEADING,
+            doctor.STATE_APPLICABILITY_HEADERS,
+            [("RESOURCE-001", "APPLICABLE", "LIFECYCLE_RESOURCE: FR-001", "STATE-001")],
+        )
+        stateful_source = replace_contract_table(
+            stateful_source,
+            doctor.STATE_REGISTER_HEADING,
+            doctor.STATE_REGISTER_HEADERS,
+            [
+                (
+                    "STATE-001",
+                    "RESOURCE-001",
+                    "PENDING, READY",
+                    "PENDING",
+                    "PENDING to READY",
+                    "READY",
+                    "Reject invalid transitions",
+                    "FR-001",
+                    "AC-FR-001",
+                )
+            ],
+        )
+        restyled_state_source = complete_state_diagrams(stateful_source)
+        released_state_source = set_diagram_block(
+            restyled_state_source,
+            "### State view",
+            "### Data lifecycle view",
+            """```mermaid
+flowchart LR
+    accTitle: Review lifecycle state
+    accDescr: The selected application points to one canonical review-state model and names its exact recorded transition.
+    ARCH-0001["Managed Serverless Baseline"]
+    STATE-001["PENDING, READY"]
+    ARCH-0001 -->|permits PENDING to READY| STATE-001
+```""",
+        )
+        released_state, released_state_issues = doctor.derive_design_contract(
+            released_state_source,
+            "DES-0001",
+            required=True,
+        )
+        restyled_state, restyled_state_issues = doctor.derive_design_contract(
+            restyled_state_source,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(released_state_issues, [])
+        self.assertEqual(restyled_state_issues, [])
+        self.assertEqual(released_state.status, "READY")
+        self.assertEqual(
+            released_state.canonical_sha256, restyled_state.canonical_sha256
+        )
+        released_state_record = next(
+            record
+            for record in released_state.diagram_contract.records
+            if record.diagram_id == "DIAGRAM-0007"
+        )
+        restyled_state_record = next(
+            record
+            for record in restyled_state.diagram_contract.records
+            if record.diagram_id == "DIAGRAM-0007"
+        )
+        self.assertEqual(
+            released_state_record.semantic_sha256,
+            restyled_state_record.semantic_sha256,
+        )
+        self.assertNotEqual(
+            released_state_record.rendered_sha256,
+            restyled_state_record.rendered_sha256,
+        )
+        table = doctor.contract_table_after_heading(
+            restyled_state_source,
+            doctor.DIAGRAM_CONTRACT_HEADING,
+            doctor.DIAGRAM_CONTRACT_HEADERS,
+        )
+        self.assertIsNotNone(table)
+        legacy_rows = [list(row) for row in table.rows]
+        for row in legacy_rows:
+            if row[1] == "STATE":
+                row[6] = "STATE-001"
+        self_loop_state_source = replace_contract_table(
+            restyled_state_source,
+            doctor.DIAGRAM_CONTRACT_HEADING,
+            doctor.DIAGRAM_CONTRACT_HEADERS,
+            [tuple(row) for row in legacy_rows],
+        )
+        self_loop_state_source = set_diagram_block(
+            self_loop_state_source,
+            "### State view",
+            "### Data lifecycle view",
+            """```mermaid
+flowchart TB
+    accTitle: Review lifecycle state
+    accDescr: The legacy presentation incorrectly shows the whole review-state model as a transition back to itself.
+    STATE-001["PENDING,<br/>READY"]:::event
+    STATE-001 -->|loops back to itself| STATE-001
+    classDef event fill:#F3ECFF,stroke:#8C4FFF,color:#232F3E;
+```""",
+        )
+        self_loop_state, self_loop_issues = doctor.derive_design_contract(
+            self_loop_state_source,
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(self_loop_state.status, "READY")
+        self.assertTrue(self_loop_state_issues := self_loop_issues)
+        self.assertTrue(
+            all(
+                issue.startswith("DIAGRAM_PRESENTATION_STALE: ")
+                for issue in self_loop_state_issues
+            ),
+            self_loop_state_issues,
+        )
+        self.assertTrue(
+            any(
+                "STATE must not contain self-loop STATE-001" in issue
+                for issue in self_loop_issues
+            ),
+            self_loop_issues,
+        )
+        self_loop_record = next(
+            record
+            for record in self_loop_state.diagram_contract.records
+            if record.diagram_id == "DIAGRAM-0007"
+        )
+        self.assertNotEqual(
+            self_loop_record.semantic_sha256,
+            restyled_state_record.semantic_sha256,
         )
 
         presentation_variants = (

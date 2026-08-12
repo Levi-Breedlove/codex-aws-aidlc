@@ -45,6 +45,7 @@ AWS_DESIGN_COVERAGE_BASE_COMMIT = "e31d60bec32dd52b3ec29f36abfad2096e9ef867"
 HUMAN_DIAGRAM_SUPPORT_DIGEST_BASE_COMMIT = "66bcf1de7e5e06feb3dcf84fae2081d515c881a4"
 OWNER_SOURCE_NAVIGATION_BASE_COMMIT = "47e1e548e0ae429d47ff838b3ebd60e98a1a5e1e"
 SEPARATE_AWS_AUTHORITY_BASE_COMMIT = "94594e7fabfa0a4dc7a1020cf51792a9ca10f07e"
+MERMAID_PRESENTATION_BASE_COMMIT = "2af6a7911e8b72bafb87102bbc8ae70e6b82c9bb"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -142,6 +143,22 @@ APPROVED_BEHAVIOR_CHANGES = [
             "requirement, design, diagram, task, or local construction authority change",
             "AWS access, execution, deployment, recovery, or teardown evidence claim",
             "release, GitHub, or teardown authority broadening",
+        ],
+    },
+    {
+        "id": "MERMAID_PRESENTATION_1_2_39",
+        "base_commit": MERMAID_PRESENTATION_BASE_COMMIT,
+        "scope": [
+            "compact state-diagram presentation and exact rendered-review fixture coverage",
+            "bounded node and relationship line-break presentation validation",
+            "relationship line breaks excluded from modern diagram semantic digests",
+            "dark and default render guidance with the existing restrained semantic palette",
+            "context-locator bytes changed only by the updated Design procedure",
+        ],
+        "prohibited": [
+            "requirement, design, containment, relationship, lifecycle, routing, task, gate, authority, or receipt semantic change",
+            "construction or AWS authorization change",
+            "AWS access, execution, deployment, recovery, or teardown evidence claim",
         ],
     },
 ]
