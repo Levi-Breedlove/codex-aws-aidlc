@@ -188,13 +188,13 @@ class PackageReleaseTests(unittest.TestCase):
             self.assertNotIn(forbidden, workflow)
         self.assertEqual(workflow.count("actions/upload-artifact@"), 1)
         self.assertIn(
-            "name: fastlane-mermaid-rendered-${{ env.FASTLANE_CANDIDATE_COMMIT }}",
+            "name: fastlane-golden-review-${{ env.FASTLANE_CANDIDATE_COMMIT }}",
             workflow,
         )
-        self.assertIn(
-            "path: ${{ runner.temp }}/fastlane-mermaid/*.svg",
-            workflow,
-        )
+        for suffix in ("md", "mmd", "svg"):
+            self.assertIn(
+                f"${{{{ runner.temp }}}}/fastlane-mermaid/*.{suffix}", workflow
+            )
         self.assertIn("if-no-files-found: error", workflow)
         self.assertIn("retention-days: 14", workflow)
 
@@ -259,7 +259,7 @@ class PackageReleaseTests(unittest.TestCase):
             "Run repository governance monitors",
             "Run Engine characterization contracts",
             "Render sanitized published and Golden Project diagrams",
-            "Preserve sanitized rendered-diagram review artifacts",
+            "Preserve sanitized Golden Project review artifacts",
             "Verify template manifest hashes",
             "Enforce customer package version identity",
             "Verify deterministic release package",
@@ -353,7 +353,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.40")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.41")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())

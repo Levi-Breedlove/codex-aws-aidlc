@@ -10,14 +10,20 @@ from __future__ import annotations
 import argparse
 import ast
 import inspect
+import os
 import re
+import tempfile
 import textwrap
 from pathlib import Path
+from unittest import mock
 
 from tests.test_bootstrap_doctor import (
+    BootstrapDoctorTests,
     approve_gate_a,
     complete_diagram_contract,
     complete_existing_design_contract,
+    doctor,
+    refresh_document_summaries,
 )
 
 
@@ -46,6 +52,38 @@ VARIANT_BINDINGS = (
     ),
 )
 VARIANT_NAMES = tuple(name for name, _work_kind, _heading in VARIANT_BINDINGS)
+PRD_NAMES = (
+    "golden-prd-untouched",
+    "golden-prd-greenfield-design",
+    "golden-prd-brownfield-feature-design",
+    "golden-prd-infrastructure-only-design",
+)
+PRD_DIAGRAM_BINDINGS = {
+    "golden-prd-untouched": {},
+    "golden-prd-greenfield-design": {
+        "DIAGRAM-0001": "golden-complete-architecture",
+        "DIAGRAM-0002": "golden-primary-outcome",
+        "DIAGRAM-0003": "golden-data-lifecycle",
+        "DIAGRAM-0004": "golden-failure-recovery",
+        "DIAGRAM-0008": "golden-aws-implementation",
+    },
+    "golden-prd-brownfield-feature-design": {
+        "DIAGRAM-0001": "golden-complete-architecture",
+        "DIAGRAM-0002": "golden-primary-outcome",
+        "DIAGRAM-0003": "golden-data-lifecycle",
+        "DIAGRAM-0004": "golden-failure-recovery",
+        "DIAGRAM-0005": "golden-brownfield-migration",
+        "DIAGRAM-0008": "golden-aws-implementation",
+    },
+    "golden-prd-infrastructure-only-design": {
+        "DIAGRAM-0001": "golden-complete-architecture",
+        "DIAGRAM-0002": "golden-primary-outcome",
+        "DIAGRAM-0003": "golden-data-lifecycle",
+        "DIAGRAM-0004": "golden-failure-recovery",
+        "DIAGRAM-0005": "golden-brownfield-migration",
+        "DIAGRAM-0008": "golden-infrastructure-aws",
+    },
+}
 
 
 def _blocks(source: str, *, expected: int, label: str) -> tuple[str, ...]:
@@ -118,6 +156,39 @@ def _variant_golden_blocks() -> dict[str, str]:
     return variants
 
 
+def _inspect_prd(project: Path) -> tuple[str, dict[str, object]]:
+    report = doctor.inspect_project(project)
+    if not report["ok"] or report["document_summaries"]["status"] != "CURRENT":
+        raise ValueError("Golden PRD project did not reach a current Engine state")
+    return (project / "docs/project/PRD.md").read_text(encoding="utf-8"), report
+
+
+def collect_prd_fixtures() -> dict[str, tuple[str, dict[str, object]]]:
+    """Build four complete sanitized PRD records through real fixture routes."""
+
+    fixture = BootstrapDoctorTests()
+    git_environment = {
+        "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+00:00",
+    }
+    with (
+        tempfile.TemporaryDirectory() as directory,
+        mock.patch.dict(os.environ, git_environment),
+    ):
+        projects: dict[str, Path] = {}
+        for name in PRD_NAMES:
+            destination = Path(directory) / name
+            destination.mkdir()
+            projects[name] = fixture.copy_project(destination)
+        refresh_document_summaries(projects[PRD_NAMES[0]])
+        fixture.pending_gate_b(projects[PRD_NAMES[1]])
+        fixture.approve_existing_project(projects[PRD_NAMES[2]], work_kind="FEATURE")
+        fixture.approve_existing_project(
+            projects[PRD_NAMES[3]], work_kind="INFRASTRUCTURE"
+        )
+        return {name: _inspect_prd(projects[name]) for name in PRD_NAMES}
+
+
 def collect_mermaid_fixtures(root: Path = REPOSITORY_ROOT) -> dict[str, str]:
     """Return the exact sanitized Mermaid sources rendered in CI."""
 
@@ -160,6 +231,26 @@ def write_mermaid_fixtures(output_dir: Path) -> tuple[Path, ...]:
     return tuple(outputs)
 
 
+def write_review_fixtures(output_dir: Path) -> tuple[Path, ...]:
+    """Write four complete PRDs and the deduplicated Mermaid render inputs."""
+
+    mermaid = write_mermaid_fixtures(output_dir)
+    prds = collect_prd_fixtures()
+    expected_names = {path.name for path in mermaid} | {f"{name}.md" for name in prds}
+    unexpected = {path.name for path in output_dir.iterdir()} - expected_names
+    if unexpected:
+        raise ValueError(
+            "Review output directory contains unexpected entries: "
+            + ", ".join(sorted(unexpected))
+        )
+    outputs = list(mermaid)
+    for name, (source, _report) in prds.items():
+        path = output_dir / f"{name}.md"
+        path.write_text(source.rstrip() + "\n", encoding="utf-8", newline="\n")
+        outputs.append(path)
+    return tuple(outputs)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Materialize sanitized Mermaid fixtures for rendering."
@@ -170,8 +261,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    outputs = write_mermaid_fixtures(args.output_dir.resolve())
-    print(f"Prepared {len(outputs)} sanitized Mermaid fixtures.")
+    outputs = write_review_fixtures(args.output_dir.resolve())
+    print(f"Prepared {len(outputs)} sanitized review fixtures.")
     return 0
 
 

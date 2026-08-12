@@ -102,11 +102,14 @@ jobs:
           done
           test "$(find "${RUNNER_TEMP}/fastlane-mermaid" -name '*.svg' | wc -l)" -eq 22
 
-      - name: Preserve sanitized rendered-diagram review artifacts
+      - name: Preserve sanitized Golden Project review artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: fastlane-mermaid-rendered-${{ env.FASTLANE_CANDIDATE_COMMIT }}
-          path: ${{ runner.temp }}/fastlane-mermaid/*.svg
+          name: fastlane-golden-review-${{ env.FASTLANE_CANDIDATE_COMMIT }}
+          path: |
+            ${{ runner.temp }}/fastlane-mermaid/*.md
+            ${{ runner.temp }}/fastlane-mermaid/*.mmd
+            ${{ runner.temp }}/fastlane-mermaid/*.svg
           if-no-files-found: error
           retention-days: 14
 

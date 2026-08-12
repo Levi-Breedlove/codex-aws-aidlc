@@ -1206,6 +1206,225 @@ sequenceDiagram
                 self.assertNotRegex(source, r"[A-Z]:\\|/(?:Users|home)/")
                 self.assertNotRegex(source, r"(?<!\d)\d{12}(?!\d)")
 
+    def test_complete_golden_prds_align_with_the_rendered_diagram_corpus(
+        self,
+    ) -> None:
+        mermaid = render_mermaid_fixtures.collect_mermaid_fixtures(REPOSITORY_ROOT)
+        prds = render_mermaid_fixtures.collect_prd_fixtures()
+        self.assertEqual(tuple(prds), render_mermaid_fixtures.PRD_NAMES)
+        with tempfile.TemporaryDirectory() as directory:
+            outputs = render_mermaid_fixtures.write_review_fixtures(Path(directory))
+            self.assertEqual(len(outputs), 15)
+            self.assertEqual(
+                {path.name for path in outputs},
+                {f"{name}.mmd" for name in mermaid} | {f"{name}.md" for name in prds},
+            )
+            for name, (source, _report) in prds.items():
+                self.assertEqual(
+                    (Path(directory) / f"{name}.md").read_text(encoding="utf-8"),
+                    source.rstrip() + "\n",
+                )
+        expected_contract = {
+            "DIAGRAM-0001": (
+                "SYSTEM_CONTEXT",
+                "proposed-system-at-a-glance",
+                ("ARCH-0001", "FR-001"),
+            ),
+            "DIAGRAM-0002": (
+                "PRIMARY_OUTCOME",
+                "sequence-primary-outcome",
+                ("ARCH-0001", "JOURNEY-001"),
+            ),
+            "DIAGRAM-0003": (
+                "DATA_LIFECYCLE",
+                "data-lifecycle-view",
+                ("ARCH-0001", "DATA-001"),
+            ),
+            "DIAGRAM-0004": (
+                "FAILURE_RECOVERY",
+                "sequence-failure-and-recovery",
+                ("ARCH-0001", "REL-005"),
+            ),
+            "DIAGRAM-0005": (
+                "MIGRATION",
+                "migration-view",
+                ("PRES-001", "ARCH-0001"),
+            ),
+            "DIAGRAM-0008": (
+                "AWS_IMPLEMENTATION",
+                "aws-implementation-at-a-glance",
+                ("ARCH-0001", "DES-0001"),
+            ),
+        }
+        expected_relationships = {
+            "golden-complete-architecture": {
+                ("ACT-001", "SOLID", "sends a review request through", "TECH-0013"),
+                ("TECH-0010", "DASHED", "provides token issuer trust to", "TECH-0013"),
+                (
+                    "TECH-0013",
+                    "SOLID",
+                    "routes authenticated requests into",
+                    "BOUNDARY-001",
+                ),
+                ("BOUNDARY-001", "SOLID", "allows requests to", "API-001"),
+                ("API-001", "SOLID", "invokes", "TECH-0002"),
+                ("TECH-0002", "SOLID", "runs on", "TECH-0001"),
+                ("TECH-0001", "SOLID", "implements", "ARCH-0001"),
+                ("ARCH-0001", "SOLID", "stores owner records in", "TECH-0011"),
+                (
+                    "TECH-0008",
+                    "DASHED",
+                    "protects code, data, and secrets posture for",
+                    "ARCH-0001",
+                ),
+                ("ARCH-0001", "DASHED", "emits operational signals to", "TECH-0014"),
+                ("TECH-0004", "DASHED", "defines changes for", "TECH-0009"),
+                ("TECH-0009", "DASHED", "deploys", "TECH-0001"),
+                ("TECH-0015", "DASHED", "restores", "TECH-0001"),
+            },
+            "golden-primary-outcome": {
+                ("ACT-001", "SOLID", "submits a review request to", "API-001"),
+                ("API-001", "SOLID", "returns the validated review to", "ACT-001"),
+            },
+            "golden-data-lifecycle": {
+                ("API-001", "SOLID", "validates and stores in", "TECH-0011")
+            },
+            "golden-failure-recovery": {
+                ("API-001", "SOLID", "fails safely and invokes", "TECH-0015")
+            },
+            "golden-aws-implementation": {
+                ("TECH-0010", "DASHED", "provides token issuer trust to", "TECH-0013"),
+                ("TECH-0013", "SOLID", "routes authenticated requests to", "TECH-0002"),
+                ("TECH-0002", "SOLID", "runs on", "TECH-0001"),
+                ("TECH-0001", "SOLID", "implements", "ARCH-0001"),
+                ("ARCH-0001", "SOLID", "reads and writes", "TECH-0011"),
+                ("TECH-0008", "DASHED", "protects", "ARCH-0001"),
+                ("ARCH-0001", "DASHED", "emits signals to", "TECH-0014"),
+                ("TECH-0004", "DASHED", "defines changes for", "TECH-0009"),
+                ("TECH-0009", "DASHED", "deploys", "TECH-0001"),
+                ("TECH-0015", "DASHED", "restores", "TECH-0001"),
+            },
+            "golden-brownfield-migration": {
+                ("BOUNDARY-001", "SOLID", "routes existing requests to", "ARCH-0001"),
+                ("ARCH-0001", "SOLID", "keeps compatible records in", "TECH-0011"),
+                ("TECH-0015", "DASHED", "restores", "ARCH-0001"),
+            },
+        }
+        expected_relationships["golden-infrastructure-aws"] = expected_relationships[
+            "golden-aws-implementation"
+        ]
+
+        def relationships(candidate: str) -> set[tuple[str, str, str, str]]:
+            solid = re.compile(
+                r"^\s*([A-Z][A-Z0-9_]*-\d{3,})\s*-->\|([^|]+)\|\s*"
+                r"([A-Z][A-Z0-9_]*-\d{3,})\s*$"
+            )
+            dashed = re.compile(
+                r'^\s*([A-Z][A-Z0-9_]*-\d{3,})\s*-\.\s*"([^"]+)"\s*\.->\s*'
+                r"([A-Z][A-Z0-9_]*-\d{3,})\s*$"
+            )
+            observed: set[tuple[str, str, str, str]] = set()
+            for line in candidate.splitlines():
+                match = solid.fullmatch(line) or dashed.fullmatch(line)
+                if match is None:
+                    continue
+                kind = "SOLID" if "-->|" in line else "DASHED"
+                label = " ".join(match.group(2).replace("<br/>", " ").split())
+                observed.add((match.group(1), kind, label, match.group(3)))
+            return observed
+
+        used_sources: set[str] = set()
+        for name, (source, report) in prds.items():
+            self.assertNotIn("\r", source)
+            self.assertNotRegex(source, r"\{\{[A-Z0-9_]+\}\}")
+            self.assertNotRegex(source, r"(?i)aws_access_key|secret_key|session_token")
+            self.assertNotRegex(source, r"[A-Z]:\\|/(?:Users|home)/")
+            self.assertNotRegex(source, r"(?im)(?:account|arn:aws)[^\n|`]*\d{12}")
+            self.assertNotIn("SECRET_CUSTOMER_MARKER", source)
+            self.assertEqual(report["document_summaries"]["status"], "CURRENT")
+            self.assertLessEqual(
+                len(
+                    rendered_visible_lines(
+                        MERMAID_BLOCK.sub("[Rendered diagram]", source)
+                    )
+                ),
+                330,
+            )
+            diagram = report["design_contract"]["diagram_contract"]
+            current = {
+                item["diagram_id"]: item
+                for item in diagram["records"]
+                if item["status"] == "CURRENT"
+            }
+            bindings = render_mermaid_fixtures.PRD_DIAGRAM_BINDINGS[name]
+            self.assertEqual(set(current), set(bindings))
+            self.assertEqual(len(MERMAID_BLOCK.findall(source)), len(bindings))
+            if bindings:
+                self.assertEqual(report["design_contract"]["status"], "READY")
+                self.assertEqual(diagram["status"], "CURRENT")
+            for diagram_id, fixture_name in bindings.items():
+                record = current[diagram_id]
+                kind, anchor, basis_ids = expected_contract[diagram_id]
+                self.assertEqual(
+                    (record["kind"], record["anchor"], tuple(record["basis_ids"])),
+                    (kind, anchor, basis_ids),
+                )
+                heading_matches = [
+                    match
+                    for match in re.finditer(r"(?m)^#{1,6} (.+?)\s*$", source)
+                    if re.sub(r"[^a-z0-9]+", "-", match.group(1).lower()).strip("-")
+                    == anchor
+                ]
+                self.assertEqual(len(heading_matches), 1, diagram_id)
+                following_heading = re.search(
+                    r"(?m)^#{1,6} .+?\s*$", source[heading_matches[0].end() :]
+                )
+                section_end = (
+                    heading_matches[0].end() + following_heading.start()
+                    if following_heading is not None
+                    else len(source)
+                )
+                blocks = re.findall(
+                    r"(?ms)^```mermaid\s*\n.*?^```\s*$",
+                    source[heading_matches[0].end() : section_end],
+                )
+                self.assertEqual(len(blocks), 1, diagram_id)
+                canonical = blocks[0].rstrip() + "\n"
+                expected = "```mermaid\n" + mermaid[fixture_name].rstrip() + "\n```\n"
+                self.assertEqual(canonical, expected, diagram_id)
+                self.assertEqual(
+                    record["rendered_sha256"],
+                    "sha256:" + hashlib.sha256(canonical.encode()).hexdigest(),
+                )
+                endpoint_ids = {
+                    endpoint
+                    for relationship in record["relationships"]
+                    for endpoint in (
+                        relationship["from_id"],
+                        relationship["to_id"],
+                    )
+                }
+                self.assertEqual(endpoint_ids, set(record["referenced_ids"]))
+                observed = relationships(mermaid[fixture_name])
+                self.assertEqual(observed, expected_relationships[fixture_name])
+                self.assertEqual(
+                    {(start, label, end) for start, _kind, label, end in observed},
+                    {
+                        (
+                            relationship["from_id"],
+                            relationship["relation"],
+                            relationship["to_id"],
+                        )
+                        for relationship in record["relationships"]
+                    },
+                )
+                used_sources.add(fixture_name)
+        self.assertEqual(
+            used_sources,
+            set(render_mermaid_fixtures.GOLDEN_NAMES)
+            | set(render_mermaid_fixtures.VARIANT_NAMES),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
