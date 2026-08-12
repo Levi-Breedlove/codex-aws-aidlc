@@ -24,7 +24,17 @@ label with current canonical PRD records. Remove unused nodes and paths.
 - Aim for 12–20 nodes in broad views and node labels near three short lines; confirm final readability in the rendered review. Keep relationship labels to one concise phrase.
 - Use solid arrows for primary runtime and data flow. Use dashed arrows for trust, telemetry, control, planning, and optional relationships.
 - Use comments to divide request, data, failure, and operations flows in Mermaid source.
-- Use at most six semantic class styles. Assign color by meaning, keep fills light and text dark, and never rely on color alone.
+- Declare the primary owner-to-outcome runtime spine in reading order. Keep
+  operations and recovery on one side of that spine and data and safeguards on
+  the other when the renderer permits it. Reorder declarations or move detail
+  to a focused view before accepting long edges that cross unrelated groups.
+- Use at most six semantic class styles. Assign color by meaning, keep fills
+  light and text dark, and never rely on color alone.
+- Keep each node to at most three intentional visual lines, each near 40
+  visible characters. Break a long relationship label into at most two short
+  lines without changing its wording. Review the same source on both the dark
+  and default canvases; the restrained pastel role palette must remain legible
+  on each.
 - Avoid experimental Mermaid syntax, external icon packs, custom JavaScript, and renderer-specific layout hacks.
 
 ### Connect relationships to the actual component
@@ -133,28 +143,37 @@ flowchart TB
 
 - `PRIMARY_OUTCOME` shows the shortest approved end-to-end owner outcome.
 - `JOURNEY` shows material actors, alternate paths, and rich-use-case behavior.
-- `STATE` shows declared product states and valid transitions.
+- `STATE` uses compact canonical state-model cards and only the exact recorded
+  transitions. Never paste a whole register into one giant label or invent a
+  self-loop merely to make the diagram nonempty. If the exact transition model
+  cannot be shown cleanly with current canonical endpoints, keep the State
+  register authoritative and leave the conditional diagram not yet created.
 - `DATA_LIFECYCLE` shows ownership, retention, deletion, backup, and recovery movement.
 - `FAILURE_RECOVERY` shows the material failure, bounded retry, rollback, and recovery path.
 - `MIGRATION` shows the preserved source, bounded transition, validation point, and rollback target.
 
 ```mermaid
 flowchart LR
-    accTitle: First useful customer outcome
-    accDescr: The invited customer submits one request and receives the validated result through the application interface.
+    accTitle: Customer journey with a safe alternate path
+    accDescr: The invited customer submits one request and receives the validated result, while a recoverable failure follows the selected recovery path before returning to the interface.
     ACT-000["Invited customer"]
     API-000["Customer request interface"]
+    TECH-0005["Selected recovery mechanism"]
     ACT-000 -->|submits the request to| API-000
     API-000 -->|returns the validated result to| ACT-000
+    API-000 -. "uses the recovery path" .-> TECH-0005
+    TECH-0005 -. "returns to" .-> API-000
 ```
 
 ```mermaid
-flowchart LR
-    accTitle: Application failure and recovery path
-    accDescr: A failed request preserves approved state and invokes the planned rollback and recovery path.
-    API-000["Customer request interface"]
-    TECH-0005["Selected rollback and recovery mechanism"]
-    API-000 -->|fails safely and invokes| TECH-0005
+flowchart TB
+    accTitle: Compact project state flow
+    accDescr: The application points to one canonical state-model card whose relationship names the exact validation and publication transitions recorded in the State register.
+    ARCH-0000["Project application"]:::compute
+    STATE-000["DRAFT<br/>VALIDATED<br/>PUBLISHED"]:::event
+    ARCH-0000 -->|permits DRAFT to VALIDATED<br/>and VALIDATED to PUBLISHED| STATE-000
+    classDef compute fill:#FFF1E8,stroke:#D86613,color:#232F3E;
+    classDef event fill:#F3ECFF,stroke:#8C4FFF,color:#232F3E;
 ```
 
 Every focused view follows the same human-label, relationship-label,

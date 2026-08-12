@@ -334,7 +334,12 @@ sequenceDiagram
                 first = next(
                     line.strip() for line in block.splitlines() if line.strip()
                 )
-                self.assertEqual(first, "flowchart TB" if index < 2 else "flowchart LR")
+                self.assertEqual(
+                    first,
+                    ("flowchart TB", "flowchart TB", "flowchart LR", "flowchart TB")[
+                        index
+                    ],
+                )
                 self.assertEqual(block.count("accTitle:"), 1)
                 self.assertEqual(block.count("accDescr:"), 1)
                 for line in block.splitlines():
@@ -369,6 +374,23 @@ sequenceDiagram
             'TECH-0007 -. "delivers and rolls back" .-> TECH-0001',
             blocks[1],
         )
+        self.assertIn(
+            "accTitle: Customer journey with a safe alternate path", blocks[2]
+        )
+        self.assertIn(
+            'API-000 -. "uses the recovery path" .-> TECH-0005',
+            blocks[2],
+        )
+        self.assertIn(
+            'TECH-0005 -. "returns to" .-> API-000',
+            blocks[2],
+        )
+        self.assertIn("accTitle: Compact project state flow", blocks[3])
+        self.assertIn(
+            "ARCH-0000 -->|permits DRAFT to VALIDATED<br/>and VALIDATED to PUBLISHED| STATE-000",
+            blocks[3],
+        )
+        self.assertNotRegex(blocks[3], r"(STATE-\d{3})\s+-->[^\n]+\1")
 
     def test_prd_binds_project_specific_diagram_semantics_and_rendering(self) -> None:
         prd = (REPOSITORY_ROOT / "docs" / "project" / "PRD.md").read_text(
@@ -1087,6 +1109,57 @@ sequenceDiagram
         for name, markers in expected_golden_markers.items():
             for marker in markers:
                 self.assertIn(marker, fixtures[name], name)
+        complete = fixtures["golden-complete-architecture"]
+        self.assertTrue(complete.startswith("flowchart TB\n"))
+        self.assertEqual(complete.count("classDef "), 6)
+        organized_groups = (
+            'subgraph PEOPLE["People"]',
+            'subgraph AWS_CLOUD["AWS Cloud',
+            'subgraph REGION["AWS Region',
+            'subgraph ENTRY["Managed entry and identity"]',
+            'subgraph APPLICATION["Application and trust boundary"]',
+            'subgraph DATA["Owner data and safeguards"]',
+            'subgraph OPERATIONS["Operations, delivery, and recovery"]',
+        )
+        self.assertEqual(
+            [complete.index(marker) for marker in organized_groups],
+            sorted(complete.index(marker) for marker in organized_groups),
+        )
+        published_journey = fixtures["published-journey-flow"]
+        self.assertTrue(published_journey.startswith("flowchart LR\n"))
+        self.assertIn(
+            "accTitle: Customer journey with a safe alternate path",
+            published_journey,
+        )
+        self.assertIn(
+            'API-000 -. "uses the recovery path" .-> TECH-0005',
+            published_journey,
+        )
+        self.assertIn(
+            'TECH-0005 -. "returns to" .-> API-000',
+            published_journey,
+        )
+        published_state = fixtures["published-state-flow"]
+        self.assertTrue(published_state.startswith("flowchart TB\n"))
+        self.assertIn("accTitle: Compact project state flow", published_state)
+        self.assertIn('ARCH-0000["Project application"]:::compute', published_state)
+        self.assertIn(
+            'STATE-000["DRAFT<br/>VALIDATED<br/>PUBLISHED"]:::event',
+            published_state,
+        )
+        self.assertIn(
+            "classDef compute fill:#FFF1E8,stroke:#D86613,color:#232F3E;",
+            published_state,
+        )
+        self.assertIn(
+            "classDef event fill:#F3ECFF,stroke:#8C4FFF,color:#232F3E;",
+            published_state,
+        )
+        self.assertIn(
+            "ARCH-0000 -->|permits DRAFT to VALIDATED<br/>and VALIDATED to PUBLISHED| STATE-000",
+            published_state,
+        )
+        self.assertNotRegex(published_state, r"(STATE-\d{3})\s+-->[^\n]+\1")
         with tempfile.TemporaryDirectory() as directory:
             synthetic_root = Path(directory) / "initialized-adopter"
             pattern_path = (

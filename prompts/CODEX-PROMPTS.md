@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.38
+**Pack version:** 1.2.39
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and

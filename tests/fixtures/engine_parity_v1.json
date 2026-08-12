@@ -97,6 +97,22 @@
         "AWS access, execution, deployment, recovery, or teardown evidence claim",
         "release, GitHub, or teardown authority broadening"
       ]
+    },
+    {
+      "id": "MERMAID_PRESENTATION_1_2_39",
+      "base_commit": "2af6a7911e8b72bafb87102bbc8ae70e6b82c9bb",
+      "scope": [
+        "compact state-diagram presentation and exact rendered-review fixture coverage",
+        "bounded node and relationship line-break presentation validation",
+        "relationship line breaks excluded from modern diagram semantic digests",
+        "dark and default render guidance with the existing restrained semantic palette",
+        "context-locator bytes changed only by the updated Design procedure"
+      ],
+      "prohibited": [
+        "requirement, design, containment, relationship, lifecycle, routing, task, gate, authority, or receipt semantic change",
+        "construction or AWS authorization change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "summary_truth_compatibility": {
@@ -2220,8 +2236,8 @@
     "unconfigured_template": "b2bc3a913224ac214d640b7281541f5cc1b48e4d932e04a5b42c33c4958299af",
     "rendered_intake": "925156a0d7772dfbc4a30d18efa405c1373da0c0b8d43def609867366606784b",
     "gate_a_pending": "65b807c4925833a1a944188331fc269163f0920731a286b0299f6e06a636ccd2",
-    "gate_a_approved": "f7221b240ba21c7005c3c61f332dfd20036651225bf9200bada11146587ac8d3",
-    "gate_b_pending": "2d4b04e1ed222992cfabcf1a43326bf1afdec6791ab66cd52264a0926e020775",
+    "gate_a_approved": "8b0e968843ac3b001c5c22f43270d38f11e64b871bbd8412430dfeb6e80fb9ee",
+    "gate_b_pending": "de225562b02bb9dac59cd3c3f8294d176dbb6097f5c29512e2dc6b1d507bf8d0",
     "gate_b_approved": "3dd2c33a27a046cffdd652deb5ffaa95fe24eb18ab843ddea7fa81d2086b1027"
   },
   "report_cases": {
@@ -10892,8 +10908,8 @@
               "start_line": 26,
               "end_line": 46,
               "active_ids": [],
-              "canonical_sha256": "sha256:424ed78eb8c333d08ad177e2fcfda12394ad49de76668987302d314a4ba23792",
-              "source_bytes": 7690,
+              "canonical_sha256": "sha256:e2ba5b52f753acecb28a4abe9e970ba51fc709348ef3f4a9112962da173b7d64",
+              "source_bytes": 8121,
               "reason": "On-demand canonical source"
             },
             {
@@ -10912,10 +10928,10 @@
               "selector_kind": "WHOLE_FILE",
               "selector": ".agents/skills/fastlane/references/diagram-patterns.md",
               "start_line": 1,
-              "end_line": 166,
+              "end_line": 185,
               "active_ids": [],
-              "canonical_sha256": "sha256:36245fdb84cc6075d8f91a7d3024a6e17d5e5a5334b914d4f225c46ed7456570",
-              "source_bytes": 10068,
+              "canonical_sha256": "sha256:bf4db0545607efee407a891440e2c73df0525b408102737336326dc55462ee10",
+              "source_bytes": 11465,
               "reason": "On-demand canonical source"
             },
             {
@@ -13847,8 +13863,8 @@
               "start_line": 26,
               "end_line": 46,
               "active_ids": [],
-              "canonical_sha256": "sha256:424ed78eb8c333d08ad177e2fcfda12394ad49de76668987302d314a4ba23792",
-              "source_bytes": 7690,
+              "canonical_sha256": "sha256:e2ba5b52f753acecb28a4abe9e970ba51fc709348ef3f4a9112962da173b7d64",
+              "source_bytes": 8121,
               "reason": "On-demand canonical source"
             },
             {

@@ -555,6 +555,25 @@ ACT-001 -. "trusts" .-> ARCH-0001
         self.assertEqual(normalized, label)
         self.assertEqual(issues, [])
 
+        _normalized, issues = design_diagrams._mermaid_label_issues(
+            "DIAGRAM-0004",
+            "STATE-001",
+            "DRAFT<br/>VALIDATED<br/>PUBLISHED<br/>EXPIRED",
+        )
+        self.assertTrue(any("at most three visual lines" in issue for issue in issues))
+
+        issues = design_diagrams._mermaid_relationship_issues(
+            "DIAGRAM-0004",
+            (
+                "STATE-001 -->|permits only<br/>recorded publication<br/>transitions| STATE-001",
+            ),
+            presentation_only=True,
+        )
+        self.assertTrue(
+            any("at most two visual lines" in issue for issue in issues),
+            issues,
+        )
+
     def test_visible_text_distinguishes_standards_and_plain_colons_from_uris(
         self,
     ) -> None:

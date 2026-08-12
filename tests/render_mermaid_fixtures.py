@@ -26,7 +26,7 @@ MERMAID_BLOCK = re.compile(r"(?ms)^```mermaid\r?\n(.*?)\r?\n```\s*$")
 PUBLISHED_NAMES = (
     "published-complete-architecture",
     "published-aws-implementation",
-    "published-focused-outcome",
+    "published-journey-flow",
     "published-state-flow",
 )
 GOLDEN_BINDINGS = (
