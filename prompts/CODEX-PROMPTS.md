@@ -412,14 +412,14 @@ Use the owner-response and authorization-receipt procedures; validate before wri
 Use the Deliver bugfix procedure and preserve the existing route and authority.
 ~~~
 ## DIAGRAM-10 — Planned Board
-**Purpose:** Compile one local planned board. **Preconditions:** Request; current Gate B, DIAGRAM-0001, DIAGRAM-0008, skill, and path.
-**Authoritative inputs:** Report, PRD, diagrams, and skill receipt.
-**Permitted writes:** Only `dist/architecture/<DES>-<semantic-sha256>/**`.
-**GitHub mode:** None. **AWS mode:** None; do not inspect credentials or access AWS.
-**Required authorization:** Request plus Gate B; AWS authority NONE.
-**Stop conditions:** Stale, mismatched, conflicting, or failed evidence.
-**Receipt:** Links, bindings, evidence, and route. **Next:** Rerun the Engine and restore the route; conflict returns through DESIGN-10 without silent repair.
-`[DIAGRAM-10]` Use `$aws-architecture-diagrams`; validate it and never create a third gate.
+**Purpose:** Board. **Preconditions:** Exact request/Gate B/DIAGRAM-0001/DIAGRAM-0008/v1.3.1/model absent.
+**Authoritative inputs:** Report/PRD/diagrams/receipt.
+**Permitted writes:** `dist/architecture/<DES>-<semantic-sha256>/**` only.
+**GitHub mode:** None. **AWS mode:** NONE; do not inspect credentials; no AWS.
+**Required authorization:** Gate B request; AWS authority NONE.
+**Stop conditions:** Stale/mismatch/conflict/failure.
+**Receipt:** OK. **Next:** restore the route; conflict -> DESIGN-10 without silent repair.
+`[DIAGRAM-10]` Write `architecture-board-task-manifest.json` + `architecture-source.mmd`: `NEW_DERIVATION`/`PENDING_DERIVATION`; skill writes/hashes/reloads schema-2 `source-model.json`. No pre-creation digest; never create a third gate.
 ## TASK-10 — Executable Task Plan
 
 **Purpose:** Derive one dependency-aware local work plan from the approved requirements, design, and construction boundary.

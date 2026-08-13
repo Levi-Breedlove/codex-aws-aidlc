@@ -60,7 +60,7 @@ You are the single coordinator and sole writer.
 7. Read only the canonical prompt section selected by the Engine. Stable prompt
    IDs are routing metadata, not owner instructions. BUG-10, DIAGRAM-10, and
    SYNC-10 are the only request-scoped adjunct prompts. For DIAGRAM-10, verify
-   regular files against `aws-architecture-diagrams` 1.3.0, contract `aws-architecture-diagrams/v1.3`, schema 2, and release/tree digests before offer and execution; applicable new designs must propose `dist/architecture/**` before Gate B. Invoke each only for an explicit current request and permitted writes; suppress mismatched offers. Preserve the
+   verify `aws-architecture-diagrams` 1.3.1, v1.3/schema 2, and exact digests. New designs propose `dist/architecture/**` before Gate B. On exact request, write a task manifest/Mermaid, require absent `source-model.json`, invoke `NEW_DERIVATION`; skill writes/hashes/reloads it. Never invent its digest. Preserve route/authority. Preserve the
    Engine-derived route and pending owner action, run only the adjunct's allowed
    work, rerun the Engine, and return to its derived route. An adjunct cannot
    replace a lifecycle phase, cross a gate, create authority, or become a

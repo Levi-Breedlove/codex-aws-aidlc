@@ -913,6 +913,36 @@ class ProductJourneyTests(unittest.TestCase):
                 presenter.render_owner_update(current),
             )
 
+            prd_path = deliver_project / "docs/project/PRD.md"
+            prd_text = prd_path.read_text(encoding="utf-8")
+            current_before_packet = json.dumps(current, sort_keys=True)
+            packet = engine_api.derive_architecture_board_request_packet(
+                current,
+                prd_text,
+                identity,
+                owner_request=engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                source_model_target_exists=False,
+            )
+            manifest = json.loads(packet["manifest_text"])
+            output_root = deliver_project / Path(handoff["output_root"])
+            self.assertEqual(packet["status"], "READY")
+            self.assertEqual(packet["resume_route"], "TASK-10")
+            self.assertEqual(
+                manifest["authority"]["construction_authorization_id"],
+                current["authorizations"]["construction"],
+            )
+            self.assertEqual(
+                manifest["design"]["canonical_sha256"],
+                current["design_contract"]["canonical_sha256"],
+            )
+            self.assertEqual(manifest["source_model"]["mode"], "NEW_DERIVATION")
+            self.assertEqual(manifest["source_model"]["state"], "PENDING_DERIVATION")
+            self.assertFalse(output_root.exists())
+            self.assertFalse(
+                (deliver_project / Path(packet["source_model_path"])).exists()
+            )
+            self.assertEqual(prd_path.read_text(encoding="utf-8"), prd_text)
+            self.assertEqual(json.dumps(current, sort_keys=True), current_before_packet)
             verify_path = deliver_project / "docs/project/VERIFY.md"
             current_evidence = verify_path.read_text(encoding="utf-8")
             verify_path.write_text(

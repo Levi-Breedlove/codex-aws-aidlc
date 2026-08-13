@@ -146,6 +146,129 @@ class EngineDesignTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "presentation digest changed"):
             engine_api.architecture_board_mermaid_source(source, handoff)
 
+    def test_architecture_board_request_packet_is_exact_and_fail_closed(self) -> None:
+        report = json.loads(
+            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )["report_cases"]["gate_b_approved"]["report"]
+        report["write_authority"]["approved_write_roots"].append("dist/architecture/**")
+        prd_text = doctor_fixtures.complete_design_contract(
+            (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        identity = {
+            **engine_api.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+            "valid": True,
+            "issues": [],
+        }
+        original = json.dumps(report, sort_keys=True)
+        packet = engine_api.derive_architecture_board_request_packet(
+            report,
+            prd_text,
+            identity,
+            owner_request=engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+            source_model_target_exists=False,
+        )
+        manifest = json.loads(packet["manifest_text"])
+        root = engine_api.derive_architecture_board_handoff(report)["output_root"]
+        self.assertEqual(packet["manifest"], manifest)
+        self.assertEqual(packet["status"], "READY")
+        self.assertEqual(packet["resume_route"], "TASK-10")
+        self.assertEqual(
+            (packet["aws_authority"], packet["external_authority"]),
+            ("NONE", "NONE"),
+        )
+        self.assertEqual(
+            packet["manifest_path"],
+            f"{root}/architecture-board-task-manifest.json",
+        )
+        self.assertEqual(packet["mermaid_path"], f"{root}/architecture-source.mmd")
+        self.assertEqual(packet["source_model_path"], f"{root}/source-model.json")
+        self.assertEqual(
+            manifest["approved_mermaid"]["sha256"],
+            "sha256:"
+            + hashlib.sha256(packet["mermaid_text"].encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            manifest["authority"],
+            {
+                "construction_authorization_id": "AUTH-0001",
+                "permitted_output_boundary": f"{root}/**",
+                "aws": "NONE",
+                "external": "NONE",
+            },
+        )
+        self.assertEqual(
+            manifest["source_model"],
+            {
+                "mode": "NEW_DERIVATION",
+                "state": "PENDING_DERIVATION",
+                "schema_version": 2,
+                "target_path": f"{root}/source-model.json",
+                "target_must_be_absent": True,
+            },
+        )
+        self.assertEqual(
+            manifest["skill"], engine_api.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY
+        )
+        self.assertNotIn("expected_sha256", packet["manifest_text"])
+        self.assertNotIn("source_model_sha256", packet["manifest_text"])
+        self.assertEqual(json.dumps(report, sort_keys=True), original)
+
+        failures = (
+            (
+                "exact owner request",
+                report,
+                identity,
+                "not the exact request",
+                False,
+            ),
+            (
+                "skill identity",
+                report,
+                {**identity, "version": "1.3.0"},
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                False,
+            ),
+            (
+                "absent source-model",
+                report,
+                identity,
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                True,
+            ),
+            (
+                "not currently eligible",
+                {
+                    **report,
+                    "write_authority": {
+                        **report["write_authority"],
+                        "approved_write_roots": ["app/**", "tests/**"],
+                    },
+                },
+                identity,
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                False,
+            ),
+            (
+                "project identity",
+                {**report, "project": {}},
+                identity,
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                False,
+            ),
+        )
+        for message, candidate, receipt, request, target_exists in failures:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    engine_api.derive_architecture_board_request_packet(
+                        candidate,
+                        prd_text,
+                        receipt,
+                        owner_request=request,
+                        source_model_target_exists=target_exists,
+                    )
+
     def test_mermaid_claim_guard_allows_real_verified_names_and_states(self) -> None:
         for value in (
             "AWS Verified Access",

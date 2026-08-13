@@ -10,6 +10,7 @@ AWS, approves a gate, or grants authority.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime, timezone
@@ -105,12 +106,13 @@ from .evaluation import EngineEvaluation
 
 ARCHITECTURE_DIAGRAM_SKILL_IDENTITY = {
     "name": "aws-architecture-diagrams",
-    "version": "1.3.0",
+    "version": "1.3.1",
     "contract_id": "aws-architecture-diagrams/v1.3",
     "source_model_schema_version": 2,
-    "tree_sha256": "sha256:91ef150a240c513547a4ee75c81a7515268a20cfb883d8f5be8001b24c5d4808",
-    "release_sha256": "sha256:731388fac5eed5a9713bdabb88b22c7181a8b1ae1b6fc2e669e9435da3639a51",
+    "tree_sha256": "sha256:3482ba7a5cb5f8b9db12f4eb25700f257e04f5fedb50eb2c8d64d5ff00062977",
+    "release_sha256": "sha256:ffa17e5905bfb83ce7b302894760745b192a625eafa7ea7261613df9a0134d4",
 }
+ARCHITECTURE_BOARD_OWNER_REQUEST = "Generate the planned AWS architecture board."
 
 if TYPE_CHECKING:
     from .project_delivery import DELIVERY_VALIDATION_POLICY
@@ -312,6 +314,158 @@ def architecture_board_mermaid_source(text: str, handoff: Mapping[str, Any]) -> 
     if observed != source.get("rendered_sha256"):
         raise ValueError("approved Mermaid presentation digest changed")
     return rendered.removeprefix("```mermaid\n").removesuffix("```\n")
+
+
+def _architecture_board_request_manifest(
+    handoff: Mapping[str, Any],
+    design: Mapping[str, Any],
+    project: Mapping[str, Any],
+    construction: str,
+    mermaid_path: str,
+    mermaid_sha256: str,
+    source_model_path: str,
+) -> dict[str, Any]:
+    source, cross_check = handoff["source"], handoff["cross_check"]
+    output_root = str(handoff["output_root"])
+    return {
+        "schema_version": 1,
+        "kind": "FASTLANE_ARCHITECTURE_BOARD_REQUEST",
+        "request": ARCHITECTURE_BOARD_OWNER_REQUEST,
+        "status": "CURRENT",
+        "architecture_status": "PLANNED",
+        "project": {"name": project.get("name"), "region": project.get("region")},
+        "lifecycle": {"route": "TASK-10", "resume_route": "TASK-10"},
+        "authority": {
+            "construction_authorization_id": construction,
+            "permitted_output_boundary": f"{output_root}/**",
+            "aws": "NONE",
+            "external": "NONE",
+        },
+        "design": {
+            "revision": design.get("design_revision"),
+            "canonical_sha256": design.get("canonical_sha256"),
+        },
+        "approved_mermaid": {
+            "prd_path": handoff.get("source_path"),
+            "anchor": source.get("anchor"),
+            "diagram_id": source.get("diagram_id"),
+            "semantic_sha256": source.get("semantic_sha256"),
+            "rendered_sha256": source.get("rendered_sha256"),
+            "target_path": mermaid_path,
+            "sha256": mermaid_sha256,
+        },
+        "mandatory_cross_check": {
+            "diagram_id": cross_check.get("diagram_id"),
+            "semantic_sha256": cross_check.get("semantic_sha256"),
+            "rendered_sha256": cross_check.get("rendered_sha256"),
+        },
+        "source_model": {
+            "mode": "NEW_DERIVATION",
+            "state": "PENDING_DERIVATION",
+            "schema_version": 2,
+            "target_path": source_model_path,
+            "target_must_be_absent": True,
+        },
+        "skill": dict(ARCHITECTURE_DIAGRAM_SKILL_IDENTITY),
+        "output": {
+            "directory": output_root,
+            "required": [
+                "architecture-board.drawio",
+                "architecture-board.svg",
+                "architecture-board.png",
+                "architecture-board.md",
+                "architecture-board-manifest.json",
+                "architecture-board-validation.json",
+                "architecture-board-render.json",
+                "visual-review-receipt.json",
+                "qa-tiles/qa-tiles-manifest.json",
+            ],
+        },
+    }
+
+
+def derive_architecture_board_request_packet(
+    report: Mapping[str, Any],
+    prd_text: str,
+    skill_identity: Mapping[str, Any],
+    *,
+    owner_request: str,
+    source_model_target_exists: bool,
+) -> dict[str, Any]:
+    """Derive one local DIAGRAM-10 request packet without writing project state."""
+
+    expected_identity = {
+        **ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+        "valid": True,
+        "issues": [],
+    }
+    if owner_request != ARCHITECTURE_BOARD_OWNER_REQUEST:
+        raise ValueError("architecture board requires the exact owner request")
+    if dict(skill_identity) != expected_identity:
+        raise ValueError("architecture diagram skill identity is not current")
+    if source_model_target_exists is not False:
+        raise ValueError("NEW_DERIVATION requires an absent source-model target")
+
+    handoff = derive_architecture_board_handoff(report)
+    interaction = report.get("interaction")
+    if (
+        handoff.get("eligible") is not True
+        or report.get("next_prompt") != "TASK-10"
+        or not isinstance(interaction, Mapping)
+        or interaction.get("owner_action_required") is not False
+        or interaction.get("automatic_continuation_allowed") is not True
+    ):
+        raise ValueError("architecture board request is not currently eligible")
+
+    design = report.get("design_contract")
+    authorizations = report.get("authorizations")
+    project = report.get("project")
+    source, cross_check = handoff.get("source"), handoff.get("cross_check")
+    if not all(
+        isinstance(item, Mapping)
+        for item in (design, authorizations, project, source, cross_check)
+    ):
+        raise ValueError("architecture board request evidence is malformed")
+    if any(
+        not isinstance(project.get(field), str) or not project[field].strip()
+        for field in ("name", "region")
+    ):
+        raise ValueError("architecture board project identity is malformed")
+    construction = str(authorizations.get("construction", ""))
+    if not _BOARD_SHA256.fullmatch(
+        str(design.get("canonical_sha256", ""))
+    ) or not re.fullmatch(r"AUTH-\d{4,}", construction):
+        raise ValueError("architecture board authority binding is malformed")
+
+    output_root = str(handoff["output_root"])
+    manifest_path = f"{output_root}/architecture-board-task-manifest.json"
+    mermaid_path = f"{output_root}/architecture-source.mmd"
+    source_model_path = f"{output_root}/source-model.json"
+    mermaid_text = architecture_board_mermaid_source(prd_text, handoff)
+    mermaid_sha256 = (
+        "sha256:" + hashlib.sha256(mermaid_text.encode("utf-8")).hexdigest()
+    )
+    manifest = _architecture_board_request_manifest(
+        handoff,
+        design,
+        project,
+        construction,
+        mermaid_path,
+        mermaid_sha256,
+        source_model_path,
+    )
+    return {
+        "status": "READY",
+        "manifest_path": manifest_path,
+        "manifest": manifest,
+        "manifest_text": json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        "mermaid_path": mermaid_path,
+        "mermaid_text": mermaid_text,
+        "source_model_path": source_model_path,
+        "resume_route": "TASK-10",
+        "aws_authority": "NONE",
+        "external_authority": "NONE",
+    }
 
 
 def preview_source_brief(root: Path, source_path: str) -> dict[str, Any]:
@@ -1499,6 +1653,7 @@ def validate_approved_property_evidence(
 
 __all__ = (
     "IntakeFoundationContract",
+    "ARCHITECTURE_BOARD_OWNER_REQUEST",
     "ARCHITECTURE_DIAGRAM_SKILL_IDENTITY",
     "DesignContract",
     "ApprovedDeliveryContract",
@@ -1518,6 +1673,7 @@ __all__ = (
     "RequirementsContract",
     "capture_project_snapshot",
     "architecture_board_mermaid_source",
+    "derive_architecture_board_request_packet",
     "evaluate_project",
     "inspect_project",
     "aws_core_phase_evidence_issues",

@@ -208,6 +208,13 @@ class PromptPackContractTests(unittest.TestCase):
             "DIAGRAM-0001",
             "DIAGRAM-0008",
             "dist/architecture/<DES>-<semantic-sha256>/**",
+            "architecture-board-task-manifest.json",
+            "architecture-source.mmd",
+            "v1.3.1",
+            "NEW_DERIVATION",
+            "PENDING_DERIVATION",
+            "source-model.json",
+            "pre-creation digest",
             "AWS authority NONE",
             "restore the route",
             "never create a third gate",
@@ -216,6 +223,14 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("do not inspect credentials", section)
         self.assertIn("without silent repair", section)
         self.assertNotIn("Gate C", self.prompts)
+        for expected in (
+            "aws-architecture-diagrams` 1.3.1",
+            "write a task manifest/Mermaid",
+            "absent `source-model.json`",
+            "invoke `NEW_DERIVATION`",
+            "Never invent its digest",
+        ):
+            self.assertIn(expected, self.fastlane_skill)
         for expected in (
             "applicable new Design-7 project",
             "include `dist/architecture/**` in the proposed Gate B allowed repository write set",
