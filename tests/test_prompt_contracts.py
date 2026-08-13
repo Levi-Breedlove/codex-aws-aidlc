@@ -216,6 +216,14 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("do not inspect credentials", section)
         self.assertIn("without silent repair", section)
         self.assertNotIn("Gate C", self.prompts)
+        for expected in (
+            "applicable new Design-7 project",
+            "include `dist/architecture/**` in the proposed Gate B allowed repository write set",
+            "do not ask another owner question",
+            "create a third gate",
+            "never widened silently",
+        ):
+            self.assertIn(expected, self.fastlane_design)
 
     def test_route_interfaces_keep_external_authority_separate(self) -> None:
         for prompt_id in PROMPT_IDS:

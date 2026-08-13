@@ -1218,6 +1218,32 @@ sequenceDiagram
             tuple(render_mermaid_fixtures._golden_record_overrides()),
             render_mermaid_fixtures.GOLDEN_RECORD_PATHS,
         )
+        for name, (source, _report) in prds.items():
+            write_set = test_bootstrap_doctor.doctor.table_after_heading(
+                source, "## 28. Construction envelope"
+            )["Allowed repository write set"]
+            if name == render_mermaid_fixtures.PRD_NAMES[0]:
+                self.assertNotIn("dist/architecture/**", write_set)
+            else:
+                self.assertIn("dist/architecture/**", write_set)
+        self.assertEqual(
+            prds[render_mermaid_fixtures.PRD_NAMES[1]][1]["write_authority"][
+                "approved_write_roots"
+            ],
+            [],
+        )
+        self.assertEqual(
+            prds[render_mermaid_fixtures.PRD_NAMES[2]][1]["write_authority"][
+                "approved_write_roots"
+            ],
+            ["legacy/**", "tests/**", "dist/architecture/**"],
+        )
+        self.assertEqual(
+            prds[render_mermaid_fixtures.PRD_NAMES[3]][1]["write_authority"][
+                "approved_write_roots"
+            ],
+            ["infrastructure/**", "tests/**", "dist/architecture/**"],
+        )
         with tempfile.TemporaryDirectory() as directory:
             outputs = render_mermaid_fixtures.write_review_fixtures(Path(directory))
             self.assertEqual(len(outputs), 15)
