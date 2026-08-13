@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.41
+**Pack version:** 1.2.42
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -182,6 +182,7 @@ Next action: <one canonical next step or STOP>
 | DESIGN-10 | Complete the technical plan | DESIGN-20 |
 | DESIGN-20 | Present Gate B | TASK-10 after approval |
 | BUG-10 | Define one current-request defect contract | Return to the Engine route |
+| DIAGRAM-10 | Compile one optional approved planned architecture board | Return to the Engine route |
 | TASK-10 | Prepare the approved work plan | BUILD-10 or BUILD-20 |
 | BUILD-10 | Execute one approved task | BUILD-10, BUILD-20, RELEASE-10, or stop |
 | BUILD-20 | Continue approved local construction | BUILD-20, RELEASE-10, or stop |
@@ -410,7 +411,15 @@ Use the owner-response and authorization-receipt procedures; validate before wri
 [BUG-10]
 Use the Deliver bugfix procedure and preserve the existing route and authority.
 ~~~
-
+## DIAGRAM-10 — Planned Board
+**Purpose:** Compile one local planned board. **Preconditions:** Request; current Gate B, DIAGRAM-0001, DIAGRAM-0008, skill, and path.
+**Authoritative inputs:** Report, PRD, diagrams, and skill receipt.
+**Permitted writes:** Only `dist/architecture/<DES>-<semantic-sha256>/**`.
+**GitHub mode:** None. **AWS mode:** None; do not inspect credentials or access AWS.
+**Required authorization:** Request plus Gate B; AWS authority NONE.
+**Stop conditions:** Stale, mismatched, conflicting, or failed evidence.
+**Receipt:** Links, bindings, evidence, and route. **Next:** Rerun the Engine and restore the route; conflict returns through DESIGN-10 without silent repair.
+`[DIAGRAM-10]` Use `$aws-architecture-diagrams`; validate it and never create a third gate.
 ## TASK-10 — Executable Task Plan
 
 **Purpose:** Derive one dependency-aware local work plan from the approved requirements, design, and construction boundary.

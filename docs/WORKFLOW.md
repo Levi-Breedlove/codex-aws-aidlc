@@ -146,8 +146,7 @@ and rejection reasons, tradeoffs, risks and mitigations, current evidence, claim
 status, and a measurable reason to reconsider it. The exact Gate B receipt
 appears last.
 
-Gate B authorizes only the recorded local construction boundary. It does not
-authorize AWS account access, spending, deployment, or teardown.
+Gate B authorizes only its recorded local construction boundary. If it includes `dist/architecture/**`, Fastlane may offer one optional professional planned board while task planning continues; silence or decline never blocks or repeats it. Gate B still does not authorize AWS account access, spending, deployment, or teardown.
 
 ## How the control plane works
 

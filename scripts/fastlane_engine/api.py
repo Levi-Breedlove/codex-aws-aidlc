@@ -9,6 +9,7 @@ AWS, approves a gate, or grants authority.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime, timezone
@@ -29,6 +30,8 @@ from .aws import (
 
 from .core.contracts import (
     contract_table_after_heading,
+    path_boundaries_overlap,
+    path_boundary_contains,
     table_after_heading,
 )
 from .core.ids import clean_cell, validate_relative_path
@@ -100,6 +103,15 @@ from .deliver import (
 )
 from .evaluation import EngineEvaluation
 
+ARCHITECTURE_DIAGRAM_SKILL_IDENTITY = {
+    "name": "aws-architecture-diagrams",
+    "version": "1.3.0",
+    "contract_id": "aws-architecture-diagrams/v1.3",
+    "source_model_schema_version": 2,
+    "tree_sha256": "sha256:91ef150a240c513547a4ee75c81a7515268a20cfb883d8f5be8001b24c5d4808",
+    "release_sha256": "sha256:731388fac5eed5a9713bdabb88b22c7181a8b1ae1b6fc2e669e9435da3639a51",
+}
+
 if TYPE_CHECKING:
     from .project_delivery import DELIVERY_VALIDATION_POLICY
 
@@ -126,6 +138,180 @@ def capture_project_snapshot(
         else:
             observer.observe_binary(relative)
     return observer.freeze()
+
+
+_BOARD_SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
+_BOARD_RECORDS = {
+    "DIAGRAM-0001": ("SYSTEM_CONTEXT", "proposed-system-at-a-glance"),
+    "DIAGRAM-0008": ("AWS_IMPLEMENTATION", "aws-implementation-at-a-glance"),
+}
+
+
+def _architecture_board_record(
+    diagrams: Mapping[str, Any], diagram_id: str
+) -> dict[str, Any] | None:
+    rows = [
+        row
+        for row in diagrams.get("records", [])
+        if isinstance(row, Mapping) and row.get("diagram_id") == diagram_id
+    ]
+    if len(rows) != 1:
+        return None
+    row = rows[0]
+    kind, anchor = _BOARD_RECORDS[diagram_id]
+    valid = (
+        row.get("kind") == kind
+        and row.get("applicability") == "REQUIRED"
+        and row.get("status") == "CURRENT"
+        and row.get("anchor") == anchor
+        and isinstance(row.get("relationships"), list)
+        and bool(row["relationships"])
+        and all(isinstance(edge, Mapping) for edge in row["relationships"])
+        and all(
+            _BOARD_SHA256.fullmatch(str(row.get(key, "")))
+            for key in ("semantic_sha256", "rendered_sha256")
+        )
+    )
+    return dict(row) if valid else None
+
+
+def _architecture_board_report_current(
+    report: Mapping[str, Any], parts: tuple[Any, ...]
+) -> bool:
+    if not all(isinstance(item, Mapping) for item in parts):
+        return False
+    gates, design, project, diagrams, authority, auth, external = parts
+    return bool(
+        report.get("schema_version") == 2
+        and report.get("ok") is True
+        and gates.get("gate_a") == "APPROVED_FOR_DESIGN"
+        and gates.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
+        and design.get("schema_version") == project.get("schema_version") == 7
+        and design.get("status") == project.get("status") == "READY"
+        and not any(project.get(f"grandfathered_v{version}") for version in (4, 5, 6))
+        and diagrams.get("status") == "CURRENT"
+        and diagrams.get("grandfathered_schema5") is False
+        and authority.get("valid") is True
+        and authority.get("active_task") == "NONE"
+        and authority.get("authorization_id") == auth.get("construction")
+        and auth.get("construction") != "NONE"
+        and auth.get("aws") == "NONE"
+        and external.get("kind") == external.get("validity") == "NONE"
+    )
+
+
+def _architecture_board_conflict(
+    diagrams: Mapping[str, Any] | None,
+    primary: Mapping[str, Any] | None,
+    cross_check: Mapping[str, Any] | None,
+) -> bool:
+    if diagrams is None or primary is None or cross_check is None:
+        return False
+
+    primary_edges = {(e["from_id"], e["to_id"]) for e in primary["relationships"]}
+    cross_edges = {(e["from_id"], e["to_id"]) for e in cross_check["relationships"]}
+
+    def reaches(source: str, target: str) -> bool:
+        frontier = {right for left, right in primary_edges if left == source}
+        for _ in primary.get("referenced_ids", []):
+            frontier |= {right for left, right in primary_edges if left in frontier}
+        return target in frontier
+
+    basis = diagrams.get("architecture_basis_id")
+    return bool(
+        basis not in primary.get("basis_ids", [])
+        or basis not in cross_check.get("basis_ids", [])
+        or not set(cross_check.get("referenced_ids", [])).issubset(
+            primary.get("referenced_ids", [])
+        )
+        or any(not reaches(source, target) for source, target in cross_edges)
+    )
+
+
+def _architecture_board_output(
+    design: Mapping[str, Any] | None,
+    primary: Mapping[str, Any] | None,
+    authority: Mapping[str, Any] | None,
+) -> tuple[str | None, str | None, bool]:
+    revision = str(design.get("design_revision", "")) if design else ""
+    semantic = str(primary.get("semantic_sha256", "")) if primary else ""
+    root = (
+        f"dist/architecture/{revision}-{semantic[7:]}"
+        if re.fullmatch(r"DES-\d{4,}", revision) and _BOARD_SHA256.fullmatch(semantic)
+        else None
+    )
+    boundary = f"{root}/**" if root else None
+    roots = authority.get("approved_write_roots", []) if authority else []
+    blocked = [
+        *(authority.get("exclusions", []) if authority else []),
+        *(authority.get("protected_paths", []) if authority else []),
+    ]
+    authorized = bool(
+        boundary
+        and all(isinstance(path, str) for path in [*roots, *blocked])
+        and any(path_boundary_contains(path, boundary) for path in roots)
+        and not any(path_boundaries_overlap(path, boundary) for path in blocked)
+    )
+    return root, boundary, authorized
+
+
+def derive_architecture_board_handoff(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the request-scoped planned-board capability; never infer a plugin."""
+
+    gates, design = report.get("gates"), report.get("design_contract")
+    project = design.get("project_contract") if isinstance(design, Mapping) else None
+    diagrams = design.get("diagram_contract") if isinstance(design, Mapping) else None
+    authority, auth = report.get("write_authority"), report.get("authorizations")
+    external = report.get("external_authority")
+    parts = (gates, design, project, diagrams, authority, auth, external)
+    current = _architecture_board_report_current(report, parts)
+    if isinstance(diagrams, Mapping):
+        primary = _architecture_board_record(diagrams, "DIAGRAM-0001")
+        cross_check = _architecture_board_record(diagrams, "DIAGRAM-0008")
+    else:
+        primary = cross_check = None
+    conflict = _architecture_board_conflict(diagrams, primary, cross_check)
+    root, boundary, authorized = _architecture_board_output(
+        design if isinstance(design, Mapping) else None,
+        primary,
+        authority if isinstance(authority, Mapping) else None,
+    )
+    issues = [
+        *([] if current else ["CURRENT_GATE_B_REQUIRED"]),
+        *([] if primary else ["SYSTEM_CONTEXT_DIAGRAM_REQUIRED"]),
+        *([] if cross_check else ["AWS_IMPLEMENTATION_DIAGRAM_REQUIRED"]),
+        *(["DIAGRAM_CROSS_CHECK_CONFLICT"] if conflict else []),
+        *([] if root else ["DIAGRAM_OUTPUT_IDENTITY_INVALID"]),
+        *([] if authorized else ["DIAGRAM_OUTPUT_NOT_AUTHORIZED"]),
+    ]
+    status = (
+        "SEMANTIC_CONFLICT" if conflict else ("ELIGIBLE", "INELIGIBLE")[bool(issues)]
+    )
+    return {
+        "status": status,
+        "eligible": not issues,
+        "issues": issues,
+        "source_path": "docs/project/PRD.md",
+        "source": primary,
+        "cross_check": cross_check,
+        "output_root": root,
+        "failure_route": "DESIGN-10" if conflict else None,
+        "aws_authority": "NONE",
+        "external_authority": "NONE",
+    }
+
+
+def architecture_board_mermaid_source(text: str, handoff: Mapping[str, Any]) -> str:
+    from .design.diagrams import _canonical_mermaid_block
+
+    source = handoff.get("source")
+    if handoff.get("eligible") is not True or not isinstance(source, Mapping):
+        raise ValueError("architecture board handoff is not eligible")
+    rendered_bytes, rendered = _canonical_mermaid_block(text, str(source.get("anchor")))
+    observed = "sha256:" + hashlib.sha256(rendered_bytes).hexdigest()
+    if observed != source.get("rendered_sha256"):
+        raise ValueError("approved Mermaid presentation digest changed")
+    return rendered.removeprefix("```mermaid\n").removesuffix("```\n")
 
 
 def preview_source_brief(root: Path, source_path: str) -> dict[str, Any]:
@@ -1313,6 +1499,7 @@ def validate_approved_property_evidence(
 
 __all__ = (
     "IntakeFoundationContract",
+    "ARCHITECTURE_DIAGRAM_SKILL_IDENTITY",
     "DesignContract",
     "ApprovedDeliveryContract",
     "ApprovedSpikeContract",
@@ -1330,10 +1517,12 @@ __all__ = (
     "EngineEvaluation",
     "RequirementsContract",
     "capture_project_snapshot",
+    "architecture_board_mermaid_source",
     "evaluate_project",
     "inspect_project",
     "aws_core_phase_evidence_issues",
     "derive_change_impact_contract",
+    "derive_architecture_board_handoff",
     "derive_aws_core_observed_usage",
     "derive_aws_execution_projection",
     "derive_coverage_contract",

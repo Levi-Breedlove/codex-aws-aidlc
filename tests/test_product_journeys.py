@@ -31,6 +31,7 @@ import fastlane_context as context_runtime
 import package_release
 import setup_assistant as setup
 import task_waves
+from scripts.fastlane_engine import api as engine_api
 
 
 class ProductJourneyTests(unittest.TestCase):
@@ -615,7 +616,7 @@ class ProductJourneyTests(unittest.TestCase):
                 "legacy/existing.txt",
                 "preserved legacy behavior\n",
                 {"kind": "BROWNFIELD_PRESERVE", "paths": ["legacy/**"]},
-                ["legacy/**", "tests/**"],
+                ["legacy/**", "tests/**", "dist/architecture/**"],
             ),
             (
                 "infrastructure-only",
@@ -623,7 +624,7 @@ class ProductJourneyTests(unittest.TestCase):
                 "infrastructure/template.yaml",
                 "Resources: {}\n",
                 {"kind": "NOT_APPLICABLE", "paths": []},
-                ["infrastructure/**", "tests/**"],
+                ["infrastructure/**", "tests/**", "dist/architecture/**"],
             ),
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -646,6 +647,7 @@ class ProductJourneyTests(unittest.TestCase):
                     baseline = fixture.approve_existing_project(
                         project,
                         work_kind=work_kind,
+                        architecture_board=True,
                     )
                     exit_code, report = self.run_doctor_cli(project)
 
@@ -678,6 +680,9 @@ class ProductJourneyTests(unittest.TestCase):
                     )
                     self.assertEqual(report["authorizations"]["aws"], "NONE")
                     self.assertEqual(report["external_authority"]["kind"], "NONE")
+                    handoff = engine_api.derive_architecture_board_handoff(report)
+                    self.assertTrue(handoff["eligible"], handoff["issues"])
+                    self.assertEqual(handoff["aws_authority"], "NONE")
                     self.assertEqual(
                         protected.read_text(encoding="utf-8"), protected_source
                     )
@@ -868,7 +873,9 @@ class ProductJourneyTests(unittest.TestCase):
 
             deliver_project = self.extract_template(temporary, "deliver")
             self.initialize(deliver_project)
-            fixture.approve_project(deliver_project, gate_b=True)
+            fixture.approve_project(
+                deliver_project, gate_b=True, architecture_board=True
+            )
             current = doctor.inspect_project(deliver_project)
             self.assertTrue(current["ok"], current["diagnostics"])
             self.assertEqual(current["next_prompt"], "TASK-10")
@@ -888,6 +895,22 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn("(docs/project/PRD.md#diagram-guide)", after_gate_b_update)
             self.assertIn(
                 "(docs/project/TASKS.md#current-progress)", after_gate_b_update
+            )
+            handoff = engine_api.derive_architecture_board_handoff(current)
+            identity = {
+                **presenter.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+                "valid": True,
+                "issues": [],
+            }
+            offer = presenter.render_architecture_board_offer(
+                current, handoff, identity, transition="GATE_B_ACCEPTED"
+            )
+            self.assertTrue(handoff["eligible"], handoff["issues"])
+            self.assertIn("Generate the planned AWS architecture board.", offer)
+            self.assertIn("Need from you: Nothing.", offer)
+            self.assertNotIn(
+                "Optional planned architecture board",
+                presenter.render_owner_update(current),
             )
 
             verify_path = deliver_project / "docs/project/VERIFY.md"

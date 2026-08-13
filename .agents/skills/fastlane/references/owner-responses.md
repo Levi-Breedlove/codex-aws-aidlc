@@ -5,8 +5,7 @@
   --input-stdin`; do not hand-compose lifecycle routing.
 - Immediately after successful initialization, render the first Engine report
   once with `python scripts/fastlane_presenter.py project-ready --input-stdin`.
-  This is the only post-setup handoff: normal resume uses `owner` mode and never
-  repeats the welcome, project settings, or Project Ready explanation.
+- After current Gate B, render `architecture-board-offer` only with an eligible handoff and exact skill receipt; normal `owner` resume never repeats it, setup, the welcome, project settings, or Project Ready.
 - Present one concrete next action. Show an owner action only for a genuine
   decision, setup step, approval, authorization, protected-boundary decision,
   or human safety review. Otherwise continue the selected phase.

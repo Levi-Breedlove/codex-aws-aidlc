@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any, Mapping, Sequence
 
 try:
+    from fastlane_engine.api import ARCHITECTURE_DIAGRAM_SKILL_IDENTITY
     from fastlane_engine.core.ids import TASK_ID
     from fastlane_owner_briefs import (
         GATE_B_NAVIGATION_LOCATOR_KEYS,
@@ -21,6 +22,7 @@ try:
     from intake_response import intake_reply_token
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
+    from scripts.fastlane_engine.api import ARCHITECTURE_DIAGRAM_SKILL_IDENTITY
     from scripts.fastlane_engine.core.ids import TASK_ID
     from scripts.fastlane_owner_briefs import (
         GATE_B_NAVIGATION_LOCATOR_KEYS,
@@ -1855,6 +1857,52 @@ def render_owner_update(
     return "\n".join(lines)
 
 
+def render_architecture_board_offer(
+    report: Mapping[str, Any],
+    handoff: Mapping[str, Any],
+    skill_identity: Mapping[str, Any],
+    transition: str,
+) -> str:
+    interaction = _interaction(report)
+    if (
+        transition != "GATE_B_ACCEPTED"
+        or report.get("next_prompt") != "TASK-10"
+        or interaction.get("route_reason_code") != "TASK_PLAN_REQUIRED"
+        or interaction.get("owner_action_required") is not False
+        or interaction.get("automatic_continuation_allowed") is not True
+    ):
+        raise PresentationError("architecture-board offer requires Gate B continuation")
+    base = render_owner_update(report, updated="Gate B was accepted.")
+    identity = {**ARCHITECTURE_DIAGRAM_SKILL_IDENTITY, "valid": True, "issues": []}
+    if dict(skill_identity) != identity or handoff.get("eligible") is not True:
+        return base
+    if (
+        handoff.get("status") != "ELIGIBLE"
+        or handoff.get("issues") != []
+        or (handoff.get("aws_authority"), handoff.get("external_authority"))
+        != ("NONE", "NONE")
+        or not all(
+            isinstance(handoff.get(key), Mapping) for key in ("source", "cross_check")
+        )
+        or handoff.get("source", {}).get("diagram_id") != "DIAGRAM-0001"
+        or handoff.get("cross_check", {}).get("diagram_id") != "DIAGRAM-0008"
+        or re.fullmatch(
+            r"dist/architecture/DES-\d{4,}-[0-9a-f]{64}",
+            str(handoff.get("output_root", "")),
+        )
+        is None
+    ):
+        raise PresentationError("architecture-board handoff is malformed")
+    return base + (
+        "\n\nOptional planned architecture board\n\n"
+        "Would you like Fastlane to compile a professional AWS architecture board "
+        "from the approved Mermaid design?\n"
+        "Optional reply: `Generate the planned AWS architecture board.`\n"
+        "Fastlane will continue TASK-10 either way. This creates local planned-design "
+        "files only; it does not inspect credentials, access AWS, or authorize deployment."
+    )
+
+
 def render_side_question_response(
     report: Mapping[str, Any],
     *,
@@ -2679,6 +2727,7 @@ def main(argv: list[str] | None = None) -> int:
             "gate-a-brief",
             "gate-b-brief",
             "answer-confirmation",
+            "architecture-board-offer",
             "source-brief",
         ),
     )
@@ -2713,6 +2762,17 @@ def main(argv: list[str] | None = None) -> int:
             output = render_owner_update(
                 report,
                 updated=str(payload.get("updated", "Nothing.")),
+            )
+        elif args.mode == "architecture-board-offer":
+            handoff = payload.get("architecture_board_handoff")
+            identity = payload.get("skill_identity")
+            if not isinstance(handoff, Mapping) or not isinstance(identity, Mapping):
+                raise PresentationError("input is missing architecture-board evidence")
+            output = render_architecture_board_offer(
+                report,
+                handoff,
+                identity,
+                transition=str(payload.get("transition", "")),
             )
         elif args.mode == "gate-a-brief":
             output = render_owner_decision_brief(report, "GATE_A")

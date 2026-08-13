@@ -376,6 +376,69 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("(docs/project/PRD.md#diagram-guide)", rendered)
         self.assertIn("(docs/project/TASKS.md#current-progress)", rendered)
 
+    def test_architecture_board_offer_is_optional_transition_only_and_fail_closed(
+        self,
+    ) -> None:
+        current = report(
+            owner_stage="DELIVER",
+            state="WORKING",
+            route_reason_code="TASK_PLAN_REQUIRED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
+        )
+        current["gates"] = {
+            "gate_a": "APPROVED_FOR_DESIGN",
+            "gate_b": "APPROVED_FOR_CONSTRUCTION",
+        }
+        current["design_contract"] = {
+            "diagram_contract": {
+                "records": [
+                    {"kind": "SYSTEM_CONTEXT", "status": "CURRENT"},
+                    {"kind": "AWS_IMPLEMENTATION", "status": "CURRENT"},
+                ]
+            }
+        }
+        current["next_prompt"] = "TASK-10"
+        handoff = {
+            "status": "ELIGIBLE",
+            "eligible": True,
+            "issues": [],
+            "source": {"diagram_id": "DIAGRAM-0001"},
+            "cross_check": {"diagram_id": "DIAGRAM-0008"},
+            "output_root": "dist/architecture/DES-0001-" + "a" * 64,
+            "aws_authority": "NONE",
+            "external_authority": "NONE",
+        }
+        identity = {
+            **presenter.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+            "valid": True,
+            "issues": [],
+        }
+        rendered = presenter.render_architecture_board_offer(
+            current, handoff, identity, transition="GATE_B_ACCEPTED"
+        )
+        self.assertIn("Optional planned architecture board", rendered)
+        self.assertIn("Generate the planned AWS architecture board.", rendered)
+        self.assertIn("Fastlane will continue TASK-10 either way", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
+        self.assertNotIn(
+            "Optional planned architecture board",
+            presenter.render_owner_update(current),
+        )
+
+        mismatch = dict(identity, version="mismatched")
+        self.assertEqual(
+            presenter.render_architecture_board_offer(
+                current, handoff, mismatch, transition="GATE_B_ACCEPTED"
+            ),
+            presenter.render_owner_update(current, updated="Gate B was accepted."),
+        )
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_architecture_board_offer(
+                current, handoff, identity, transition="RESUME"
+            )
+
     def test_legacy_gate_b_navigation_omits_unavailable_diagram_links(self) -> None:
         current = report(
             owner_stage="DELIVER",

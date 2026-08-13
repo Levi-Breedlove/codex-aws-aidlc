@@ -174,6 +174,7 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
         scenarios = {
             scenario["id"]: scenario["expect"] for scenario in plan["scenarios"]
         }
+        self.assertEqual(len(scenarios), 25)
         for scenario_id in (
             "prerequisite-recovery",
             "onboarding-project-ready",
@@ -195,6 +196,13 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             "one valid naturally spaced reply", scenarios["consultative-intake"]
         )
         self.assertIn("imports no approval", scenarios["source-assisted-define"])
+        self.assertIn(
+            "continues TASK-10 and grants no AWS authority",
+            scenarios["project-diagram-understanding"],
+        )
+        self.assertIn(
+            "architecture-board offer", scenarios["resume-without-repetition"]
+        )
         self.assertEqual(
             plan["evidence_bundle"]["prompt_contract_command"],
             "python scripts/model_roleplay_eval.py prompt-contract --root . --json",
