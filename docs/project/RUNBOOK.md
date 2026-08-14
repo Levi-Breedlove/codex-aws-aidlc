@@ -304,9 +304,11 @@ The compatibility adapter names the two supported execution forms
 
 ## Conditional AWS action receipts
 
-These are action-specific safety messages, not routine project approvals. The
-first permits named reads only, the second one matching deployment, and the
-third one matching teardown. Each must match Fastlane's current approved boundary.
+These are action-specific canonical templates, not receipts, authority, or
+routine project approvals. The owner must fill every `<...>` placeholder and
+return the entire applicable block. Only the completed owner reply, after
+deterministic validation against Fastlane's current approved boundary, can
+authorize the named reads, one matching deployment, or one matching teardown.
 
 ```text
 AUTHORIZE AWS READ-ONLY PREFLIGHT

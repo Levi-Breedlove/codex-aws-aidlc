@@ -4,6 +4,14 @@ Use the exact canonical blocks in `prompts/CODEX-PROMPTS.md` and the current
 authoritative records. Do not paraphrase, reorder, complete, or self-accept a
 receipt.
 
+A placeholder-bearing block is a canonical receipt template, not an exact or
+current receipt and not authority. Present the entire applicable template with
+its field names and order unchanged. The human owner must fill every `<...>`
+placeholder and return the entire block. Only that complete owner reply, after
+deterministic validation against current project state, becomes the exact
+current receipt. Until then, authority for that action is `NONE`; do not
+substitute a prose checklist or perform the read, mutation, or removal.
+
 - Gate A binds the current requirements revision, cost posture, accepted
   assumptions, and human approver.
 - Gate B binds the current requirements and design revisions, construction

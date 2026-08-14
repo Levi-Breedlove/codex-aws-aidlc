@@ -497,10 +497,13 @@ class FastlanePresenterTests(unittest.TestCase):
             answer="The requested preflight can inspect only the named scope.",
         )
         self.assertIn(
-            "Pending next action: Review the exact read-only AWS preflight receipt. "
-            "It grants no mutation.",
+            "Pending next action: Fill every `<...>` placeholder in the AWS "
+            "read-only preflight receipt template, then return the entire block. "
+            "Until Fastlane validates the owner's completed block, the named "
+            "reads remain unauthorized and no mutation is permitted.",
             rendered,
         )
+        self.assertNotIn("exact read-only AWS preflight receipt", rendered)
         self.assertNotIn("deployment receipt", rendered)
 
     def test_preflight_running_names_read_only_scope_without_owner_work(self) -> None:
@@ -567,9 +570,11 @@ class FastlanePresenterTests(unittest.TestCase):
             answer="The preflight itself remained read-only.",
         )
         self.assertIn(
-            "Review the exact AWS deployment receipt before any AWS mutation",
+            "Fill every `<...>` placeholder in the separate AWS deployment "
+            "receipt template, then return the entire block",
             side_question,
         )
+        self.assertNotIn("exact AWS deployment receipt", side_question)
         self.assertNotIn("Gate-B-authorized", side_question)
 
     def test_legacy_fast_dev_gate_b_authority_cannot_reach_owner_copy(self) -> None:
@@ -696,10 +701,13 @@ class FastlanePresenterTests(unittest.TestCase):
             answer="Preflight is complete; deployment remains separately gated.",
         )
         self.assertIn(
-            "Pending next action: Review the exact AWS deployment receipt before any "
-            "AWS mutation.",
+            "Pending next action: Fill every `<...>` placeholder in the separate "
+            "AWS deployment receipt template, then return the entire block. Until "
+            "Fastlane validates the owner's completed block, no AWS mutation is "
+            "authorized.",
             rendered,
         )
+        self.assertNotIn("exact AWS deployment receipt", rendered)
 
         current["interaction"]["route_reason_code"] = "AWS_PREFLIGHT_RUNNING"
         current["aws_execution"]["progress_state"] = "AWS_PREFLIGHT_RUNNING"
@@ -742,10 +750,13 @@ class FastlanePresenterTests(unittest.TestCase):
         )
 
         self.assertIn(
-            "Pending next action: Review the exact read-only AWS preflight receipt. "
-            "It grants no mutation.",
+            "Pending next action: Fill every `<...>` placeholder in the AWS "
+            "read-only preflight receipt template, then return the entire block. "
+            "Until Fastlane validates the owner's completed block, the named "
+            "reads remain unauthorized and no mutation is permitted.",
             rendered,
         )
+        self.assertNotIn("exact read-only AWS preflight receipt", rendered)
         self.assertNotIn("deployment receipt", rendered)
         self.assertNotIn("teardown receipt", rendered)
 
@@ -764,10 +775,13 @@ class FastlanePresenterTests(unittest.TestCase):
         )
 
         self.assertIn(
-            "Pending next action: Review the exact AWS teardown receipt before any "
-            "resource is removed.",
+            "Pending next action: Fill every `<...>` placeholder in the separate "
+            "AWS teardown receipt template, then return the entire block. Until "
+            "Fastlane validates the owner's completed block, no resource removal "
+            "is authorized.",
             rendered,
         )
+        self.assertNotIn("exact AWS teardown receipt", rendered)
         self.assertNotIn("deployment receipt", rendered)
 
     def test_current_teardown_authority_continues_exact_cleanup(self) -> None:
@@ -2211,7 +2225,7 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertIn("read-only", normalized)
         self.assertIn("Need from you: Nothing.", rendered)
         self.assertIn("no further mutation", normalized)
-        self.assertNotIn("Review the exact AWS deployment receipt", rendered)
+        self.assertNotIn("AWS deployment receipt template", rendered)
 
         missing_read = aws_progress_report(
             "AWS_DEPLOYMENT_RECONCILIATION",
@@ -2234,11 +2248,13 @@ class FastlanePresenterTests(unittest.TestCase):
             answer="Reconciliation verifies the observed deployment result.",
         )
         self.assertIn(
-            "Pending next action: Review the exact read-only AWS preflight receipt. "
-            "It grants no mutation.",
+            "Pending next action: Fill every `<...>` placeholder in the AWS "
+            "read-only preflight receipt template, then return the entire block. "
+            "Until Fastlane validates the owner's completed block, the named "
+            "reads remain unauthorized and no mutation is permitted.",
             side,
         )
-        self.assertNotIn("Review the exact AWS deployment receipt", side)
+        self.assertNotIn("AWS deployment receipt template", side)
 
     def test_release_closure_projects_only_allowed_release_states(self) -> None:
         current = aws_progress_report("RELEASE_REVIEW", lane="explicit-gate")

@@ -161,7 +161,7 @@
   },
   "report_case_digests": {
     "stale_gate_a_summary": "e014fd712ce467765b7dc0408968004183adfdbe00168abc48d33347f4c4c506",
-    "task_ready": "0602e4796479cdbf04076aedcb3ffcc6732b1f17a38b2f3e00814f4621efed22"
+    "task_ready": "171292710289a8d4f64481219cf6285965e1a8a958c6a220d55b359c55c57bb8"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -2977,8 +2977,8 @@
               "start_line": 60,
               "end_line": 65,
               "active_ids": [],
-              "canonical_sha256": "sha256:5b00bb7707335a6a9e1e428c308861071ee857d972c7bd3a38621b799cf34317",
-              "source_bytes": 1125,
+              "canonical_sha256": "sha256:71fde07ab791d464aa3efa6ac22b72f6aac4e1ad6e29dd9e16d69f18e1021212",
+              "source_bytes": 1164,
               "reason": "On-demand canonical source"
             },
             {

@@ -1762,7 +1762,10 @@ class ProductJourneyTests(unittest.TestCase):
             ),
             answer="The preflight can inspect only the exact named scope.",
         )
-        self.assertIn("It grants no mutation.", read_scope_text)
+        self.assertIn("AWS read-only preflight receipt template", read_scope_text)
+        self.assertIn("the named reads remain unauthorized", read_scope_text)
+        self.assertIn("no mutation is permitted", read_scope_text)
+        self.assertNotIn("exact current receipt", read_scope_text)
         running_text = presenter.render_owner_update(
             presenter_fixtures.aws_progress_report("AWS_PREFLIGHT_RUNNING")
         )
@@ -1790,7 +1793,9 @@ class ProductJourneyTests(unittest.TestCase):
             ),
             answer="The preflight does not authorize deployment.",
         )
-        self.assertIn("deployment receipt", mutation_text)
+        self.assertIn("AWS deployment receipt template", mutation_text)
+        self.assertIn("no AWS mutation is authorized", mutation_text)
+        self.assertNotIn("exact current receipt", mutation_text)
         self.assertNotIn("teardown receipt", mutation_text)
 
     def test_failed_task_evidence_cannot_produce_false_done(self) -> None:

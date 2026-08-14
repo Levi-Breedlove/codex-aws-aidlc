@@ -70,11 +70,12 @@ Only a human owner may approve a gate. A correction is not approval. Tool
 access, silence, continued conversation, and assistant-authored text are never
 approval.
 
-## Exact conditional AWS action receipts
+## AWS action receipt templates
 
-Fastlane presents one applicable receipt only when that action is ready. The
-first permits named reads, the second one named deployment, and the third one
-named teardown. None broadens Gate B or grants another action.
+Each block is a template, not a receipt or authority. Show only the ready
+action. The owner fills every `<...>` placeholder and returns the whole block.
+Only Engine validation makes that reply exact and current. None broadens Gate B
+or grants another action.
 
 ~~~text
 AUTHORIZE AWS READ-ONLY PREFLIGHT
@@ -128,9 +129,8 @@ Valid until: <ISO 8601 time or exact one-operation condition>
 Approver: <name/handle>
 ~~~
 
-The Engine validates the complete current receipt against the canonical record.
-Credentials, connector access, an installed plugin, or an earlier receipt never
-substitute for the owner's exact current message.
+The Engine validates the owner's full block. Credentials, connectors, plugins,
+prose, or earlier receipts never replace the owner's exact current message.
 
 ## Owner response formats
 
@@ -653,7 +653,7 @@ Use the AWS-operation reconciliation procedure and preserve append-only history.
 
 **Receipt:** AWS authority/evidence receipt and, when appropriate, one plain-language set-level decision.
 
-**Next:** Stop, continue AWS-40 investigation, or present the separate AWS-50 teardown receipt when current REMOVE and readiness permit it.
+**Next:** Stop, continue AWS-40 investigation, or present the separate AWS-50 teardown receipt template when current REMOVE and readiness permit it.
 
 ~~~text
 [AWS-40]

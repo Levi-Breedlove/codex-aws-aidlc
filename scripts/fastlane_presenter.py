@@ -103,13 +103,20 @@ ACTION_TEXT = {
     "ENABLE_AWS_CORE": "Enable official AWS Core, then continue the affected AWS step.",
     "APPROVE_GATE_B": "Review and decide the Gate B design and construction receipt.",
     "AUTHORIZE_AWS_READ_PREFLIGHT": (
-        "Review the exact read-only AWS preflight receipt. It grants no mutation."
+        "Fill every `<...>` placeholder in the AWS read-only preflight receipt "
+        "template, then return the entire block. Until Fastlane validates the "
+        "owner's completed block, the named reads remain unauthorized and no "
+        "mutation is permitted."
     ),
     "AUTHORIZE_AWS_OPERATION": (
-        "Review the exact AWS deployment receipt before any AWS mutation."
+        "Fill every `<...>` placeholder in the separate AWS deployment receipt "
+        "template, then return the entire block. Until Fastlane validates the "
+        "owner's completed block, no AWS mutation is authorized."
     ),
     "AUTHORIZE_AWS_TEARDOWN": (
-        "Review the exact AWS teardown receipt before any resource is removed."
+        "Fill every `<...>` placeholder in the separate AWS teardown receipt "
+        "template, then return the entire block. Until Fastlane validates the "
+        "owner's completed block, no resource removal is authorized."
     ),
     "CHOOSE_AWS_RESIDUAL_DISPOSITION": (
         "Choose one outcome for the current residual set: RETAIN, INVESTIGATE, "

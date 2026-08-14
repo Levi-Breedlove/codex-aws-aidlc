@@ -292,6 +292,45 @@ class PromptPackContractTests(unittest.TestCase):
             self.authorization_receipts,
         )
         self.assertIn("permits no mutation", self.authorization_receipts)
+        authorization_receipts_compact = " ".join(self.authorization_receipts.split())
+        for phrase in (
+            "A placeholder-bearing block is a canonical receipt template",
+            "fill every `<...>` placeholder and return the entire block",
+            "after deterministic validation against current project state",
+            "authority for that action is `NONE`",
+        ):
+            self.assertIn(phrase, authorization_receipts_compact)
+        self.assertIn("AWS action receipt templates", self.prompts)
+        self.assertIn(
+            "Each block is a template, not a receipt or authority",
+            self.prompts,
+        )
+        self.assertIn(
+            "full canonical `AUTHORIZE AWS READ-ONLY PREFLIGHT` receipt template",
+            self.operate_fastlane_aws,
+        )
+        self.assertIn(
+            "fill every `<...>` placeholder and return the entire block",
+            self.operate_fastlane_aws,
+        )
+        self.assertIn(
+            "full canonical teardown receipt template for owner completion",
+            self.fastlane_deliver,
+        )
+        self.assertIn("Canonical action-authorization receipt templates", self.verify)
+        self.assertIn(
+            "The template is not an exact or current receipt and grants no authority",
+            " ".join(self.verify.split()),
+        )
+        self.assertNotIn("matching copyable receipt", self.verify)
+        self.assertIn(
+            "action-specific canonical templates, not receipts, authority",
+            " ".join(self.runbook.split()),
+        )
+        self.assertIn(
+            "Only the completed owner reply, after deterministic validation",
+            " ".join(self.runbook.split()),
+        )
 
     def test_setup_is_chronological_owner_runnable_and_hook_safe(self) -> None:
         headings = (
@@ -518,6 +557,9 @@ class PromptPackContractTests(unittest.TestCase):
             "side questions",
             "turn_boundary_required",
             "Never label an unresolved placeholder",
+            "An owner's statement that a test, preflight, deployment, recovery, or teardown",
+            "A placeholder-bearing AWS block is a template",
+            "fill every `<...>` placeholder and return the entire canonical block",
             "Change the requirements: <correction>",
             "Change the design: <correction>",
             "Owner Decision Briefs",

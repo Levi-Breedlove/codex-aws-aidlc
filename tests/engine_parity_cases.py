@@ -840,7 +840,7 @@ def receipt_contracts() -> dict[str, dict[str, str]]:
     sections = []
     for heading in (
         "## Exactly accepted Gate receipts",
-        "## Exact conditional AWS action receipts",
+        "## AWS action receipt templates",
     ):
         start = text.index(heading)
         next_heading = text.find("\n## ", start + len(heading))

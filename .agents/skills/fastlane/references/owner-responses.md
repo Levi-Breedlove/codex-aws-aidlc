@@ -23,6 +23,10 @@
   state that no AWS account was accessed. If those calls are unavailable or
   unobservable, omit `Audit:` rather than claiming AWS Core use. Persist no raw
   skill content, transcript, credential, session identifier, or machine detail.
+- An owner's statement that a test, preflight, deployment, recovery, or teardown
+  completed is not observed evidence. Only current Engine-projected evidence may
+  establish completion. Otherwise identify the statement as the owner's report,
+  preserve the current evidence state, and keep the corresponding action gated.
 - Keep the AWS delivery states distinct. Guidance needs nothing from the owner
   and accesses no account. Read-scope authorization tells the owner the named
   account will be accessed read-only. Running preflight needs no further owner
@@ -145,19 +149,28 @@ new owner message may resolve it.
 
 ## Material decision card
 
-Before an exact Gate A, Gate B, AWS read-only preflight, deployment, or teardown
-receipt, give one short decision card with exactly these labels:
+Before an exact Gate A or Gate B receipt, or before an AWS read-only preflight,
+deployment, or teardown receipt template, give one short decision card with
+exactly these labels:
 
 - `Decision:` what the owner is deciding now;
 - `Recommendation:` Codex's evidence-backed recommendation;
 - `Why:` the material requirement and evidence basis;
 - `Tradeoff:` the principal benefit and cost or limitation;
-- `Reply:` the exact copyable response; and
+- `Reply:` for a gate, the exact copyable response; for AWS, an instruction to
+  fill every `<...>` placeholder and return the entire canonical block; and
 - `After that:` the work Fastlane will continue automatically.
 
-The card summarizes but never replaces or alters the exact formal receipt.
-Do not add it to routine status, side-question restoration, or an internal
-checkpoint. Keep methodology and context-management terms out of the card.
+The card summarizes but never replaces or alters the exact gate receipt or the
+full canonical AWS template. A placeholder-bearing AWS block is a template, not
+an exact or current receipt, a copyable reply, or authority. Show the entire
+applicable template after the card with its field names and order unchanged.
+The human owner must fill every placeholder and return the entire block. Only
+after deterministic validation against current project state may the completed
+owner reply be described as the exact current receipt. Until then, authority
+for that AWS action is `NONE`. Do not add the card to routine status,
+side-question restoration, or an internal checkpoint. Keep methodology and
+context-management terms out of the card.
 ## Owner Decision Briefs
 
 Before a Gate A or Gate B receipt, render the matching

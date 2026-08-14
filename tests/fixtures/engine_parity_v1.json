@@ -2268,7 +2268,7 @@
     "gate_a_pending": "dff7e46152d735adaf731e6e874888605a9ac9cfe849d4b2097a28b4973df68e",
     "gate_a_approved": "3613573422f2df37bb02a6d40c0d29a274c5f08304590512a4f9f61fdbd78532",
     "gate_b_pending": "b00ab703c9859174ed3bedf8dd3ac9d4c115b65e31a1e6c5754621c4d6b318b8",
-    "gate_b_approved": "ab9ac1dec16be2e0238187e3406ffe02bf8d4ced79e165c2a11267474ea30731"
+    "gate_b_approved": "a6be7d1dcea117a6f6ff86c3da7874c2e8cb872087e2bd8880f1b2046dd6a149"
   },
   "report_cases": {
     "template_source": {
@@ -17260,8 +17260,8 @@
               "start_line": 60,
               "end_line": 65,
               "active_ids": [],
-              "canonical_sha256": "sha256:5b00bb7707335a6a9e1e428c308861071ee857d972c7bd3a38621b799cf34317",
-              "source_bytes": 1125,
+              "canonical_sha256": "sha256:71fde07ab791d464aa3efa6ac22b72f6aac4e1ad6e29dd9e16d69f18e1021212",
+              "source_bytes": 1164,
               "reason": "On-demand canonical source"
             },
             {
