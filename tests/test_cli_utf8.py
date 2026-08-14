@@ -90,6 +90,8 @@ class FastlaneCliUtf8Tests(unittest.TestCase):
             "synthetic-target",
             "--project-name",
             "Synthetic Project",
+            "--region",
+            "us-west-2",
             "--unknown—option",
         )
         self.assertEqual(completed.returncode, 2)

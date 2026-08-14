@@ -738,7 +738,7 @@ def complete_owner_visible_gate_a(text: str, *, project_mode: str) -> str:
         text,
         "## Document status",
         "## 1. Workload profile",
-        "Bootstrap release || `Fastlane 1.2.42; baseline f24bf467` ;; Specification status || `Current` ;; Target release || `development validation` ;; Last reviewed || `2026-07-17T09:55:00-07:00` ;; Primary owner || `alice`",
+        "Bootstrap release || `Fastlane 1.2.43; baseline c14f4a9` ;; Specification status || `Current` ;; Target release || `development validation` ;; Last reviewed || `2026-07-17T09:55:00-07:00` ;; Primary owner || `alice`",
     )
     text = set_fixture_values(
         text,
@@ -3911,7 +3911,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.42")
+        self.assertEqual(report["bootstrap_version"], "1.2.43")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)

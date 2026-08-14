@@ -128,6 +128,21 @@
         "lifecycle or route change for already-complete current project records",
         "AWS access, execution, deployment, recovery, or teardown evidence claim"
       ]
+    },
+    {
+      "id": "EXPLICIT_REGION_SELECTION_1_2_43",
+      "base_commit": "c14f4a9eb7c57332d4332033c034ef1e9b33355a",
+      "scope": [
+        "fresh initialization requires one explicit canonical owner Region",
+        "recommendation requests remain unselected until a new owner confirmation",
+        "context-locator bytes changed only by the updated Define procedure",
+        "Fastlane patch-version mirrors and Golden fixture version identity"
+      ],
+      "prohibited": [
+        "migration or rewrite of an initialized project's recorded Region",
+        "requirement, design, diagram, lifecycle, route, gate, authority, or receipt change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "summary_truth_compatibility": {
@@ -149,10 +164,10 @@
       "template_source": "93342ac776238cc2fb71393e51fb25e195bc70ef1c1561f2ec71988441a5dd7a",
       "unconfigured_template": "547740ec1c6690da6ded36c63dd19e9f0ba5c0de3367dae6b4f96a8d6dde01eb",
       "rendered_intake": "17238d5b1210b1a0957897155442ea231c77990d027dca1730102fa028ab05a4",
-      "gate_a_pending": "b5b7bedaa5b5498b12a762a1d12f8a04771bad587d539043f0a46e523f49f4eb",
-      "gate_a_approved": "768cecd6b3885d276736dd49bf302de81afdaf048ddf4c95a8bf24c07f1fa35e",
-      "gate_b_pending": "d638bde4a72b361cd3cba1fb8ba777a80622fdf7992648232f368dbe1dd99e52",
-      "gate_b_approved": "1025c7e23d745dc9ac130204dea3af697f24ab0c075cd07b5aba9316c784b771"
+      "gate_a_pending": "b7cc0d46b7f6947a284af5db35c49a0ea89ac49df7def655d0bee737b04b73e1",
+      "gate_a_approved": "1df5b2dbf7536e2b3c526e82d9cc763fb85f8c86d59bc6dd792d9fb0d95748fc",
+      "gate_b_pending": "2c46ca174ee810fa61510c306d62b8b0ecd75ce5bb8841067f02d016398379fd",
+      "gate_b_approved": "09899b548a21b9895404a6efd3a40158ffd5073fb10990f8802487ebeb31f7eb"
     }
   },
   "normalization": {
@@ -2247,13 +2262,13 @@
     }
   },
   "report_case_digests": {
-    "template_source": "6b2a9bb5bcec3d1deddd530c5fe3ee3b2bd3afb26a424a142e2a2a17d48fcf87",
-    "unconfigured_template": "b2bc3a913224ac214d640b7281541f5cc1b48e4d932e04a5b42c33c4958299af",
-    "rendered_intake": "925156a0d7772dfbc4a30d18efa405c1373da0c0b8d43def609867366606784b",
-    "gate_a_pending": "9f55ff5ed283e8a16bbf37f163ab34c921c6e7bad57ee6809e810d651a9eb4b5",
-    "gate_a_approved": "9684b07006bec165206ce677210f5fd6673c57c0bc3808e15d443cb0b0e534bc",
-    "gate_b_pending": "b64a75cb000beb14cf9a0fbda1c96255bed355d67d0a08174fa2871426d5659d",
-    "gate_b_approved": "c622314b6d184ccf47cee10004da6c68d3908cfc5feeddadf6a379368fa1b0f0"
+    "template_source": "152e08081b0892bb558df26d5cbaa7e5400e44cae013d0ae76aa4d7a9653621c",
+    "unconfigured_template": "eaede87ebad50e20b3da352e45d9db514e1e75f588f71f9e61bf0e6bd6dc0163",
+    "rendered_intake": "e84152124c9991cca0a22f56cb33dbff06f3a3a0be92c9678b4b1c1cdc2430ca",
+    "gate_a_pending": "dff7e46152d735adaf731e6e874888605a9ac9cfe849d4b2097a28b4973df68e",
+    "gate_a_approved": "eae75134b0d631c82729dc95538767e45cdc21dbcfc60305c861d99bea9b90a9",
+    "gate_b_pending": "033a292f4c7feea950d5cf0d3646349207df73f597860081ec880945c976ccfe",
+    "gate_b_approved": "ab9ac1dec16be2e0238187e3406ffe02bf8d4ced79e165c2a11267474ea30731"
   },
   "report_cases": {
     "template_source": {
@@ -2309,7 +2324,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 5369,
+          "actual_initial_source_bytes": 5711,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -2317,10 +2332,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 32,
+              "end_line": 38,
               "active_ids": [],
-              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
-              "source_bytes": 3680,
+              "canonical_sha256": "sha256:61b04f61d10322bdede81c0fb00ea4a0f8a5ca233888192df23f17195a770be2",
+              "source_bytes": 4022,
               "reason": "Current phase procedure"
             },
             {
@@ -2351,8 +2366,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 33,
-              "end_line": 45,
+              "start_line": 39,
+              "end_line": 51,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -2362,8 +2377,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 46,
-              "end_line": 53,
+              "start_line": 52,
+              "end_line": 59,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -4206,7 +4221,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 5369,
+          "actual_initial_source_bytes": 5711,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -4214,10 +4229,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 32,
+              "end_line": 38,
               "active_ids": [],
-              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
-              "source_bytes": 3680,
+              "canonical_sha256": "sha256:61b04f61d10322bdede81c0fb00ea4a0f8a5ca233888192df23f17195a770be2",
+              "source_bytes": 4022,
               "reason": "Current phase procedure"
             },
             {
@@ -4248,8 +4263,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 33,
-              "end_line": 45,
+              "start_line": 39,
+              "end_line": 51,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -4259,8 +4274,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 46,
-              "end_line": 53,
+              "start_line": 52,
+              "end_line": 59,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -6073,7 +6088,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 5369,
+          "actual_initial_source_bytes": 5711,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -6081,10 +6096,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 32,
+              "end_line": 38,
               "active_ids": [],
-              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
-              "source_bytes": 3680,
+              "canonical_sha256": "sha256:61b04f61d10322bdede81c0fb00ea4a0f8a5ca233888192df23f17195a770be2",
+              "source_bytes": 4022,
               "reason": "Current phase procedure"
             },
             {
@@ -6115,8 +6130,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 33,
-              "end_line": 45,
+              "start_line": 39,
+              "end_line": 51,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -6126,8 +6141,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 46,
-              "end_line": 53,
+              "start_line": 52,
+              "end_line": 59,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -8108,7 +8123,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 5792,
+          "actual_initial_source_bytes": 6133,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -8116,10 +8131,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 32,
+              "end_line": 38,
               "active_ids": [],
-              "canonical_sha256": "sha256:5d48fcee75b618d49b2fcb8c4adf8d55ccfce1df09f1cd107fb8eb6efb919c01",
-              "source_bytes": 3680,
+              "canonical_sha256": "sha256:61b04f61d10322bdede81c0fb00ea4a0f8a5ca233888192df23f17195a770be2",
+              "source_bytes": 4022,
               "reason": "Current phase procedure"
             },
             {
@@ -8168,8 +8183,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:da005f1f7f0ba2523c49d101e2f8f4a249ce02da4dad16e8b7c605ee8ff428d9",
-              "source_bytes": 2112,
+              "canonical_sha256": "sha256:66fde5fa7368cb2ca3d16ab7e99a0e3894be66619d66c34a7aa11a6f10661abb",
+              "source_bytes": 2111,
               "reason": "Controlling PRD record"
             }
           ],
@@ -8227,8 +8242,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 33,
-              "end_line": 45,
+              "start_line": 39,
+              "end_line": 51,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -8238,8 +8253,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 46,
-              "end_line": 53,
+              "start_line": 52,
+              "end_line": 59,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -8592,7 +8607,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:704466f99e69240b66760910b4354fcb405eb33ca659a539f813133ede61a5e4"
+          "prd_snapshot_sha256": "sha256:ef521140ba9ae93f9b6db3b6dfe0d8d49065ee32c20ced01b0634865538d8721"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -11316,7 +11331,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:749fa81ac51cb45c55b98b5ebb5370f39d26426940b7febf637fc5f2e9440c70"
+          "prd_snapshot_sha256": "sha256:1a7559ef619bcfa8f1375872131e8b259793dce4db7446b2c4a6f2a196ff80f0"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -14350,7 +14365,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:3a5c8e1143b40d09dceacfeee8d310a71577fa710d3293ee2a502737c3f7c7d3"
+          "prd_snapshot_sha256": "sha256:07f04d769e60a20de9284767907c55f02ec13bdb312cd5dcfb3e03be0ff32595"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -17596,7 +17611,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:a178d8b9eba00bcee1a6cba451ac700af0ca9c9e46ef472747178daf727b22d2"
+          "prd_snapshot_sha256": "sha256:307e45cc3bd6d6118e547f1c05e02f42c0cbdd886838faa3b2899d0189d6d367"
         },
         "document_summaries": {
           "schema_version": 1,

@@ -18,7 +18,10 @@ You are the single coordinator and sole writer.
    - After `PREREQUISITES_READY`, run `python scripts/setup_assistant.py
      welcome`. Return its complete stdout verbatim as the entire owner response;
      do not alter it. It already asks exactly once
-     for project name, preferred Region, and optional budget. Initialize
+     for project name, preferred Region, and optional budget. Require one
+     owner-confirmed canonical Region. `recommend one` asks for one option,
+     not a selection; wait for a new reply naming it. Missing/blank/
+     unconfirmed values block bootstrap. Initialize
      dry-run-first, then continue to the Engine. After initialization, render
      `python scripts/fastlane_presenter.py project-ready --input-stdin` once;
      never on resume.

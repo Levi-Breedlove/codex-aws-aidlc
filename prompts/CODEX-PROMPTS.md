@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.42
+**Pack version:** 1.2.43
 
 Fastlane turns an application idea or an existing repository into approved
 requirements, an AWS-informed technical plan, bounded local construction, and
@@ -23,7 +23,10 @@ them.
 | Prepare an AWS account action | Ask Codex to use `$operate-fastlane-aws` for the named read-only check, deployment, review, or teardown |
 
 Fastlane asks for the project name, preferred AWS Region, and optional
-development budget once. After that, it normally asks one plain-language
+development budget once. The owner must confirm one exact canonical Region
+before initialization. `recommend one` requests an explained recommendation;
+it never selects a Region, and Fastlane waits for a new owner confirmation.
+After that, it normally asks one plain-language
 question per turn. You do not need to select AWS services or understand Fastlane
 record IDs.
 
@@ -230,12 +233,14 @@ setup-assistant welcome; or, immediately after successful initialization, one
 ~~~text
 [BOOT-00]
 Use the Fastlane coordinator and Define procedure for the current Engine report.
-When prerequisites are ready, run
-`python scripts/setup_assistant.py welcome` and return its complete stdout
-verbatim as the entire owner response before accepting the three setup values.
+When ready, run `python scripts/setup_assistant.py welcome`; return its
+complete stdout verbatim as the entire owner response before setup values.
 Do not summarize, abridge, preface, append to, or reformat it.
-After a new project is initialized, render `project-ready` exactly once before
-ordinary intake. Never render it during resume.
+Require an owner-confirmed canonical Region. `recommend one` asks for a
+recommendation, not selection; wait for a new exact-Region reply. Missing or
+unconfirmed values must not reach bootstrap or writes.
+After initialization, render `project-ready` once before intake.
+Never render it during resume.
 ~~~
 
 ## INTAKE-10 — Guided Intake

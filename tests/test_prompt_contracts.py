@@ -529,6 +529,28 @@ class PromptPackContractTests(unittest.TestCase):
         ):
             self.assertIn(phrase, self.prompts)
 
+    def test_initialization_requires_an_owner_confirmed_region(self) -> None:
+        for surface in (
+            self.fastlane_skill,
+            self.fastlane_define,
+            self.prompts,
+            self.setup,
+            self.workflow,
+            self.readme,
+        ):
+            normalized = " ".join(surface.lower().split())
+            self.assertIn("recommend one", normalized)
+            self.assertIn("exact", normalized)
+            self.assertIn("region", normalized)
+        self.assertIn(
+            "it never selects that region",
+            " ".join(self.fastlane_define.lower().split()),
+        )
+        self.assertIn("it never chooses a default", self.readme)
+        self.assertIn(
+            "must not reach bootstrap", " ".join(self.prompts.lower().split())
+        )
+
     def test_design_procedure_owns_architecture_and_validation_method(self) -> None:
         for phrase in (
             "search_documentation",
@@ -716,9 +738,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.42")
-        self.assertIn("**Pack version:** 1.2.42", self.prompts)
-        self.assertIn("Current customer build: **1.2.42**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.43")
+        self.assertIn("**Pack version:** 1.2.43", self.prompts)
+        self.assertIn("Current customer build: **1.2.43**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

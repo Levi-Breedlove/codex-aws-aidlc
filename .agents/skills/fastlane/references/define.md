@@ -5,7 +5,13 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A. The Engine owns routing and vali
 ## Setup and intake
 
 - A fresh template requires ephemeral `PREREQUISITES_READY` evidence before any welcome or write. Show every missing dependency in one consolidated checklist; never install dependencies or persist client, credential, plugin, trust, path, or readiness state. Initialized projects resume without setup.
-- Ask project name, preferred Region, and optional budget once, then initialize dry-run-first with the exact ephemeral report supplied on stdin.
+- Ask project name, preferred Region, and optional budget once. An exact
+  canonical Region is required before initialization. `recommend one` requests
+  one project-fit recommendation with a practical rationale; it never selects
+  that Region. Wait for a new owner reply confirming the exact Region, then
+  initialize dry-run-first with the exact ephemeral report supplied on stdin.
+  An absent, blank, placeholder, or assistant-recommended Region authorizes no
+  initialization write.
 - Repository mode (`GREENFIELD` or `BROWNFIELD`) never determines owner work context. Ground `INTAKE-*` facts in the owner's brief before asking anything. An empty repository does not prove a new application.
 - Ask the starting-point decision first because repository contents cannot prove
   owner intent. After it is confirmed, follow the Engine's

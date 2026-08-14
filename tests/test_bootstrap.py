@@ -40,6 +40,12 @@ def ready_prerequisite_report() -> str:
     return json.dumps(setup_assistant.READY_PREREQUISITE_REPORT)
 
 
+def configured_values() -> dict[str, str]:
+    values = dict(bootstrap.PLACEHOLDERS)
+    values["{{AWS_REGION}}"] = "us-west-2"
+    return values
+
+
 def copy_manifest_template(destination: Path) -> None:
     manifest = json.loads(
         (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
@@ -175,6 +181,20 @@ class BootstrapSafetyTests(unittest.TestCase):
             self.assertGreater(resumed.unchanged, 0)
             self.assertEqual(user_file.read_text(encoding="utf-8"), "VALUE = 1\n")
 
+            changed_region = dict(values)
+            changed_region["{{AWS_REGION}}"] = "us-east-1"
+            region_resume = bootstrap.initialize_template_in_place(
+                project,
+                changed_region,
+            )
+            self.assertEqual(region_resume.written, 0)
+            self.assertEqual(
+                json.loads((project / "bootstrap.yaml").read_text(encoding="utf-8"))[
+                    "project"
+                ]["region"],
+                "us-west-2",
+            )
+
     @source_template_only
     def test_in_place_setup_rejects_modified_template_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -188,7 +208,7 @@ class BootstrapSafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "source hash mismatch"):
                 bootstrap.initialize_template_in_place(
                     project,
-                    dict(bootstrap.PLACEHOLDERS),
+                    configured_values(),
                 )
 
     @source_template_only
@@ -203,7 +223,7 @@ class BootstrapSafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "unexpected: owner-notes.md"):
                 bootstrap.initialize_template_in_place(
                     project,
-                    dict(bootstrap.PLACEHOLDERS),
+                    configured_values(),
                 )
 
             self.assertEqual(extra.read_text(encoding="utf-8"), "do not overwrite")
@@ -216,7 +236,7 @@ class BootstrapSafetyTests(unittest.TestCase):
             project.mkdir()
             copy_manifest_template(project)
             original = (project / "bootstrap.yaml").read_bytes()
-            values = dict(bootstrap.PLACEHOLDERS)
+            values = configured_values()
             values["{{PROJECT_NAME}}"] = "Rollback Example"
 
             with mock.patch.object(
@@ -329,6 +349,8 @@ class BootstrapSafetyTests(unittest.TestCase):
                     str(REPOSITORY_ROOT),
                     "--project-name",
                     "Dependency Stop",
+                    "--region",
+                    "us-west-2",
                     "--in-place-template-instance",
                     "--prerequisite-report-stdin",
                 ]
@@ -343,6 +365,8 @@ class BootstrapSafetyTests(unittest.TestCase):
             str(REPOSITORY_ROOT),
             "--project-name",
             "Readiness Boundary",
+            "--region",
+            "us-west-2",
             "--in-place-template-instance",
         ]
         blocked = [
@@ -391,6 +415,8 @@ class BootstrapSafetyTests(unittest.TestCase):
                 str(REPOSITORY_ROOT),
                 "--project-name",
                 "Ready Bootstrap",
+                "--region",
+                "us-west-2",
                 "--in-place-template-instance",
                 "--prerequisite-report-stdin",
             ]
@@ -412,6 +438,48 @@ class BootstrapSafetyTests(unittest.TestCase):
                 initialize.assert_called_once_with(
                     REPOSITORY_ROOT, mock.ANY, dry_run=dry_run
                 )
+                self.assertEqual(
+                    initialize.call_args.args[1]["{{AWS_REGION}}"], "us-west-2"
+                )
+
+    def test_main_requires_one_owner_confirmed_region_before_setup(self) -> None:
+        base = [
+            "--target",
+            str(REPOSITORY_ROOT),
+            "--project-name",
+            "Region Boundary",
+            "--in-place-template-instance",
+            "--prerequisite-report-stdin",
+        ]
+        with (
+            mock.patch.object(bootstrap, "validate_repository_dependencies") as check,
+            mock.patch.object(bootstrap, "initialize_template_in_place") as initialize,
+            self.assertRaises(SystemExit) as omitted,
+        ):
+            bootstrap.main(base)
+        self.assertEqual(omitted.exception.code, 2)
+        check.assert_not_called()
+        initialize.assert_not_called()
+
+        for region in ("", " ", "recommend one", "{{AWS_REGION}}"):
+            with (
+                self.subTest(region=region),
+                mock.patch.object(
+                    sys, "stdin", io.StringIO(ready_prerequisite_report())
+                ),
+                mock.patch.object(
+                    bootstrap, "validate_repository_dependencies"
+                ) as check,
+                mock.patch.object(
+                    bootstrap, "initialize_template_in_place"
+                ) as initialize,
+            ):
+                self.assertEqual(bootstrap.main([*base, "--region", region]), 2)
+                check.assert_not_called()
+                initialize.assert_not_called()
+
+        with self.assertRaisesRegex(ValueError, "--region must be a canonical"):
+            bootstrap.normalize_render_values(dict(bootstrap.PLACEHOLDERS))
 
     def test_main_rejects_noncanonical_cost_posture_before_any_setup(self) -> None:
         with (
@@ -426,6 +494,8 @@ class BootstrapSafetyTests(unittest.TestCase):
                     str(REPOSITORY_ROOT),
                     "--project-name",
                     "Cost Boundary Stop",
+                    "--region",
+                    "us-west-2",
                     "--cost-posture",
                     "unlimited",
                     "--in-place-template-instance",
@@ -448,6 +518,8 @@ class BootstrapSafetyTests(unittest.TestCase):
                     str(REPOSITORY_ROOT),
                     "--project-name",
                     "Currency Boundary Stop",
+                    "--region",
+                    "us-west-2",
                     "--cost-posture",
                     "MINIMIZE_TOTAL_COST; HARD_CAP: ZZZ 20.00",
                     "--in-place-template-instance",
