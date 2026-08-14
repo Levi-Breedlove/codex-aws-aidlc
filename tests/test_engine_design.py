@@ -12,6 +12,7 @@ from unittest import mock
 
 from scripts import bootstrap_doctor as doctor
 from scripts import fastlane_adr
+from scripts.fastlane_engine import api as engine_api
 from scripts.fastlane_engine import design
 from scripts.fastlane_engine.define.models import RequirementsContract
 from scripts.fastlane_engine.design import adr as design_adr
@@ -29,6 +30,245 @@ DESIGN_PACKAGE = REPOSITORY_ROOT / "scripts/fastlane_engine/design"
 
 
 class EngineDesignTests(unittest.TestCase):
+    def test_architecture_board_handoff_is_current_bound_and_non_authorizing(
+        self,
+    ) -> None:
+        fixture = json.loads(
+            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        report = fixture["report_cases"]["gate_b_approved"]["report"]
+        original = json.dumps(report, sort_keys=True)
+        self.assertIn(
+            "DIAGRAM_OUTPUT_NOT_AUTHORIZED",
+            engine_api.derive_architecture_board_handoff(report)["issues"],
+        )
+        report["write_authority"]["approved_write_roots"].append("dist/architecture/**")
+        handoff = engine_api.derive_architecture_board_handoff(report)
+        semantic = report["design_contract"]["diagram_contract"]["records"][0][
+            "semantic_sha256"
+        ][7:]
+        self.assertTrue(handoff["eligible"])
+        self.assertEqual(
+            handoff["output_root"], f"dist/architecture/DES-0001-{semantic}"
+        )
+        self.assertEqual(handoff["source"]["diagram_id"], "DIAGRAM-0001")
+        self.assertEqual(handoff["cross_check"]["diagram_id"], "DIAGRAM-0008")
+        self.assertEqual(
+            (handoff["aws_authority"], handoff["external_authority"]),
+            ("NONE", "NONE"),
+        )
+        report["write_authority"]["approved_write_roots"].pop()
+        self.assertEqual(json.dumps(report, sort_keys=True), original)
+
+    def test_architecture_board_handoff_fails_closed_without_changing_route(
+        self,
+    ) -> None:
+        fixture = json.loads(
+            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )["report_cases"]["gate_b_approved"]["report"]
+        fixture["write_authority"]["approved_write_roots"].append(
+            "dist/architecture/**"
+        )
+        cases = {
+            "stale-gate": lambda row: row["gates"].update(gate_b="STALE"),
+            "legacy": lambda row: row["design_contract"]["diagram_contract"].update(
+                grandfathered_schema5=True
+            ),
+            "active-task": lambda row: row["write_authority"].update(
+                active_task="TASK-0001"
+            ),
+            "excluded": lambda row: row["write_authority"]["exclusions"].append(
+                "dist/**"
+            ),
+            "protected": lambda row: row["write_authority"]["protected_paths"].append(
+                "dist/architecture/**"
+            ),
+            "no-aws-view": lambda row: row["design_contract"]["diagram_contract"][
+                "records"
+            ][7].update(status="NOT_APPLICABLE"),
+            "bad-digest": lambda row: row["design_contract"]["diagram_contract"][
+                "records"
+            ][0].update(semantic_sha256="sha256:bad"),
+            "empty-relationships": lambda row: row["design_contract"][
+                "diagram_contract"
+            ]["records"][0].update(relationships=[]),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                candidate = json.loads(json.dumps(fixture))
+                route = candidate["next_prompt"]
+                mutate(candidate)
+                self.assertFalse(
+                    engine_api.derive_architecture_board_handoff(candidate)["eligible"]
+                )
+                self.assertEqual(candidate["next_prompt"], route)
+
+        conflict = json.loads(json.dumps(fixture))
+        diagrams = conflict["design_contract"]["diagram_contract"]
+        diagrams["records"][7]["referenced_ids"].append("ACT-001")
+        diagrams["records"][7]["relationships"] = [
+            {"from_id": "TECH-0013", "relation": "reverses", "to_id": "ACT-001"}
+        ]
+        handoff = engine_api.derive_architecture_board_handoff(conflict)
+        self.assertEqual(handoff["status"], "SEMANTIC_CONFLICT")
+        self.assertEqual(handoff["failure_route"], "DESIGN-10")
+
+        redirect = json.loads(json.dumps(fixture))
+        redirect["design_contract"]["diagram_contract"]["records"][7]["relationships"][
+            0
+        ]["to_id"] = "TECH-0009"
+        handoff = engine_api.derive_architecture_board_handoff(redirect)
+        self.assertEqual(handoff["status"], "SEMANTIC_CONFLICT")
+        self.assertEqual(handoff["failure_route"], "DESIGN-10")
+
+    def test_architecture_board_source_is_exactly_the_approved_mermaid(self) -> None:
+        source = (
+            "# Record\n\n## Proposed system at a glance\n\n"
+            "```mermaid\nflowchart TB\n    A --> B\n```\n\n## Next\n"
+        )
+        rendered = b"```mermaid\nflowchart TB\n    A --> B\n```\n"
+        handoff = {
+            "eligible": True,
+            "source": {
+                "anchor": "proposed-system-at-a-glance",
+                "rendered_sha256": "sha256:" + hashlib.sha256(rendered).hexdigest(),
+            },
+        }
+        self.assertEqual(
+            engine_api.architecture_board_mermaid_source(source, handoff),
+            "flowchart TB\n    A --> B\n",
+        )
+        handoff["source"]["rendered_sha256"] = "sha256:" + "0" * 64
+        with self.assertRaisesRegex(ValueError, "presentation digest changed"):
+            engine_api.architecture_board_mermaid_source(source, handoff)
+
+    def test_architecture_board_request_packet_is_exact_and_fail_closed(self) -> None:
+        report = json.loads(
+            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )["report_cases"]["gate_b_approved"]["report"]
+        report["write_authority"]["approved_write_roots"].append("dist/architecture/**")
+        prd_text = doctor_fixtures.complete_design_contract(
+            (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        identity = {
+            **engine_api.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+            "valid": True,
+            "issues": [],
+        }
+        original = json.dumps(report, sort_keys=True)
+        packet = engine_api.derive_architecture_board_request_packet(
+            report,
+            prd_text,
+            identity,
+            owner_request=engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+            source_model_target_exists=False,
+        )
+        manifest = json.loads(packet["manifest_text"])
+        root = engine_api.derive_architecture_board_handoff(report)["output_root"]
+        self.assertEqual(packet["manifest"], manifest)
+        self.assertEqual(packet["status"], "READY")
+        self.assertEqual(packet["resume_route"], "TASK-10")
+        self.assertEqual(
+            (packet["aws_authority"], packet["external_authority"]),
+            ("NONE", "NONE"),
+        )
+        self.assertEqual(
+            packet["manifest_path"],
+            f"{root}/architecture-board-task-manifest.json",
+        )
+        self.assertEqual(packet["mermaid_path"], f"{root}/architecture-source.mmd")
+        self.assertEqual(packet["source_model_path"], f"{root}/source-model.json")
+        self.assertEqual(
+            manifest["approved_mermaid"]["sha256"],
+            "sha256:"
+            + hashlib.sha256(packet["mermaid_text"].encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            manifest["authority"],
+            {
+                "construction_authorization_id": "AUTH-0001",
+                "permitted_output_boundary": f"{root}/**",
+                "aws": "NONE",
+                "external": "NONE",
+            },
+        )
+        self.assertEqual(
+            manifest["source_model"],
+            {
+                "mode": "NEW_DERIVATION",
+                "state": "PENDING_DERIVATION",
+                "schema_version": 2,
+                "target_path": f"{root}/source-model.json",
+                "target_must_be_absent": True,
+            },
+        )
+        self.assertEqual(
+            manifest["skill"], engine_api.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY
+        )
+        self.assertNotIn("expected_sha256", packet["manifest_text"])
+        self.assertNotIn("source_model_sha256", packet["manifest_text"])
+        self.assertEqual(json.dumps(report, sort_keys=True), original)
+
+        failures = (
+            (
+                "exact owner request",
+                report,
+                identity,
+                "not the exact request",
+                False,
+            ),
+            (
+                "skill identity",
+                report,
+                {**identity, "version": "1.3.0"},
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                False,
+            ),
+            (
+                "absent source-model",
+                report,
+                identity,
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                True,
+            ),
+            (
+                "not currently eligible",
+                {
+                    **report,
+                    "write_authority": {
+                        **report["write_authority"],
+                        "approved_write_roots": ["app/**", "tests/**"],
+                    },
+                },
+                identity,
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                False,
+            ),
+            (
+                "project identity",
+                {**report, "project": {}},
+                identity,
+                engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                False,
+            ),
+        )
+        for message, candidate, receipt, request, target_exists in failures:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    engine_api.derive_architecture_board_request_packet(
+                        candidate,
+                        prd_text,
+                        receipt,
+                        owner_request=request,
+                        source_model_target_exists=target_exists,
+                    )
+
     def test_mermaid_claim_guard_allows_real_verified_names_and_states(self) -> None:
         for value in (
             "AWS Verified Access",

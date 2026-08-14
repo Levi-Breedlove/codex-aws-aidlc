@@ -16,6 +16,7 @@ PROMPT_IDS = [
     "DESIGN-10",
     "DESIGN-20",
     "BUG-10",
+    "DIAGRAM-10",
     "TASK-10",
     "BUILD-10",
     "BUILD-20",
@@ -200,6 +201,44 @@ class PromptPackContractTests(unittest.TestCase):
                     self.assertEqual(section.count(f"**{field}:**"), 1, field)
                 self.assertIn(f"[{prompt_id}]", section)
                 self.assertLessEqual(len(section.encode("utf-8")), 2_000)
+
+    def test_diagram_adjunct_is_optional_local_and_not_a_third_gate(self) -> None:
+        section = self.prompt_section("DIAGRAM-10")
+        for expected in (
+            "DIAGRAM-0001",
+            "DIAGRAM-0008",
+            "dist/architecture/<DES>-<semantic-sha256>/**",
+            "architecture-board-task-manifest.json",
+            "architecture-source.mmd",
+            "v1.3.1",
+            "NEW_DERIVATION",
+            "PENDING_DERIVATION",
+            "source-model.json",
+            "pre-creation digest",
+            "AWS authority NONE",
+            "restore the route",
+            "never create a third gate",
+        ):
+            self.assertIn(expected, section)
+        self.assertIn("do not inspect credentials", section)
+        self.assertIn("without silent repair", section)
+        self.assertNotIn("Gate C", self.prompts)
+        for expected in (
+            "aws-architecture-diagrams` 1.3.1",
+            "write a task manifest/Mermaid",
+            "absent `source-model.json`",
+            "invoke `NEW_DERIVATION`",
+            "Never invent its digest",
+        ):
+            self.assertIn(expected, self.fastlane_skill)
+        for expected in (
+            "applicable new Design-7 project",
+            "include `dist/architecture/**` in the proposed Gate B allowed repository write set",
+            "do not ask another owner question",
+            "create a third gate",
+            "never widened silently",
+        ):
+            self.assertIn(expected, self.fastlane_design)
 
     def test_route_interfaces_keep_external_authority_separate(self) -> None:
         for prompt_id in PROMPT_IDS:
@@ -738,9 +777,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.44")
-        self.assertIn("**Pack version:** 1.2.44", self.prompts)
-        self.assertIn("Current customer build: **1.2.44**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.45")
+        self.assertIn("**Pack version:** 1.2.45", self.prompts)
+        self.assertIn("Current customer build: **1.2.45**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

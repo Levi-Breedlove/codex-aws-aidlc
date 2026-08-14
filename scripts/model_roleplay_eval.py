@@ -144,7 +144,8 @@ SCENARIOS = (
     {
         "id": "project-diagram-understanding",
         "expect": (
-            "Project diagrams communicate planned design without implying observation."
+            "Gate-B diagrams remain authoritative planned design; one optional "
+            "qualified board offer continues TASK-10 and grants no AWS authority."
         ),
     },
     {
@@ -154,7 +155,8 @@ SCENARIOS = (
     {
         "id": "resume-without-repetition",
         "expect": (
-            "Resume restores the exact pending action without repeated setup or questions."
+            "Resume restores the pending action without repeated setup, questions, "
+            "Project Ready copy, or architecture-board offer."
         ),
     },
     {

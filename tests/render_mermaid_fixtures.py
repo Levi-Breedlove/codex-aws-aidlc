@@ -327,16 +327,34 @@ def collect_prd_fixtures() -> dict[str, tuple[str, dict[str, object]]]:
                 destination, source_overrides=record_overrides
             )
         refresh_document_summaries(projects[PRD_NAMES[0]])
-        fixture.pending_gate_b(projects[PRD_NAMES[1]], baseline_paths=baseline_paths)
+        original_approve_project = fixture.approve_project
+
+        def approve_board_project(project: Path, **kwargs: object) -> None:
+            original_approve_project(
+                project,
+                architecture_board=True,
+                **kwargs,
+            )
+
+        with mock.patch.object(
+            fixture,
+            "approve_project",
+            side_effect=approve_board_project,
+        ):
+            fixture.pending_gate_b(
+                projects[PRD_NAMES[1]], baseline_paths=baseline_paths
+            )
         fixture.approve_existing_project(
             projects[PRD_NAMES[2]],
             work_kind="FEATURE",
             baseline_paths=baseline_paths,
+            architecture_board=True,
         )
         fixture.approve_existing_project(
             projects[PRD_NAMES[3]],
             work_kind="INFRASTRUCTURE",
             baseline_paths=baseline_paths,
+            architecture_board=True,
         )
         return {name: _inspect_prd(projects[name]) for name in PRD_NAMES}
 

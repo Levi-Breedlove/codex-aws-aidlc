@@ -1,12 +1,10 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.44
+**Pack version:** 1.2.45
 
-Fastlane turns an application idea or an existing repository into approved
-requirements, an AWS-informed technical plan, bounded local construction, and
-honest verification. Owners use the commands in the first section. Codex uses
-the route interfaces later in this file only after the Fastlane Engine selects
-them.
+Fastlane turns an idea or repository into approved requirements, an AWS-informed
+plan, bounded local construction, and honest verification. Owners use the first
+section; Codex uses only Engine-selected route interfaces.
 
 ## Owner command guide
 
@@ -22,18 +20,14 @@ them.
 | Approve Gate A or Gate B | Copy the complete current receipt Fastlane presents, replace the approver placeholder, and send only that receipt |
 | Prepare an AWS account action | Ask Codex to use `$operate-fastlane-aws` for the named read-only check, deployment, review, or teardown |
 
-Fastlane asks for the project name, preferred AWS Region, and optional
-development budget once. The owner must confirm one exact canonical Region
-before initialization. `recommend one` requests an explained recommendation;
-it never selects a Region, and Fastlane waits for a new owner confirmation.
-After that, it normally asks one plain-language
-question per turn. You do not need to select AWS services or understand Fastlane
-record IDs.
+Fastlane asks once for project name, preferred AWS Region, and optional budget.
+Initialization requires the owner's exact canonical Region. `recommend one`
+requests guidance, never selects a Region, and waits for the next confirmation.
+Intake then asks one plain-language
+question per turn; owners need not select AWS services or know record IDs.
 
-Gate A approves what the application should do. Gate B approves the technical
-plan and bounded local construction. Neither gate automatically authorizes an
-AWS account change. Read-only AWS checks, deployment, and teardown each retain
-their own exact boundary.
+Gate A approves product scope; Gate B approves the plan and bounded local build.
+Neither authorizes AWS. Reads, deployment, and teardown keep separate boundaries.
 
 ## Where the machinery lives
 
@@ -45,8 +39,8 @@ their own exact boundary.
 | Exact owner commands and receipt bytes | This prompt pack |
 | Parsing, readiness, digests, routing, and authority | Fastlane Engine and deterministic tests |
 
-This file is not a second lifecycle manual. Stable prompt IDs are internal route
-interfaces selected by the Engine; they are never owner instructions.
+This file is not a second lifecycle manual. Prompt IDs are Engine-selected internal
+routes, never owner instructions.
 
 ## Exactly accepted Gate receipts
 
@@ -185,6 +179,7 @@ Next action: <one canonical next step or STOP>
 | DESIGN-10 | Complete the technical plan | DESIGN-20 |
 | DESIGN-20 | Present Gate B | TASK-10 after approval |
 | BUG-10 | Define one current-request defect contract | Return to the Engine route |
+| DIAGRAM-10 | Compile one optional approved planned architecture board | Return to the Engine route |
 | TASK-10 | Prepare the approved work plan | BUILD-10 or BUILD-20 |
 | BUILD-10 | Execute one approved task | BUILD-10, BUILD-20, RELEASE-10, or stop |
 | BUILD-20 | Continue approved local construction | BUILD-20, RELEASE-10, or stop |
@@ -415,7 +410,13 @@ Use the owner-response and authorization-receipt procedures; validate before wri
 [BUG-10]
 Use the Deliver bugfix procedure and preserve the existing route and authority.
 ~~~
-
+## DIAGRAM-10 — Planned Board
+**Purpose:** Board. **Preconditions:** Request/current Gate B/DIAGRAM-0001/DIAGRAM-0008/v1.3.1/absent model.
+**Authoritative inputs:** Report/PRD. **Permitted writes:** `dist/architecture/<DES>-<semantic-sha256>/**`.
+**GitHub mode:** None. **AWS mode:** NONE; do not inspect credentials.
+**Required authorization:** Gate B; AWS authority NONE. **Stop conditions:** Stale/mismatch/conflict/failure.
+**Receipt:** `[DIAGRAM-10]`: `architecture-board-task-manifest.json`, `architecture-source.mmd`, `PENDING_DERIVATION`; no pre-creation digest. `NEW_DERIVATION` writes/hashes/reloads schema-2 `source-model.json`.
+**Next:** restore the route; conflict -> DESIGN-10 without silent repair; never create a third gate.
 ## TASK-10 — Executable Task Plan
 
 **Purpose:** Derive one dependency-aware local work plan from the approved requirements, design, and construction boundary.

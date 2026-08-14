@@ -3383,6 +3383,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         *,
         gate_b: bool = True,
         baseline_paths: tuple[str, ...] | None = None,
+        architecture_board: bool = False,
     ) -> None:
         baseline = "a" * 40
         if gate_b:
@@ -3475,6 +3476,15 @@ class BootstrapDoctorTests(unittest.TestCase):
         text = approve_gate_a(prd_path.read_text(encoding="utf-8"))
         if gate_b:
             text = approve_gate_b(text, baseline=baseline)
+            if architecture_board:
+                text = set_table_value(
+                    text,
+                    "## 28. Construction envelope",
+                    "## 29. Gate B owner authorization record",
+                    "Allowed repository write set",
+                    "`PATHS: app/**; tests/**; dist/architecture/**`",
+                )
+                text = rebind_gate_b_envelope(text)
         prd_path.write_text(text, encoding="utf-8")
         state_path = project / "bootstrap.yaml"
         state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -3504,6 +3514,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         *,
         work_kind: str,
         baseline_paths: tuple[str, ...] | None = None,
+        architecture_board: bool = False,
     ) -> str:
         if work_kind not in {"FEATURE", "INFRASTRUCTURE"}:
             raise AssertionError(
@@ -3519,6 +3530,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             project,
             gate_b=True,
             baseline_paths=baseline_paths,
+            architecture_board=architecture_board,
         )
         baseline = subprocess.run(
             ["git", "-C", str(project), "rev-parse", "HEAD"],
@@ -3547,12 +3559,15 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         if work_kind == "INFRASTRUCTURE":
             in_scope = "`infrastructure and tests in development`"
-            write_set = "`PATHS: infrastructure/**; tests/**`"
+            paths = "infrastructure/**; tests/**"
             source_disposition = f"`{APPLICATION_SOURCE_INFRASTRUCTURE_ONLY}`"
         else:
             in_scope = "`legacy service and tests in development`"
-            write_set = "`PATHS: legacy/**; tests/**`"
+            paths = "legacy/**; tests/**"
             source_disposition = "`BROWNFIELD_PRESERVE: legacy/**`"
+        write_set = (
+            f"`PATHS: {paths}{'; dist/architecture/**' if architecture_board else ''}`"
+        )
 
         scope_ids = (
             *MODERN_APPROVED_REQUIREMENT_IDS,
@@ -3911,7 +3926,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.44")
+        self.assertEqual(report["bootstrap_version"], "1.2.45")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)

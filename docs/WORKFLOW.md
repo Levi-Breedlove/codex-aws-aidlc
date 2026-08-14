@@ -150,8 +150,10 @@ and rejection reasons, tradeoffs, risks and mitigations, current evidence, claim
 status, and a measurable reason to reconsider it. The exact Gate B receipt
 appears last.
 
-Gate B authorizes only the recorded local construction boundary. It does not
-authorize AWS account access, spending, deployment, or teardown.
+Gate B authorizes only the recorded local boundary, never AWS. If it includes
+`dist/architecture/**`, Fastlane may once offer a planned board without blocking
+task planning. An exact request binds the approved Mermaid and derives its
+schema-2 model; no gate or AWS authority results.
 
 ## How the control plane works
 
