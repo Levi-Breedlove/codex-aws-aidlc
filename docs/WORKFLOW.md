@@ -20,8 +20,12 @@ When prerequisites are ready, Fastlane asks these three settings together and
 only once:
 
 1. Project name.
-2. Preferred AWS Region.
+2. Preferred AWS Region, confirmed as one exact canonical Region.
 3. Development cost posture or hard cap.
+
+`recommend one` asks Fastlane to explain one project-fit Region; it does not
+select that Region. Fastlane waits for the owner to confirm the exact Region in
+a new reply, and an absent or blank Region never falls back to a default.
 
 Fastlane confirms readiness, restates the AWS boundary, and asks the first
 project question. Resume never repeats setup or that handoff.

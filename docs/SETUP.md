@@ -100,6 +100,12 @@ repository hooks remain disabled until a current Gate B approves construction.
 5. Answer the three one-time project settings together: project name, preferred
    AWS Region, and development budget or cost posture.
 
+Name an exact AWS Region such as `us-west-2`, or answer `recommend one` if you
+want Fastlane to explain one project-fit recommendation. A recommendation is
+not selected automatically: Fastlane waits for you to confirm the exact Region
+in a new reply before initialization. A missing or blank Region does not use a
+default.
+
 Fastlane then configures the template dry-run-first and presents one **Project
 Ready** handoff. It confirms the settings and that AWS access is not authorized,
 explains how the consultation works, and asks the first project question.

@@ -32,7 +32,7 @@ from scripts.setup_assistant import (
 
 PLACEHOLDERS = {
     "{{PROJECT_NAME}}": "AWS Codex Project",
-    "{{AWS_REGION}}": "us-west-2",
+    "{{AWS_REGION}}": "{{AWS_REGION}}",
     "{{COST_POSTURE}}": "MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED",
     "{{SETUP_METHOD}}": "EXTERNAL_COPY",
     "{{SETUP_STATUS}}": "CONFIGURED",
@@ -1292,7 +1292,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--project-name", required=True, help="One-line human-readable project name"
     )
-    parser.add_argument("--region", default="us-west-2", help="Canonical AWS Region ID")
+    parser.add_argument(
+        "--region", required=True, help="Owner-confirmed canonical AWS Region ID"
+    )
     parser.add_argument(
         "--cost-posture",
         "--budget",

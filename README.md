@@ -6,7 +6,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
 
-Current customer build: **1.2.42**.
+Current customer build: **1.2.43**.
 
 Fastlane is a repository-native governance platform that turns Codex into a technical guide, AWS architecture consultant, implementation partner, and evidence-driven verifier.
 
@@ -106,7 +106,7 @@ The read-only deterministic Fastlane Engine observes the current project records
    init template
    ```
 
-4. Provide the project name, preferred AWS Region, and development budget once. Fastlane then explains the consultation and asks one project question at a time.
+4. Provide the project name, one exact preferred AWS Region, and development budget once. If you reply `recommend one`, Fastlane explains one option and waits for your explicit Region confirmation; it never chooses a default. Fastlane then explains the consultation and asks one project question at a time.
 
 Initialization is credential-free and never accesses an AWS account. Missing prerequisites appear in one consolidated checklist.
 

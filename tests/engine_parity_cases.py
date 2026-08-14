@@ -47,6 +47,7 @@ OWNER_SOURCE_NAVIGATION_BASE_COMMIT = "47e1e548e0ae429d47ff838b3ebd60e98a1a5e1e"
 SEPARATE_AWS_AUTHORITY_BASE_COMMIT = "94594e7fabfa0a4dc7a1020cf51792a9ca10f07e"
 MERMAID_PRESENTATION_BASE_COMMIT = "2af6a7911e8b72bafb87102bbc8ae70e6b82c9bb"
 GOLDEN_PRD_TRUTH_BASE_COMMIT = "f24bf4674a792a305acfae5cd9e9ad0077a9bf79"
+EXPLICIT_REGION_SELECTION_BASE_COMMIT = "c14f4a9eb7c57332d4332033c034ef1e9b33355a"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -177,6 +178,21 @@ APPROVED_BEHAVIOR_CHANGES = [
             "AWS access, execution, deployment, recovery, or teardown evidence claim",
         ],
     },
+    {
+        "id": "EXPLICIT_REGION_SELECTION_1_2_43",
+        "base_commit": EXPLICIT_REGION_SELECTION_BASE_COMMIT,
+        "scope": [
+            "fresh initialization requires one explicit canonical owner Region",
+            "recommendation requests remain unselected until a new owner confirmation",
+            "context-locator bytes changed only by the updated Define procedure",
+            "Fastlane patch-version mirrors and Golden fixture version identity",
+        ],
+        "prohibited": [
+            "migration or rewrite of an initialized project's recorded Region",
+            "requirement, design, diagram, lifecycle, route, gate, authority, or receipt change",
+            "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        ],
+    },
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
@@ -189,16 +205,16 @@ SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
         "17238d5b1210b1a0957897155442ea231c77990d027dca1730102fa028ab05a4"
     ),
     "gate_a_pending": (
-        "b5b7bedaa5b5498b12a762a1d12f8a04771bad587d539043f0a46e523f49f4eb"
+        "b7cc0d46b7f6947a284af5db35c49a0ea89ac49df7def655d0bee737b04b73e1"
     ),
     "gate_a_approved": (
-        "768cecd6b3885d276736dd49bf302de81afdaf048ddf4c95a8bf24c07f1fa35e"
+        "1df5b2dbf7536e2b3c526e82d9cc763fb85f8c86d59bc6dd792d9fb0d95748fc"
     ),
     "gate_b_pending": (
-        "d638bde4a72b361cd3cba1fb8ba777a80622fdf7992648232f368dbe1dd99e52"
+        "2c46ca174ee810fa61510c306d62b8b0ecd75ce5bb8841067f02d016398379fd"
     ),
     "gate_b_approved": (
-        "1025c7e23d745dc9ac130204dea3af697f24ab0c075cd07b5aba9316c784b771"
+        "09899b548a21b9895404a6efd3a40158ffd5073fb10990f8802487ebeb31f7eb"
     ),
 }
 
