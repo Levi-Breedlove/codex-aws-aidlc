@@ -113,6 +113,21 @@
         "construction or AWS authorization change",
         "AWS access, execution, deployment, recovery, or teardown evidence claim"
       ]
+    },
+    {
+      "id": "GOLDEN_PRD_TRUTH_1_2_42",
+      "base_commit": "f24bf4674a792a305acfae5cd9e9ad0077a9bf79",
+      "scope": [
+        "fail-closed owner-visible Product Agreement and Design completeness",
+        "exact Findings and Open decisions reconciliation with Gate A summaries",
+        "selected-Region and bounded-label diagram presentation validation",
+        "native-text default and dark Golden render evidence"
+      ],
+      "prohibited": [
+        "canonical requirement, design, diagram semantic, envelope, gate, authority, or receipt change",
+        "lifecycle or route change for already-complete current project records",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "summary_truth_compatibility": {
@@ -134,10 +149,10 @@
       "template_source": "93342ac776238cc2fb71393e51fb25e195bc70ef1c1561f2ec71988441a5dd7a",
       "unconfigured_template": "547740ec1c6690da6ded36c63dd19e9f0ba5c0de3367dae6b4f96a8d6dde01eb",
       "rendered_intake": "17238d5b1210b1a0957897155442ea231c77990d027dca1730102fa028ab05a4",
-      "gate_a_pending": "3d0fdb61d84576e7c4c7289e89c8a7a95933e2a79394a749c6c8e62a80e928cf",
-      "gate_a_approved": "124b78b0294ad05cb248c811ee548206a60cd16373012345510bc68c02fb44d5",
-      "gate_b_pending": "a9ca40e4b9eaa11e825ded65a62c0823ee6e175f6bce7a7d39192ed718775714",
-      "gate_b_approved": "7f71eb9a6b25af4de1e696ffcbea1f452a50049d5f19a242b40878fe274ab13b"
+      "gate_a_pending": "b5b7bedaa5b5498b12a762a1d12f8a04771bad587d539043f0a46e523f49f4eb",
+      "gate_a_approved": "768cecd6b3885d276736dd49bf302de81afdaf048ddf4c95a8bf24c07f1fa35e",
+      "gate_b_pending": "d638bde4a72b361cd3cba1fb8ba777a80622fdf7992648232f368dbe1dd99e52",
+      "gate_b_approved": "1025c7e23d745dc9ac130204dea3af697f24ab0c075cd07b5aba9316c784b771"
     }
   },
   "normalization": {
@@ -2235,10 +2250,10 @@
     "template_source": "6b2a9bb5bcec3d1deddd530c5fe3ee3b2bd3afb26a424a142e2a2a17d48fcf87",
     "unconfigured_template": "b2bc3a913224ac214d640b7281541f5cc1b48e4d932e04a5b42c33c4958299af",
     "rendered_intake": "925156a0d7772dfbc4a30d18efa405c1373da0c0b8d43def609867366606784b",
-    "gate_a_pending": "65b807c4925833a1a944188331fc269163f0920731a286b0299f6e06a636ccd2",
-    "gate_a_approved": "8b0e968843ac3b001c5c22f43270d38f11e64b871bbd8412430dfeb6e80fb9ee",
-    "gate_b_pending": "de225562b02bb9dac59cd3c3f8294d176dbb6097f5c29512e2dc6b1d507bf8d0",
-    "gate_b_approved": "3dd2c33a27a046cffdd652deb5ffaa95fe24eb18ab843ddea7fa81d2086b1027"
+    "gate_a_pending": "9f55ff5ed283e8a16bbf37f163ab34c921c6e7bad57ee6809e810d651a9eb4b5",
+    "gate_a_approved": "9684b07006bec165206ce677210f5fd6673c57c0bc3808e15d443cb0b0e534bc",
+    "gate_b_pending": "b64a75cb000beb14cf9a0fbda1c96255bed355d67d0a08174fa2871426d5659d",
+    "gate_b_approved": "c622314b6d184ccf47cee10004da6c68d3908cfc5feeddadf6a379368fa1b0f0"
   },
   "report_cases": {
     "template_source": {
@@ -8093,7 +8108,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 5750,
+          "actual_initial_source_bytes": 5792,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -8153,8 +8168,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:a1aacf9c960f4ade43569abf6a92307186c840a653d59689f1bb5c6e33795898",
-              "source_bytes": 2070,
+              "canonical_sha256": "sha256:da005f1f7f0ba2523c49d101e2f8f4a249ce02da4dad16e8b7c605ee8ff428d9",
+              "source_bytes": 2112,
               "reason": "Controlling PRD record"
             }
           ],
@@ -8164,7 +8179,7 @@
               "selector_kind": "HEADING",
               "selector": "Product Agreement",
               "start_line": 89,
-              "end_line": 568,
+              "end_line": 562,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -8204,8 +8219,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:c4859f059082da2879d13f65580074aa0f09253a2c4dd01f66239c3621b18dbf",
-              "source_bytes": 34523,
+              "canonical_sha256": "sha256:4a6137a499d89ac39169f71ba8f65574ab24a868ed1cf394d6cd4e1fe5c5fa9a",
+              "source_bytes": 35469,
               "reason": "Controlling PRD record"
             },
             {
@@ -8245,8 +8260,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Gate A Review",
-              "start_line": 569,
-              "end_line": 687,
+              "start_line": 563,
+              "end_line": 679,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -8287,8 +8302,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:ac63eedba5697ff95da1420e3ca3cc7a65b037b0e7541e26540baf4ac48a9421",
-              "source_bytes": 4752,
+              "canonical_sha256": "sha256:50f3ddf6ff74f18e27f5b88c4958e44d754cb3f1ddb43f1d965764ee5731f985",
+              "source_bytes": 4713,
               "reason": "On-demand canonical source"
             }
           ],
@@ -8577,7 +8592,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:b408f77dc083fb8aae015a6bc5a377036594b3fc1a9ae227c203f7cec53da5f5"
+          "prd_snapshot_sha256": "sha256:704466f99e69240b66760910b4354fcb405eb33ca659a539f813133ede61a5e4"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -9567,7 +9582,7 @@
               "heading": "2. Product statement",
               "start_line": 223,
               "end_line": 226,
-              "section_sha256": "sha256:09a5daaaddd78732a76ffc84d88264e7616d2582402be336185cc989d7dff0b8",
+              "section_sha256": "sha256:f5a65b50ea0db6ec811f28ee7ba5da478fd102b99269c7ba001e683fdb7fcec4",
               "required": true
             },
             {
@@ -9577,7 +9592,7 @@
               "heading": "6. Feature specifications",
               "start_line": 256,
               "end_line": 288,
-              "section_sha256": "sha256:b5ddafe4b0a23321867063827635de46df67d7c9a4eede4093b63fc638c5d190",
+              "section_sha256": "sha256:f073a97e77d3a4cb5fe86e6993c163ad63881bd3ef61d3fd9090eaef58d1275a",
               "required": true
             },
             {
@@ -9586,8 +9601,8 @@
               "path": "docs/project/PRD.md",
               "heading": "7. Primary, alternate, and failure flows",
               "start_line": 289,
-              "end_line": 360,
-              "section_sha256": "sha256:8978763f5c72ed13972cf9e11b246cbe7c45fa0defa92b5f8c309900dcb57643",
+              "end_line": 354,
+              "section_sha256": "sha256:46577225af278004d2dd5f8c7ad404a59db7af64bdd02d90dcab7dd453f0eeef",
               "required": true
             },
             {
@@ -9595,8 +9610,8 @@
               "label": "Data requirements",
               "path": "docs/project/PRD.md",
               "heading": "8. Data requirements",
-              "start_line": 361,
-              "end_line": 381,
+              "start_line": 355,
+              "end_line": 375,
               "section_sha256": "sha256:f1c2ed5147a7d6df8625bf51b284842c36c6707da8111b431021308c6f2145ec",
               "required": true
             },
@@ -9605,8 +9620,8 @@
               "label": "Security and privacy requirements",
               "path": "docs/project/PRD.md",
               "heading": "9. Security and privacy requirements",
-              "start_line": 382,
-              "end_line": 404,
+              "start_line": 376,
+              "end_line": 398,
               "section_sha256": "sha256:88b1c5e88682505fbdb8a1383e39d3fc5f596f6fdc4aa4fcfdd90512ca15134d",
               "required": true
             },
@@ -9615,8 +9630,8 @@
               "label": "Reliability requirements",
               "path": "docs/project/PRD.md",
               "heading": "10. Reliability requirements",
-              "start_line": 405,
-              "end_line": 425,
+              "start_line": 399,
+              "end_line": 419,
               "section_sha256": "sha256:1122a2547a206c2749442b78e8fe0cb592fbe3e69c7d2cafa395bfc20fe8ee40",
               "required": true
             },
@@ -9625,8 +9640,8 @@
               "label": "Performance and cost",
               "path": "docs/project/PRD.md",
               "heading": "11. Performance, cost, and sustainability requirements",
-              "start_line": 426,
-              "end_line": 491,
+              "start_line": 420,
+              "end_line": 485,
               "section_sha256": "sha256:0487a63263d80c22b657655e1272bae3974be23df6adc2491778a70e2be807af",
               "required": true
             },
@@ -9635,8 +9650,8 @@
               "label": "Gate A readiness",
               "path": "docs/project/PRD.md",
               "heading": "Gate A — readiness card",
-              "start_line": 630,
-              "end_line": 644,
+              "start_line": 622,
+              "end_line": 636,
               "section_sha256": "sha256:b5a4745e52384c6a2aad35b6509425cda8299f3dc536e55789c97db3e1177f21",
               "required": true
             },
@@ -9645,9 +9660,9 @@
               "label": "Gate A acceptance record",
               "path": "docs/project/PRD.md",
               "heading": "Gate A — owner acceptance record",
-              "start_line": 645,
-              "end_line": 667,
-              "section_sha256": "sha256:ef5d6bd0d6adb1fe454812ad85777b230ddd2a84947600944412942d390f24c9",
+              "start_line": 637,
+              "end_line": 659,
+              "section_sha256": "sha256:d2b78bf171294661d14edb369c53ce246460b516bba5cf6b5c7762c45669c229",
               "required": true
             }
           ],
@@ -9660,7 +9675,7 @@
             ]
           },
           "formal_receipt_required": true,
-          "canonical_sha256": "sha256:3bd8492838d6dfa31dd52b5a08896d486d90b4b877354410f88e22795f44fa7c"
+          "canonical_sha256": "sha256:48e9e15c73858f42d5601cbbcdb567a29afecfd960f9f7ea27f765df0d92c73a"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -9916,11 +9931,11 @@
               "heading": "1.1 Intake provenance",
               "start_line": 133,
               "end_line": 189,
-              "section_sha256": "sha256:722968ffff9a4d2e54c5d963f13188a7e61db4cb4a26b6c2b74a33bb6bd4fa51",
+              "section_sha256": "sha256:d25d4c084aaf346b2b2f11486eeeac8c44fc79e91509141d13da5ba94451e861",
               "required": true
             }
           ],
-          "canonical_sha256": "sha256:63947463cf533dc91d4f0308d657f6f64dd23b668cc58b8ab299e4f804eed246"
+          "canonical_sha256": "sha256:7824479a244b0b2346b0d30bb0d330042d3b956ea2295bce1ad6aef58e4d5a02"
         },
         "intake_foundation": {
           "schema_version": 2,
@@ -10859,8 +10874,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Architecture drivers",
-              "start_line": 735,
-              "end_line": 740,
+              "start_line": 727,
+              "end_line": 732,
               "active_ids": [],
               "canonical_sha256": "sha256:0e882297ec365abafe1eeb2d8c82854e3aa5a5f937bbf9346e02eab74b48bc0a",
               "source_bytes": 167,
@@ -10870,8 +10885,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Whole-system candidates",
-              "start_line": 741,
-              "end_line": 748,
+              "start_line": 733,
+              "end_line": 740,
               "active_ids": [],
               "canonical_sha256": "sha256:6adc893dd925fc22cbf1c0d439febf23cc7a2f44e6f7102b9d5a5e2876acbe83",
               "source_bytes": 252,
@@ -10881,8 +10896,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Selected architecture",
-              "start_line": 749,
-              "end_line": 771,
+              "start_line": 741,
+              "end_line": 763,
               "active_ids": [],
               "canonical_sha256": "sha256:19caef3c59accb308148e6780937e966adc2a5d3f1cf3b2a3c32e2855afabcd4",
               "source_bytes": 1108,
@@ -10928,18 +10943,18 @@
               "selector_kind": "WHOLE_FILE",
               "selector": ".agents/skills/fastlane/references/diagram-patterns.md",
               "start_line": 1,
-              "end_line": 185,
+              "end_line": 187,
               "active_ids": [],
-              "canonical_sha256": "sha256:bf4db0545607efee407a891440e2c73df0525b408102737336326dc55462ee10",
-              "source_bytes": 11465,
+              "canonical_sha256": "sha256:491037df92cfdac7c99e762ccaf6413cac018a24827f1c4c3b831b9f5d31ad0a",
+              "source_bytes": 11647,
               "reason": "On-demand canonical source"
             },
             {
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Architecture traceability",
-              "start_line": 772,
-              "end_line": 777,
+              "start_line": 764,
+              "end_line": 769,
               "active_ids": [],
               "canonical_sha256": "sha256:9d490b29d85557b485c1c0c02c28b8ea16dac584ee103aa18da764b97837caf7",
               "source_bytes": 190,
@@ -10949,8 +10964,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Change impact record",
-              "start_line": 785,
-              "end_line": 790,
+              "start_line": 777,
+              "end_line": 782,
               "active_ids": [],
               "canonical_sha256": "sha256:c61a321ec6984c11392d7fd8a4da7131fe133fa8f2a1a7aea2597b31b24edde8",
               "source_bytes": 181,
@@ -10960,8 +10975,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Project diagram contract",
-              "start_line": 791,
-              "end_line": 809,
+              "start_line": 783,
+              "end_line": 801,
               "active_ids": [],
               "canonical_sha256": "sha256:c897d4c99fd93da8e9bd4499de7891fb490efcfaf952b7d5ba952ce7f7dffeb7",
               "source_bytes": 1132,
@@ -10971,8 +10986,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Proposed system at a glance",
-              "start_line": 819,
-              "end_line": 822,
+              "start_line": 811,
+              "end_line": 814,
               "active_ids": [],
               "canonical_sha256": "sha256:ef767bed15f9cf5020dc4cf11a6941e30725296a0d7e7cb1ae15a498611afe1f",
               "source_bytes": 299,
@@ -10982,8 +10997,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "AWS implementation at a glance",
-              "start_line": 939,
-              "end_line": 962,
+              "start_line": 931,
+              "end_line": 954,
               "active_ids": [],
               "canonical_sha256": "sha256:125cf73a4b6343e43d7b09a4ca95e013bc884ae1e97b1dff1030d8bd454609e8",
               "source_bytes": 1105,
@@ -10993,8 +11008,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Gate B Harness Profile",
-              "start_line": 1046,
-              "end_line": 1079,
+              "start_line": 1038,
+              "end_line": 1071,
               "active_ids": [],
               "canonical_sha256": "sha256:0e2ac18f467fb91fd487233a3a4bc2f64275af21cc31f7a35d5b2b74432be60e",
               "source_bytes": 2629,
@@ -11004,8 +11019,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1259,
-              "end_line": 1315,
+              "start_line": 1251,
+              "end_line": 1307,
               "active_ids": [
                 "FR-001",
                 "REQ-0001",
@@ -11301,7 +11316,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:8ffb915a0615a4f5cbe430fa837d21a7ecb398adaf6104081938e51e0ae043ae"
+          "prd_snapshot_sha256": "sha256:749fa81ac51cb45c55b98b5ebb5370f39d26426940b7febf637fc5f2e9440c70"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -12329,8 +12344,8 @@
               "label": "Technical plan",
               "path": "docs/project/PRD.md",
               "heading": "14. Architecture overview",
-              "start_line": 814,
-              "end_line": 822,
+              "start_line": 806,
+              "end_line": 814,
               "section_sha256": "sha256:7ddd46757cc5ce10723f852df0ee6eefec4ff7dc488bc2932085d56d1b99e8fb",
               "required": true
             },
@@ -12339,8 +12354,8 @@
               "label": "Technology decisions",
               "path": "docs/project/PRD.md",
               "heading": "Technology decisions",
-              "start_line": 693,
-              "end_line": 703,
+              "start_line": 685,
+              "end_line": 695,
               "section_sha256": "sha256:fdb376b5c5eb8006e4df93606aa967dee51fd3650771d858afd2dfeb4490796c",
               "required": true
             },
@@ -12349,8 +12364,8 @@
               "label": "Selected architecture",
               "path": "docs/project/PRD.md",
               "heading": "Selected architecture",
-              "start_line": 749,
-              "end_line": 771,
+              "start_line": 741,
+              "end_line": 763,
               "section_sha256": "sha256:19caef3c59accb308148e6780937e966adc2a5d3f1cf3b2a3c32e2855afabcd4",
               "required": true
             },
@@ -12359,8 +12374,8 @@
               "label": "Component design",
               "path": "docs/project/PRD.md",
               "heading": "15. Component design",
-              "start_line": 823,
-              "end_line": 845,
+              "start_line": 815,
+              "end_line": 837,
               "section_sha256": "sha256:8e195280ee5659597d01aa3b527c5357c6204ab9e0b862da2d95445d49de7885",
               "required": true
             },
@@ -12369,8 +12384,8 @@
               "label": "Interfaces and contracts",
               "path": "docs/project/PRD.md",
               "heading": "16. Interfaces and contracts",
-              "start_line": 846,
-              "end_line": 862,
+              "start_line": 838,
+              "end_line": 854,
               "section_sha256": "sha256:6a8c896fca26f31d911eb0acbbdf5d53851015b28b99f7a971143450c16a9d04",
               "required": true
             },
@@ -12379,8 +12394,8 @@
               "label": "Data model and lifecycle",
               "path": "docs/project/PRD.md",
               "heading": "17. Data model and lifecycle",
-              "start_line": 863,
-              "end_line": 895,
+              "start_line": 855,
+              "end_line": 887,
               "section_sha256": "sha256:1da752a8c69bd1d285c2a93c63a4adb53d152fc9b868285c2e2cb5094ec7a7a4",
               "required": true
             },
@@ -12389,8 +12404,8 @@
               "label": "AWS implementation approach",
               "path": "docs/project/PRD.md",
               "heading": "20. AWS implementation approach",
-              "start_line": 930,
-              "end_line": 968,
+              "start_line": 922,
+              "end_line": 960,
               "section_sha256": "sha256:c215bb0f528afda37ab0de85a03baec63ccae15558a4fa6636c4d45c95b24969",
               "required": true
             },
@@ -12399,8 +12414,8 @@
               "label": "Validation strategy",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1013,
-              "end_line": 1017,
+              "start_line": 1005,
+              "end_line": 1009,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -12409,8 +12424,8 @@
               "label": "Harness checks",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1013,
-              "end_line": 1017,
+              "start_line": 1005,
+              "end_line": 1009,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -12419,8 +12434,8 @@
               "label": "Release acceptance",
               "path": "docs/project/PRD.md",
               "heading": "26. Release acceptance",
-              "start_line": 1168,
-              "end_line": 1179,
+              "start_line": 1160,
+              "end_line": 1171,
               "section_sha256": "sha256:c832a27356dcd160f306dc1a9eac78b7d340127f4ccff5a4abf2ed25f2b45a45",
               "required": true
             },
@@ -12429,8 +12444,8 @@
               "label": "First construction wave",
               "path": "docs/project/PRD.md",
               "heading": "21. Implementation boundaries and order",
-              "start_line": 969,
-              "end_line": 1012,
+              "start_line": 961,
+              "end_line": 1004,
               "section_sha256": "sha256:577f11cacda9a82f87540cfb9c68a56aaa3810bd7c70bd155a4b1097790afd23",
               "required": true
             },
@@ -12439,8 +12454,8 @@
               "label": "Gate B readiness",
               "path": "docs/project/PRD.md",
               "heading": "Gate B — readiness card",
-              "start_line": 1226,
-              "end_line": 1249,
+              "start_line": 1218,
+              "end_line": 1241,
               "section_sha256": "sha256:7913dd626676ebf2b7492b5432d735491617bda58ef3ee38a67167996f86d496",
               "required": true
             },
@@ -12449,8 +12464,8 @@
               "label": "Construction boundary",
               "path": "docs/project/PRD.md",
               "heading": "Construction and authorization boundary",
-              "start_line": 1250,
-              "end_line": 1258,
+              "start_line": 1242,
+              "end_line": 1250,
               "section_sha256": "sha256:d3abef77ee0ad9abc81d5bb96fb72912434ebf60553713ee40678b192a64908e",
               "required": true
             },
@@ -12459,8 +12474,8 @@
               "label": "Gate B authorization record",
               "path": "docs/project/PRD.md",
               "heading": "29. Gate B owner authorization record",
-              "start_line": 1316,
-              "end_line": 1354,
+              "start_line": 1308,
+              "end_line": 1346,
               "section_sha256": "sha256:6fb946c821749fe38980af47ff0202589b302544d4d670d3c23f3029ae77ec6f",
               "required": true
             },
@@ -12469,8 +12484,8 @@
               "label": "Complete proposed architecture",
               "path": "docs/project/PRD.md",
               "heading": "Proposed system at a glance",
-              "start_line": 819,
-              "end_line": 822,
+              "start_line": 811,
+              "end_line": 814,
               "section_sha256": "sha256:ef767bed15f9cf5020dc4cf11a6941e30725296a0d7e7cb1ae15a498611afe1f",
               "required": true
             },
@@ -12479,8 +12494,8 @@
               "label": "AWS implementation diagram",
               "path": "docs/project/PRD.md",
               "heading": "AWS implementation at a glance",
-              "start_line": 939,
-              "end_line": 962,
+              "start_line": 931,
+              "end_line": 954,
               "section_sha256": "sha256:125cf73a4b6343e43d7b09a4ca95e013bc884ae1e97b1dff1030d8bd454609e8",
               "required": true
             },
@@ -12489,8 +12504,8 @@
               "label": "Project diagram guide",
               "path": "docs/project/PRD.md",
               "heading": "Diagram guide",
-              "start_line": 1368,
-              "end_line": 1381,
+              "start_line": 1360,
+              "end_line": 1373,
               "section_sha256": "sha256:2329a034ec5fac44fa9b49305c3b34eaa116365dc09ac521d6b49ba5cf79ea5b",
               "required": true
             }
@@ -12504,7 +12519,7 @@
             ]
           },
           "formal_receipt_required": false,
-          "canonical_sha256": "sha256:4b80e037a7c64a2f5f308c766ee8fbc0e2424fe472c3433b0c8e6c7af3b8e6d1"
+          "canonical_sha256": "sha256:2eb650158f461396ec5f937d6e94663ad5b3fa1facbb010694a1505025f87bdb"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -12758,11 +12773,11 @@
               "heading": "1.1 Intake provenance",
               "start_line": 133,
               "end_line": 189,
-              "section_sha256": "sha256:722968ffff9a4d2e54c5d963f13188a7e61db4cb4a26b6c2b74a33bb6bd4fa51",
+              "section_sha256": "sha256:d25d4c084aaf346b2b2f11486eeeac8c44fc79e91509141d13da5ba94451e861",
               "required": true
             }
           ],
-          "canonical_sha256": "sha256:63947463cf533dc91d4f0308d657f6f64dd23b668cc58b8ab299e4f804eed246"
+          "canonical_sha256": "sha256:7824479a244b0b2346b0d30bb0d330042d3b956ea2295bce1ad6aef58e4d5a02"
         },
         "intake_foundation": {
           "schema_version": 2,
@@ -13700,8 +13715,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Architecture drivers",
-              "start_line": 735,
-              "end_line": 740,
+              "start_line": 727,
+              "end_line": 732,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -13749,8 +13764,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Whole-system candidates",
-              "start_line": 741,
-              "end_line": 749,
+              "start_line": 733,
+              "end_line": 741,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -13798,8 +13813,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Selected architecture",
-              "start_line": 750,
-              "end_line": 772,
+              "start_line": 742,
+              "end_line": 764,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -13882,8 +13897,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Architecture traceability",
-              "start_line": 773,
-              "end_line": 814,
+              "start_line": 765,
+              "end_line": 806,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -13931,8 +13946,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Change impact record",
-              "start_line": 827,
-              "end_line": 831,
+              "start_line": 819,
+              "end_line": 823,
               "active_ids": [],
               "canonical_sha256": "sha256:9350011eb3ff56c8b7ff2b9897d42063f5b8065a0e05df2294e0bb0b3fe821ca",
               "source_bytes": 137,
@@ -13942,8 +13957,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Project diagram contract",
-              "start_line": 832,
-              "end_line": 850,
+              "start_line": 824,
+              "end_line": 842,
               "active_ids": [
                 "DATA-001",
                 "FR-001",
@@ -13957,30 +13972,30 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Proposed system at a glance",
-              "start_line": 860,
-              "end_line": 916,
+              "start_line": 852,
+              "end_line": 908,
               "active_ids": [],
-              "canonical_sha256": "sha256:f06ab0d8a96ae7ccac208390ce6820711e011d152c837719b40829f209c9f7a5",
-              "source_bytes": 3096,
+              "canonical_sha256": "sha256:bd9e22ac0da54dc4e45506e5cd6628b6e14ac856e495fc18ba99a4f62476db3f",
+              "source_bytes": 3095,
               "reason": "On-demand canonical source"
             },
             {
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "AWS implementation at a glance",
-              "start_line": 1054,
-              "end_line": 1121,
+              "start_line": 1046,
+              "end_line": 1113,
               "active_ids": [],
-              "canonical_sha256": "sha256:c332334c0241a6d43a4593a2476470f13d57b304d8b28b9c25baa3bdbe6d90ed",
-              "source_bytes": 4648,
+              "canonical_sha256": "sha256:eaf2053b4dda7174eafe00701fa7aa70645efd0428b6fcf691d6ffe945be2daa",
+              "source_bytes": 4651,
               "reason": "On-demand canonical source"
             },
             {
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Gate B Harness Profile",
-              "start_line": 1203,
-              "end_line": 1230,
+              "start_line": 1195,
+              "end_line": 1222,
               "active_ids": [
                 "FR-001"
               ],
@@ -13992,8 +14007,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1442,
-              "end_line": 1498,
+              "start_line": 1434,
+              "end_line": 1490,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -14335,7 +14350,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:7fd991c8c33bdbf6ff3870a12b78a6ed6acf9d7df7b1c0be61d01f60e899c5cf"
+          "prd_snapshot_sha256": "sha256:3a5c8e1143b40d09dceacfeee8d310a71577fa710d3293ee2a502737c3f7c7d3"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -15391,9 +15406,9 @@
               "label": "Technical plan",
               "path": "docs/project/PRD.md",
               "heading": "14. Architecture overview",
-              "start_line": 855,
-              "end_line": 916,
-              "section_sha256": "sha256:e686fa4e0cc8b522e6bfd696be7cff01a063503ec85c4fef123e29a97e3466b2",
+              "start_line": 847,
+              "end_line": 908,
+              "section_sha256": "sha256:d20e4d1abde83a212a9954ae258dc39042bc84d4b2c9dffef132c6c2fbb7e90e",
               "required": true
             },
             {
@@ -15401,8 +15416,8 @@
               "label": "Technology decisions",
               "path": "docs/project/PRD.md",
               "heading": "Technology decisions",
-              "start_line": 693,
-              "end_line": 703,
+              "start_line": 685,
+              "end_line": 695,
               "section_sha256": "sha256:fdb376b5c5eb8006e4df93606aa967dee51fd3650771d858afd2dfeb4490796c",
               "required": true
             },
@@ -15411,8 +15426,8 @@
               "label": "Selected architecture",
               "path": "docs/project/PRD.md",
               "heading": "Selected architecture",
-              "start_line": 750,
-              "end_line": 772,
+              "start_line": 742,
+              "end_line": 764,
               "section_sha256": "sha256:428967113515f19a26bfc47a6f5d9bd0bbe32778dea29324359a10837a04695d",
               "required": true
             },
@@ -15421,9 +15436,9 @@
               "label": "Component design",
               "path": "docs/project/PRD.md",
               "heading": "15. Component design",
-              "start_line": 917,
-              "end_line": 939,
-              "section_sha256": "sha256:6b2fadf8d55397e186619d57eac688af97111f947037a72b6c09f8e399953424",
+              "start_line": 909,
+              "end_line": 931,
+              "section_sha256": "sha256:3967574b8d9d752c77e3d670ee41cbe83ccffa5aed1249cee5daab5c8cbc1f0f",
               "required": true
             },
             {
@@ -15431,8 +15446,8 @@
               "label": "Interfaces and contracts",
               "path": "docs/project/PRD.md",
               "heading": "16. Interfaces and contracts",
-              "start_line": 940,
-              "end_line": 956,
+              "start_line": 932,
+              "end_line": 948,
               "section_sha256": "sha256:e18f3c970878388166ff9d542a6246f4b34b5f2923e33eccb576193cb8dca01f",
               "required": true
             },
@@ -15441,8 +15456,8 @@
               "label": "Data model and lifecycle",
               "path": "docs/project/PRD.md",
               "heading": "17. Data model and lifecycle",
-              "start_line": 957,
-              "end_line": 995,
+              "start_line": 949,
+              "end_line": 987,
               "section_sha256": "sha256:94d900871d98a0925f05d917b73c061e8a55ec59dc50697ba78557c9d67690d7",
               "required": true
             },
@@ -15451,9 +15466,9 @@
               "label": "AWS implementation approach",
               "path": "docs/project/PRD.md",
               "heading": "20. AWS implementation approach",
-              "start_line": 1045,
-              "end_line": 1127,
-              "section_sha256": "sha256:5fdcd4a6234a862e60b692aae63a3679749da2ecbaba92443e8c7f3fc86cbd06",
+              "start_line": 1037,
+              "end_line": 1119,
+              "section_sha256": "sha256:dfd13546523b7b1323070a4f09b5e5662f76d93edfee8e578cf4e58eb7ecc3ce",
               "required": true
             },
             {
@@ -15461,8 +15476,8 @@
               "label": "Validation strategy",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1170,
-              "end_line": 1174,
+              "start_line": 1162,
+              "end_line": 1166,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -15471,8 +15486,8 @@
               "label": "Harness checks",
               "path": "docs/project/PRD.md",
               "heading": "Validation strategy",
-              "start_line": 1170,
-              "end_line": 1174,
+              "start_line": 1162,
+              "end_line": 1166,
               "section_sha256": "sha256:721cbf00d2cfe6064c42df0b3b5fd50015d7a98d8277827551b91c2adacbd6e0",
               "required": true
             },
@@ -15481,8 +15496,8 @@
               "label": "Release acceptance",
               "path": "docs/project/PRD.md",
               "heading": "26. Release acceptance",
-              "start_line": 1351,
-              "end_line": 1362,
+              "start_line": 1343,
+              "end_line": 1354,
               "section_sha256": "sha256:c832a27356dcd160f306dc1a9eac78b7d340127f4ccff5a4abf2ed25f2b45a45",
               "required": true
             },
@@ -15491,9 +15506,9 @@
               "label": "First construction wave",
               "path": "docs/project/PRD.md",
               "heading": "21. Implementation boundaries and order",
-              "start_line": 1128,
-              "end_line": 1169,
-              "section_sha256": "sha256:eb9209edb3098d7361605f491ab03f7784bc47ec761fec9b76145dfe590d429d",
+              "start_line": 1120,
+              "end_line": 1161,
+              "section_sha256": "sha256:5632358952cd459de0f614ff531d3fea2539f95b065f61f3cd3751fe5253e18a",
               "required": true
             },
             {
@@ -15501,8 +15516,8 @@
               "label": "Gate B readiness",
               "path": "docs/project/PRD.md",
               "heading": "Gate B — readiness card",
-              "start_line": 1409,
-              "end_line": 1432,
+              "start_line": 1401,
+              "end_line": 1424,
               "section_sha256": "sha256:aca0534f4d08c8096d17e4a2dff82a42f49b8cf37a77749de80545b2e465bf63",
               "required": true
             },
@@ -15511,8 +15526,8 @@
               "label": "Construction boundary",
               "path": "docs/project/PRD.md",
               "heading": "Construction and authorization boundary",
-              "start_line": 1433,
-              "end_line": 1441,
+              "start_line": 1425,
+              "end_line": 1433,
               "section_sha256": "sha256:d3abef77ee0ad9abc81d5bb96fb72912434ebf60553713ee40678b192a64908e",
               "required": true
             },
@@ -15521,8 +15536,8 @@
               "label": "Gate B authorization record",
               "path": "docs/project/PRD.md",
               "heading": "29. Gate B owner authorization record",
-              "start_line": 1499,
-              "end_line": 1537,
+              "start_line": 1491,
+              "end_line": 1529,
               "section_sha256": "sha256:59eb180770db2314b00efa671ea019ff8483b63c59e8c806b9123fc1137ca3db",
               "required": true
             },
@@ -15531,9 +15546,9 @@
               "label": "Complete proposed architecture",
               "path": "docs/project/PRD.md",
               "heading": "Proposed system at a glance",
-              "start_line": 860,
-              "end_line": 916,
-              "section_sha256": "sha256:f06ab0d8a96ae7ccac208390ce6820711e011d152c837719b40829f209c9f7a5",
+              "start_line": 852,
+              "end_line": 908,
+              "section_sha256": "sha256:bd9e22ac0da54dc4e45506e5cd6628b6e14ac856e495fc18ba99a4f62476db3f",
               "required": true
             },
             {
@@ -15541,9 +15556,9 @@
               "label": "AWS implementation diagram",
               "path": "docs/project/PRD.md",
               "heading": "AWS implementation at a glance",
-              "start_line": 1054,
-              "end_line": 1121,
-              "section_sha256": "sha256:c332334c0241a6d43a4593a2476470f13d57b304d8b28b9c25baa3bdbe6d90ed",
+              "start_line": 1046,
+              "end_line": 1113,
+              "section_sha256": "sha256:eaf2053b4dda7174eafe00701fa7aa70645efd0428b6fcf691d6ffe945be2daa",
               "required": true
             },
             {
@@ -15551,8 +15566,8 @@
               "label": "Project diagram guide",
               "path": "docs/project/PRD.md",
               "heading": "Diagram guide",
-              "start_line": 1551,
-              "end_line": 1564,
+              "start_line": 1543,
+              "end_line": 1556,
               "section_sha256": "sha256:2329a034ec5fac44fa9b49305c3b34eaa116365dc09ac521d6b49ba5cf79ea5b",
               "required": true
             }
@@ -15566,7 +15581,7 @@
             ]
           },
           "formal_receipt_required": true,
-          "canonical_sha256": "sha256:0a1ca353d69086939a2992e9d43e10d31ae0da239428f6dc31a316e40a2b511c"
+          "canonical_sha256": "sha256:dbe145069b976905d177cc6e82038d655961a653952677c68bdd71d1ccba9111"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -15843,11 +15858,11 @@
               "heading": "1.1 Intake provenance",
               "start_line": 133,
               "end_line": 189,
-              "section_sha256": "sha256:722968ffff9a4d2e54c5d963f13188a7e61db4cb4a26b6c2b74a33bb6bd4fa51",
+              "section_sha256": "sha256:d25d4c084aaf346b2b2f11486eeeac8c44fc79e91509141d13da5ba94451e861",
               "required": true
             }
           ],
-          "canonical_sha256": "sha256:63947463cf533dc91d4f0308d657f6f64dd23b668cc58b8ab299e4f804eed246"
+          "canonical_sha256": "sha256:7824479a244b0b2346b0d30bb0d330042d3b956ea2295bce1ad6aef58e4d5a02"
         },
         "intake_foundation": {
           "schema_version": 2,
@@ -16865,7 +16880,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:f8a222d373be341997bfca9e2562446d66ac449f1f2af145976a512058b9d0dc",
-                "rendered_sha256": "sha256:87ddd666efcf270ace3c4ac9b955234da442d1ebf6a5c30619154ee38b1cd662"
+                "rendered_sha256": "sha256:30080b0e54eb23d7483a6c5e0eb9b60e6986f0b81e4d639f91c5f5a31ce1546b"
               },
               {
                 "diagram_id": "DIAGRAM-0002",
@@ -17056,7 +17071,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:44af223f3f8526b8798541903c701eb07c4be94e0964b8dfe842497813cc4225",
-                "rendered_sha256": "sha256:6771ca90e66e095797252d6639d86f14a7d44baf07187b8816d49d0d41208350"
+                "rendered_sha256": "sha256:2fa9ad5f009f39335f87650e1fc68a9410fdee95c49b9c201021cb0707d74cc4"
               }
             ],
             "canonical_sha256": "sha256:a0ff2ed8c5bb7f11dfa737d6cca301ba64955fbf3dce3c915d343d7a29095930",
@@ -17238,8 +17253,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1442,
-              "end_line": 1498,
+              "start_line": 1434,
+              "end_line": 1490,
               "active_ids": [],
               "canonical_sha256": "sha256:dcfc7ccb7295e01e54f5d544376a31513bf568d6f61351d9ef6c3bc0e4a01b21",
               "source_bytes": 4129,
@@ -17581,7 +17596,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:0aff1ef818fc0c9e9644a28496677a9a0ba5f93543eea6304401abc27230b1c2"
+          "prd_snapshot_sha256": "sha256:a178d8b9eba00bcee1a6cba451ac700af0ca9c9e46ef472747178daf727b22d2"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -18356,11 +18371,11 @@
               "heading": "1.1 Intake provenance",
               "start_line": 133,
               "end_line": 189,
-              "section_sha256": "sha256:722968ffff9a4d2e54c5d963f13188a7e61db4cb4a26b6c2b74a33bb6bd4fa51",
+              "section_sha256": "sha256:d25d4c084aaf346b2b2f11486eeeac8c44fc79e91509141d13da5ba94451e861",
               "required": true
             }
           ],
-          "canonical_sha256": "sha256:63947463cf533dc91d4f0308d657f6f64dd23b668cc58b8ab299e4f804eed246"
+          "canonical_sha256": "sha256:7824479a244b0b2346b0d30bb0d330042d3b956ea2295bce1ad6aef58e4d5a02"
         },
         "intake_foundation": {
           "schema_version": 2,
@@ -19378,7 +19393,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:f8a222d373be341997bfca9e2562446d66ac449f1f2af145976a512058b9d0dc",
-                "rendered_sha256": "sha256:87ddd666efcf270ace3c4ac9b955234da442d1ebf6a5c30619154ee38b1cd662"
+                "rendered_sha256": "sha256:30080b0e54eb23d7483a6c5e0eb9b60e6986f0b81e4d639f91c5f5a31ce1546b"
               },
               {
                 "diagram_id": "DIAGRAM-0002",
@@ -19569,7 +19584,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:44af223f3f8526b8798541903c701eb07c4be94e0964b8dfe842497813cc4225",
-                "rendered_sha256": "sha256:6771ca90e66e095797252d6639d86f14a7d44baf07187b8816d49d0d41208350"
+                "rendered_sha256": "sha256:2fa9ad5f009f39335f87650e1fc68a9410fdee95c49b9c201021cb0707d74cc4"
               }
             ],
             "canonical_sha256": "sha256:a0ff2ed8c5bb7f11dfa737d6cca301ba64955fbf3dce3c915d343d7a29095930",

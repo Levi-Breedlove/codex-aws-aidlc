@@ -12,7 +12,11 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from ..core.contracts import markdown_tables
+from ..core.contracts import (
+    _heading_section_lines,
+    markdown_tables,
+    table_after_heading,
+)
 from ..core.ids import (
     STABLE_CONTRACT_ID,
     canonical_id_list,
@@ -22,6 +26,8 @@ from ..core.ids import (
 
 
 REQ_ID = re.compile(r"REQ-\d{4,}")
+RA_ID = re.compile(r"RA-\d{3,}")
+DEC_ID = re.compile(r"DEC-\d{3,}")
 AWS_DISCOVERY_ID = re.compile(r"AWS-DISC-\d{4,}")
 AWS_CORE_MATERIALITY_VALUES = {"REQUIRED", "OPTIONAL", "NOT_MATERIAL"}
 BROWNFIELD_BASELINE_FIELDS = {
@@ -51,6 +57,102 @@ GATE_A_READINESS_FIELDS = {
     "Cost posture",
     "Intake provenance",
 }
+
+
+def _section_body(text: str, heading: str) -> str:
+    section = _heading_section_lines(text, heading)
+    return "\n".join(section[1]) if section else ""
+
+
+def gate_a_product_truth_issues(
+    text: str,
+    gate_a_agent: Mapping[str, str],
+    current_requirement_ids: set[str],
+) -> list[tuple[str, str]]:
+    """Validate the owner-visible Product Agreement before Gate A can advance."""
+
+    issues: list[tuple[str, str]] = []
+    try:
+        workload = table_after_heading(text, "## 1. Workload profile")
+    except ValueError:
+        workload = {}
+    unresolved_workload = sorted(
+        field
+        for field, value in workload.items()
+        if not explicit_value(value, allow_none=True)
+    )
+    if not workload or unresolved_workload:
+        issues.append(
+            (
+                "GATE_A_READINESS_CARD",
+                "Workload profile has unresolved fields: "
+                + (", ".join(unresolved_workload) or "profile table missing"),
+            )
+        )
+    for heading in ("## 2. Product statement", "## 3. Problem and opportunity"):
+        body = " ".join(_section_body(text, heading).split())
+        if not explicit_value(body, allow_none=False):
+            issues.append(("GATE_A_READINESS_CARD", f"{heading} is unresolved"))
+    for heading in ("### Goals", "### Non-goals"):
+        entries = re.findall(
+            r"(?m)^\s*(?:\d+\.|-)\s+(.+)$",
+            _section_body(text, heading),
+        )
+        if not any(explicit_value(entry, allow_none=False) for entry in entries):
+            issues.append(("GATE_A_READINESS_CARD", f"{heading} is unresolved"))
+    story_tables = markdown_tables(_section_body(text, "### User stories"))
+    stories = story_tables[0][2:] if story_tables else []
+    if not any(
+        len(row) >= 4
+        and explicit_value(row[1], allow_none=False)
+        and set(STABLE_CONTRACT_ID.findall(row[3])) <= current_requirement_ids
+        and any(
+            identifier in current_requirement_ids
+            for identifier in STABLE_CONTRACT_ID.findall(row[3])
+        )
+        for row in stories
+    ):
+        issues.append(
+            ("GATE_A_READINESS_CARD", "User stories lack a current requirement link")
+        )
+
+    finding_tables = markdown_tables(_section_body(text, "### Findings"))
+    decision_tables = markdown_tables(_section_body(text, "### Open decisions"))
+    open_findings = {
+        row[0]
+        for row in (finding_tables[0][2:] if finding_tables else [])
+        if len(row) >= 7
+        and RA_ID.fullmatch(row[0])
+        and clean_cell(row[5]).casefold() == "yes"
+        and clean_cell(row[6]).casefold() not in {"closed", "resolved", "accepted"}
+    }
+    open_decisions = {
+        row[0]
+        for row in (decision_tables[0][2:] if decision_tables else [])
+        if len(row) >= 6
+        and DEC_ID.fullmatch(row[0])
+        and clean_cell(row[4]).casefold() == "yes"
+        and not explicit_value(row[5], allow_none=False)
+    }
+    for field, actual, pattern in (
+        ("Open blocking finding IDs", open_findings, RA_ID),
+        ("Open blocking decision IDs", open_decisions, DEC_ID),
+    ):
+        raw = clean_cell(gate_a_agent.get(field, ""))
+        try:
+            declared = (
+                set() if raw == "NONE" else set(canonical_id_list(raw, pattern, field))
+            )
+        except ValueError:
+            declared = None
+        if declared != actual:
+            issues.append(
+                (
+                    "GATE_A_BLOCKER",
+                    f"{field} must exactly match detailed open blockers",
+                )
+            )
+    return issues
 
 
 def brownfield_contract_issues(text: str) -> list[tuple[str, str]]:
@@ -302,5 +404,6 @@ __all__ = (
     "GATE_A_READINESS_FIELDS",
     "brownfield_contract_issues",
     "derive_req_aws_materiality",
+    "gate_a_product_truth_issues",
     "gate_a_readiness_card_issues",
 )

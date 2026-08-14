@@ -46,6 +46,7 @@ HUMAN_DIAGRAM_SUPPORT_DIGEST_BASE_COMMIT = "66bcf1de7e5e06feb3dcf84fae2081d515c8
 OWNER_SOURCE_NAVIGATION_BASE_COMMIT = "47e1e548e0ae429d47ff838b3ebd60e98a1a5e1e"
 SEPARATE_AWS_AUTHORITY_BASE_COMMIT = "94594e7fabfa0a4dc7a1020cf51792a9ca10f07e"
 MERMAID_PRESENTATION_BASE_COMMIT = "2af6a7911e8b72bafb87102bbc8ae70e6b82c9bb"
+GOLDEN_PRD_TRUTH_BASE_COMMIT = "f24bf4674a792a305acfae5cd9e9ad0077a9bf79"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
@@ -161,6 +162,21 @@ APPROVED_BEHAVIOR_CHANGES = [
             "AWS access, execution, deployment, recovery, or teardown evidence claim",
         ],
     },
+    {
+        "id": "GOLDEN_PRD_TRUTH_1_2_42",
+        "base_commit": GOLDEN_PRD_TRUTH_BASE_COMMIT,
+        "scope": [
+            "fail-closed owner-visible Product Agreement and Design completeness",
+            "exact Findings and Open decisions reconciliation with Gate A summaries",
+            "selected-Region and bounded-label diagram presentation validation",
+            "native-text default and dark Golden render evidence",
+        ],
+        "prohibited": [
+            "canonical requirement, design, diagram semantic, envelope, gate, authority, or receipt change",
+            "lifecycle or route change for already-complete current project records",
+            "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        ],
+    },
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
@@ -173,16 +189,16 @@ SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
         "17238d5b1210b1a0957897155442ea231c77990d027dca1730102fa028ab05a4"
     ),
     "gate_a_pending": (
-        "3d0fdb61d84576e7c4c7289e89c8a7a95933e2a79394a749c6c8e62a80e928cf"
+        "b5b7bedaa5b5498b12a762a1d12f8a04771bad587d539043f0a46e523f49f4eb"
     ),
     "gate_a_approved": (
-        "124b78b0294ad05cb248c811ee548206a60cd16373012345510bc68c02fb44d5"
+        "768cecd6b3885d276736dd49bf302de81afdaf048ddf4c95a8bf24c07f1fa35e"
     ),
     "gate_b_pending": (
-        "a9ca40e4b9eaa11e825ded65a62c0823ee6e175f6bce7a7d39192ed718775714"
+        "d638bde4a72b361cd3cba1fb8ba777a80622fdf7992648232f368dbe1dd99e52"
     ),
     "gate_b_approved": (
-        "7f71eb9a6b25af4de1e696ffcbea1f452a50049d5f19a242b40878fe274ab13b"
+        "1025c7e23d745dc9ac130204dea3af697f24ab0c075cd07b5aba9316c784b771"
     ),
 }
 

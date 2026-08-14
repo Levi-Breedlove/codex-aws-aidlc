@@ -1119,7 +1119,7 @@ sequenceDiagram
             'subgraph AWS_CLOUD["AWS Cloud',
             'subgraph REGION["AWS Region',
             'subgraph ENTRY["Managed entry and identity"]',
-            'subgraph APPLICATION["Application and trust boundary"]',
+            'subgraph APPLICATION["Application · trust boundary"]',
             'subgraph DATA["Owner data and safeguards"]',
             'subgraph OPERATIONS["Operations, delivery, and recovery"]',
         )
@@ -1433,6 +1433,20 @@ sequenceDiagram
             self.assertNotRegex(source, r"(?im)(?:account|arn:aws)[^\n|`]*\d{12}")
             self.assertNotIn("SECRET_CUSTOMER_MARKER", source)
             self.assertEqual(report["document_summaries"]["status"], "CURRENT")
+            if name != "golden-prd-untouched":
+                gate_b_owner = source.split(
+                    "## 29. Gate B owner authorization record", 1
+                )
+                self.assertEqual(len(gate_b_owner), 2)
+                self.assertNotRegex(gate_b_owner[0], r"\b(?:TODO|TBD)\b")
+                expected_pending = 8 if name == "golden-prd-greenfield-design" else 0
+                self.assertEqual(
+                    len(re.findall(r"\b(?:TODO|TBD)\b", gate_b_owner[1])),
+                    expected_pending,
+                )
+                self.assertNotRegex(source, r"(?m)^\| (?:RA|DEC)-\d+")
+                self.assertIn("| Open blocking finding IDs | `NONE` |", source)
+                self.assertIn("| Open blocking decision IDs | `NONE` |", source)
             self.assertLessEqual(
                 len(
                     rendered_visible_lines(
@@ -1448,6 +1462,9 @@ sequenceDiagram
                 if item["status"] == "CURRENT"
             }
             bindings = render_mermaid_fixtures.PRD_DIAGRAM_BINDINGS[name]
+            primary_region = test_bootstrap_doctor.doctor.table_after_heading(
+                source, "## 1. Workload profile"
+            )["Primary Region"]
             self.assertEqual(set(current), set(bindings))
             self.assertEqual(len(MERMAID_BLOCK.findall(source)), len(bindings))
             if bindings:
@@ -1483,6 +1500,8 @@ sequenceDiagram
                 canonical = blocks[0].rstrip() + "\n"
                 expected = "```mermaid\n" + mermaid[fixture_name].rstrip() + "\n```\n"
                 self.assertEqual(canonical, expected, diagram_id)
+                if record["kind"] in {"SYSTEM_CONTEXT", "AWS_IMPLEMENTATION"}:
+                    self.assertIn(primary_region, mermaid[fixture_name])
                 self.assertEqual(
                     record["rendered_sha256"],
                     "sha256:" + hashlib.sha256(canonical.encode()).hexdigest(),
