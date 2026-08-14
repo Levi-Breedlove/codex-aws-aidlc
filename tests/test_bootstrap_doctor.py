@@ -19,6 +19,7 @@ from scripts.fastlane_adr import ADR_AUTHORITY
 from scripts.fastlane_engine.design.models import (
     APPLICATION_SOURCE_INFRASTRUCTURE_ONLY,
 )
+from scripts.fastlane_engine.design import diagrams as design_diagrams
 from scripts.fastlane_engine.design.support import AWS_SERVICE_TECH_CONCERNS
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +90,36 @@ def set_table_value(
     suffix = "\n" if lines[matches[0]].endswith("\n") else ""
     lines[matches[0]] = f"| {field} | {value} |{suffix}"
     return text[:start] + "".join(lines) + text[end:]
+
+
+def fixture_rows(rows: str) -> list[str]:
+    return rows.replace(" ;; ", "\n").strip().splitlines()
+
+
+def set_fixture_values(text: str, heading: str, next_heading: str, rows: str) -> str:
+    for row in fixture_rows(rows):
+        field, value = row.split(" || ", 1)
+        text = set_table_value(text, heading, next_heading, field, value)
+    return text
+
+
+def replace_fixture_table(text: str, heading: str, headers: str, rows: str = "") -> str:
+    values = [tuple(row.split(" || ")) for row in fixture_rows(rows)]
+    return replace_contract_table(text, heading, tuple(headers.split(" || ")), values)
+
+
+def replace_fixture_bullets(text: str, rows: str) -> str:
+    for row in fixture_rows(rows):
+        field, value = row.split(" || ", 1)
+        text = text.replace(f"- {field}: TODO", f"- {field}: {value}", 1)
+    return text
+
+
+def replace_fixture_sections(text: str, rows: str) -> str:
+    for row in fixture_rows(rows):
+        heading, next_heading, body = row.split(" || ", 2)
+        text = set_diagram_block(text, heading, next_heading, body.replace("\\n", "\n"))
+    return text
 
 
 def set_receipt(text: str, gate: str, receipt: str) -> str:
@@ -598,6 +629,7 @@ def approve_gate_a(
             raise AssertionError(f"Expected one method-contract fixture row: {before}")
         text = text.replace(before, after, 1)
     text = complete_requirements_contract(text)
+    text = complete_owner_visible_gate_a(text, project_mode=project_mode)
 
     for field, value in {
         "Project mode": f"`{project_mode}`",
@@ -671,6 +703,7 @@ def approve_gate_a(
         "Authorized requirements revision": "`REQ-0001`",
         "Authorized cost posture": "`MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED`",
         "Explicitly accepted assumption IDs": "`NONE`",
+        "Explicitly rejected assumption IDs and resolution": "`NONE`",
         "Authorization provided at": "`2026-07-17T10:00:00-07:00`",
         "Authorization source": "`owner message MSG-001`",
         "Verbatim owner receipt": "`RECORDED_BELOW`",
@@ -698,6 +731,76 @@ def approve_gate_a(
             ]
         ),
     )
+
+
+def complete_owner_visible_gate_a(text: str, *, project_mode: str) -> str:
+    text = set_fixture_values(
+        text,
+        "## Document status",
+        "## 1. Workload profile",
+        "Bootstrap release || `Fastlane 1.2.42; baseline f24bf467` ;; Specification status || `Current` ;; Target release || `development validation` ;; Last reviewed || `2026-07-17T09:55:00-07:00` ;; Primary owner || `alice`",
+    )
+    text = set_fixture_values(
+        text,
+        "## 1. Workload profile",
+        "### Owner decisions and sources",
+        "Business outcome || `Display the current approved project outcome` ;; Primary owner || `alice` ;; Users || `development users` ;; Environment || `Development` ;; AWS accounts || `NONE — no account access is authorized` ;; Primary Region || `us-west-2` ;; Data classification || `internal synthetic` ;; Availability target || `best effort during development` ;; Recovery target || `RTO: 60 minutes; RPO: 15 minutes` ;; Expected traffic || `up to 100 requests per minute` ;; Applicable AWS lenses || `Serverless; security; reliability; cost optimization`",
+    )
+    text = set_fixture_values(
+        text,
+        "### 1.1 Intake provenance",
+        "#### Intake foundation",
+        "Intake session ID || `INTAKE-SESSION-0001` ;; Intake source links || `NONE — direct owner intake` ;; Participants and decision owner || `alice; decision owner alice` ;; Captured by || `Fastlane coordinator` ;; Captured at || `2026-07-17T09:30:00-07:00` ;; Last reconciled with sources || `2026-07-17T09:45:00-07:00` ;; Owner-stated outcome, in their words || `Show the current approved project outcome` ;; Unresolved input IDs || `NONE` ;; Material source conflicts || `NONE`",
+    )
+    intake_source = "| FR-001 | `OWNER_FACT` / `REPOSITORY_FACT` / `AGENT_RECOMMENDATION` / `PROPOSED_ASSUMPTION` / `OPEN_QUESTION` | TODO | TODO | TODO |"
+    if text.count(intake_source) != 1:
+        raise AssertionError("Expected one unresolved intake provenance row")
+    text = text.replace(
+        intake_source,
+        "| FR-001 | OWNER_FACT | owner message MSG-000 | HIGH | CONFIRMED |",
+        1,
+    )
+    text = replace_fixture_sections(
+        text,
+        r"## 2. Product statement || ## 3. Problem and opportunity || Fastlane Golden Project helps development users see the current approved project outcome through a bounded development interface. ;; ## 3. Problem and opportunity || ## 4. Users and outcomes || Development users need one reliable view of the approved outcome; ambiguous or invalid input must not change approved state. ;; ### Goals || ### Non-goals || 1. Display the approved outcome.\n2. Reject invalid input without changing state.\n3. Preserve traceable validation evidence. ;; ### Non-goals || ## 6. Feature specifications || - Production deployment or AWS account access.\n- Unapproved product behavior or data migration. ;; ### Alternate flows || ### Failure and recovery flows || - A user may correct rejected input and resubmit without changing approved state. ;; ### Failure and recovery flows || ## 8. Data requirements || - A failed request returns a safe explanation and preserves the last approved state.",
+    )
+    text = replace_fixture_table(
+        text,
+        "### User stories",
+        "ID || User story || Priority || Related requirements",
+        "US-001 || As a development user, I want the approved outcome, so that I can verify the current result. || High || FR-001",
+    )
+    text = replace_fixture_table(
+        text,
+        "### Findings",
+        "ID || Type || Requirements involved || Finding || Resolution or decision || Blocking? || Status",
+    )
+    text = replace_fixture_table(
+        text,
+        "### Open decisions",
+        "ID || Decision needed || Options || Decision owner || Blocking? || Resolution",
+    )
+    text = set_fixture_values(
+        text,
+        "### Gate A — agent analysis record",
+        "### Gate A — owner acceptance record",
+        "Reviewed commit (optional) || `NOT_RECORDED` ;; Analysis performed by || `Fastlane deterministic validation` ;; Analysis completed at || `2026-07-17T09:50:00-07:00` ;; AWS Core materiality || `NOT_MATERIAL` ;; AWS materiality basis IDs || `NONE — documentation-only local release` ;; AWS Core discovery IDs || `NONE — no material AWS requirement` ;; Unresolved material AWS fact IDs || `NONE` ;; Recommendation rationale || `The complete Product Agreement has no open blockers`",
+    )
+    if project_mode == "greenfield":
+        for field in doctor.BROWNFIELD_BASELINE_FIELDS:
+            text = set_table_value(
+                text,
+                "### 1.2 Brownfield baseline and preservation contract",
+                "## 2. Product statement",
+                field,
+                "`NOT_APPLICABLE — greenfield project`",
+            )
+        text = text.replace(
+            "| PRES-001 | TODO | TODO | TODO | TODO |",
+            "| PRES-001 | NOT_APPLICABLE — greenfield project | NOT_APPLICABLE — greenfield project | NOT_APPLICABLE — greenfield project | NOT_APPLICABLE — greenfield project |",
+            1,
+        )
+    return text
 
 
 def approve_gate_b(
@@ -1519,12 +1622,12 @@ flowchart TB
         ACT-001[\"Development user\"]:::actor
     end
     subgraph AWS_CLOUD[\"AWS Cloud · proposed architecture\"]
-        subgraph REGION[\"AWS Region · us-east-1\"]
+        subgraph REGION[\"AWS Region · us-west-2\"]
             subgraph ENTRY[\"Managed entry and identity\"]
                 TECH-0013[\"Amazon API Gateway<br/>regional HTTPS endpoint\"]:::entry
                 TECH-0010[\"Amazon Cognito with<br/>server-side authorization\"]:::entry
             end
-            subgraph APPLICATION[\"Application and trust boundary\"]
+            subgraph APPLICATION[\"Application · trust boundary\"]
                 BOUNDARY-001[\"Local client adapter to<br/>Application domain\"]:::entry
                 API-001[\"Local client to<br/>Trusted application service\"]:::compute
                 TECH-0002[\"FastAPI through a<br/>Lambda adapter\"]:::compute
@@ -1575,12 +1678,12 @@ flowchart TB
     accTitle: Proposed AWS implementation
     accDescr: Requests move through the selected edge, identity, compute, and data services while managed observability, encryption, deployment, and rollback controls support the application.
     subgraph AWS_CLOUD[\"AWS Cloud · proposed implementation\"]
-        subgraph REGION[\"AWS Region · us-east-1\"]
+        subgraph REGION[\"AWS Region · us-west-2\"]
             subgraph ENTRY[\"Managed entry and identity\"]
                 TECH-0013[\"Amazon API Gateway<br/>regional HTTPS endpoint\"]:::entry
                 TECH-0010[\"Amazon Cognito with<br/>server-side authorization\"]:::entry
             end
-            subgraph APPLICATION[\"Application compute\"]
+            subgraph APPLICATION[\"Application · compute\"]
                 TECH-0002[\"FastAPI through a<br/>Lambda adapter\"]:::compute
                 TECH-0001[\"Python 3.12 on<br/>AWS Lambda\"]:::compute
                 ARCH-0001[\"Managed Serverless Baseline\"]:::compute
@@ -1765,6 +1868,57 @@ flowchart LR
     API-001 -->|advances the review state to| STATE-001
 ```""",
     )
+
+
+def complete_owner_visible_design(text: str) -> str:
+    text = set_fixture_values(
+        text,
+        "### Technical design revision record",
+        "### Technology and toolchain decision register",
+        "Requirements revision designed || `REQ-0001` ;; Reviewed commit (optional) || `NOT_RECORDED` ;; Design prepared by || `Fastlane coordinator` ;; Design completed at || `2026-07-17T10:15:00-07:00` ;; Remaining design gaps || `NONE`",
+    )
+    text = replace_fixture_table(
+        text,
+        "## 15. Component design",
+        "Component || Responsibility || Inputs || Outputs || Dependencies || Failure behavior || Owner",
+        "Trusted application service || Validate requests and return the approved outcome || Approved request DTO || Approved outcome DTO || Local client adapter and owner record store || Fail closed without changing approved state || alice",
+    )
+    brownfield = (
+        doctor.table_after_heading(text, "## Document status")["Project mode"]
+        == "brownfield"
+    )
+    values = {
+        True: "Legacy service and tests || Legacy service boundary || Preserve existing records with a reversible adapter || Bounded local compatibility checks || `PRES-001`",
+        False: "None — greenfield application || None — greenfield application || NOT_APPLICABLE — greenfield application || NOT_APPLICABLE — local development release || `NOT_APPLICABLE — greenfield project`",
+    }[brownfield]
+    reuse, modify, migration, rollout, compatibility = values.split(" || ")
+    text = replace_fixture_bullets(
+        text,
+        f"Existing components to reuse || {reuse} ;; Components to modify || {modify} ;; Components to add || Trusted service, local adapter, and validation tests ;; Compatibility constraints || Preserve the approved request and outcome schema ;; Migration approach || {migration} ;; Feature flags or staged rollout || {rollout} ;; Rollback boundary || Restore the authorized baseline commit ;; Explicitly deferred work || AWS deployment and production operations",
+    )
+    text = replace_fixture_table(
+        text,
+        "## 22. Test layers",
+        "Layer || Purpose || Required coverage",
+        "Static || Formatting, linting, typing, schemas, IaC || Required ;; Unit || Isolated rules and functions || Required ;; Integration || Data stores, identity, APIs, and contracts || Required ;; End-to-end || Complete user outcomes || Required for FR-001 ;; Security || Authentication, authorization, abuse, and secrets || Required ;; Reliability || Timeout, recovery, and safe-state preservation || Required ;; Performance || Latency and bounded throughput || Conditional on load target ;; AWS environment || Deployed configuration and service behavior || NOT_APPLICABLE — no AWS authorization ;; Operations || Deployment, alarms, rollback, restore, teardown || NOT_APPLICABLE — local release",
+    )
+    text = replace_fixture_bullets(
+        text,
+        "Synthetic fixture strategy || Deterministic owner and outcome fixtures ;; Generated data constraints || No secrets or real customer data ;; Sensitive-data prohibition || Synthetic internal values only ;; Local emulation or mocks || Local adapters with explicit boundaries ;; AWS test environment || NOT_APPLICABLE — no AWS authorization ;; Cleanup strategy || Remove temporary local fixtures after validation ;; Cost limit for billable deployed tests || NOT_APPLICABLE — local validation",
+    )
+    text = set_fixture_values(
+        text,
+        "## 27. Gate B agent review record",
+        "## 28. Construction envelope",
+        "Requirements revision reviewed || `REQ-0001` ;; Design revision reviewed || `DES-0001` ;; Construction authorization ID reviewed || `AUTH-0001` ;; Construction envelope SHA-256 reviewed || `NOT_RECORDED — calculated before owner review` ;; Reviewed commit (optional) || `NOT_RECORDED` ;; PRD completeness gaps || `NONE` ;; Requirement-to-design-and-test traceability gaps || `NONE` ;; Unresolved risk or preservation gaps || `NONE` ;; Review completed by and at || `Fastlane read-only review; 2026-07-17T10:20:00-07:00` ;; Agent recommendation || `READY_FOR_CONSTRUCTION_APPROVAL` ;; Recommendation rationale || `The complete design and bounded local envelope are review-ready`",
+    )
+    text = set_fixture_values(
+        text,
+        "### Gate B — readiness card",
+        "## 28. Construction envelope",
+        f"Design basis IDs || `DES-0001, FR-001` ;; Architecture/components || `ARCH-0001` ;; Technology/toolchains/version policy || `TECH-0001, TECH-0002, TECH-0003, TECH-0004, TECH-0005, TECH-0006, TECH-0007, TECH-0008, TECH-0009, TECH-0010, TECH-0011, TECH-0012, TECH-0013, TECH-0014, TECH-0015` ;; Interfaces/data flow || `Local request and response flow` ;; Identity/secrets || `No secrets; local development identity` ;; Failure/retry/concurrency || `Fail closed; bounded retries; serialized state` ;; Deployment/operations || `Documentation-only AWS lane; local commands` ;; Validation/evidence || `EX-001 and focused unittest evidence` ;; Rollback/recovery/teardown || `Restore the authorized baseline commit` ;; Brownfield compatibility/migration || {compatibility} ;; Outstanding gaps || `NONE`",
+    )
+    return text
 
 
 def complete_design_contract(text: str) -> str:
@@ -2278,7 +2432,9 @@ def complete_design_contract(text: str) -> str:
             ),
         ],
     )
-    return complete_diagram_contract(complete_project_design_contract(text))
+    return complete_owner_visible_design(
+        complete_diagram_contract(complete_project_design_contract(text))
+    )
 
 
 def complete_brownfield_foundation(
@@ -3372,7 +3528,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         ).stdout.strip()
 
         text = complete_brownfield_foundation(source_prd, baseline=baseline)
-        text = approve_gate_a(text)
+        text = approve_gate_a(text, project_mode="brownfield")
         text = approve_gate_b(
             text,
             baseline=baseline,
@@ -3755,7 +3911,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.2.41")
+        self.assertEqual(report["bootstrap_version"], "1.2.42")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -4087,6 +4243,32 @@ class BootstrapDoctorTests(unittest.TestCase):
                 ),
                 messages,
             )
+
+    def test_gate_a_rejects_unselected_region_and_unreconciled_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project = self.copy_project(Path(temp_dir))
+            self.approve_project(project, gate_b=False)
+            prd_path = project / "docs/project/PRD.md"
+            approved = prd_path.read_text(encoding="utf-8")
+            unresolved_region = set_table_value(
+                approved,
+                "## 1. Workload profile",
+                "### Owner decisions and sources",
+                "Primary Region",
+                "`TODO — owner has not selected a Region`",
+            )
+            prd_path.write_text(unresolved_region, encoding="utf-8")
+            self.assertIn(
+                "GATE_A_READINESS_CARD", codes(doctor.inspect_project(project))
+            )
+            blocker = replace_fixture_table(
+                approved,
+                "### Findings",
+                "ID || Type || Requirements involved || Finding || Resolution or decision || Blocking? || Status",
+                "RA-001 || Ambiguity || FR-001 || Owner Region is unresolved || Request owner selection || Yes || Open",
+            )
+            prd_path.write_text(blocker, encoding="utf-8")
+            self.assertIn("GATE_A_BLOCKER", codes(doctor.inspect_project(project)))
 
     def test_design_contract_parser_is_deterministic_and_fail_closed(self) -> None:
         template = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
@@ -8690,7 +8872,9 @@ class BootstrapDoctorTests(unittest.TestCase):
 
             blocked_report = doctor.inspect_project(project)
 
-            text = approve_gate_a(prd_path.read_text(encoding="utf-8"))
+            text = approve_gate_a(
+                prd_path.read_text(encoding="utf-8"), project_mode="brownfield"
+            )
             text = set_table_value(
                 text,
                 "## Document status",
@@ -11214,8 +11398,19 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
 
     def test_diagram_semantics_and_rendering_are_bound_separately(self) -> None:
+        def system_context(contract):
+            records = contract.diagram_contract.records
+            return {row.diagram_id: row for row in records}["DIAGRAM-0001"]
+
         source = complete_design_contract(
             (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        source = set_table_value(
+            source,
+            "## 1. Workload profile",
+            "### Owner decisions and sources",
+            "Primary Region",
+            "`us-west-2`",
         )
         baseline, baseline_issues = doctor.derive_design_contract(
             source,
@@ -11223,11 +11418,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             required=True,
         )
         self.assertEqual(baseline_issues, [])
-        baseline_record = next(
-            item
-            for item in baseline.diagram_contract.records
-            if item.diagram_id == "DIAGRAM-0001"
-        )
+        baseline_record = system_context(baseline)
 
         relabeled, relabeled_issues = doctor.derive_design_contract(
             source.replace(
@@ -11239,11 +11430,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             required=True,
         )
         self.assertEqual(relabeled_issues, [])
-        relabeled_record = next(
-            item
-            for item in relabeled.diagram_contract.records
-            if item.diagram_id == "DIAGRAM-0001"
-        )
+        relabeled_record = system_context(relabeled)
         self.assertEqual(baseline.canonical_sha256, relabeled.canonical_sha256)
         self.assertEqual(
             baseline_record.semantic_sha256,
@@ -11264,11 +11451,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             required=True,
         )
         self.assertEqual(wrapped_issues, [])
-        wrapped_record = next(
-            item
-            for item in wrapped_relation.diagram_contract.records
-            if item.diagram_id == "DIAGRAM-0001"
-        )
+        wrapped_record = system_context(wrapped_relation)
         self.assertEqual(baseline.canonical_sha256, wrapped_relation.canonical_sha256)
         self.assertEqual(
             baseline_record.semantic_sha256,
@@ -11297,11 +11480,7 @@ class BootstrapDoctorTests(unittest.TestCase):
             ),
             overwrapped_issues,
         )
-        overwrapped_record = next(
-            item
-            for item in overwrapped.diagram_contract.records
-            if item.diagram_id == "DIAGRAM-0001"
-        )
+        overwrapped_record = system_context(overwrapped)
         self.assertEqual(baseline.canonical_sha256, overwrapped.canonical_sha256)
         self.assertEqual(
             baseline_record.semantic_sha256,
@@ -11311,6 +11490,35 @@ class BootstrapDoctorTests(unittest.TestCase):
             baseline_record.rendered_sha256,
             overwrapped_record.rendered_sha256,
         )
+
+        region_drifted, region_issues = doctor.derive_design_contract(
+            source.replace(
+                "AWS Region · us-west-2",
+                "AWS Region · us-east-1",
+            ),
+            "DES-0001",
+            required=True,
+        )
+        self.assertEqual(region_drifted.status, "READY")
+        self.assertTrue(
+            region_issues
+            and all(
+                issue.startswith("DIAGRAM_PRESENTATION_STALE: ")
+                for issue in region_issues
+            ),
+            region_issues,
+        )
+        self.assertEqual(baseline.canonical_sha256, region_drifted.canonical_sha256)
+        region_record = system_context(region_drifted)
+        self.assertEqual(baseline_record.semantic_sha256, region_record.semantic_sha256)
+        self.assertNotEqual(
+            baseline_record.rendered_sha256, region_record.rendered_sha256
+        )
+        for width, has_issue in ((48, False), (49, True)):
+            node = f'TECH-0001["{"x" * width}"]'
+            self.assertEqual(
+                bool(design_diagrams._mermaid_node_line_issues("D", [node])), has_issue
+            )
 
         stateful_source = replace_contract_table(
             source,
@@ -12309,7 +12517,7 @@ flowchart TB
             "subgraph access grant claim": (
                 source.replace(
                     "AWS Cloud · proposed architecture",
-                    "AWS Cloud · owner granted AWS access · proposed architecture",
+                    "AWS Cloud · owner granted AWS access",
                     1,
                 ),
                 "subgraph label must not claim approval, authorization, access, or observed execution evidence",

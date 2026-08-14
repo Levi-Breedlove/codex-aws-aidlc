@@ -32,6 +32,7 @@ from .define.models import (
 from .define.project import (
     brownfield_contract_issues,
     derive_req_aws_materiality,
+    gate_a_product_truth_issues,
     gate_a_readiness_card_issues,
 )
 from .define.requirements import (
@@ -977,6 +978,13 @@ def validate_prd(
     if coverage_required:
         for code, issue in requirements_contract_issues:
             ctx.error(code, issue, PRD_FILE)
+        if requirements_contract.status != "GRANDFATHERED":
+            for code, issue in gate_a_product_truth_issues(
+                text,
+                gate_a_agent,
+                set(requirements_contract.requirement_ids),
+            ):
+                ctx.error(code, issue, PRD_FILE)
         if requirements_contract.status not in {"READY", "GRANDFATHERED"}:
             ctx.error(
                 "PROJECT_CONTRACT_MIGRATION_REQUIRED",

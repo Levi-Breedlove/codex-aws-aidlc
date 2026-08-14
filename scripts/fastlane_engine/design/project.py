@@ -30,6 +30,7 @@ from ..core.ids import (
     explicit_value,
     unresolved,
 )
+
 from .architecture import _derive_architecture_contract
 from .diagrams import (
     DIAGRAM_CONTRACT_HEADERS,
@@ -85,6 +86,28 @@ from .support import (
     valid_technology_selection,
     valid_technology_version_policy,
 )
+
+OWNER_VISIBLE_DESIGN_HEADINGS = (
+    "### Technical design revision record",
+    "## 15. Component design",
+    "## 21. Implementation boundaries and order",
+    "## 22. Test layers",
+    "## 25. Test data and environments",
+    "## 27. Gate B agent review record",
+)
+OWNER_VISIBLE_PLACEHOLDER = re.compile(r"\b(?:TODO|TBD)\b", re.IGNORECASE)
+
+
+def _owner_visible_design_issues(text: str) -> list[str]:
+    issues: list[str] = []
+    for heading in OWNER_VISIBLE_DESIGN_HEADINGS:
+        section = _heading_section_lines(text, heading)
+        if section is None or any(
+            OWNER_VISIBLE_PLACEHOLDER.search(line)
+            for line in (section[1] if section else ())
+        ):
+            issues.append(f"{heading}: owner-visible Design record is unresolved")
+    return issues
 
 
 PROJECT_DESIGN_CONTRACT_SCHEMA = "7"
@@ -555,6 +578,10 @@ def derive_project_design_contract(
     )
     if early_result is not None:
         return early_result
+    if required and not (
+        grandfather_approved_v4 or grandfather_schema_5 or grandfather_schema_6
+    ):
+        issues.extend(_owner_visible_design_issues(text))
     add = issues.append
     missing_records: list[str] = []
 
@@ -1151,6 +1178,7 @@ def _current_diagram_contract(
     *,
     required: bool,
     grandfathered: bool,
+    expected_region: str | None,
 ) -> tuple[Any, list[str]]:
     """Evaluate current project diagrams with legacy Design compatibility."""
 
@@ -1169,6 +1197,7 @@ def _current_diagram_contract(
         ),
         grandfathered_pre_aws_diagrams=grandfathered,
         legacy_public_compatibility=project_contract.grandfathered_v6,
+        expected_region=expected_region,
     )
 
 
@@ -1630,6 +1659,11 @@ def derive_design_contract(
     )
     if required:
         issues.extend(project_contract_issues)
+    try:
+        workload_profile = table_after_heading(text, "## 1. Workload profile")
+        expected_region = clean_cell(workload_profile.get("Primary Region", ""))
+    except ValueError:
+        expected_region = ""
     diagram_contract, diagram_issues = _current_diagram_contract(
         text,
         architecture,
@@ -1641,6 +1675,11 @@ def derive_design_contract(
         allowed_basis_ids | set(technology_by_id),
         required=required,
         grandfathered=grandfather_approved_v1,
+        expected_region=(
+            expected_region
+            if re.fullmatch(r"[a-z]{2}(?:-[a-z0-9]+)+-\d", expected_region)
+            else None
+        ),
     )
     if required:
         issues.extend(diagram_issues)

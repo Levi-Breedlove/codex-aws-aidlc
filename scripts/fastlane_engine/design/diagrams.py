@@ -713,6 +713,20 @@ def _mermaid_node_issues(
     return node_counts, observed_styles, issues
 
 
+def _mermaid_node_line_issues(diagram_id: str, lines: Iterable[str]) -> list[str]:
+    """Keep visual wrapping separate from canonical node-label semantics."""
+
+    return [
+        f"{diagram_id}: {match.group('id')} label lines must contain 1 to 48 visible characters"
+        for line in lines
+        if (match := DIAGRAM_NODE.fullmatch(line)) is not None
+        if any(
+            not item or len(item) > 48
+            for item in _mermaid_visible_lines(_diagram_node_label(match))
+        )
+    ]
+
+
 def _mermaid_relationship_issues(
     diagram_id: str,
     lines: Iterable[str],
@@ -875,6 +889,17 @@ def _planned_diagram_language_issues(
     return []
 
 
+def _mermaid_subgraph_line_issues(diagram_id: str, raw_label: str) -> list[str]:
+    visual_lines = _mermaid_visible_lines(raw_label)
+    if len(visual_lines) > 2 or any(
+        not item or len(item) > 48 for item in visual_lines
+    ):
+        return [
+            f"{diagram_id}: subgraph labels require one or two lines of 1 to 48 visible characters"
+        ]
+    return []
+
+
 def _mermaid_subgraph_issues(
     diagram_id: str,
     lines: list[str],
@@ -899,9 +924,10 @@ def _mermaid_subgraph_issues(
         raw_label = match.group("label")
         issues.extend(
             _unsafe_visible_mermaid_issues(
-                diagram_id, "subgraph label", raw_label, allow_breaks=False
+                diagram_id, "subgraph label", raw_label, allow_breaks=True
             )
         )
+        issues.extend(_mermaid_subgraph_line_issues(diagram_id, raw_label))
         label = _plain_mermaid_label(raw_label)
         if not label or _exposed_current_contract_id(label, current_ids):
             issues.append(
@@ -1248,6 +1274,7 @@ def _mermaid_presentation_issues(
     )
     return [
         *node_issues,
+        *_mermaid_node_line_issues(diagram_id, lines),
         *_mermaid_relationship_issues(diagram_id, lines, presentation_only=True),
         *_mermaid_accessibility_issues(diagram_id, lines, current_ids),
         *_planned_diagram_language_issues(diagram_id, kind, lines),
@@ -1900,6 +1927,7 @@ def _derive_current_diagram_contract(
     grandfathered_schema5: bool,
     grandfathered_pre_aws_diagrams: bool,
     legacy_public_compatibility: bool = False,
+    expected_region: str | None = None,
 ) -> tuple[DiagramContract, list[str]]:
     """Validate current typed Mermaid views without making them design authority."""
     if grandfathered_schema5:
@@ -2001,6 +2029,29 @@ def _derive_current_diagram_contract(
                 rendered_bytes, rendered_text = _canonical_mermaid_block(text, anchor)
                 rendered_sha256 = "sha256:" + hashlib.sha256(rendered_bytes).hexdigest()
                 body = rendered_text.split("\n", 1)[1].rsplit("\n```", 1)[0]
+                if expected_region and kind in {
+                    "SYSTEM_CONTEXT",
+                    "AWS_IMPLEMENTATION",
+                }:
+                    observed_regions = {
+                        token.group(0)
+                        for line in body.splitlines()
+                        if (subgraph := DIAGRAM_SUBGRAPH.fullmatch(line)) is not None
+                        if (
+                            token := re.search(
+                                r"\b[a-z]{2}(?:-[a-z0-9]+)+-\d\b",
+                                _plain_mermaid_label(subgraph.group("label")),
+                            )
+                        )
+                    }
+                    if observed_regions != {expected_region}:
+                        issues.extend(
+                            _presentation_issues(
+                                [
+                                    f"{diagram_id}: broad diagram Region must be exactly {expected_region}"
+                                ]
+                            )
+                        )
                 if re.search(r"\b(?:TODO|PLACEHOLDER|GENERIC)\b", body, re.IGNORECASE):
                     issues.append(
                         f"{diagram_id}: Mermaid block contains generic placeholder content"

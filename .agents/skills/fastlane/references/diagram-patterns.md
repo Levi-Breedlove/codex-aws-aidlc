@@ -21,7 +21,7 @@ label with current canonical PRD records. Remove unused nodes and paths.
 - Use no more than three boundary levels. Group peers by public entry, processing, automation, data, messaging, observability, cost, delivery, or recovery.
 - Use a left-to-right flow only for a compact linear story. Use top-to-bottom flow for complete architecture, AWS implementation, branching, and component-rich views.
 - Do not rely on a nested subgraph direction when its nodes connect outside that subgraph. Organize the parent direction, declaration order, and boundaries.
-- Aim for 12–20 nodes in broad views and node labels near three short lines; confirm final readability in the rendered review. Keep relationship labels to one concise phrase.
+- Aim for 12–20 nodes in broad views. Keep nodes to at most three visual lines, boundaries to at most two, and relationships to at most two; every line contains 1–48 visible characters.
 - Use solid arrows for primary runtime and data flow. Use dashed arrows for trust, telemetry, control, planning, and optional relationships.
 - Use comments to divide request, data, failure, and operations flows in Mermaid source.
 - Declare the primary owner-to-outcome runtime spine in reading order. Keep
@@ -35,6 +35,8 @@ label with current canonical PRD records. Remove unused nodes and paths.
   lines without changing its wording. Review the same source on both the dark
   and default canvases; the restrained pastel role palette must remain legible
   on each.
+- Use only the owner-selected Primary Region in project diagrams. A recommendation
+  remains unresolved until the owner confirms it; never choose or render a default.
 - Avoid experimental Mermaid syntax, external icon packs, custom JavaScript, and renderer-specific layout hacks.
 
 ### Connect relationships to the actual component
@@ -68,7 +70,7 @@ flowchart TB
             subgraph ENTRY["Managed public entry"]
                 API-000["Secure application interface"]:::compute
             end
-            subgraph APPLICATION["Application and trust boundary"]
+            subgraph APPLICATION["Application · trust boundary"]
                 BOUNDARY-000["Authenticated application boundary"]:::entry
                 ARCH-0000["Project application"]:::compute
             end
@@ -107,7 +109,7 @@ flowchart TB
                 TECH-0002["Selected API and edge service"]:::entry
                 TECH-0003["Selected identity service"]:::entry
             end
-            subgraph APPLICATION["Application compute"]
+            subgraph APPLICATION["Application · compute"]
                 TECH-0001["Selected application runtime"]:::compute
                 ARCH-0000["Project application"]:::compute
             end
