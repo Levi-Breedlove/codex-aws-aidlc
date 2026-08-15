@@ -441,9 +441,7 @@ def _text(value: object, label: str) -> str:
     return value.strip()
 
 
-def _strings(
-    value: object, label: str, *, allow_empty: bool = True
-) -> list[str]:
+def _strings(value: object, label: str, *, allow_empty: bool = True) -> list[str]:
     if (
         not isinstance(value, list)
         or (not allow_empty and not value)
@@ -487,7 +485,10 @@ def _architecture_board_expected_paths(packet: Mapping[str, Any]) -> frozenset[s
         _safe_relative_path(packet.get("manifest_path"), "manifest"),
         _safe_relative_path(packet.get("mermaid_path"), "Mermaid"),
         _safe_relative_path(packet.get("source_model_path"), "source model"),
-        *(f"{output_root}/{relative}" for relative in ARCHITECTURE_BOARD_REQUIRED_OUTPUTS),
+        *(
+            f"{output_root}/{relative}"
+            for relative in ARCHITECTURE_BOARD_REQUIRED_OUTPUTS
+        ),
     }
     if len(paths) != 25 or any(
         not path.startswith(output_root + "/") for path in paths
@@ -540,8 +541,7 @@ def _validated_request_context(
     mermaid_text = packet.get("mermaid_text")
     construction = str(authorizations.get("construction", ""))
     if (
-        re.fullmatch(r"dist/architecture/DES-\d{4,}-[0-9a-f]{64}", output_root)
-        is None
+        re.fullmatch(r"dist/architecture/DES-\d{4,}-[0-9a-f]{64}", output_root) is None
         or packet.get("manifest_path") != manifest_path
         or packet.get("mermaid_path") != mermaid_path
         or packet.get("source_model_path") != source_model_path
@@ -585,10 +585,9 @@ def _validated_request_context(
 def _snapshot_artifacts(
     snapshot: ProjectSnapshot, expected_paths: frozenset[str]
 ) -> dict[str, str]:
-    if (
-        set(snapshot.files) != set(expected_paths)
-        or snapshot.observation_metrics.files_opened != len(expected_paths)
-    ):
+    if set(snapshot.files) != set(
+        expected_paths
+    ) or snapshot.observation_metrics.files_opened != len(expected_paths):
         raise ValueError("architecture board completion observation is incomplete")
     return {
         path: "sha256:" + snapshot.files[path].byte_sha256
@@ -822,7 +821,9 @@ def _validate_components(
             or semantic in semantics
             or row.get("boundary") not in boundaries
             or row.get("icon_key") not in icons["assets"]
-            or any(isinstance(item, bool) or not isinstance(item, int) for item in values)
+            or any(
+                isinstance(item, bool) or not isinstance(item, int) for item in values
+            )
             or min(int(item) for item in values) < 0
             or int(geometry["size"]) <= 0
             or int(geometry["x"]) + int(geometry["size"]) > int(canvas["width"])
@@ -989,9 +990,13 @@ def _validate_presentation_edge(
     relationship_ids = _strings(
         row.get("relationship_ids"), "presentation relationships", allow_empty=False
     )
-    selected = [relationships[item] for item in relationship_ids if item in relationships]
+    selected = [
+        relationships[item] for item in relationship_ids if item in relationships
+    ]
     if len(selected) != len(relationship_ids):
-        raise ValueError("architecture board presentation references unknown relationships")
+        raise ValueError(
+            "architecture board presentation references unknown relationships"
+        )
     representation = _validated_edge_style(row)
     _validate_edge_cardinality(representation, selected)
     _validated_edge_points(row, canvas)
@@ -1038,10 +1043,16 @@ def _validate_presentation(
     relationships: Mapping[str, Mapping[str, Any]],
     canvas: Mapping[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    presentation = _object(model.get("presentation"), {"edges", "notes"}, "presentation")
+    presentation = _object(
+        model.get("presentation"), {"edges", "notes"}, "presentation"
+    )
     values = presentation.get("edges")
     notes = presentation.get("notes")
-    if not isinstance(values, list) or not isinstance(notes, list) or not 6 <= len(notes) <= 10:
+    if (
+        not isinstance(values, list)
+        or not isinstance(notes, list)
+        or not 6 <= len(notes) <= 10
+    ):
         raise ValueError("architecture board presentation is invalid")
     edges: list[dict[str, Any]] = []
     covered: set[str] = set()
@@ -1103,8 +1114,12 @@ def _validate_mermaid(
         target = semantics[str(relationship["target_id"])]
         label = str(relationship["source_text"])
         arrow = "-.->" if relationship["id"] in dashed else "-->"
-        if not any(_mermaid_edge_matches(line, source, target, label, arrow) for line in lines):
+        if not any(
+            _mermaid_edge_matches(line, source, target, label, arrow) for line in lines
+        ):
             raise ValueError("architecture board Mermaid relationship binding changed")
+
+
 def _validate_source_model(
     document: Mapping[str, Any], mermaid_raw: bytes, source_sha: str
 ) -> dict[str, Any]:
@@ -1270,14 +1285,12 @@ def _validate_manifest(
         or manifest.get("records") != list(model_state["components"])
         or manifest.get("nodes") != len(model_state["components"])
         or manifest.get("relationships") != len(model_state["edges"])
-        or manifest.get("canonical_relationships")
-        != len(model_state["relationships"])
+        or manifest.get("canonical_relationships") != len(model_state["relationships"])
         or manifest.get("edge_labels")
         != sum(bool(row["visible_label"]) for row in model_state["edges"])
         or manifest.get("flow_notes")
         != len(model_state["model"]["presentation"]["notes"])
-        or manifest.get("svg_layer_order")
-        != model_state["render"]["svg_layer_order"]
+        or manifest.get("svg_layer_order") != model_state["render"]["svg_layer_order"]
         or manifest.get("boundary_label_collisions") != []
         or manifest.get("precision_contract") != "1.3.0"
         or manifest.get("derived_sources") != derived
@@ -1307,10 +1320,9 @@ def _validate_render_receipt(
         "width": png_dimensions[0],
         "height": png_dimensions[1],
     }
-    if (
-        dict(document) != expected
-        or png_dimensions
-        != (int(canvas["width"]) * 2, int(canvas["height"]) * 2)
+    if dict(document) != expected or png_dimensions != (
+        int(canvas["width"]) * 2,
+        int(canvas["height"]) * 2,
     ):
         raise ValueError("architecture board render receipt is invalid")
 
@@ -1489,17 +1501,14 @@ def _validate_qa_manifest(
             "sha256": artifacts[f"{root}/{relative}"].removeprefix("sha256:"),
         }
         observed = snapshot.file(f"{root}/{relative}")
-        tile = (
-            _png_rgba(observed.raw_bytes, name) if observed is not None else None
-        )
+        tile = _png_rgba(observed.raw_bytes, name) if observed is not None else None
         if (
             not isinstance(value, Mapping)
             or dict(value) != expected
             or observed is None
             or tile is None
             or tile[:2] != (width, height)
-            or tile[2]
-            != _rgba_crop(main_pixels, main_width, left, top, width, height)
+            or tile[2] != _rgba_crop(main_pixels, main_width, left, top, width, height)
         ):
             raise ValueError("architecture board QA tile evidence is invalid")
         result[name] = str(expected["sha256"])
@@ -1538,9 +1547,7 @@ def _validate_visual_checks(values: object) -> None:
         raise ValueError("architecture board visual checks are incomplete")
 
 
-def _validate_visual_tiles(
-    values: object, tile_digests: Mapping[str, str]
-) -> None:
+def _validate_visual_tiles(values: object, tile_digests: Mapping[str, str]) -> None:
     if not isinstance(values, list) or len(values) != 12:
         raise ValueError("architecture board visual tile review is incomplete")
     for sequence, value in enumerate(values, start=1):
@@ -1590,9 +1597,9 @@ def _validate_visual_receipt(
         "architecture-board.drawio": artifacts[
             f"{root}/architecture-board.drawio"
         ].removeprefix("sha256:"),
-        "architecture-board.md": artifacts[f"{root}/architecture-board.md"].removeprefix(
-            "sha256:"
-        ),
+        "architecture-board.md": artifacts[
+            f"{root}/architecture-board.md"
+        ].removeprefix("sha256:"),
         "architecture-board.mmd": artifacts[
             f"{root}/architecture-board.mmd"
         ].removeprefix("sha256:"),
@@ -1624,9 +1631,7 @@ def _validate_visual_receipt(
         or str(tiles_manifest.get("file", "")).replace("\\", "/")
         != "qa-tiles/qa-tiles-manifest.json"
         or tiles_manifest.get("sha256")
-        != artifacts[f"{root}/qa-tiles/qa-tiles-manifest.json"].removeprefix(
-            "sha256:"
-        )
+        != artifacts[f"{root}/qa-tiles/qa-tiles-manifest.json"].removeprefix("sha256:")
         or _named_digests(receipt.get("bundle")) != expected_bundle
         or not isinstance(full, Mapping)
         or full.get("status") != "PASS"
@@ -1655,9 +1660,7 @@ def _completion_projection(
         "binding": {
             "design_revision": design["revision"],
             "design_sha256": design["canonical_sha256"],
-            "construction_authorization_id": authority[
-                "construction_authorization_id"
-            ],
+            "construction_authorization_id": authority["construction_authorization_id"],
             "request_manifest_sha256": artifacts[str(packet["manifest_path"])],
             "approved_mermaid_sha256": manifest["approved_mermaid"]["sha256"],
             "source_model_mode": source_model["mode"],
@@ -1723,8 +1726,7 @@ def validate_architecture_board_completion(
     if (
         manifest_file is None
         or mermaid_file is None
-        or manifest_file.raw_bytes
-        != str(packet["manifest_text"]).encode("utf-8")
+        or manifest_file.raw_bytes != str(packet["manifest_text"]).encode("utf-8")
         or mermaid_file.raw_bytes != context["mermaid_raw"]
     ):
         raise ValueError("architecture board request artifact binding changed")

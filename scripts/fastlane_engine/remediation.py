@@ -312,7 +312,9 @@ def _owner_authorization_action(items: list[dict[str, Any]]) -> str:
     return "AUTHORIZE_AWS_OPERATION"
 
 
-def _resolved_owner_stage(owner_stage_hint: str | None, gate_a: str, gate_b: str) -> str:
+def _resolved_owner_stage(
+    owner_stage_hint: str | None, gate_a: str, gate_b: str
+) -> str:
     return (
         owner_stage_hint
         if owner_stage_hint in {"DEFINE", "DESIGN", "DELIVER"}
@@ -328,7 +330,9 @@ def _agent_correction_action(
 ) -> dict[str, Any]:
     corrections: list[dict[str, Any]] = []
     active_task = tasks.active[0] if len(tasks.active) == 1 else None
-    active_write_set = list(tasks.write_sets.get(active_task, ())) if active_task else []
+    active_write_set = (
+        list(tasks.write_sets.get(active_task, ())) if active_task else []
+    )
     for item in items:
         diagnostic_path = str(item.get("path") or "NONE")
         ledger_task_owned = bool(
@@ -351,7 +355,9 @@ def _agent_correction_action(
         write_boundary = (
             list(dict.fromkeys([*active_write_set, diagnostic_path]))
             if ledger_task_owned
-            else active_write_set if task_owned else [diagnostic_path]
+            else active_write_set
+            if task_owned
+            else [diagnostic_path]
         )
         corrections.append(
             {

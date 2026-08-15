@@ -246,9 +246,7 @@ def _board_model_rows(
             "sha256": mermaid_sha256,
         },
         "icon_package": {
-            "assets": {
-                key: _board_sha256(value) for key, value in icon_assets.items()
-            },
+            "assets": {key: _board_sha256(value) for key, value in icon_assets.items()},
             "name": "AWS Architecture Icons Q2 2026",
             "release": "2026-04-30",
             "source": "AWS Architecture Icons",
@@ -594,9 +592,7 @@ def _board_artifacts(
     render = model["render_contract"]
     assert isinstance(render, dict)
     render["svg_presentation_sha256"] = _board_presentation_sha256(svg, "svg")
-    render["drawio_presentation_sha256"] = _board_presentation_sha256(
-        drawio, "drawio"
-    )
+    render["drawio_presentation_sha256"] = _board_presentation_sha256(drawio, "drawio")
     inventory_sha256 = _board_sha256(
         _board_canonical_bytes(
             {
@@ -875,9 +871,7 @@ def write_architecture_board_completion_fixture(
         "status": "PASS",
         "png": {
             "file": "architecture-board.png",
-            "sha256": digest(
-                f"{output_root}/architecture-board.png", prefixed=False
-            ),
+            "sha256": digest(f"{output_root}/architecture-board.png", prefixed=False),
             "width": 2560,
             "height": 1600,
         },
@@ -973,9 +967,7 @@ def write_architecture_board_completion_fixture(
             "tile_count": 12,
             "findings": [],
         },
-        "sha256": {
-            name: digest(f"{output_root}/{name}") for name in validation_names
-        },
+        "sha256": {name: digest(f"{output_root}/{name}") for name in validation_names},
     }
     write(
         f"{output_root}/architecture-board-validation.json",
@@ -992,6 +984,7 @@ def _mutate_board_json(path: Path, mutate) -> None:
     document = json.loads(path.read_text(encoding="utf-8"))
     mutate(document)
     path.write_bytes(_board_json_bytes(document))
+
 
 class EngineDesignTests(unittest.TestCase):
     def test_architecture_board_handoff_is_current_bound_and_non_authorizing(
@@ -1338,30 +1331,23 @@ class EngineDesignTests(unittest.TestCase):
                     assert isinstance(target, dict)
                     target[path[-1]] = value
                     candidate["manifest_text"] = (
-                        json.dumps(candidate_manifest, indent=2, sort_keys=True)
-                        + "\n"
+                        json.dumps(candidate_manifest, indent=2, sort_keys=True) + "\n"
                     )
-                    with self.assertRaisesRegex(
-                        ValueError, "request packet is stale"
-                    ):
+                    with self.assertRaisesRegex(ValueError, "request packet is stale"):
                         engine_api.validate_architecture_board_completion(
                             report, candidate, snapshot
                         )
 
             stale_report = copy.deepcopy(report)
             stale_report["gates"]["gate_b"] = "STALE"
-            with self.assertRaisesRegex(
-                ValueError, "request packet is not current"
-            ):
+            with self.assertRaisesRegex(ValueError, "request packet is not current"):
                 engine_api.validate_architecture_board_completion(
                     stale_report, packet, snapshot
                 )
 
             paths = _board_fixture_paths(packet)
             missing = engine_api.capture_project_snapshot(board_root, paths[:-1])
-            with self.assertRaisesRegex(
-                ValueError, "observation is incomplete"
-            ):
+            with self.assertRaisesRegex(ValueError, "observation is incomplete"):
                 engine_api.validate_architecture_board_completion(
                     report, packet, missing
                 )
@@ -1370,12 +1356,8 @@ class EngineDesignTests(unittest.TestCase):
             extra = engine_api.capture_project_snapshot(
                 board_root, (*paths, extra_path)
             )
-            with self.assertRaisesRegex(
-                ValueError, "observation is incomplete"
-            ):
-                engine_api.validate_architecture_board_completion(
-                    report, packet, extra
-                )
+            with self.assertRaisesRegex(ValueError, "observation is incomplete"):
+                engine_api.validate_architecture_board_completion(report, packet, extra)
 
             def changed_json(raw: bytes, mutate) -> bytes:
                 document = json.loads(raw.decode("utf-8"))
@@ -1437,9 +1419,9 @@ class EngineDesignTests(unittest.TestCase):
                 source_model_relative,
                 lambda raw: changed_json(
                     raw,
-                    lambda document: document["presentation"]["edges"][0][
-                        "points"
-                    ][-1].__setitem__(0, 1281),
+                    lambda document: document["presentation"]["edges"][0]["points"][
+                        -1
+                    ].__setitem__(0, 1281),
                 ),
                 "edge route is invalid",
             )
@@ -1503,9 +1485,7 @@ class EngineDesignTests(unittest.TestCase):
                 svg = ET.fromstring(raw)
                 images = [
                     group.find(f"{{{SVG_NAMESPACE}}}image")
-                    for group in svg.findall(
-                        f".//{{{SVG_NAMESPACE}}}g[@data-record]"
-                    )
+                    for group in svg.findall(f".//{{{SVG_NAMESPACE}}}g[@data-record]")
                 ]
                 self.assertEqual(len(images), 2)
                 first, second = images
@@ -1634,9 +1614,7 @@ class EngineDesignTests(unittest.TestCase):
                 ),
                 (
                     "extra validation check",
-                    lambda document: document["checks"].update(
-                        unexpected_check=True
-                    ),
+                    lambda document: document["checks"].update(unexpected_check=True),
                 ),
                 (
                     "failed validation check",
@@ -1710,9 +1688,7 @@ class EngineDesignTests(unittest.TestCase):
                     (board_root / qa_relative).read_text(encoding="utf-8")
                 )
                 qa_document["tiles"][0]["sha256"] = wrong_sha
-                (board_root / qa_relative).write_bytes(
-                    _board_json_bytes(qa_document)
-                )
+                (board_root / qa_relative).write_bytes(_board_json_bytes(qa_document))
                 visual_document = json.loads(
                     (board_root / visual_relative).read_text(encoding="utf-8")
                 )
@@ -1723,9 +1699,7 @@ class EngineDesignTests(unittest.TestCase):
                 (board_root / visual_relative).write_bytes(
                     _board_json_bytes(visual_document)
                 )
-                with self.assertRaisesRegex(
-                    ValueError, "QA tile evidence is invalid"
-                ):
+                with self.assertRaisesRegex(ValueError, "QA tile evidence is invalid"):
                     engine_api.validate_architecture_board_completion(
                         report, packet, _capture_board_snapshot(board_root, packet)
                     )
@@ -1745,6 +1719,7 @@ class EngineDesignTests(unittest.TestCase):
                     finally:
                         for relative, raw in originals.items():
                             (board_root / relative).write_bytes(raw)
+
     def test_mermaid_claim_guard_allows_real_verified_names_and_states(self) -> None:
         for value in (
             "AWS Verified Access",

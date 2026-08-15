@@ -2046,9 +2046,7 @@ def render_architecture_board_completion(
             "architecture-board completion requires an observed project root"
         )
     try:
-        observed = capture_architecture_board_completion(
-            project_root, report, packet
-        )
+        observed = capture_architecture_board_completion(project_root, report, packet)
     except (ObservationError, OSError, ValueError) as exc:
         raise PresentationError(str(exc)) from exc
     root = str(observed["output_root"])

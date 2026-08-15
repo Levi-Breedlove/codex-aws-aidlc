@@ -180,20 +180,16 @@ def _validate_inventory_membership(
     if (
         {str(item.get("data-record")) for item in inventory["svg_nodes"]}
         != component_ids
-        or {
-            str(item.get("componentRecord")) for item in inventory["draw_nodes"]
-        }
+        or {str(item.get("componentRecord")) for item in inventory["draw_nodes"]}
         != component_ids
-        or {str(item.get("data-edge")) for item in inventory["svg_edges"]}
-        != edge_ids
+        or {str(item.get("data-edge")) for item in inventory["svg_edges"]} != edge_ids
         or {
             str(item.get("id", "")).removeprefix("edge-")
             for item in inventory["draw_edges"]
         }
         != edge_ids
         or {
-            str(item.get("data-boundary-shape"))
-            for item in inventory["svg_boundaries"]
+            str(item.get("data-boundary-shape")) for item in inventory["svg_boundaries"]
         }
         != boundary_ids
         or {
@@ -228,8 +224,10 @@ def _validate_edge_bindings(
         edge_id = str(group.get("data-edge"))
         expected = _canonical_bytes(edge_map[edge_id]).decode().strip()
         path = next((item for item in group if _local_name(item) == "path"), None)
-        if group.get("data-contract") != expected or path is None or not path.get(
-            "marker-end"
+        if (
+            group.get("data-contract") != expected
+            or path is None
+            or not path.get("marker-end")
         ):
             raise ValueError("architecture board SVG edge binding changed")
     for cell in inventory["draw_edges"]:
@@ -254,9 +252,7 @@ def _validate_icons_and_status(
     )
     if len(images) != expected_icons or len(draw_images) != expected_icons:
         raise ValueError("architecture board embedded icon inventory changed")
-    _validate_source_icon_bindings(
-        svg, draw_images, components, boundaries, assets
-    )
+    _validate_source_icon_bindings(svg, draw_images, components, boundaries, assets)
     _validate_planned_status(svg, drawio)
     return len(images)
 
@@ -311,14 +307,8 @@ def _validate_source_icon_bindings(
             )
 
 
-def _keyed_elements(
-    elements: Any, attribute: str
-) -> dict[str, ET.Element]:
-    return {
-        str(item.get(attribute)): item
-        for item in elements
-        if item.get(attribute)
-    }
+def _keyed_elements(elements: Any, attribute: str) -> dict[str, ET.Element]:
+    return {str(item.get(attribute)): item for item in elements if item.get(attribute)}
 
 
 def _style(value: str) -> dict[str, str]:
@@ -477,9 +467,7 @@ def _png_rgba(raw: bytes, label: str) -> tuple[int, int, bytes]:
     return width, height, _decoded_png_pixels(scanlines, width, height, label)
 
 
-def _decoded_png_pixels(
-    scanlines: bytes, width: int, height: int, label: str
-) -> bytes:
+def _decoded_png_pixels(scanlines: bytes, width: int, height: int, label: str) -> bytes:
     stride = width * 4
     pixels = bytearray()
     previous = bytearray(stride)
@@ -536,8 +524,10 @@ def _rgba_crop(
 ) -> bytes:
     return b"".join(
         pixels[
-            ((top + row) * source_width + left) * 4 :
-            ((top + row) * source_width + left + width) * 4
+            ((top + row) * source_width + left) * 4 : (
+                (top + row) * source_width + left + width
+            )
+            * 4
         ]
         for row in range(height)
     )

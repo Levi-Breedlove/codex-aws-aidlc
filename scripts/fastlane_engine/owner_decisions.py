@@ -525,8 +525,7 @@ def _gate_b_construction_boundary(envelope: Mapping[str, str]) -> str:
             "Tasks: " + envelope.get("Maximum generated tasks", "NONE"),
             "Attempts: " + envelope.get("Attempt budget", "NONE"),
             "Checkpoints: " + envelope.get("Checkpoint cadence", "NONE"),
-            "External state: "
-            + envelope.get("Allowed external-state targets", "NONE"),
+            "External state: " + envelope.get("Allowed external-state targets", "NONE"),
             "GitHub: " + envelope.get("GitHub boundary", "NONE"),
             "AWS: " + envelope.get("AWS boundary", "NONE"),
         )
@@ -658,9 +657,7 @@ def _derive_gate_b_decision_inventory(
         if domain == "identity" and selection is not None:
             safeguards.append(selection.security_impact)
         if domain == "validation/construction" and design_contract.harness.rows:
-            selections.extend(
-                _required_harness_owner_selections(design_contract)
-            )
+            selections.extend(_required_harness_owner_selections(design_contract))
             rationales.append(
                 "The approved checks bind construction completion to executable evidence."
             )

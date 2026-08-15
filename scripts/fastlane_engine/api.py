@@ -159,7 +159,6 @@ def capture_architecture_board_completion(
     return validate_architecture_board_completion(report, packet, observer.freeze())
 
 
-
 def preview_source_brief(root: Path, source_path: str) -> dict[str, Any]:
     """Return one bounded non-authoritative source-assisted Define preview.
 

@@ -567,9 +567,7 @@ class FastlanePresenterTests(unittest.TestCase):
             rendered = presenter.render_architecture_board_completion(
                 current, packet, project_root
             )
-            validation_path = (
-                project_root / root / "architecture-board-validation.json"
-            )
+            validation_path = project_root / root / "architecture-board-validation.json"
             validation_path.write_text("{}\n", encoding="utf-8")
             with self.assertRaisesRegex(
                 presenter.PresentationError, "validation report schema is invalid"

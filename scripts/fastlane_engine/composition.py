@@ -1364,6 +1364,7 @@ def build_evaluation(
             has_errors=ctx.has_errors,
             enabled=classification not in {"TEMPLATE_SOURCE", "UNCONFIGURED_TEMPLATE"},
         )
+
     owner_decision_brief, owner_decision_inventory, owner_brief_issues = _brief()
     for code, message in owner_brief_issues:
         if code == "OWNER_BRIEF_SOURCE_STALE":
@@ -1384,7 +1385,8 @@ def build_evaluation(
         tasks=tasks,
         requirements_revision=prd_fields.get("requirements_revision"),
         design_revision=prd_fields.get("design_revision"),
-        owner_stage_hint=resolved_owner_stage, task_validation_evidence=ve,
+        owner_stage_hint=resolved_owner_stage,
+        task_validation_evidence=ve,
     )
     interaction = derive_interaction(
         lifecycle_state,
@@ -1523,7 +1525,8 @@ def build_evaluation(
             tasks=tasks,
             requirements_revision=prd_fields.get("requirements_revision"),
             design_revision=prd_fields.get("design_revision"),
-            owner_stage_hint=resolved_owner_stage, task_validation_evidence=ve,
+            owner_stage_hint=resolved_owner_stage,
+            task_validation_evidence=ve,
         )
         interaction = derive_interaction(
             lifecycle_state,
@@ -1615,7 +1618,8 @@ def build_evaluation(
             tasks=tasks,
             requirements_revision=prd_fields.get("requirements_revision"),
             design_revision=prd_fields.get("design_revision"),
-            owner_stage_hint=resolved_owner_stage, task_validation_evidence=ve,
+            owner_stage_hint=resolved_owner_stage,
+            task_validation_evidence=ve,
         )
         interaction = derive_interaction(
             lifecycle_state,
