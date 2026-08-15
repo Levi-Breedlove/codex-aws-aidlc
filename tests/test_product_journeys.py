@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -399,13 +400,24 @@ class ProductJourneyTests(unittest.TestCase):
                 self.assertEqual(locator["path"], "docs/project/PRD.md")
                 self.assertNotIn(locator["heading"], hidden_machine_headings)
                 source = (project / locator["path"]).read_text(encoding="utf-8")
+                source_lines = source.splitlines()
+                self.assertLessEqual(1, locator["start_line"], locator)
+                self.assertLessEqual(
+                    locator["start_line"], locator["end_line"], locator
+                )
+                self.assertLessEqual(locator["end_line"], len(source_lines), locator)
+                self.assertRegex(
+                    source_lines[locator["start_line"] - 1],
+                    rf"^#{{1,6}}\s+{re.escape(str(locator['heading']))}\s*$",
+                    locator,
+                )
                 depth = 0
-                for line in source.splitlines()[: locator["start_line"] - 1]:
+                for line in source_lines[: locator["start_line"] - 1]:
                     depth += line.strip() == "<details>"
                     depth -= line.strip() == "</details>"
                 self.assertEqual(depth, 0, locator)
                 selected = "\n".join(
-                    source.splitlines()[locator["start_line"] - 1 : locator["end_line"]]
+                    source_lines[locator["start_line"] - 1 : locator["end_line"]]
                 )
                 canonical = context_runtime.canonical_source_bytes(selected)
                 self.assertEqual(
@@ -453,6 +465,19 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn("Gate A Owner Decision Brief", rendered_gate_a)
             self.assertIn("## Your recorded decisions", rendered_gate_a)
             self.assertIn("First-release journey: JOURNEY-001", rendered_gate_a)
+            self.assertIn(
+                "Outcome: See the current approved project outcome.", rendered_gate_a
+            )
+            self.assertIn(
+                "First-release boundary: Include one local outcome view; defer "
+                "external integrations.",
+                rendered_gate_a,
+            )
+            self.assertIn(
+                "Success measures: An invited tester can view the approved outcome "
+                "without help; acceptance records:",
+                rendered_gate_a,
+            )
             self.assertIn("Not authorized", rendered_gate_a)
             for locator in gate_a_brief["source_locators"]:
                 anchor = presenter._markdown_anchor(str(locator["heading"]))
@@ -482,6 +507,20 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
+            for exact_owner_fact in (
+                "Recommendation: CAND-0001 — MANAGED_SERVERLESS_BASELINE: bounded "
+                "managed entry, compute, and data services",
+                "Construction boundary: Outcome: OUT-001 — Deliver the FR-001 "
+                "outcome; Writes: PATHS: app/**; tests/**; Excludes: PATHS: "
+                "docs/project/PRD.md; bootstrap.yaml; Commands: ALLOW_PREFIXES: "
+                "python -m unittest; Tasks: 8; Attempts: 3; Checkpoints: "
+                "COMMIT_AFTER_EACH_VALIDATED_WAVE_BEFORE_PAUSE; External state: "
+                "NONE; GitHub: NONE; AWS: DOCS_ONLY",
+                "HARNESS-004: unittest journey validation; COMMAND: python -m "
+                "unittest tests.test_product_journeys; EVIDENCE: "
+                "docs/project/VERIFY.md#harness-execution-evidence",
+            ):
+                self.assertIn(exact_owner_fact, rendered_gate_b)
             navigation_keys = set(briefs.GATE_B_NAVIGATION_LOCATOR_KEYS)
             self.assertTrue(
                 navigation_keys.issubset(
@@ -969,8 +1008,13 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn("Project state changed: No.", side_answer)
             self.assertIn("Pending next action: Nothing.", side_answer)
             self.assertIn(
-                "Next: Codex will correct the reported in-scope failure and rerun "
-                "validation.",
+                "Next: Codex will correct DGN-0001 in docs/project/VERIFY.md; "
+                "task: NONE; write boundary: docs/project/VERIFY.md",
+                side_answer,
+            )
+            self.assertIn(
+                "then rerun the Engine with `python scripts/bootstrap_doctor.py "
+                "--root . --json --prior-remediation-fingerprint sha256:",
                 side_answer,
             )
 

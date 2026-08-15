@@ -4,6 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -16,7 +17,11 @@ if SPEC is None or SPEC.loader is None:
 presenter = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(presenter)
 
+from scripts import fastlane_owner_briefs as owner_briefs
 from scripts import intake_response
+from scripts.fastlane_engine import api as engine_api
+from tests import test_bootstrap_doctor as doctor_fixtures
+from tests import test_engine_design as design_fixtures
 
 
 def report(**updates: object) -> dict[str, object]:
@@ -321,6 +326,29 @@ class FastlanePresenterTests(unittest.TestCase):
             presenter.render_owner_update(baseline),
         )
 
+    def test_answer_progress_uses_recorded_fact_as_the_next_update(self) -> None:
+        current = report(turn_boundary_required=True)
+        current["intake_foundation"] = intake_foundation()
+        current["owner_answer_confirmation"] = owner_briefs.answer_confirmation(
+            status="READY",
+            owner_response_id="OWNER-MSG-0002",
+            card_id="INTAKE-CARD-0001",
+            revision=1,
+            presented_sha256="sha256:" + "a" * 64,
+            recorded=["Starting point: a new application."],
+            project_effect="This shapes the next requirements.",
+            correction_prompt="Change starting point to <new value>.",
+            basis_ids=["INTAKE-0001"],
+        )
+
+        rendered = presenter.render_answer_progress(current, "OWNER-MSG-0002")
+
+        self.assertEqual(rendered.count("Recorded: Starting point"), 1)
+        self.assertIn("Updated: Starting point: a new application.", rendered)
+        self.assertNotIn("Updated: Nothing.", rendered)
+        with self.assertRaisesRegex(presenter.PresentationError, "current owner"):
+            presenter.render_answer_progress(current, "OWNER-MSG-0001")
+
     def test_automatic_update_says_nothing_and_continues(self) -> None:
         current = report(
             owner_stage="DESIGN",
@@ -505,6 +533,83 @@ class FastlanePresenterTests(unittest.TestCase):
         )
         self.assertNotIn("exact read-only AWS preflight receipt", rendered)
         self.assertNotIn("deployment receipt", rendered)
+
+    def test_architecture_board_completion_names_observed_local_evidence(self) -> None:
+        current = json.loads(
+            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )["report_cases"]["gate_b_approved"]["report"]
+        current["write_authority"]["approved_write_roots"].append(
+            "dist/architecture/**"
+        )
+        prd_text = doctor_fixtures.complete_design_contract(
+            (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        identity = {
+            **engine_api.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+            "valid": True,
+            "issues": [],
+        }
+        packet = engine_api.derive_architecture_board_request_packet(
+            current,
+            prd_text,
+            identity,
+            owner_request=engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+            source_model_target_exists=False,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            project_root = Path(directory)
+            completion = design_fixtures.write_architecture_board_completion_fixture(
+                project_root, current, packet
+            )
+            root = completion["output_root"]
+            rendered = presenter.render_architecture_board_completion(
+                current, packet, project_root
+            )
+            validation_path = (
+                project_root / root / "architecture-board-validation.json"
+            )
+            validation_path.write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                presenter.PresentationError, "validation report schema is invalid"
+            ):
+                presenter.render_architecture_board_completion(
+                    current, packet, project_root
+                )
+
+        self.assertIn(f"[Task manifest]({packet['manifest_path']})", rendered)
+        self.assertIn(f"[Canonical Mermaid source]({packet['mermaid_path']})", rendered)
+        self.assertIn(f"[Derived Mermaid]({root}/architecture-board.mmd)", rendered)
+        self.assertIn(f"[Editable Draw.io]({root}/architecture-board.drawio)", rendered)
+        self.assertIn("[Validation report]", rendered)
+        self.assertIn("[Render receipt]", rendered)
+        self.assertIn("[Visual-review receipt]", rendered)
+        self.assertIn("QA tile 12", rendered)
+        self.assertIn("Fastlane checks and reported external evidence", rendered)
+        self.assertIn("receipt file bindings — PASS", rendered)
+        self.assertIn(
+            "Pinned external validator report (aws-architecture-diagrams/v1.3): "
+            "reports 20/20 PASS, including SVG-to-PNG reproduction.",
+            rendered,
+        )
+        self.assertIn("exact PNG-to-QA-tile pixels", rendered)
+        self.assertIn("did not rerender the SVG", rendered)
+        self.assertIn("icon-package provenance", rendered)
+        self.assertIn("AWS authority: NONE; no AWS account was accessed.", rendered)
+        self.assertIn(
+            "Next: Codex will generate the dependency-aware task plan.", rendered
+        )
+        self.assertLess(
+            rendered.index("Architecture board bundle checked"),
+            rendered.index("FASTLANE · DELIVER"),
+        )
+        with self.assertRaisesRegex(
+            presenter.PresentationError, "observed project root"
+        ):
+            presenter.render_architecture_board_completion(  # type: ignore[arg-type]
+                current, packet, completion
+            )
 
     def test_preflight_running_names_read_only_scope_without_owner_work(self) -> None:
         rendered = presenter.render_owner_update(
@@ -1425,7 +1530,7 @@ class FastlanePresenterTests(unittest.TestCase):
         with self.assertRaises(presenter.PresentationError):
             presenter.render_owner_update(current)
 
-    def test_agent_correction_needs_nothing_and_continues(self) -> None:
+    def test_agent_correction_fails_closed_without_exact_execution_detail(self) -> None:
         current = report(
             owner_stage="DELIVER",
             response_mode="OWNER_UPDATE",
@@ -1453,14 +1558,75 @@ class FastlanePresenterTests(unittest.TestCase):
             },
         }
 
-        rendered = presenter.render_owner_update(current)
-        self.assertIn("Status: Fastlane found an in-scope validation defect.", rendered)
-        self.assertIn("Need from you: Nothing.", rendered)
-        self.assertIn(
-            "Next: Codex will correct the reported in-scope failure and rerun validation.",
-            rendered,
+        with self.assertRaisesRegex(presenter.PresentationError, "execution detail"):
+            presenter.render_owner_update(current)
+
+    def test_agent_correction_names_defect_boundary_and_revalidation(self) -> None:
+        current = report(
+            owner_stage="DELIVER",
+            response_mode="OWNER_UPDATE",
+            state="WORKING",
+            route_reason_code="BLOCKED",
+            owner_action_required=False,
+            owner_action_kind="NONE_CONTINUE_AUTOMATICALLY",
+            automatic_continuation_allowed=True,
         )
-        self.assertNotIn("Resolve the listed validation failure", rendered)
+        fingerprint = "sha256:" + "b" * 64
+        current["remediation"] = {
+            "items": [
+                {
+                    "diagnostic_id": "DGN-0001",
+                    "diagnostic_code": "TASK_GRAPH_INVALID",
+                    "path": "app/main.py",
+                    "cause": "TASK-001 validation command is stale.",
+                    "responsible_party": "CODEX",
+                    "category": "AGENT_CORRECTION",
+                    "automatic_correction_allowed": True,
+                }
+            ],
+            "next_action": {
+                "responsible_party": "CODEX",
+                "action_kind": "CORRECT_AND_REVALIDATE",
+                "automatic_continuation_allowed": True,
+                "corrections": [
+                    {
+                        "diagnostic_id": "DGN-0001",
+                        "cause": "TASK-001 validation command is stale.",
+                        "path": "app/main.py",
+                        "task_id": "TASK-001",
+                        "write_boundary": ["app/main.py"],
+                        "validation_evidence": [
+                            {
+                                "validation_id": "HARNESS-004",
+                                "command": (
+                                    "python -m unittest tests.test_product_journeys"
+                                ),
+                                "evidence_destination": (
+                                    "docs/project/VERIFY.md#harness-execution-evidence"
+                                ),
+                            }
+                        ],
+                    }
+                ],
+                "engine_rerun": {
+                    "command": (
+                        "python scripts/bootstrap_doctor.py --root . --json "
+                        "--prior-remediation-fingerprint " + fingerprint
+                    ),
+                    "fingerprint": fingerprint,
+                },
+            },
+            "fingerprint": fingerprint,
+        }
+
+        rendered = presenter.render_owner_update(current)
+
+        self.assertIn("TASK-001 validation command is stale", rendered)
+        self.assertIn("task: TASK-001; write boundary: app/main.py", rendered)
+        self.assertIn("`python -m unittest tests.test_product_journeys`", rendered)
+        self.assertIn("docs/project/VERIFY.md#harness-execution-evidence", rendered)
+        self.assertIn("--prior-remediation-fingerprint", rendered)
+        self.assertIn("Need from you: Nothing.", rendered)
 
     def test_human_safety_review_is_one_genuine_action(self) -> None:
         current = report(
@@ -1770,6 +1936,33 @@ class FastlanePresenterTests(unittest.TestCase):
             result.stderr,
         )
         self.assertNotIn("Audit:", result.stdout)
+
+    def test_public_cli_rejects_caller_supplied_board_completion(self) -> None:
+        payload = {
+            "report": report(),
+            "architecture_board_request": {},
+            "architecture_board_completion": {
+                "status": "COMPLETE",
+                "validation_report": {"status": "PASS"},
+            },
+        }
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "architecture-board-completion",
+                "--input-stdin",
+            ],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("observed architecture-board root", result.stderr)
+        self.assertNotIn("generated", result.stdout.casefold())
+        self.assertNotIn("validated", result.stdout.casefold())
 
     def test_public_cli_emits_strict_utf8_bytes(self) -> None:
         payload = {

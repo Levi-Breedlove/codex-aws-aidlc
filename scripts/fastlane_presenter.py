@@ -9,10 +9,16 @@ import json
 import re
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 try:
-    from fastlane_engine.api import ARCHITECTURE_DIAGRAM_SKILL_IDENTITY
+    from fastlane_engine.api import (
+        ARCHITECTURE_BOARD_QA_TILES,
+        ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+        capture_architecture_board_completion,
+    )
+    from fastlane_engine.core.snapshot import ObservationError
     from fastlane_engine.core.ids import TASK_ID
     from fastlane_owner_briefs import (
         GATE_B_NAVIGATION_LOCATOR_KEYS,
@@ -22,7 +28,12 @@ try:
     from intake_response import intake_reply_token
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
-    from scripts.fastlane_engine.api import ARCHITECTURE_DIAGRAM_SKILL_IDENTITY
+    from scripts.fastlane_engine.api import (
+        ARCHITECTURE_BOARD_QA_TILES,
+        ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+        capture_architecture_board_completion,
+    )
+    from scripts.fastlane_engine.core.snapshot import ObservationError
     from scripts.fastlane_engine.core.ids import TASK_ID
     from scripts.fastlane_owner_briefs import (
         GATE_B_NAVIGATION_LOCATOR_KEYS,
@@ -767,9 +778,114 @@ def _remediation_text(report: Mapping[str, Any]) -> tuple[str | None, str | None
     if action_kind == "CORRECT_AND_REVALIDATE":
         if party != "CODEX" or not automatic:
             raise PresentationError("unsafe automatic remediation state")
+        items = value.get("items")
+        if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
+            raise PresentationError("invalid automatic remediation items")
+        codex_items = [
+            item
+            for item in items
+            if isinstance(item, Mapping) and item.get("category") == "AGENT_CORRECTION"
+        ]
+        corrections = next_action.get("corrections")
+        engine_rerun = next_action.get("engine_rerun")
+        if (
+            not codex_items
+            or any(
+                not str(item.get("cause", "")).strip()
+                or not str(item.get("path", "")).strip()
+                for item in codex_items
+            )
+            or not isinstance(corrections, Sequence)
+            or isinstance(corrections, (str, bytes))
+            or not corrections
+            or not isinstance(engine_rerun, Mapping)
+        ):
+            raise PresentationError("invalid automatic remediation execution detail")
+        expected_ids = {str(item["diagnostic_id"]) for item in codex_items}
+        correction_ids: list[str] = []
+        correction_text: list[str] = []
+        for correction in corrections:
+            if not isinstance(correction, Mapping):
+                raise PresentationError("invalid automatic remediation correction")
+            diagnostic_id = correction.get("diagnostic_id")
+            cause = correction.get("cause")
+            path = correction.get("path")
+            task_id = correction.get("task_id")
+            write_boundary = correction.get("write_boundary")
+            validations = correction.get("validation_evidence")
+            if (
+                not isinstance(diagnostic_id, str)
+                or diagnostic_id not in expected_ids
+                or not isinstance(cause, str)
+                or not cause.strip()
+                or not isinstance(path, str)
+                or not path.strip()
+                or not isinstance(task_id, str)
+                or (task_id != "NONE" and TASK_ID_PATTERN.fullmatch(task_id) is None)
+                or not isinstance(write_boundary, Sequence)
+                or isinstance(write_boundary, (str, bytes))
+                or not write_boundary
+                or any(
+                    not isinstance(boundary, str) or not boundary.strip()
+                    for boundary in write_boundary
+                )
+                or not isinstance(validations, Sequence)
+                or isinstance(validations, (str, bytes))
+            ):
+                raise PresentationError("invalid automatic remediation correction")
+            correction_ids.append(diagnostic_id)
+            validation_text: list[str] = []
+            for validation in validations:
+                if not isinstance(validation, Mapping):
+                    raise PresentationError(
+                        "invalid automatic remediation validation detail"
+                    )
+                command = validation.get("command")
+                destination = validation.get("evidence_destination")
+                if (
+                    not isinstance(command, str)
+                    or not command.strip()
+                    or not isinstance(destination, str)
+                    or not destination.strip()
+                ):
+                    raise PresentationError(
+                        "invalid automatic remediation validation detail"
+                    )
+                validation_text.append(f"`{command}` -> {destination}")
+            detail = (
+                f"{diagnostic_id} in {path}; task: {task_id}; write boundary: "
+                + ", ".join(str(boundary) for boundary in write_boundary)
+            )
+            if validation_text:
+                detail += "; task validation: " + "; ".join(validation_text)
+            correction_text.append(detail)
+        if (
+            len(correction_ids) != len(set(correction_ids))
+            or set(correction_ids) != expected_ids
+        ):
+            raise PresentationError("invalid automatic remediation correction")
+        fingerprint = value.get("fingerprint")
+        engine_command = engine_rerun.get("command")
+        if (
+            not isinstance(fingerprint, str)
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", fingerprint) is None
+            or engine_rerun.get("fingerprint") != fingerprint
+            or engine_command
+            != (
+                "python scripts/bootstrap_doctor.py --root . --json "
+                "--prior-remediation-fingerprint " + fingerprint
+            )
+        ):
+            raise PresentationError("invalid automatic remediation Engine rerun")
+        first = codex_items[0]
+        status = (
+            f"Fastlane found an in-scope defect in {first['path']}: {first['cause']}"
+        )
         return (
-            "Fastlane found an in-scope validation defect.",
-            "Codex will correct the reported in-scope failure and rerun validation.",
+            status,
+            "Codex will correct "
+            + " | ".join(correction_text)
+            + f"; then rerun the Engine with `{engine_command}`.",
         )
     if action_kind == "REVIEW_SAFETY_BLOCKER":
         if party != "HUMAN_REVIEWER" or automatic:
@@ -1910,6 +2026,109 @@ def render_architecture_board_offer(
     )
 
 
+def render_architecture_board_completion(
+    report: Mapping[str, Any],
+    packet: Mapping[str, Any],
+    project_root: Path,
+) -> str:
+    """Render one observed local DIAGRAM-10 completion and resume TASK-10."""
+
+    interaction = _interaction(report)
+    if (
+        report.get("next_prompt") != "TASK-10"
+        or interaction.get("route_reason_code") != "TASK_PLAN_REQUIRED"
+        or interaction.get("owner_action_required") is not False
+        or interaction.get("automatic_continuation_allowed") is not True
+    ):
+        raise PresentationError("architecture-board completion requires TASK-10")
+    if not isinstance(project_root, Path):
+        raise PresentationError(
+            "architecture-board completion requires an observed project root"
+        )
+    try:
+        observed = capture_architecture_board_completion(
+            project_root, report, packet
+        )
+    except (ObservationError, OSError, ValueError) as exc:
+        raise PresentationError(str(exc)) from exc
+    root = str(observed["output_root"])
+    evidence = observed["evidence"]
+    artifact_manifest = evidence["artifact_manifest"]
+    validation = evidence["validation_report"]
+    icons = artifact_manifest["official_icons"]
+    binding = observed["binding"]
+    artifacts = observed["artifacts"]
+    qa_lines = tuple(
+        f"  - [QA tile {sequence:02d}]({root}/{relative})"
+        for sequence, relative in enumerate(
+            ARCHITECTURE_BOARD_QA_TILES,
+            start=1,
+        )
+    )
+    evidence_lines = (
+        "Architecture board bundle checked locally",
+        "",
+        "Current basis",
+        "",
+        f"- Design: {binding['design_revision']} ({binding['design_sha256']})",
+        f"- Construction authorization: {binding['construction_authorization_id']}",
+        f"- [Task manifest]({packet['manifest_path']})",
+        f"- [Canonical Mermaid source]({packet['mermaid_path']})",
+        "- Source model: "
+        f"{binding['source_model_mode']} — "
+        f"[source-model.json]({packet['source_model_path']}) "
+        f"({artifacts[packet['source_model_path']]})",
+        "",
+        "Local artifacts",
+        "",
+        f"- [Derived Mermaid]({root}/architecture-board.mmd)",
+        f"- [Board overview]({root}/architecture-board.md)",
+        f"- [Editable Draw.io]({root}/architecture-board.drawio)",
+        f"- [Self-contained SVG]({root}/architecture-board.svg)",
+        f"- [2x PNG]({root}/architecture-board.png) "
+        f"({artifacts[f'{root}/architecture-board.png']})",
+        f"- [Artifact manifest]({root}/architecture-board-manifest.json)",
+        f"- [Render receipt]({root}/architecture-board-render.json)",
+        f"- [Validation report]({root}/architecture-board-validation.json): reports PASS",
+        f"- [Visual-review receipt]({root}/visual-review-receipt.json): records PASS",
+        f"- [QA tile manifest]({root}/qa-tiles/qa-tiles-manifest.json): 12 tiles",
+        *qa_lines,
+        "",
+        "Fastlane checks and reported external evidence",
+        "",
+        f"- Declared icon package: {icons['package']} ({icons['release_date']})",
+        f"- Components: {artifact_manifest['nodes']}",
+        f"- Canonical relationships: {artifact_manifest['canonical_relationships']}",
+        "- Fastlane-independent checks: current report/request binding; "
+        "Mermaid/source-model semantics; SVG/Draw.io structure and bindings; "
+        "artifact hash graph; PNG structure/dimensions; exact PNG-to-QA-tile "
+        "pixels; receipt file bindings — PASS",
+        "- Pinned external validator report "
+        f"({validation['contract_id']}): reports {len(validation['checks'])}/20 "
+        "PASS, including SVG-to-PNG reproduction.",
+        "- Visual-review receipt records the full canvas, 8 visual checks, and "
+        "12 QA tiles PASS",
+        "- Evidence boundary: Fastlane did not rerender the SVG or authenticate "
+        "the skill execution or icon-package provenance.",
+        "- Architecture status: PLANNED",
+        "- AWS authority: NONE; no AWS account was accessed.",
+        "",
+        "These local files describe the planned design only. They do not prove "
+        "implementation, deployment, live AWS state, spending, or AWS authority.",
+    )
+    return (
+        "\n".join(evidence_lines)
+        + "\n\n"
+        + render_owner_update(
+            report,
+            updated=(
+                "The planned architecture board bundle was generated; its local "
+                "bindings were checked."
+            ),
+        )
+    )
+
+
 def render_side_question_response(
     report: Mapping[str, Any],
     *,
@@ -2558,6 +2777,20 @@ def render_answer_confirmation(
     return "\n".join(lines)
 
 
+def render_answer_progress(report: Mapping[str, Any], owner_response_id: str) -> str:
+    """Confirm one new owner answer and render its resulting current route."""
+
+    confirmation = _validated_answer_confirmation(report, owner_response_id)
+    updated = "; ".join(str(item) for item in confirmation["recorded"])
+    if not updated.strip() or updated.strip().casefold() == "nothing.":
+        raise PresentationError("Answer Confirmation has no owner-visible update")
+    return (
+        render_answer_confirmation(report, owner_response_id)
+        + "\n\n"
+        + render_owner_update(report, updated=updated)
+    )
+
+
 def _source_brief_sequence(preview: Mapping[str, Any], key: str) -> Sequence[Any]:
     value = preview.get(key)
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
@@ -2734,7 +2967,9 @@ def main(argv: list[str] | None = None) -> int:
             "gate-a-brief",
             "gate-b-brief",
             "answer-confirmation",
+            "answer-progress",
             "architecture-board-offer",
+            "architecture-board-completion",
             "source-brief",
         ),
     )
@@ -2781,12 +3016,32 @@ def main(argv: list[str] | None = None) -> int:
                 identity,
                 transition=str(payload.get("transition", "")),
             )
+        elif args.mode == "architecture-board-completion":
+            packet = payload.get("architecture_board_request")
+            project_root = payload.get("architecture_board_root")
+            if (
+                not isinstance(packet, Mapping)
+                or not isinstance(project_root, str)
+                or not project_root.strip()
+            ):
+                raise PresentationError(
+                    "input is missing the observed architecture-board root"
+                )
+            output = render_architecture_board_completion(
+                report,
+                packet,
+                Path(project_root),
+            )
         elif args.mode == "gate-a-brief":
             output = render_owner_decision_brief(report, "GATE_A")
         elif args.mode == "gate-b-brief":
             output = render_owner_decision_brief(report, "GATE_B")
         elif args.mode == "answer-confirmation":
             output = render_answer_confirmation(
+                report, str(payload.get("owner_response_id", ""))
+            )
+        elif args.mode == "answer-progress":
+            output = render_answer_progress(
                 report, str(payload.get("owner_response_id", ""))
             )
         else:

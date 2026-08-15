@@ -143,6 +143,22 @@
         "requirement, design, diagram, lifecycle, route, gate, authority, or receipt change",
         "AWS access, execution, deployment, recovery, or teardown evidence claim"
       ]
+    },
+    {
+      "id": "OWNER_DECISION_EVIDENCE_AND_REMEDIATION_1_2_46",
+      "base_commit": "11f34120660b910d12c529cb0ed0b01c2b530ed9",
+      "scope": [
+        "current prompt-slice bytes for the clarified owner-facing procedures",
+        "concrete Gate A and Gate B owner decision projections and exact current source locators",
+        "risk-derived Harness selection with exact command and evidence destination",
+        "additive agent-correction cause, bounded write set, task validation evidence, and Engine rerun detail"
+      ],
+      "prohibited": [
+        "lifecycle or route change",
+        "gate, authority, or receipt change",
+        "requirement, design, diagram, or construction-envelope semantic change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim"
+      ]
     }
   ],
   "normalization": {
@@ -160,8 +176,8 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "e014fd712ce467765b7dc0408968004183adfdbe00168abc48d33347f4c4c506",
-    "task_ready": "171292710289a8d4f64481219cf6285965e1a8a958c6a220d55b359c55c57bb8"
+    "stale_gate_a_summary": "d66cf08f8eb523a52015c08b3f056acf8a30bcd9e307ad704808715d233d1810",
+    "task_ready": "cb219f32b2503106b55f6a7f7aa51ec7533df061a70e83ba0a7dfdb8526e3d28"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -200,13 +216,30 @@
               "path": "docs/project/PRD.md",
               "responsible_party": "CODEX",
               "category": "AGENT_CORRECTION",
-              "automatic_correction_allowed": true
+              "automatic_correction_allowed": true,
+              "cause": "Visible project summary differs from the current canonical Engine projection"
             }
           ],
           "next_action": {
             "responsible_party": "CODEX",
             "action_kind": "CORRECT_AND_REVALIDATE",
-            "automatic_continuation_allowed": true
+            "automatic_continuation_allowed": true,
+            "corrections": [
+              {
+                "diagnostic_id": "DGN-0001",
+                "cause": "Visible project summary differs from the current canonical Engine projection",
+                "path": "docs/project/PRD.md",
+                "task_id": "NONE",
+                "write_boundary": [
+                  "docs/project/PRD.md"
+                ],
+                "validation_evidence": []
+              }
+            ],
+            "engine_rerun": {
+              "command": "python scripts/bootstrap_doctor.py --root . --json --prior-remediation-fingerprint sha256:7e465f4419e4219d3d084483a8a2e5eecd26436bb5a658dc6dcc7fcab7777675",
+              "fingerprint": "sha256:7e465f4419e4219d3d084483a8a2e5eecd26436bb5a658dc6dcc7fcab7777675"
+            }
           },
           "fingerprint": "sha256:7e465f4419e4219d3d084483a8a2e5eecd26436bb5a658dc6dcc7fcab7777675",
           "retry_state": "FIRST_OR_NONE"
@@ -265,7 +298,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 6133,
+          "actual_initial_source_bytes": 6803,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -273,10 +306,10 @@
               "selector_kind": "HEADING",
               "selector": "Setup and intake",
               "start_line": 5,
-              "end_line": 38,
+              "end_line": 40,
               "active_ids": [],
-              "canonical_sha256": "sha256:61b04f61d10322bdede81c0fb00ea4a0f8a5ca233888192df23f17195a770be2",
-              "source_bytes": 4022,
+              "canonical_sha256": "sha256:a9d6c2c57078c0860f0eb6942ebe113ddbdda480e734ac80d6f3f632b45002d7",
+              "source_bytes": 4692,
               "reason": "Current phase procedure"
             },
             {
@@ -384,8 +417,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Requirements and Gate A",
-              "start_line": 39,
-              "end_line": 51,
+              "start_line": 41,
+              "end_line": 53,
               "active_ids": [],
               "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
               "source_bytes": 3044,
@@ -395,8 +428,8 @@
               "path": ".agents/skills/fastlane/references/define.md",
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
-              "start_line": 52,
-              "end_line": 59,
+              "start_line": 54,
+              "end_line": 61,
               "active_ids": [],
               "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
               "source_bytes": 2108,
@@ -1489,7 +1522,7 @@
               "section_id": "GATE-A-OUTCOME",
               "title": "Outcome, users, and first useful journey",
               "items": [
-                "Outcome: OUT-001 — Deliver FR-001",
+                "Outcome: See the current approved project outcome.",
                 "Owner and users: alice; development users",
                 "First-release journey: JOURNEY-001 — See the approved project outcome; success means The current approved outcome is displayed"
               ],
@@ -1511,6 +1544,7 @@
               "section_id": "GATE-A-BOUNDARY",
               "title": "First-release boundary",
               "items": [
+                "First-release boundary: Include one local outcome view; defer external integrations.",
                 "Scope and non-goals: FR-001 in scope; production is out of scope",
                 "Data and access: Synthetic internal test data only Local development identity; no public access"
               ],
@@ -1559,7 +1593,7 @@
               "section_id": "GATE-A-SUCCESS",
               "title": "Success, resilience, Region, and cost",
               "items": [
-                "Success measures: FR-001, EX-001",
+                "Success measures: An invited tester can view the approved outcome without help; acceptance records: FR-001, EX-001",
                 "Recovery, Region, and cost: Fail closed; local rollback to baseline; Development; us-west-2; MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED"
               ],
               "basis_ids": [
@@ -1836,7 +1870,7 @@
             ]
           },
           "formal_receipt_required": false,
-          "canonical_sha256": "sha256:ddbc6965cd2a72d148332e37bfdc26f58046eae26752cc47827120849b561253"
+          "canonical_sha256": "sha256:582c27d0711b34168a4730945526a84eecb7202ef479fbf252b221e87f56c961"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -2919,7 +2953,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 5649,
+          "actual_initial_source_bytes": 6263,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -2927,10 +2961,10 @@
               "selector_kind": "HEADING",
               "selector": "Tasks and local construction",
               "start_line": 28,
-              "end_line": 39,
+              "end_line": 41,
               "active_ids": [],
-              "canonical_sha256": "sha256:49612ec0288b690faff7b2b28db91a819fc472877740ecf67913cf238bf19d86",
-              "source_bytes": 2820,
+              "canonical_sha256": "sha256:a2fa3ea4b776160e1dfa61c7c53e7dfbb5cf309521c7861a740663852184dceb",
+              "source_bytes": 3434,
               "reason": "Current phase procedure"
             },
             {
@@ -2963,8 +2997,8 @@
               "path": ".agents/skills/fastlane/references/deliver.md",
               "selector_kind": "HEADING",
               "selector": "AWS handoff and reconciliation",
-              "start_line": 54,
-              "end_line": 59,
+              "start_line": 56,
+              "end_line": 61,
               "active_ids": [],
               "canonical_sha256": "sha256:2e63e90a25fb93f5be9d80bfb5a7fd52582c388f6be0225b666a00868afbf16b",
               "source_bytes": 845,
@@ -2974,8 +3008,8 @@
               "path": ".agents/skills/fastlane/references/deliver.md",
               "selector_kind": "HEADING",
               "selector": "Teardown and residuals",
-              "start_line": 60,
-              "end_line": 65,
+              "start_line": 62,
+              "end_line": 67,
               "active_ids": [],
               "canonical_sha256": "sha256:71fde07ab791d464aa3efa6ac22b72f6aac4e1ad6e29dd9e16d69f18e1021212",
               "source_bytes": 1164,

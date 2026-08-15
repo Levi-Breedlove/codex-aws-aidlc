@@ -240,6 +240,34 @@ class PromptPackContractTests(unittest.TestCase):
         ):
             self.assertIn(expected, self.fastlane_design)
 
+    def test_owner_explanations_bind_current_values_and_evidence(self) -> None:
+        for expected in (
+            "do not expose labels such as `EARS`",
+            "Define boundary terms such as invalid input",
+            "Never say `Updated: Nothing.`",
+        ):
+            self.assertIn(expected, self.fastlane_define)
+        for expected in (
+            "current canonical decision and source locators",
+            "canonical VERIFY destination",
+            "absent from the current requirements is a requirements conflict",
+        ):
+            self.assertIn(expected, self.fastlane_design)
+        for expected in (
+            "focused validation command",
+            "An `AGENT_CORRECTION` handoff names the observed defect",
+        ):
+            self.assertIn(expected, self.fastlane_deliver)
+        for expected in (
+            "## Comprehension, navigation, and completion replies",
+            "actual current outcome",
+            "actual selected architecture",
+            "uses only the current Engine-projected",
+            "architecture-board-task-manifest.json",
+            "do not preserve Gate A",
+        ):
+            self.assertIn(expected, self.owner_responses)
+
     def test_route_interfaces_keep_external_authority_separate(self) -> None:
         for prompt_id in PROMPT_IDS:
             section = self.prompt_section(prompt_id)
@@ -819,9 +847,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.45")
-        self.assertIn("**Pack version:** 1.2.45", self.prompts)
-        self.assertIn("Current customer build: **1.2.45**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.46")
+        self.assertIn("**Pack version:** 1.2.46", self.prompts)
+        self.assertIn("Current customer build: **1.2.46**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

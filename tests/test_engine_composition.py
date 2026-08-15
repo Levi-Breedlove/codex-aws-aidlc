@@ -10,8 +10,12 @@ from unittest import mock
 
 from scripts import bootstrap_doctor as doctor
 from scripts.fastlane_engine import api
+from scripts.fastlane_engine import composition
+from scripts.fastlane_engine.deliver import task_remediation_validation_evidence
+from scripts.fastlane_engine.deliver.models import TaskSummary
 from scripts.fastlane_engine.evaluation import EngineEvaluation
 from scripts.fastlane_engine.report import serialize_evaluation
+from tests import test_bootstrap_doctor as doctor_fixtures
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,6 +82,146 @@ def synthetic_schema2_report() -> dict[str, object]:
 
 
 class EngineCompositionTests(unittest.TestCase):
+    def test_remediation_uses_only_the_active_tasks_exact_validation_binding(
+        self,
+    ) -> None:
+        command = "python -m unittest tests.test_properties"
+        tasks_text = doctor_fixtures.ready_task(
+            command=command,
+            property_projection=doctor_fixtures.property_execution_projection(),
+        )
+        active = TaskSummary(statuses={"TASK-001": "IN_PROGRESS"}, active=["TASK-001"])
+
+        self.assertEqual(
+            task_remediation_validation_evidence(tasks_text, active),
+            (
+                {
+                    "validation_id": "PROP-001",
+                    "command": command,
+                    "evidence_destination": (
+                        "docs/project/VERIFY.md#property-based-test-evidence"
+                    ),
+                },
+            ),
+        )
+        self.assertEqual(
+            task_remediation_validation_evidence(
+                tasks_text,
+                TaskSummary(statuses={"TASK-001": "READY"}, ready=["TASK-001"]),
+            ),
+            (),
+        )
+
+    def test_ledger_correction_preserves_the_active_task_validation_contract(
+        self,
+    ) -> None:
+        command = "python -m unittest tests.test_product_journeys"
+        harness = "\n".join(
+            (
+                "| Harness ID | Layer | Selected check or tool | Trigger | Basis IDs | Exact command or API | Evidence destination | Required or conditional status |",
+                "|---|---|---|---|---|---|---|---|",
+                "| HARNESS-004 | End-to-end | unittest journey validation | active task correction | DES-0001, FR-001 | "
+                + command
+                + " | docs/project/VERIFY.md#harness-execution-evidence | REQUIRED |",
+            )
+        )
+        tasks_text = doctor_fixtures.ready_task(command=command).replace(
+            "- Status: `READY`", "- Status: `IN_PROGRESS`", 1
+        )
+        tasks_text = tasks_text.replace(
+            "#### Validation\n\n", "#### Validation\n\n" + harness + "\n\n", 1
+        )
+        tasks = TaskSummary(
+            statuses={"TASK-001": "IN_PROGRESS"},
+            active=["TASK-001"],
+            write_sets={"TASK-001": ["app/main.py"]},
+            attempts_used={"TASK-001": 0},
+            attempt_budgets={"TASK-001": 3},
+        )
+        evidence = task_remediation_validation_evidence(tasks_text, tasks)
+        expected_evidence = (
+            {
+                "validation_id": "HARNESS-004",
+                "command": command,
+                "evidence_destination": (
+                    "docs/project/VERIFY.md#harness-execution-evidence"
+                ),
+            },
+        )
+        self.assertEqual(evidence, expected_evidence)
+
+        context = doctor.Context(ROOT)
+        context.error(
+            "TASK_GRAPH_INVALID",
+            "TASK-001 active task ledger differs from its current task contract",
+            "docs/project/TASKS.md",
+        )
+        common = {
+            "classification": "ACTIVE_GREENFIELD",
+            "gate_a": "APPROVED_FOR_DESIGN",
+            "gate_b": "APPROVED_FOR_CONSTRUCTION",
+            "envelope": {
+                "Allowed repository write set": "PATHS: app/**",
+                "Excluded or owner-only write set": "NONE",
+                "Protected dirty paths": "NONE",
+            },
+            "tasks": tasks,
+            "requirements_revision": "REQ-0001",
+            "design_revision": "DES-0001",
+            "owner_stage_hint": "DELIVER",
+        }
+        remediation = doctor.derive_remediation(
+            context, task_validation_evidence=evidence, **common
+        )
+        self.assertEqual(
+            remediation["next_action"]["corrections"],
+            [
+                {
+                    "diagnostic_id": "DGN-0001",
+                    "cause": (
+                        "TASK-001 active task ledger differs from its current task contract"
+                    ),
+                    "path": "docs/project/TASKS.md",
+                    "task_id": "TASK-001",
+                    "write_boundary": ["app/main.py", "docs/project/TASKS.md"],
+                    "validation_evidence": list(expected_evidence),
+                }
+            ],
+        )
+        self.assertEqual(
+            remediation["next_action"]["engine_rerun"],
+            {
+                "command": (
+                    "python scripts/bootstrap_doctor.py --root . --json "
+                    "--prior-remediation-fingerprint " + remediation["fingerprint"]
+                ),
+                "fingerprint": remediation["fingerprint"],
+            },
+        )
+
+        evidence_free = doctor.derive_remediation(context, **common)
+        self.assertEqual(
+            evidence_free["next_action"]["corrections"][0]["task_id"], "NONE"
+        )
+        self.assertEqual(
+            evidence_free["next_action"]["corrections"][0]["write_boundary"],
+            ["docs/project/TASKS.md"],
+        )
+
+        unrelated = doctor.Context(ROOT)
+        unrelated.error(
+            "DOCUMENT_SUMMARY_STALE",
+            "Generated task summary differs from canonical state",
+            "docs/project/TASKS.md",
+        )
+        unrelated_remediation = doctor.derive_remediation(
+            unrelated, task_validation_evidence=evidence, **common
+        )
+        self.assertEqual(
+            unrelated_remediation["next_action"]["corrections"][0]["task_id"],
+            "NONE",
+        )
+
     def test_public_evaluation_serializes_to_the_existing_report(self) -> None:
         evaluation = api.evaluate_project(ROOT, template_source=True)
         self.assertIsInstance(evaluation, EngineEvaluation)

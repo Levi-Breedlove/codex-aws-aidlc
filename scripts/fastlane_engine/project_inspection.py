@@ -169,6 +169,8 @@ ENGINE_RUNTIME_CONTROL_FILES = {
     "scripts/fastlane_engine/design/__init__.py",
     "scripts/fastlane_engine/design/adr.py",
     "scripts/fastlane_engine/design/architecture.py",
+    "scripts/fastlane_engine/design/architecture_board.py",
+    "scripts/fastlane_engine/design/architecture_board_validation.py",
     "scripts/fastlane_engine/design/diagrams.py",
     "scripts/fastlane_engine/design/envelope.py",
     "scripts/fastlane_engine/design/harness.py",

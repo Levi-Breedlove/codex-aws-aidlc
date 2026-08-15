@@ -1153,15 +1153,45 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
             tasks=doctor.TaskSummary(),
             owner_stage_hint="DEFINE",
         )
+        fingerprint = (
+            "sha256:5b3bcfc1f8f379389152ec7a92ee7ba9cb375361698592d7391f08733fbefbd0"
+        )
+        self.assertEqual(remediation["fingerprint"], fingerprint)
         self.assertEqual(
             remediation["next_action"],
             {
                 "responsible_party": "CODEX",
                 "action_kind": "CORRECT_AND_REVALIDATE",
                 "automatic_continuation_allowed": True,
+                "corrections": [
+                    {
+                        "cause": "Visible project summary differs from canonical state",
+                        "diagnostic_id": "DGN-0001",
+                        "path": "docs/project/PRD.md",
+                        "task_id": "NONE",
+                        "validation_evidence": [],
+                        "write_boundary": ["docs/project/PRD.md"],
+                    }
+                ],
+                "engine_rerun": {
+                    "command": "python scripts/bootstrap_doctor.py --root . --json "
+                    "--prior-remediation-fingerprint " + fingerprint,
+                    "fingerprint": fingerprint,
+                },
             },
         )
-        self.assertEqual(remediation["items"][0]["category"], "AGENT_CORRECTION")
+        self.assertEqual(
+            remediation["items"][0],
+            {
+                "automatic_correction_allowed": True,
+                "category": "AGENT_CORRECTION",
+                "cause": "Visible project summary differs from canonical state",
+                "diagnostic_code": "DOCUMENT_SUMMARY_STALE",
+                "diagnostic_id": "DGN-0001",
+                "path": "docs/project/PRD.md",
+                "responsible_party": "CODEX",
+            },
+        )
 
     def test_missing_ambiguous_and_private_sources_fail_closed(self) -> None:
         specifications = template_specifications()

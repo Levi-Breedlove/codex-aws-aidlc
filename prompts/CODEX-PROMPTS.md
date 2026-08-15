@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.2.45
+**Pack version:** 1.2.46
 
 Fastlane turns an idea or repository into approved requirements, an AWS-informed
 plan, bounded local construction, and honest verification. Owners use the first
@@ -415,7 +415,7 @@ Use the Deliver bugfix procedure and preserve the existing route and authority.
 **Authoritative inputs:** Report/PRD. **Permitted writes:** `dist/architecture/<DES>-<semantic-sha256>/**`.
 **GitHub mode:** None. **AWS mode:** NONE; do not inspect credentials.
 **Required authorization:** Gate B; AWS authority NONE. **Stop conditions:** Stale/mismatch/conflict/failure.
-**Receipt:** `[DIAGRAM-10]`: `architecture-board-task-manifest.json`, `architecture-source.mmd`, `PENDING_DERIVATION`; no pre-creation digest. `NEW_DERIVATION` writes/hashes/reloads schema-2 `source-model.json`.
+**Receipt:** `[DIAGRAM-10]`: `architecture-board-task-manifest.json`, `architecture-source.mmd`, `PENDING_DERIVATION`; no pre-creation digest. `NEW_DERIVATION` writes/hashes/reloads schema-2 `source-model.json`. Observed: crops; reported: render/icons.
 **Next:** restore the route; conflict -> DESIGN-10 without silent repair; never create a third gate.
 ## TASK-10 — Executable Task Plan
 

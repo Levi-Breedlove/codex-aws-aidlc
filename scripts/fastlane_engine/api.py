@@ -9,8 +9,6 @@ AWS, approves a gate, or grants authority.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime, timezone
@@ -31,8 +29,6 @@ from .aws import (
 
 from .core.contracts import (
     contract_table_after_heading,
-    path_boundaries_overlap,
-    path_boundary_contains,
     table_after_heading,
 )
 from .core.ids import clean_cell, validate_relative_path
@@ -104,18 +100,20 @@ from .deliver import (
 )
 from .evaluation import EngineEvaluation
 
-ARCHITECTURE_DIAGRAM_SKILL_IDENTITY = {
-    "name": "aws-architecture-diagrams",
-    "version": "1.3.1",
-    "contract_id": "aws-architecture-diagrams/v1.3",
-    "source_model_schema_version": 2,
-    "tree_sha256": "sha256:3482ba7a5cb5f8b9db12f4eb25700f257e04f5fedb50eb2c8d64d5ff00062977",
-    "release_sha256": "sha256:ffa17e5905bfb83ce7b302894760745b192a625eafa7ea7261613df9a0134d4",
-}
-ARCHITECTURE_BOARD_OWNER_REQUEST = "Generate the planned AWS architecture board."
-
-if TYPE_CHECKING:
-    from .project_delivery import DELIVERY_VALIDATION_POLICY
+from .design.architecture_board import (
+    ARCHITECTURE_BOARD_OWNER_REQUEST,
+    ARCHITECTURE_BOARD_QA_TILES,
+    ARCHITECTURE_BOARD_REQUIRED_OUTPUTS,
+    ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+    _ARCHITECTURE_BOARD_VALIDATION_CHECKS,
+    _ARCHITECTURE_BOARD_VISUAL_CHECKS,
+    _architecture_board_expected_paths,
+    architecture_board_completion_digest,
+    architecture_board_mermaid_source,
+    derive_architecture_board_handoff,
+    derive_architecture_board_request_packet,
+    validate_architecture_board_completion,
+)
 
 
 def capture_project_snapshot(
@@ -142,330 +140,19 @@ def capture_project_snapshot(
     return observer.freeze()
 
 
-_BOARD_SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
-_BOARD_RECORDS = {
-    "DIAGRAM-0001": ("SYSTEM_CONTEXT", "proposed-system-at-a-glance"),
-    "DIAGRAM-0008": ("AWS_IMPLEMENTATION", "aws-implementation-at-a-glance"),
-}
-
-
-def _architecture_board_record(
-    diagrams: Mapping[str, Any], diagram_id: str
-) -> dict[str, Any] | None:
-    rows = [
-        row
-        for row in diagrams.get("records", [])
-        if isinstance(row, Mapping) and row.get("diagram_id") == diagram_id
-    ]
-    if len(rows) != 1:
-        return None
-    row = rows[0]
-    kind, anchor = _BOARD_RECORDS[diagram_id]
-    valid = (
-        row.get("kind") == kind
-        and row.get("applicability") == "REQUIRED"
-        and row.get("status") == "CURRENT"
-        and row.get("anchor") == anchor
-        and isinstance(row.get("relationships"), list)
-        and bool(row["relationships"])
-        and all(isinstance(edge, Mapping) for edge in row["relationships"])
-        and all(
-            _BOARD_SHA256.fullmatch(str(row.get(key, "")))
-            for key in ("semantic_sha256", "rendered_sha256")
-        )
-    )
-    return dict(row) if valid else None
-
-
-def _architecture_board_report_current(
-    report: Mapping[str, Any], parts: tuple[Any, ...]
-) -> bool:
-    if not all(isinstance(item, Mapping) for item in parts):
-        return False
-    gates, design, project, diagrams, authority, auth, external = parts
-    return bool(
-        report.get("schema_version") == 2
-        and report.get("ok") is True
-        and gates.get("gate_a") == "APPROVED_FOR_DESIGN"
-        and gates.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
-        and design.get("schema_version") == project.get("schema_version") == 7
-        and design.get("status") == project.get("status") == "READY"
-        and not any(project.get(f"grandfathered_v{version}") for version in (4, 5, 6))
-        and diagrams.get("status") == "CURRENT"
-        and diagrams.get("grandfathered_schema5") is False
-        and authority.get("valid") is True
-        and authority.get("active_task") == "NONE"
-        and authority.get("authorization_id") == auth.get("construction")
-        and auth.get("construction") != "NONE"
-        and auth.get("aws") == "NONE"
-        and external.get("kind") == external.get("validity") == "NONE"
-    )
-
-
-def _architecture_board_conflict(
-    diagrams: Mapping[str, Any] | None,
-    primary: Mapping[str, Any] | None,
-    cross_check: Mapping[str, Any] | None,
-) -> bool:
-    if diagrams is None or primary is None or cross_check is None:
-        return False
-
-    primary_edges = {(e["from_id"], e["to_id"]) for e in primary["relationships"]}
-    cross_edges = {(e["from_id"], e["to_id"]) for e in cross_check["relationships"]}
-
-    def reaches(source: str, target: str) -> bool:
-        frontier = {right for left, right in primary_edges if left == source}
-        for _ in primary.get("referenced_ids", []):
-            frontier |= {right for left, right in primary_edges if left in frontier}
-        return target in frontier
-
-    basis = diagrams.get("architecture_basis_id")
-    return bool(
-        basis not in primary.get("basis_ids", [])
-        or basis not in cross_check.get("basis_ids", [])
-        or not set(cross_check.get("referenced_ids", [])).issubset(
-            primary.get("referenced_ids", [])
-        )
-        or any(not reaches(source, target) for source, target in cross_edges)
-    )
-
-
-def _architecture_board_output(
-    design: Mapping[str, Any] | None,
-    primary: Mapping[str, Any] | None,
-    authority: Mapping[str, Any] | None,
-) -> tuple[str | None, str | None, bool]:
-    revision = str(design.get("design_revision", "")) if design else ""
-    semantic = str(primary.get("semantic_sha256", "")) if primary else ""
-    root = (
-        f"dist/architecture/{revision}-{semantic[7:]}"
-        if re.fullmatch(r"DES-\d{4,}", revision) and _BOARD_SHA256.fullmatch(semantic)
-        else None
-    )
-    boundary = f"{root}/**" if root else None
-    roots = authority.get("approved_write_roots", []) if authority else []
-    blocked = [
-        *(authority.get("exclusions", []) if authority else []),
-        *(authority.get("protected_paths", []) if authority else []),
-    ]
-    authorized = bool(
-        boundary
-        and all(isinstance(path, str) for path in [*roots, *blocked])
-        and any(path_boundary_contains(path, boundary) for path in roots)
-        and not any(path_boundaries_overlap(path, boundary) for path in blocked)
-    )
-    return root, boundary, authorized
-
-
-def derive_architecture_board_handoff(report: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the request-scoped planned-board capability; never infer a plugin."""
-
-    gates, design = report.get("gates"), report.get("design_contract")
-    project = design.get("project_contract") if isinstance(design, Mapping) else None
-    diagrams = design.get("diagram_contract") if isinstance(design, Mapping) else None
-    authority, auth = report.get("write_authority"), report.get("authorizations")
-    external = report.get("external_authority")
-    parts = (gates, design, project, diagrams, authority, auth, external)
-    current = _architecture_board_report_current(report, parts)
-    if isinstance(diagrams, Mapping):
-        primary = _architecture_board_record(diagrams, "DIAGRAM-0001")
-        cross_check = _architecture_board_record(diagrams, "DIAGRAM-0008")
-    else:
-        primary = cross_check = None
-    conflict = _architecture_board_conflict(diagrams, primary, cross_check)
-    root, boundary, authorized = _architecture_board_output(
-        design if isinstance(design, Mapping) else None,
-        primary,
-        authority if isinstance(authority, Mapping) else None,
-    )
-    issues = [
-        *([] if current else ["CURRENT_GATE_B_REQUIRED"]),
-        *([] if primary else ["SYSTEM_CONTEXT_DIAGRAM_REQUIRED"]),
-        *([] if cross_check else ["AWS_IMPLEMENTATION_DIAGRAM_REQUIRED"]),
-        *(["DIAGRAM_CROSS_CHECK_CONFLICT"] if conflict else []),
-        *([] if root else ["DIAGRAM_OUTPUT_IDENTITY_INVALID"]),
-        *([] if authorized else ["DIAGRAM_OUTPUT_NOT_AUTHORIZED"]),
-    ]
-    status = (
-        "SEMANTIC_CONFLICT" if conflict else ("ELIGIBLE", "INELIGIBLE")[bool(issues)]
-    )
-    return {
-        "status": status,
-        "eligible": not issues,
-        "issues": issues,
-        "source_path": "docs/project/PRD.md",
-        "source": primary,
-        "cross_check": cross_check,
-        "output_root": root,
-        "failure_route": "DESIGN-10" if conflict else None,
-        "aws_authority": "NONE",
-        "external_authority": "NONE",
-    }
-
-
-def architecture_board_mermaid_source(text: str, handoff: Mapping[str, Any]) -> str:
-    from .design.diagrams import _canonical_mermaid_block
-
-    source = handoff.get("source")
-    if handoff.get("eligible") is not True or not isinstance(source, Mapping):
-        raise ValueError("architecture board handoff is not eligible")
-    rendered_bytes, rendered = _canonical_mermaid_block(text, str(source.get("anchor")))
-    observed = "sha256:" + hashlib.sha256(rendered_bytes).hexdigest()
-    if observed != source.get("rendered_sha256"):
-        raise ValueError("approved Mermaid presentation digest changed")
-    return rendered.removeprefix("```mermaid\n").removesuffix("```\n")
-
-
-def _architecture_board_request_manifest(
-    handoff: Mapping[str, Any],
-    design: Mapping[str, Any],
-    project: Mapping[str, Any],
-    construction: str,
-    mermaid_path: str,
-    mermaid_sha256: str,
-    source_model_path: str,
-) -> dict[str, Any]:
-    source, cross_check = handoff["source"], handoff["cross_check"]
-    output_root = str(handoff["output_root"])
-    return {
-        "schema_version": 1,
-        "kind": "FASTLANE_ARCHITECTURE_BOARD_REQUEST",
-        "request": ARCHITECTURE_BOARD_OWNER_REQUEST,
-        "status": "CURRENT",
-        "architecture_status": "PLANNED",
-        "project": {"name": project.get("name"), "region": project.get("region")},
-        "lifecycle": {"route": "TASK-10", "resume_route": "TASK-10"},
-        "authority": {
-            "construction_authorization_id": construction,
-            "permitted_output_boundary": f"{output_root}/**",
-            "aws": "NONE",
-            "external": "NONE",
-        },
-        "design": {
-            "revision": design.get("design_revision"),
-            "canonical_sha256": design.get("canonical_sha256"),
-        },
-        "approved_mermaid": {
-            "prd_path": handoff.get("source_path"),
-            "anchor": source.get("anchor"),
-            "diagram_id": source.get("diagram_id"),
-            "semantic_sha256": source.get("semantic_sha256"),
-            "rendered_sha256": source.get("rendered_sha256"),
-            "target_path": mermaid_path,
-            "sha256": mermaid_sha256,
-        },
-        "mandatory_cross_check": {
-            "diagram_id": cross_check.get("diagram_id"),
-            "semantic_sha256": cross_check.get("semantic_sha256"),
-            "rendered_sha256": cross_check.get("rendered_sha256"),
-        },
-        "source_model": {
-            "mode": "NEW_DERIVATION",
-            "state": "PENDING_DERIVATION",
-            "schema_version": 2,
-            "target_path": source_model_path,
-            "target_must_be_absent": True,
-        },
-        "skill": dict(ARCHITECTURE_DIAGRAM_SKILL_IDENTITY),
-        "output": {
-            "directory": output_root,
-            "required": [
-                "architecture-board.drawio",
-                "architecture-board.svg",
-                "architecture-board.png",
-                "architecture-board.md",
-                "architecture-board-manifest.json",
-                "architecture-board-validation.json",
-                "architecture-board-render.json",
-                "visual-review-receipt.json",
-                "qa-tiles/qa-tiles-manifest.json",
-            ],
-        },
-    }
-
-
-def derive_architecture_board_request_packet(
+def capture_architecture_board_completion(
+    root: Path,
     report: Mapping[str, Any],
-    prd_text: str,
-    skill_identity: Mapping[str, Any],
-    *,
-    owner_request: str,
-    source_model_target_exists: bool,
+    packet: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Derive one local DIAGRAM-10 request packet without writing project state."""
+    """Capture and validate the exact bounded architecture-board bundle once."""
 
-    expected_identity = {
-        **ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
-        "valid": True,
-        "issues": [],
-    }
-    if owner_request != ARCHITECTURE_BOARD_OWNER_REQUEST:
-        raise ValueError("architecture board requires the exact owner request")
-    if dict(skill_identity) != expected_identity:
-        raise ValueError("architecture diagram skill identity is not current")
-    if source_model_target_exists is not False:
-        raise ValueError("NEW_DERIVATION requires an absent source-model target")
+    paths = _architecture_board_expected_paths(packet)
+    observer = SnapshotObserver(root, max_files=len(paths))
+    for relative in sorted(paths):
+        observer.observe_binary(relative)
+    return validate_architecture_board_completion(report, packet, observer.freeze())
 
-    handoff = derive_architecture_board_handoff(report)
-    interaction = report.get("interaction")
-    if (
-        handoff.get("eligible") is not True
-        or report.get("next_prompt") != "TASK-10"
-        or not isinstance(interaction, Mapping)
-        or interaction.get("owner_action_required") is not False
-        or interaction.get("automatic_continuation_allowed") is not True
-    ):
-        raise ValueError("architecture board request is not currently eligible")
-
-    design = report.get("design_contract")
-    authorizations = report.get("authorizations")
-    project = report.get("project")
-    source, cross_check = handoff.get("source"), handoff.get("cross_check")
-    if not all(
-        isinstance(item, Mapping)
-        for item in (design, authorizations, project, source, cross_check)
-    ):
-        raise ValueError("architecture board request evidence is malformed")
-    if any(
-        not isinstance(project.get(field), str) or not project[field].strip()
-        for field in ("name", "region")
-    ):
-        raise ValueError("architecture board project identity is malformed")
-    construction = str(authorizations.get("construction", ""))
-    if not _BOARD_SHA256.fullmatch(
-        str(design.get("canonical_sha256", ""))
-    ) or not re.fullmatch(r"AUTH-\d{4,}", construction):
-        raise ValueError("architecture board authority binding is malformed")
-
-    output_root = str(handoff["output_root"])
-    manifest_path = f"{output_root}/architecture-board-task-manifest.json"
-    mermaid_path = f"{output_root}/architecture-source.mmd"
-    source_model_path = f"{output_root}/source-model.json"
-    mermaid_text = architecture_board_mermaid_source(prd_text, handoff)
-    mermaid_sha256 = (
-        "sha256:" + hashlib.sha256(mermaid_text.encode("utf-8")).hexdigest()
-    )
-    manifest = _architecture_board_request_manifest(
-        handoff,
-        design,
-        project,
-        construction,
-        mermaid_path,
-        mermaid_sha256,
-        source_model_path,
-    )
-    return {
-        "status": "READY",
-        "manifest_path": manifest_path,
-        "manifest": manifest,
-        "manifest_text": json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-        "mermaid_path": mermaid_path,
-        "mermaid_text": mermaid_text,
-        "source_model_path": source_model_path,
-        "resume_route": "TASK-10",
-        "aws_authority": "NONE",
-        "external_authority": "NONE",
-    }
 
 
 def preview_source_brief(root: Path, source_path: str) -> dict[str, Any]:
@@ -1654,6 +1341,8 @@ def validate_approved_property_evidence(
 __all__ = (
     "IntakeFoundationContract",
     "ARCHITECTURE_BOARD_OWNER_REQUEST",
+    "ARCHITECTURE_BOARD_QA_TILES",
+    "ARCHITECTURE_BOARD_REQUIRED_OUTPUTS",
     "ARCHITECTURE_DIAGRAM_SKILL_IDENTITY",
     "DesignContract",
     "ApprovedDeliveryContract",
@@ -1672,7 +1361,9 @@ __all__ = (
     "EngineEvaluation",
     "RequirementsContract",
     "capture_project_snapshot",
+    "capture_architecture_board_completion",
     "architecture_board_mermaid_source",
+    "architecture_board_completion_digest",
     "derive_architecture_board_request_packet",
     "evaluate_project",
     "inspect_project",
@@ -1710,6 +1401,7 @@ __all__ = (
     "derive_task_ready_ids",
     "task_dependency_is_satisfied",
     "validate_approved_property_evidence",
+    "validate_architecture_board_completion",
     "validate_task_execution_basis",
     "validate_task_contracts",
     "validate_task_harness_contracts",

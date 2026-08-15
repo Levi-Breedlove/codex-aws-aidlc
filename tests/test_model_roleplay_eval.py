@@ -200,6 +200,20 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             "continues TASK-10 and grants no AWS authority",
             scenarios["project-diagram-understanding"],
         )
+        for scenario_id, expected in (
+            ("architecture-consultation", "current canonical source locators"),
+            ("requirements-precision", "EARS/GHERKIN labels stay"),
+            ("task-slicing", "exact focused command"),
+            ("harness-selection", "VERIFY destination"),
+            ("one-question-intake", "rather than Nothing"),
+            ("gate-a-brief-comprehension", "actual current outcome"),
+            ("gate-b-brief-comprehension", "exact local write and command envelope"),
+            ("source-navigation", "inclusive rendered range"),
+            ("project-diagram-understanding", "exact artifact root"),
+            ("gate-correction", "does not preserve Gate A"),
+            ("agent-owned-correction", "exact revalidation evidence"),
+        ):
+            self.assertIn(expected, scenarios[scenario_id])
         self.assertIn(
             "architecture-board offer", scenarios["resume-without-repetition"]
         )

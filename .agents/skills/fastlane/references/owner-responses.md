@@ -133,12 +133,18 @@ new owner message may resolve it.
   Confirmation only when the caller supplies the matching new owner-response
   identity from that turn. Show "Recorded", "Project effect", and
   "Correct it"; never replay the confirmation on resume and never persist a
-  shown flag.
+  shown flag. If the same response also renders the next route, use presenter
+  mode `answer-progress`; its `Updated:` line is derived from the recorded
+  change and must not say `Nothing.`
 - At Gate A, accept a correction only as
   "Change the requirements: <correction>." At Gate B, accept one only as
   "Change the design: <correction>." Parse before writing, record owner
   provenance, apply existing staleness rules, and never treat a correction as
-  approval.
+  approval. If a purported design correction adds a product capability, actor,
+  data type, retention rule, integration, or journey absent from the current
+  requirements, treat it as a requirements conflict: do not preserve Gate A,
+  do not write it as design-only state, and route through the requirements
+  correction path.
 - The `Accept all recommendations.` payload is available only after the current
   card is presented and only when the current question is a decision with a complete
   recommendation that requires no detail. A factual question, missing
@@ -198,3 +204,42 @@ a second editable brief.
 - The exact approval receipt remains last and byte-identical. Receipt-only
   owner approval remains valid; after acceptance, continue in the same run and
   show the next project section.
+
+## Comprehension, navigation, and completion replies
+
+- A Gate-comprehension question is a side question, not approval. For Gate A,
+  summarize the actual current outcome, users, first-release scope/non-goals,
+  journey, and measurable success from the Engine-projected brief before
+  explaining the authority limit. For Gate B, name the actual selected architecture
+  and principal rejected alternative, then state the exact
+  allowed local write set, command boundary, attempt/checkpoint limits, and
+  exclusions from the current construction envelope. Restore the same pending
+  gate action and never repeat the formal receipt.
+- A source-navigation reply uses only the current Engine-projected
+  `source_locators`. Render a scannable list containing each locator key,
+  repository-relative path, bound heading, and inclusive current line range.
+  Never reuse offsets from a different raw, template, or previously rendered
+  PRD, and never estimate line numbers.
+- After DIAGRAM-10, claim completion only from observed current task evidence.
+  Use presenter mode `architecture-board-completion` with the current request
+  packet and an Engine-captured completion projection bound to the current
+  Gate B, design digest, construction authorization, and every required output
+  and QA-tile byte. Fastlane independently checks the current report and
+  request binding, Mermaid and source-model direction, SVG and Draw.io
+  structure, artifact hashes, PNG structure, exact PNG-to-tile crops, and
+  receipt file bindings. The pinned skill report may record all 20 external
+  checks, including SVG-to-PNG reproduction, but Fastlane does not rerender the
+  SVG or authenticate that validator execution. Treat the icon package as
+  declared input; byte binding does not authenticate official provenance.
+  Never describe the 20 reported checks or icon provenance as independently
+  observed. Name the exact
+  `dist/architecture/<DES>-<semantic-sha256>/` output root, link
+  `architecture-board-task-manifest.json`, and name the current validation,
+  render, and visual-review receipts. If any artifact or receipt is absent, say
+  the board remains incomplete. Planned diagrams never imply implementation or
+  AWS authority.
+- An agent-owned correction update names the observed defect, current task and
+  write boundary, and exact validation commands/evidence destinations being
+  rerun, followed by the exact one-time Engine rerun command and current
+  remediation fingerprint. Do not reduce it to a generic statement that
+  validation failed.
