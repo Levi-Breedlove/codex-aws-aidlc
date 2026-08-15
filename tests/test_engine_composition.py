@@ -10,7 +10,6 @@ from unittest import mock
 
 from scripts import bootstrap_doctor as doctor
 from scripts.fastlane_engine import api
-from scripts.fastlane_engine import composition
 from scripts.fastlane_engine.deliver import task_remediation_validation_evidence
 from scripts.fastlane_engine.deliver.models import TaskSummary
 from scripts.fastlane_engine.evaluation import EngineEvaluation

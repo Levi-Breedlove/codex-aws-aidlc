@@ -105,8 +105,8 @@ from .design.architecture_board import (
     ARCHITECTURE_BOARD_QA_TILES,
     ARCHITECTURE_BOARD_REQUIRED_OUTPUTS,
     ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
-    _ARCHITECTURE_BOARD_VALIDATION_CHECKS,
-    _ARCHITECTURE_BOARD_VISUAL_CHECKS,
+    _ARCHITECTURE_BOARD_VALIDATION_CHECKS as _ARCHITECTURE_BOARD_VALIDATION_CHECKS,
+    _ARCHITECTURE_BOARD_VISUAL_CHECKS as _ARCHITECTURE_BOARD_VISUAL_CHECKS,
     _architecture_board_expected_paths,
     architecture_board_completion_digest,
     architecture_board_mermaid_source,
@@ -114,6 +114,11 @@ from .design.architecture_board import (
     derive_architecture_board_request_packet,
     validate_architecture_board_completion,
 )
+
+if TYPE_CHECKING:
+    from .project_delivery import (
+        DELIVERY_VALIDATION_POLICY as DELIVERY_VALIDATION_POLICY,
+    )
 
 
 def capture_project_snapshot(
