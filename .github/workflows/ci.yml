@@ -87,8 +87,10 @@ jobs:
         run: |
           python -m tests.render_mermaid_fixtures --output-dir "${RUNNER_TEMP}/fastlane-mermaid"
           puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"
+          mermaid_config="${RUNNER_TEMP}/fastlane-mermaid-config.json"
           # GitHub-hosted Linux disables Chromium's usable sandbox; this process sees sanitized fixtures only.
           printf '%s\n' '{"args":["--no-sandbox"]}' > "${puppeteer_config}"
+          printf '%s\n' '{"htmlLabels":false}' > "${mermaid_config}"
           for source in "${RUNNER_TEMP}"/fastlane-mermaid/*.mmd; do
             for theme in default dark; do
               background="white"
@@ -97,6 +99,7 @@ jobs:
               fi
               npx --yes @mermaid-js/mermaid-cli@11.16.0 \
                 --puppeteerConfigFile "${puppeteer_config}" \
+                --configFile "${mermaid_config}" \
                 --theme "${theme}" \
                 --backgroundColor "${background}" \
                 -i "${source}" \
@@ -104,6 +107,10 @@ jobs:
             done
           done
           test "$(find "${RUNNER_TEMP}/fastlane-mermaid" -name '*.svg' | wc -l)" -eq 22
+          for rendered in "${RUNNER_TEMP}"/fastlane-mermaid/*.svg; do
+            grep -Eq '<text([ >])' "${rendered}"
+            ! grep -Eq '<foreignObject([ >])' "${rendered}"
+          done
 
       - name: Preserve sanitized Golden Project review artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

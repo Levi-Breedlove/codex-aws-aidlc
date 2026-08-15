@@ -294,10 +294,16 @@ class PackageReleaseTests(unittest.TestCase):
             'puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"',
             workflow,
         )
+        self.assertIn(
+            'mermaid_config="${RUNNER_TEMP}/fastlane-mermaid-config.json"', workflow
+        )
         self.assertEqual(workflow.count('{"args":["--no-sandbox"]}'), 1)
+        self.assertEqual(workflow.count('{"htmlLabels":false}'), 1)
+        self.assertNotIn('{"flowchart":{"htmlLabels":false}}', workflow)
         self.assertEqual(
             workflow.count('--puppeteerConfigFile "${puppeteer_config}"'), 1
         )
+        self.assertEqual(workflow.count('--configFile "${mermaid_config}"'), 1)
         self.assertNotIn("--disable-setuid-sandbox", workflow)
         self.assertIn("for theme in default dark", workflow)
         self.assertIn('--theme "${theme}"', workflow)
@@ -306,6 +312,8 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn('--backgroundColor "${background}"', workflow)
         self.assertIn('"${source%.mmd}.${theme}.svg"', workflow)
         self.assertIn("-name '*.svg' | wc -l)\" -eq 22", workflow)
+        self.assertIn("grep -Eq '<text([ >])' \"${rendered}\"", workflow)
+        self.assertIn("! grep -Eq '<foreignObject([ >])' \"${rendered}\"", workflow)
 
     def test_active_project_documents_are_grouped_under_docs_project(self) -> None:
         document_names = ("BUGFIX.md", "PRD.md", "RUNBOOK.md", "TASKS.md", "VERIFY.md")
