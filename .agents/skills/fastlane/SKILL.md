@@ -60,15 +60,14 @@ You are the single coordinator and sole writer.
    evidence-backed recommendations when justified, principal tradeoffs, and
    one next action without changing the projected state, evidence maturity, or
    authority.
-7. Read only the canonical prompt section selected by the Engine. Stable prompt
-   IDs are routing metadata, not owner instructions. BUG-10 and SYNC-10 are the
-   only current-request-scoped adjunct prompts: invoke one only when the current
-   owner message explicitly requests its bounded analysis or named GitHub
-   reconciliation and current authority permits every write. Preserve the
-   Engine-derived route and pending owner action, run only the adjunct's allowed
-   work, rerun the Engine, and return to its derived route. An adjunct cannot
-   replace a lifecycle phase, cross a gate, create authority, or become a
-   persisted next prompt.
+7. Read only Engine-selected prompts; IDs are routing, not owner instructions.
+   BUG-10, DIAGRAM-10, and SYNC-10 are exact-request adjuncts within authority.
+   DIAGRAM-10 requires `aws-architecture-diagrams` 1.3.1, v1.3/schema 2, exact
+   digests, and a pre-Gate-B `dist/architecture/**` boundary. On request,
+   write a task manifest/Mermaid, require absent `source-model.json`, and
+   invoke `NEW_DERIVATION`; skill writes/hashes/reloads it. Never invent its digest.
+   Rerun Engine; restore route, action, and authority.
+   Adjuncts never replace phases, cross gates, grant authority, or persist.
 8. Render routine updates with `python scripts/fastlane_presenter.py owner
    --input-stdin`. Run, validate, checkpoint, and rerun the Engine in the same
    turn while `automatic_continuation_allowed` is true.

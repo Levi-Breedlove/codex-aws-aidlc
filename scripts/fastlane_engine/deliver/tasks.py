@@ -32,6 +32,7 @@ from .evidence import (
     PROPERTY_TEST_EVIDENCE_HEADING,
     fenced_command_lines,
     parse_harness_projection_rows,
+    parse_property_execution_rows,
     parse_property_test_evidence,
     parse_task_completion_evidence,
     parse_verification_matrix,
@@ -53,6 +54,7 @@ from .models import (
     TaskRequirementCoverageResult,
     TaskGraphValidationResult,
     TaskSnapshot,
+    TaskSummary,
     TaskWaiver,
 )
 
@@ -170,6 +172,63 @@ def inspect_task_sections(block: str) -> tuple[dict[str, str], set[str]]:
             duplicates.add(name)
         sections[name] = block[match.end() : end]
     return sections, duplicates
+
+
+def task_remediation_validation_evidence(
+    tasks_text: str, tasks: TaskSummary
+) -> tuple[dict[str, str], ...]:
+    """Project only the sole active task's exact current validation contract."""
+
+    if len(tasks.active) != 1:
+        return ()
+    active_task = tasks.active[0]
+    matches = [
+        task for task in inspect_task_blocks(tasks_text) if task.task_id == active_task
+    ]
+    if len(matches) != 1:
+        return ()
+    sections, duplicates = inspect_task_sections(matches[0].block)
+    if "Validation" in duplicates:
+        return ()
+    validation = sections.get("Validation", "")
+    commands = fenced_command_lines(validation)
+    try:
+        property_rows, _ = parse_property_execution_rows(validation, active_task)
+    except ValueError:
+        property_rows = {}
+    try:
+        harness_rows, _ = parse_harness_projection_rows(validation, active_task)
+    except ValueError:
+        harness_rows = {}
+    projections: dict[str, list[tuple[str, str]]] = {}
+    for row in property_rows.values():
+        projections.setdefault(row.exact_command, []).append(
+            (row.property_id, row.evidence_destination)
+        )
+    for row in harness_rows.values():
+        projections.setdefault(row.exact_command, []).append(
+            (row.harness_id, row.evidence_destination)
+        )
+    result: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for command in commands:
+        bindings = projections.get(
+            command,
+            [("TASK-COMPLETION", "docs/project/VERIFY.md#task-completion-evidence")],
+        )
+        for validation_id, destination in bindings:
+            key = (validation_id, command, destination)
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(
+                {
+                    "validation_id": validation_id,
+                    "command": command,
+                    "evidence_destination": destination,
+                }
+            )
+    return tuple(result)
 
 
 def _document_section(text: str, heading: str) -> str:

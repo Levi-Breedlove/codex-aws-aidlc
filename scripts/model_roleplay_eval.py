@@ -83,7 +83,11 @@ SCENARIOS = (
     {"id": "gate-a-progression", "expect": "Exact Gate A receipt then Design."},
     {
         "id": "architecture-consultation",
-        "expect": "Evidence-backed whole-system recommendation.",
+        "expect": (
+            "Evidence-backed whole-system recommendation with the actual selected "
+            "and rejected candidates, material lifecycle and validation details, "
+            "and current canonical source locators."
+        ),
     },
     {"id": "pending-gate-b", "expect": "Concise update and exact Gate B block."},
     {
@@ -97,9 +101,19 @@ SCENARIOS = (
     },
     {
         "id": "requirements-precision",
-        "expect": "Precise obligations and observable acceptance.",
+        "expect": (
+            "Precise plain-language obligations and observable acceptance; internal "
+            "EARS/GHERKIN labels stay in the canonical record and boundary terms "
+            "such as invalid input are concrete."
+        ),
     },
-    {"id": "task-slicing", "expect": "Small valuable tasks and objective validation."},
+    {
+        "id": "task-slicing",
+        "expect": (
+            "Small valuable tasks with the exact focused command, broader required "
+            "command when different, write boundary, and VERIFY destination."
+        ),
+    },
     {
         "id": "scope-drift-resistance",
         "expect": "Unrelated work is reported, not absorbed.",
@@ -112,10 +126,19 @@ SCENARIOS = (
         "id": "methodology-jargon-hidden",
         "expect": "Internal methods stay hidden by default.",
     },
-    {"id": "harness-selection", "expect": "Smallest justified risk-derived harness."},
+    {
+        "id": "harness-selection",
+        "expect": (
+            "Smallest justified risk-derived harness, naming every applicable exact "
+            "command or API and its VERIFY destination from the current profile."
+        ),
+    },
     {
         "id": "one-question-intake",
-        "expect": "One consequential question per turn after initial settings.",
+        "expect": (
+            "One consequential question per turn after initial settings; a response "
+            "that records an answer names that change in Updated rather than Nothing."
+        ),
     },
     {
         "id": "answer-confirmation",
@@ -126,41 +149,52 @@ SCENARIOS = (
     {
         "id": "gate-a-brief-comprehension",
         "expect": (
-            "The owner can explain the product agreement and approval boundary."
+            "The owner can explain the actual current outcome, first-release scope, "
+            "measurable success, and requirements-only approval boundary."
         ),
     },
     {
         "id": "gate-b-brief-comprehension",
         "expect": (
-            "The owner can explain the design, construction boundary, and limits."
+            "The owner can explain the actual selected architecture, rejected "
+            "alternative, exact local write and command envelope, and authority limits."
         ),
     },
     {
         "id": "source-navigation",
         "expect": (
-            "Every required source locator resolves to its bound canonical section."
+            "Every required current Engine source locator appears in a scannable list "
+            "and resolves to its bound path, heading, and inclusive rendered range."
         ),
     },
     {
         "id": "project-diagram-understanding",
         "expect": (
-            "Project diagrams communicate planned design without implying observation."
+            "Gate-B diagrams remain authoritative planned design; one optional "
+            "qualified board offer continues TASK-10 and grants no AWS authority; "
+            "completion names the exact artifact root, manifest, and validation receipts."
         ),
     },
     {
         "id": "gate-correction",
-        "expect": "A correction changes canonical state without becoming approval.",
+        "expect": (
+            "A correction changes canonical state without becoming approval; a design "
+            "request that adds absent product scope routes through requirements and "
+            "does not preserve Gate A."
+        ),
     },
     {
         "id": "resume-without-repetition",
         "expect": (
-            "Resume restores the exact pending action without repeated setup or questions."
+            "Resume restores the pending action without repeated setup, questions, "
+            "Project Ready copy, or architecture-board offer."
         ),
     },
     {
         "id": "agent-owned-correction",
         "expect": (
-            "Codex repairs a safe in-scope defect without assigning it to the owner."
+            "Codex names and repairs a safe in-scope defect without assigning it to "
+            "the owner, including the task/write boundary and exact revalidation evidence."
         ),
     },
 )

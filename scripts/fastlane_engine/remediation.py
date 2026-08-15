@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Any, Mapping, Protocol
+from typing import Any, Mapping, Protocol, Sequence
 
 from .core.diagnostics import Diagnostic
 from .core.ids import validate_relative_path
@@ -312,6 +312,80 @@ def _owner_authorization_action(items: list[dict[str, Any]]) -> str:
     return "AUTHORIZE_AWS_OPERATION"
 
 
+def _resolved_owner_stage(
+    owner_stage_hint: str | None, gate_a: str, gate_b: str
+) -> str:
+    return (
+        owner_stage_hint
+        if owner_stage_hint in {"DEFINE", "DESIGN", "DELIVER"}
+        else _owner_stage_from_gates(gate_a, gate_b)
+    )
+
+
+def _agent_correction_action(
+    items: list[dict[str, Any]],
+    tasks: TaskSummary,
+    task_validation_evidence: Sequence[Mapping[str, str]],
+    remediation_fingerprint: str,
+) -> dict[str, Any]:
+    corrections: list[dict[str, Any]] = []
+    active_task = tasks.active[0] if len(tasks.active) == 1 else None
+    active_write_set = (
+        list(tasks.write_sets.get(active_task, ())) if active_task else []
+    )
+    for item in items:
+        diagnostic_path = str(item.get("path") or "NONE")
+        ledger_task_owned = bool(
+            active_task
+            and item["diagnostic_code"] in DELIVER_AGENT_DIAGNOSTICS
+            and diagnostic_path in COORDINATOR_LEDGER_PATHS
+            and task_validation_evidence
+        )
+        task_owned = bool(
+            ledger_task_owned
+            or (
+                active_task
+                and diagnostic_path not in COORDINATOR_LEDGER_PATHS
+                and any(
+                    path_boundary_contains(boundary, diagnostic_path)
+                    for boundary in active_write_set
+                )
+            )
+        )
+        write_boundary = (
+            list(dict.fromkeys([*active_write_set, diagnostic_path]))
+            if ledger_task_owned
+            else active_write_set
+            if task_owned
+            else [diagnostic_path]
+        )
+        corrections.append(
+            {
+                "diagnostic_id": item["diagnostic_id"],
+                "cause": item["cause"],
+                "path": diagnostic_path,
+                "task_id": active_task if task_owned else "NONE",
+                "write_boundary": write_boundary,
+                "validation_evidence": (
+                    [dict(row) for row in task_validation_evidence]
+                    if task_owned
+                    else []
+                ),
+            }
+        )
+    command = (
+        "python scripts/bootstrap_doctor.py --root . --json "
+        "--prior-remediation-fingerprint " + remediation_fingerprint
+    )
+    return {
+        "responsible_party": "CODEX",
+        "action_kind": "CORRECT_AND_REVALIDATE",
+        "automatic_continuation_allowed": True,
+        "corrections": corrections,
+        "engine_rerun": {"command": command, "fingerprint": remediation_fingerprint},
+    }
+
+
 def derive_remediation(
     ctx: RemediationContext,
     *,
@@ -323,13 +397,14 @@ def derive_remediation(
     requirements_revision: str | None = None,
     design_revision: str | None = None,
     owner_stage_hint: str | None = None,
+    task_validation_evidence: Sequence[Mapping[str, str]] = (),
 ) -> dict[str, Any]:
     """SAFETY: classify errors and derive one deterministic next action."""
 
-    owner_stage = (
-        owner_stage_hint
-        if owner_stage_hint in {"DEFINE", "DESIGN", "DELIVER"}
-        else _owner_stage_from_gates(gate_a, gate_b)
+    owner_stage = _resolved_owner_stage(
+        owner_stage_hint,
+        gate_a,
+        gate_b,
     )
     items: list[dict[str, Any]] = []
     for index, diagnostic in enumerate(ctx.diagnostics, start=1):
@@ -365,16 +440,17 @@ def derive_remediation(
             responsible_party = "CODEX"
             category = "AGENT_CORRECTION"
             automatic = True
-        items.append(
-            {
-                "diagnostic_id": f"DGN-{index:04d}",
-                "diagnostic_code": diagnostic.code,
-                "path": diagnostic.path,
-                "responsible_party": responsible_party,
-                "category": category,
-                "automatic_correction_allowed": automatic,
-            }
-        )
+        item = {
+            "diagnostic_id": f"DGN-{index:04d}",
+            "diagnostic_code": diagnostic.code,
+            "path": diagnostic.path,
+            "responsible_party": responsible_party,
+            "category": category,
+            "automatic_correction_allowed": automatic,
+        }
+        if category in {"AGENT_CORRECTION", "AGENT_REPLAN"}:
+            item["cause"] = re.sub(r"\s+", " ", diagnostic.message).strip()
+        items.append(item)
 
     codex_payload: list[dict[str, str]] = []
     for item in items:
@@ -430,11 +506,9 @@ def derive_remediation(
             "preserve_done_evidence": True,
         }
     elif codex:
-        next_action = {
-            "responsible_party": "CODEX",
-            "action_kind": "CORRECT_AND_REVALIDATE",
-            "automatic_continuation_allowed": True,
-        }
+        next_action = _agent_correction_action(
+            codex, tasks, task_validation_evidence, remediation_fingerprint
+        )
     elif owner_decisions:
         next_action = {
             "responsible_party": "OWNER",

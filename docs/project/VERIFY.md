@@ -339,9 +339,9 @@ Fastlane fills this record only from a complete current owner message. Read-only
 
 </details>
 
-### Exact action-authorization receipts
+### Canonical action-authorization receipt templates
 
-Fastlane presents the matching copyable receipt only when that action is ready. These templates remain separate because read-only checks, deployment, and teardown grant different authority.
+Fastlane presents the matching canonical template only when that action is ready. The owner must fill every `<...>` placeholder and return the entire block. The template is not an exact or current receipt and grants no authority; only the completed owner reply, after deterministic validation against current project state, can become the exact current receipt. The templates remain separate because read-only checks, deployment, and teardown grant different authority.
 
 <!-- bootstrap:aws-read-preflight-receipt:start -->
 ```text

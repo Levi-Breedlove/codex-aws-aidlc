@@ -294,10 +294,16 @@ class PackageReleaseTests(unittest.TestCase):
             'puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"',
             workflow,
         )
+        self.assertIn(
+            'mermaid_config="${RUNNER_TEMP}/fastlane-mermaid-config.json"', workflow
+        )
         self.assertEqual(workflow.count('{"args":["--no-sandbox"]}'), 1)
+        self.assertEqual(workflow.count('{"htmlLabels":false}'), 1)
+        self.assertNotIn('{"flowchart":{"htmlLabels":false}}', workflow)
         self.assertEqual(
             workflow.count('--puppeteerConfigFile "${puppeteer_config}"'), 1
         )
+        self.assertEqual(workflow.count('--configFile "${mermaid_config}"'), 1)
         self.assertNotIn("--disable-setuid-sandbox", workflow)
         self.assertIn("for theme in default dark", workflow)
         self.assertIn('--theme "${theme}"', workflow)
@@ -306,6 +312,8 @@ class PackageReleaseTests(unittest.TestCase):
         self.assertIn('--backgroundColor "${background}"', workflow)
         self.assertIn('"${source%.mmd}.${theme}.svg"', workflow)
         self.assertIn("-name '*.svg' | wc -l)\" -eq 22", workflow)
+        self.assertIn("grep -Eq '<text([ >])' \"${rendered}\"", workflow)
+        self.assertIn("! grep -Eq '<foreignObject([ >])' \"${rendered}\"", workflow)
 
     def test_active_project_documents_are_grouped_under_docs_project(self) -> None:
         document_names = ("BUGFIX.md", "PRD.md", "RUNBOOK.md", "TASKS.md", "VERIFY.md")
@@ -353,7 +361,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.44")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.46")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -463,6 +471,28 @@ class PackageReleaseTests(unittest.TestCase):
                 self.assertEqual(info.comment, b"")
                 self.assertEqual(archive.read(info), content)
                 self.assertFalse(info.filename.endswith((".zip", ".zip.sha256")))
+
+    def test_architecture_board_outputs_and_companion_skill_are_not_packaged(
+        self,
+    ) -> None:
+        baseline = package_release.build_release_bytes(REPOSITORY_ROOT)
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = Path(temporary) / "candidate"
+            shutil.copytree(
+                REPOSITORY_ROOT,
+                candidate,
+                ignore=shutil.ignore_patterns(
+                    ".git", "__pycache__", "*.pyc", ".ruff_cache", "dist"
+                ),
+            )
+            board = candidate / "dist/architecture/DES-0001-" / "board.svg"
+            board.parent.mkdir(parents=True)
+            board.write_text("planned local artifact\n", encoding="utf-8")
+            self.assertEqual(package_release.build_release_bytes(candidate), baseline)
+        with zipfile.ZipFile(io.BytesIO(baseline)) as archive:
+            names = [info.filename for info in archive.infolist()]
+        self.assertFalse(any("/dist/architecture/" in name for name in names))
+        self.assertFalse(any("aws-architecture-diagrams" in name for name in names))
 
     def test_extracted_release_configures_in_place_and_passes_doctor(self) -> None:
         payload = package_release.build_release_bytes(REPOSITORY_ROOT)

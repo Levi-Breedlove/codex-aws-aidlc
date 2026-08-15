@@ -474,6 +474,92 @@ def _source_disposition_owner_parts(
     )
 
 
+def _whole_system_architecture_selection(
+    design_contract: DesignContract, selection: Any
+) -> str:
+    candidate = next(
+        (
+            item
+            for item in design_contract.architecture.candidates
+            if item.candidate_id == selection.selected_candidate
+        ),
+        None,
+    )
+    return (
+        "Whole-system architecture: "
+        + selection.selected_candidate
+        + (f" — {candidate.architecture_summary}" if candidate is not None else "")
+    )
+
+
+def _required_harness_owner_selections(design_contract: DesignContract) -> list[str]:
+    return [
+        f"{row.harness_id}: {row.selected_check}; "
+        f"COMMAND: {row.exact_command}; EVIDENCE: {row.evidence_destination}"
+        for row in design_contract.harness.rows
+        if row.harness_id in design_contract.harness.required_ids
+    ]
+
+
+def _gate_b_recommendation(design_contract: DesignContract, selection: Any) -> str:
+    candidate = next(
+        (
+            item
+            for item in design_contract.architecture.candidates
+            if item.candidate_id == selection.selected_candidate
+        ),
+        None,
+    )
+    return selection.selected_candidate + (
+        f" — {candidate.architecture_summary}" if candidate is not None else ""
+    )
+
+
+def _gate_b_construction_boundary(envelope: Mapping[str, str]) -> str:
+    return "; ".join(
+        (
+            "Outcome: " + envelope.get("Authorized outcome", "Not yet recorded."),
+            "Writes: " + envelope.get("Allowed repository write set", "NONE"),
+            "Excludes: " + envelope.get("Excluded or owner-only write set", "NONE"),
+            "Commands: " + envelope.get("Local command boundary", "NONE"),
+            "Tasks: " + envelope.get("Maximum generated tasks", "NONE"),
+            "Attempts: " + envelope.get("Attempt budget", "NONE"),
+            "Checkpoints: " + envelope.get("Checkpoint cadence", "NONE"),
+            "External state: " + envelope.get("Allowed external-state targets", "NONE"),
+            "GitHub: " + envelope.get("GitHub boundary", "NONE"),
+            "AWS: " + envelope.get("AWS boundary", "NONE"),
+        )
+    )
+
+
+def _owner_intake_selections(inventory: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        str(item.get("decision_id")): str(item.get("selection", ""))
+        for item in inventory.get("decisions", [])
+        if isinstance(item, Mapping)
+    }
+
+
+def _gate_a_outcome_text(
+    selections: Mapping[str, str], readiness: Mapping[str, str]
+) -> str:
+    return selections.get("INTAKE-0004", readiness.get("Outcome", "Not yet recorded."))
+
+
+def _gate_a_boundary(selections: Mapping[str, str]) -> str:
+    return selections.get("INTAKE-0005") or "Not yet recorded."
+
+
+def _gate_a_success_text(
+    selections: Mapping[str, str], readiness: Mapping[str, str]
+) -> str:
+    measure = selections.get("INTAKE-0006", "Not yet recorded.").rstrip(".; ")
+    acceptance = readiness.get(
+        "Measurable requirement/acceptance IDs", "Not yet recorded."
+    )
+    return measure + "; acceptance records: " + acceptance
+
+
 def _derive_gate_b_decision_inventory(
     design_contract: DesignContract,
     requirements_revision: str,
@@ -542,7 +628,7 @@ def _derive_gate_b_decision_inventory(
         source_keys = list(locator_keys)
         if domain == "application/runtime" and selection is not None:
             selections.insert(
-                0, f"Whole-system architecture: {selection.selected_candidate}"
+                0, _whole_system_architecture_selection(design_contract, selection)
             )
             rationales.insert(0, selection.rationale)
             alternatives.insert(0, selection.rejected_alternatives)
@@ -571,9 +657,7 @@ def _derive_gate_b_decision_inventory(
         if domain == "identity" and selection is not None:
             safeguards.append(selection.security_impact)
         if domain == "validation/construction" and design_contract.harness.rows:
-            selections.append(
-                f"Harness Profile: {len(design_contract.harness.rows)} recorded checks"
-            )
+            selections.extend(_required_harness_owner_selections(design_contract))
             rationales.append(
                 "The approved checks bind construction completion to executable evidence."
             )
@@ -699,6 +783,7 @@ def derive_owner_decision_brief(
         inventory, inventory_issues = _derive_gate_a_decision_inventory(
             prd_text, intake_contract, requirements_contract, status=status
         )
+        intake_selections = _owner_intake_selections(inventory)
         try:
             gate_a_analysis = table_after_heading(
                 prd_text, "### Gate A — agent analysis record"
@@ -714,7 +799,7 @@ def derive_owner_decision_brief(
                 "GATE-A-OUTCOME",
                 "Outcome, users, and first useful journey",
                 [
-                    "Outcome: " + gate_a_card.get("Outcome", "Not yet recorded."),
+                    "Outcome: " + _gate_a_outcome_text(intake_selections, gate_a_card),
                     "Owner and users: "
                     + gate_a_card.get("Owner and users", "Not yet recorded."),
                     "First-release journey: "
@@ -726,6 +811,7 @@ def derive_owner_decision_brief(
                 "GATE-A-BOUNDARY",
                 "First-release boundary",
                 [
+                    "First-release boundary: " + _gate_a_boundary(intake_selections),
                     "Scope and non-goals: "
                     + gate_a_card.get("Scope and non-goals", "Not yet recorded."),
                     "Data and access: "
@@ -742,9 +828,7 @@ def derive_owner_decision_brief(
                 "Success, resilience, Region, and cost",
                 [
                     "Success measures: "
-                    + gate_a_card.get(
-                        "Measurable requirement/acceptance IDs", "Not yet recorded."
-                    ),
+                    + _gate_a_success_text(intake_selections, gate_a_card),
                     "Recovery, Region, and cost: "
                     + gate_a_card.get("Failure/recovery", "Not yet recorded.")
                     + "; "
@@ -849,17 +933,18 @@ def derive_owner_decision_brief(
             status=status,
         )
         selection = design_contract.architecture.selection
+        recommendation = (
+            _gate_b_recommendation(design_contract, selection)
+            if selection is not None
+            else "Not yet selected."
+        )
+        construction_boundary = _gate_b_construction_boundary(envelope)
         sections = [
             _owner_decision_section(
                 "GATE-B-EXECUTIVE",
                 "Executive decision",
                 [
-                    "Recommendation: "
-                    + (
-                        selection.selected_candidate
-                        if selection is not None
-                        else "Not yet selected."
-                    ),
+                    "Recommendation: " + recommendation,
                     "Why it fits: "
                     + (
                         selection.rationale
@@ -872,8 +957,7 @@ def derive_owner_decision_brief(
                         if selection is not None
                         else "Not yet recorded."
                     ),
-                    "Construction boundary: "
-                    + envelope.get("Authorized outcome", "Not yet recorded."),
+                    "Construction boundary: " + construction_boundary,
                 ],
                 [
                     requirements_revision,

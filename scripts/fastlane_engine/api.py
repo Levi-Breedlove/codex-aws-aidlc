@@ -100,8 +100,25 @@ from .deliver import (
 )
 from .evaluation import EngineEvaluation
 
+from .design.architecture_board import (
+    ARCHITECTURE_BOARD_OWNER_REQUEST,
+    ARCHITECTURE_BOARD_QA_TILES,
+    ARCHITECTURE_BOARD_REQUIRED_OUTPUTS,
+    ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+    _ARCHITECTURE_BOARD_VALIDATION_CHECKS as _ARCHITECTURE_BOARD_VALIDATION_CHECKS,
+    _ARCHITECTURE_BOARD_VISUAL_CHECKS as _ARCHITECTURE_BOARD_VISUAL_CHECKS,
+    _architecture_board_expected_paths,
+    architecture_board_completion_digest,
+    architecture_board_mermaid_source,
+    derive_architecture_board_handoff,
+    derive_architecture_board_request_packet,
+    validate_architecture_board_completion,
+)
+
 if TYPE_CHECKING:
-    from .project_delivery import DELIVERY_VALIDATION_POLICY
+    from .project_delivery import (
+        DELIVERY_VALIDATION_POLICY as DELIVERY_VALIDATION_POLICY,
+    )
 
 
 def capture_project_snapshot(
@@ -126,6 +143,20 @@ def capture_project_snapshot(
         else:
             observer.observe_binary(relative)
     return observer.freeze()
+
+
+def capture_architecture_board_completion(
+    root: Path,
+    report: Mapping[str, Any],
+    packet: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Capture and validate the exact bounded architecture-board bundle once."""
+
+    paths = _architecture_board_expected_paths(packet)
+    observer = SnapshotObserver(root, max_files=len(paths))
+    for relative in sorted(paths):
+        observer.observe_binary(relative)
+    return validate_architecture_board_completion(report, packet, observer.freeze())
 
 
 def preview_source_brief(root: Path, source_path: str) -> dict[str, Any]:
@@ -1313,6 +1344,10 @@ def validate_approved_property_evidence(
 
 __all__ = (
     "IntakeFoundationContract",
+    "ARCHITECTURE_BOARD_OWNER_REQUEST",
+    "ARCHITECTURE_BOARD_QA_TILES",
+    "ARCHITECTURE_BOARD_REQUIRED_OUTPUTS",
+    "ARCHITECTURE_DIAGRAM_SKILL_IDENTITY",
     "DesignContract",
     "ApprovedDeliveryContract",
     "ApprovedSpikeContract",
@@ -1330,10 +1365,15 @@ __all__ = (
     "EngineEvaluation",
     "RequirementsContract",
     "capture_project_snapshot",
+    "capture_architecture_board_completion",
+    "architecture_board_mermaid_source",
+    "architecture_board_completion_digest",
+    "derive_architecture_board_request_packet",
     "evaluate_project",
     "inspect_project",
     "aws_core_phase_evidence_issues",
     "derive_change_impact_contract",
+    "derive_architecture_board_handoff",
     "derive_aws_core_observed_usage",
     "derive_aws_execution_projection",
     "derive_coverage_contract",
@@ -1365,6 +1405,7 @@ __all__ = (
     "derive_task_ready_ids",
     "task_dependency_is_satisfied",
     "validate_approved_property_evidence",
+    "validate_architecture_board_completion",
     "validate_task_execution_basis",
     "validate_task_contracts",
     "validate_task_harness_contracts",

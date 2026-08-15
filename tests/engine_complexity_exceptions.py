@@ -255,12 +255,12 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "expires": "1.3.0",
     },
     "composition.py:build_evaluation": {
-        "maximum_lines": 573,
+        "maximum_lines": 577,
         "maximum_complexity": 64,
-        "reviewed_lines": 573,
+        "reviewed_lines": 577,
         "reviewed_complexity": 64,
         "reason": "Top-level immutable composition preserves historical domain order and complete state assembly.",
-        "reviewed_in": "1.2.35",
+        "reviewed_in": "1.2.46",
         "expires": "1.3.0",
     },
     "core/snapshot.py:_synthetic_result": {
@@ -660,12 +660,12 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "expires": "1.3.0",
     },
     "owner_decisions.py:_derive_gate_b_decision_inventory": {
-        "maximum_lines": 154,
+        "maximum_lines": 152,
         "maximum_complexity": 29,
-        "reviewed_lines": 154,
+        "reviewed_lines": 152,
         "reviewed_complexity": 29,
         "reason": "Complete owner projection keeps each required decision and authority boundary together.",
-        "reviewed_in": "1.2.25",
+        "reviewed_in": "1.2.46",
         "expires": "1.3.0",
     },
     "owner_decisions.py:derive_owner_decision_brief": {

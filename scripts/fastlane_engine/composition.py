@@ -59,6 +59,7 @@ from .deliver import (
     inspect_task_blocks,
     parse_task_completion_evidence,
     parse_verification_matrix,
+    task_remediation_validation_evidence,
 )
 from .owner_decisions import (
     derive_owner_answer_confirmation,
@@ -1354,7 +1355,7 @@ def build_evaluation(
 
     def _brief():
         return derive_owner_decision_brief(
-            ctx.texts.get(PRD_FILE, ""),
+            ctx.presentation_texts.get(PRD_FILE, ctx.texts.get(PRD_FILE, "")),
             prd_fields,
             intake_contract,
             requirements_contract,
@@ -1373,6 +1374,7 @@ def build_evaluation(
     owner_answer_confirmation = derive_owner_answer_confirmation(
         ctx.texts.get(PRD_FILE, ""), intake_contract
     )
+    ve = task_remediation_validation_evidence(ctx.texts.get(TASKS_FILE, ""), tasks)
     diagnostic_codes = [item.code for item in ctx.diagnostics]
     remediation = derive_remediation(
         ctx,
@@ -1384,6 +1386,7 @@ def build_evaluation(
         requirements_revision=prd_fields.get("requirements_revision"),
         design_revision=prd_fields.get("design_revision"),
         owner_stage_hint=resolved_owner_stage,
+        task_validation_evidence=ve,
     )
     interaction = derive_interaction(
         lifecycle_state,
@@ -1523,6 +1526,7 @@ def build_evaluation(
             requirements_revision=prd_fields.get("requirements_revision"),
             design_revision=prd_fields.get("design_revision"),
             owner_stage_hint=resolved_owner_stage,
+            task_validation_evidence=ve,
         )
         interaction = derive_interaction(
             lifecycle_state,
@@ -1615,6 +1619,7 @@ def build_evaluation(
             requirements_revision=prd_fields.get("requirements_revision"),
             design_revision=prd_fields.get("design_revision"),
             owner_stage_hint=resolved_owner_stage,
+            task_validation_evidence=ve,
         )
         interaction = derive_interaction(
             lifecycle_state,

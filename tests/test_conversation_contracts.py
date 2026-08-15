@@ -163,12 +163,42 @@ class ConversationContractTests(unittest.TestCase):
         self.assertFalse(report["user_state_persisted_in_repository"])
 
     def test_missing_design_evidence_stays_in_design_for_codex_correction(self) -> None:
+        fingerprint = "sha256:" + "a" * 64
         remediation = {
+            "items": [
+                {
+                    "diagnostic_id": "DGN-0001",
+                    "diagnostic_code": "AWS_CORE_EVIDENCE_REQUIRED",
+                    "path": "docs/project/VERIFY.md",
+                    "cause": "Current official AWS evidence is missing.",
+                    "responsible_party": "CODEX",
+                    "category": "AGENT_CORRECTION",
+                    "automatic_correction_allowed": True,
+                }
+            ],
             "next_action": {
                 "action_kind": "CORRECT_AND_REVALIDATE",
                 "responsible_party": "CODEX",
                 "automatic_continuation_allowed": True,
-            }
+                "corrections": [
+                    {
+                        "diagnostic_id": "DGN-0001",
+                        "cause": "Current official AWS evidence is missing.",
+                        "path": "docs/project/VERIFY.md",
+                        "task_id": "NONE",
+                        "write_boundary": ["docs/project/VERIFY.md"],
+                        "validation_evidence": [],
+                    }
+                ],
+                "engine_rerun": {
+                    "command": (
+                        "python scripts/bootstrap_doctor.py --root . --json "
+                        "--prior-remediation-fingerprint " + fingerprint
+                    ),
+                    "fingerprint": fingerprint,
+                },
+            },
+            "fingerprint": fingerprint,
         }
         interaction = doctor.derive_interaction(
             "BLOCKED",
@@ -310,6 +340,7 @@ class ConversationContractTests(unittest.TestCase):
                 "responsible_party": "CODEX",
                 "category": "AGENT_CORRECTION",
                 "automatic_correction_allowed": True,
+                "cause": "Generated task status is invalid",
             },
         )
         self.assertEqual(remediation["items"][1]["responsible_party"], "OWNER")
@@ -319,6 +350,23 @@ class ConversationContractTests(unittest.TestCase):
                 "responsible_party": "CODEX",
                 "action_kind": "CORRECT_AND_REVALIDATE",
                 "automatic_continuation_allowed": True,
+                "corrections": [
+                    {
+                        "diagnostic_id": "DGN-0001",
+                        "cause": "Generated task status is invalid",
+                        "path": "docs/project/TASKS.md",
+                        "task_id": "NONE",
+                        "write_boundary": ["docs/project/TASKS.md"],
+                        "validation_evidence": [],
+                    }
+                ],
+                "engine_rerun": {
+                    "command": (
+                        "python scripts/bootstrap_doctor.py --root . --json "
+                        "--prior-remediation-fingerprint " + remediation["fingerprint"]
+                    ),
+                    "fingerprint": remediation["fingerprint"],
+                },
             },
         )
         routed = doctor.derive_interaction(

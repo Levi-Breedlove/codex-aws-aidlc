@@ -193,6 +193,22 @@ APPROVED_BEHAVIOR_CHANGES = [
             "AWS access, execution, deployment, recovery, or teardown evidence claim",
         ],
     },
+    {
+        "id": "OWNER_DECISION_EVIDENCE_AND_REMEDIATION_1_2_46",
+        "base_commit": "11f34120660b910d12c529cb0ed0b01c2b530ed9",
+        "scope": [
+            "current prompt-slice bytes for the clarified owner-facing procedures",
+            "concrete Gate A and Gate B owner decision projections and exact current source locators",
+            "risk-derived Harness selection with exact command and evidence destination",
+            "additive agent-correction cause, bounded write set, task validation evidence, and Engine rerun detail",
+        ],
+        "prohibited": [
+            "lifecycle or route change",
+            "gate, authority, or receipt change",
+            "requirement, design, diagram, or construction-envelope semantic change",
+            "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        ],
+    },
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
@@ -202,16 +218,16 @@ SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
         "547740ec1c6690da6ded36c63dd19e9f0ba5c0de3367dae6b4f96a8d6dde01eb"
     ),
     "rendered_intake": (
-        "17238d5b1210b1a0957897155442ea231c77990d027dca1730102fa028ab05a4"
+        "e6afd8ab6be91dd838f3cfa33e36a779753b38849c05f00a8b32c1d350309e91"
     ),
     "gate_a_pending": (
-        "b7cc0d46b7f6947a284af5db35c49a0ea89ac49df7def655d0bee737b04b73e1"
+        "e6fde4991c3de475f3a4821aeab79f5ef4a7c87377ef0f08fe3979890717819b"
     ),
     "gate_a_approved": (
-        "1df5b2dbf7536e2b3c526e82d9cc763fb85f8c86d59bc6dd792d9fb0d95748fc"
+        "6b276a571c34daad92f95856eb61dca880123c077f360ba9f125b3eca796b939"
     ),
     "gate_b_pending": (
-        "2c46ca174ee810fa61510c306d62b8b0ecd75ce5bb8841067f02d016398379fd"
+        "f43aa524fa97ebb0a38f0c8c8dfea419c87398ce08c6b3b4a40b3074457dffd9"
     ),
     "gate_b_approved": (
         "09899b548a21b9895404a6efd3a40158ffd5073fb10990f8802487ebeb31f7eb"
@@ -840,7 +856,7 @@ def receipt_contracts() -> dict[str, dict[str, str]]:
     sections = []
     for heading in (
         "## Exactly accepted Gate receipts",
-        "## Exact conditional AWS action receipts",
+        "## AWS action receipt templates",
     ):
         start = text.index(heading)
         next_heading = text.find("\n## ", start + len(heading))

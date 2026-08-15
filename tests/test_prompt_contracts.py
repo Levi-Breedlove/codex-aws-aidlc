@@ -16,6 +16,7 @@ PROMPT_IDS = [
     "DESIGN-10",
     "DESIGN-20",
     "BUG-10",
+    "DIAGRAM-10",
     "TASK-10",
     "BUILD-10",
     "BUILD-20",
@@ -201,6 +202,72 @@ class PromptPackContractTests(unittest.TestCase):
                 self.assertIn(f"[{prompt_id}]", section)
                 self.assertLessEqual(len(section.encode("utf-8")), 2_000)
 
+    def test_diagram_adjunct_is_optional_local_and_not_a_third_gate(self) -> None:
+        section = self.prompt_section("DIAGRAM-10")
+        for expected in (
+            "DIAGRAM-0001",
+            "DIAGRAM-0008",
+            "dist/architecture/<DES>-<semantic-sha256>/**",
+            "architecture-board-task-manifest.json",
+            "architecture-source.mmd",
+            "v1.3.1",
+            "NEW_DERIVATION",
+            "PENDING_DERIVATION",
+            "source-model.json",
+            "pre-creation digest",
+            "AWS authority NONE",
+            "restore the route",
+            "never create a third gate",
+        ):
+            self.assertIn(expected, section)
+        self.assertIn("do not inspect credentials", section)
+        self.assertIn("without silent repair", section)
+        self.assertNotIn("Gate C", self.prompts)
+        for expected in (
+            "aws-architecture-diagrams` 1.3.1",
+            "write a task manifest/Mermaid",
+            "absent `source-model.json`",
+            "invoke `NEW_DERIVATION`",
+            "Never invent its digest",
+        ):
+            self.assertIn(expected, self.fastlane_skill)
+        for expected in (
+            "applicable new Design-7 project",
+            "include `dist/architecture/**` in the proposed Gate B allowed repository write set",
+            "do not ask another owner question",
+            "create a third gate",
+            "never widened silently",
+        ):
+            self.assertIn(expected, self.fastlane_design)
+
+    def test_owner_explanations_bind_current_values_and_evidence(self) -> None:
+        for expected in (
+            "do not expose labels such as `EARS`",
+            "Define boundary terms such as invalid input",
+            "Never say `Updated: Nothing.`",
+        ):
+            self.assertIn(expected, self.fastlane_define)
+        for expected in (
+            "current canonical decision and source locators",
+            "canonical VERIFY destination",
+            "absent from the current requirements is a requirements conflict",
+        ):
+            self.assertIn(expected, self.fastlane_design)
+        for expected in (
+            "focused validation command",
+            "An `AGENT_CORRECTION` handoff names the observed defect",
+        ):
+            self.assertIn(expected, self.fastlane_deliver)
+        for expected in (
+            "## Comprehension, navigation, and completion replies",
+            "actual current outcome",
+            "actual selected architecture",
+            "uses only the current Engine-projected",
+            "architecture-board-task-manifest.json",
+            "do not preserve Gate A",
+        ):
+            self.assertIn(expected, self.owner_responses)
+
     def test_route_interfaces_keep_external_authority_separate(self) -> None:
         for prompt_id in PROMPT_IDS:
             section = self.prompt_section(prompt_id)
@@ -253,6 +320,45 @@ class PromptPackContractTests(unittest.TestCase):
             self.authorization_receipts,
         )
         self.assertIn("permits no mutation", self.authorization_receipts)
+        authorization_receipts_compact = " ".join(self.authorization_receipts.split())
+        for phrase in (
+            "A placeholder-bearing block is a canonical receipt template",
+            "fill every `<...>` placeholder and return the entire block",
+            "after deterministic validation against current project state",
+            "authority for that action is `NONE`",
+        ):
+            self.assertIn(phrase, authorization_receipts_compact)
+        self.assertIn("AWS action receipt templates", self.prompts)
+        self.assertIn(
+            "Each block is a template, not a receipt or authority",
+            self.prompts,
+        )
+        self.assertIn(
+            "full canonical `AUTHORIZE AWS READ-ONLY PREFLIGHT` receipt template",
+            self.operate_fastlane_aws,
+        )
+        self.assertIn(
+            "fill every `<...>` placeholder and return the entire block",
+            self.operate_fastlane_aws,
+        )
+        self.assertIn(
+            "full canonical teardown receipt template for owner completion",
+            self.fastlane_deliver,
+        )
+        self.assertIn("Canonical action-authorization receipt templates", self.verify)
+        self.assertIn(
+            "The template is not an exact or current receipt and grants no authority",
+            " ".join(self.verify.split()),
+        )
+        self.assertNotIn("matching copyable receipt", self.verify)
+        self.assertIn(
+            "action-specific canonical templates, not receipts, authority",
+            " ".join(self.runbook.split()),
+        )
+        self.assertIn(
+            "Only the completed owner reply, after deterministic validation",
+            " ".join(self.runbook.split()),
+        )
 
     def test_setup_is_chronological_owner_runnable_and_hook_safe(self) -> None:
         headings = (
@@ -479,6 +585,9 @@ class PromptPackContractTests(unittest.TestCase):
             "side questions",
             "turn_boundary_required",
             "Never label an unresolved placeholder",
+            "An owner's statement that a test, preflight, deployment, recovery, or teardown",
+            "A placeholder-bearing AWS block is a template",
+            "fill every `<...>` placeholder and return the entire canonical block",
             "Change the requirements: <correction>",
             "Change the design: <correction>",
             "Owner Decision Briefs",
@@ -738,9 +847,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.44")
-        self.assertIn("**Pack version:** 1.2.44", self.prompts)
-        self.assertIn("Current customer build: **1.2.44**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.2.46")
+        self.assertIn("**Pack version:** 1.2.46", self.prompts)
+        self.assertIn("Current customer build: **1.2.46**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

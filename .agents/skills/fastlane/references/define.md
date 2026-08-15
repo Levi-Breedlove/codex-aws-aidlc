@@ -35,6 +35,8 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A. The Engine owns routing and vali
 - `Accept all recommendations.` applies only to the current decision when its recommendation is complete and needs no detail. It never resolves a factual, stale, changed, or multi-question legacy card. Hidden matching `R-*` input remains compatibility-only and is never displayed.
 - Migrate an unapproved multi-question 1.0.x card by reissuing only its first unresolved question with a new revision and digest. Keep remaining facts open. Never synthesize owner provenance. Preserve an unchanged approved Gate A until a requirements-controlled change.
 - After setup, use one owner decision per turn. A complete owner brief may ground several facts without repetition. Keep acronyms such as RTO, RPO, p95, concurrency, metadata, EARS, QAS, and Harness internal unless the owner used them or asks for technical detail.
+- Keep the owner-facing requirement draft in plain language. Preserve the exact EARS form, acceptance form, IDs, and grammar in the canonical PRD, but do not expose labels such as `EARS`, `EVENT_DRIVEN`, `GHERKIN`, or `MEASURABLE` unless the owner asks for the technical record. Define boundary terms such as invalid input with concrete examples or limits so the obligation and acceptance remain independently testable.
+- When an Answer Confirmation is followed by the next intake card in the same response, pass the newly recorded fact into the presenter's `Updated:` value. Never say `Updated: Nothing.` in the same response that says a new owner answer was recorded.
 
 ## Requirements and Gate A
 

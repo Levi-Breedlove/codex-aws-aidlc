@@ -38,9 +38,11 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
    permissions as capabilities only. They never authorize an AWS change.
 5. Before authenticated account access, require the Engine's authoritative
    `aws_execution.progress_state` to be `AWS_READ_SCOPE_REQUIRED`, present the
-   exact `AUTHORIZE AWS READ-ONLY PREFLIGHT` receipt, and end the turn. Do not
-   inspect credentials or access the named AWS account until the owner's exact
-   current receipt is accepted and projected as read-only authority.
+   full canonical `AUTHORIZE AWS READ-ONLY PREFLIGHT` receipt template, tell the
+   owner to fill every `<...>` placeholder and return the entire block, and end
+   the turn. Do not inspect credentials or access the named AWS account until
+   the owner's complete current receipt is validated, accepted, and projected
+   as read-only authority.
 6. Run `AWS-10` read-only first. Reconfirm the caller, account, role or profile,
    Region, environment, stack, resources, operations, cost, artifact, rollback,
    and expiration against the exact active record.
@@ -151,8 +153,9 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
     `READY_FOR_TEARDOWN` or `RESIDUALS_REMAIN` evidence. RETAIN stops with
     resources intentionally retained and grants no AWS authority. INVESTIGATE
     requires separate current read authority and routes to AWS-40. REMOVE on
-    current `READY_FOR_TEARDOWN` may present AWS-50's exact receipt; REMOVE after
-    `RESIDUALS_REMAIN` first returns to AWS-40 to refresh the proposal. Every
+    current `READY_FOR_TEARDOWN` may present AWS-50's full canonical receipt
+    template for owner completion; REMOVE after `RESIDUALS_REMAIN` first returns
+    to AWS-40 to refresh the proposal. Every
     choice after `RESIDUALS_REMAIN` must be strictly newer than that row. After
     READY, RETAIN and INVESTIGATE must be strictly newer, while an earlier
     owner-provenanced TEARDOWN may carry forward as REMOVE. New residual evidence

@@ -174,6 +174,7 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
         scenarios = {
             scenario["id"]: scenario["expect"] for scenario in plan["scenarios"]
         }
+        self.assertEqual(len(scenarios), 25)
         for scenario_id in (
             "prerequisite-recovery",
             "onboarding-project-ready",
@@ -195,6 +196,27 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
             "one valid naturally spaced reply", scenarios["consultative-intake"]
         )
         self.assertIn("imports no approval", scenarios["source-assisted-define"])
+        self.assertIn(
+            "continues TASK-10 and grants no AWS authority",
+            scenarios["project-diagram-understanding"],
+        )
+        for scenario_id, expected in (
+            ("architecture-consultation", "current canonical source locators"),
+            ("requirements-precision", "EARS/GHERKIN labels stay"),
+            ("task-slicing", "exact focused command"),
+            ("harness-selection", "VERIFY destination"),
+            ("one-question-intake", "rather than Nothing"),
+            ("gate-a-brief-comprehension", "actual current outcome"),
+            ("gate-b-brief-comprehension", "exact local write and command envelope"),
+            ("source-navigation", "inclusive rendered range"),
+            ("project-diagram-understanding", "exact artifact root"),
+            ("gate-correction", "does not preserve Gate A"),
+            ("agent-owned-correction", "exact revalidation evidence"),
+        ):
+            self.assertIn(expected, scenarios[scenario_id])
+        self.assertIn(
+            "architecture-board offer", scenarios["resume-without-repetition"]
+        )
         self.assertEqual(
             plan["evidence_bundle"]["prompt_contract_command"],
             "python scripts/model_roleplay_eval.py prompt-contract --root . --json",

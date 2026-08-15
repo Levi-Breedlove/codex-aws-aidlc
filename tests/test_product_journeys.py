@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -31,6 +32,7 @@ import fastlane_context as context_runtime
 import package_release
 import setup_assistant as setup
 import task_waves
+from scripts.fastlane_engine import api as engine_api
 
 
 class ProductJourneyTests(unittest.TestCase):
@@ -398,13 +400,24 @@ class ProductJourneyTests(unittest.TestCase):
                 self.assertEqual(locator["path"], "docs/project/PRD.md")
                 self.assertNotIn(locator["heading"], hidden_machine_headings)
                 source = (project / locator["path"]).read_text(encoding="utf-8")
+                source_lines = source.splitlines()
+                self.assertLessEqual(1, locator["start_line"], locator)
+                self.assertLessEqual(
+                    locator["start_line"], locator["end_line"], locator
+                )
+                self.assertLessEqual(locator["end_line"], len(source_lines), locator)
+                self.assertRegex(
+                    source_lines[locator["start_line"] - 1],
+                    rf"^#{{1,6}}\s+{re.escape(str(locator['heading']))}\s*$",
+                    locator,
+                )
                 depth = 0
-                for line in source.splitlines()[: locator["start_line"] - 1]:
+                for line in source_lines[: locator["start_line"] - 1]:
                     depth += line.strip() == "<details>"
                     depth -= line.strip() == "</details>"
                 self.assertEqual(depth, 0, locator)
                 selected = "\n".join(
-                    source.splitlines()[locator["start_line"] - 1 : locator["end_line"]]
+                    source_lines[locator["start_line"] - 1 : locator["end_line"]]
                 )
                 canonical = context_runtime.canonical_source_bytes(selected)
                 self.assertEqual(
@@ -452,6 +465,19 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn("Gate A Owner Decision Brief", rendered_gate_a)
             self.assertIn("## Your recorded decisions", rendered_gate_a)
             self.assertIn("First-release journey: JOURNEY-001", rendered_gate_a)
+            self.assertIn(
+                "Outcome: See the current approved project outcome.", rendered_gate_a
+            )
+            self.assertIn(
+                "First-release boundary: Include one local outcome view; defer "
+                "external integrations.",
+                rendered_gate_a,
+            )
+            self.assertIn(
+                "Success measures: An invited tester can view the approved outcome "
+                "without help; acceptance records:",
+                rendered_gate_a,
+            )
             self.assertIn("Not authorized", rendered_gate_a)
             for locator in gate_a_brief["source_locators"]:
                 anchor = presenter._markdown_anchor(str(locator["heading"]))
@@ -481,6 +507,20 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
+            for exact_owner_fact in (
+                "Recommendation: CAND-0001 — MANAGED_SERVERLESS_BASELINE: bounded "
+                "managed entry, compute, and data services",
+                "Construction boundary: Outcome: OUT-001 — Deliver the FR-001 "
+                "outcome; Writes: PATHS: app/**; tests/**; Excludes: PATHS: "
+                "docs/project/PRD.md; bootstrap.yaml; Commands: ALLOW_PREFIXES: "
+                "python -m unittest; Tasks: 8; Attempts: 3; Checkpoints: "
+                "COMMIT_AFTER_EACH_VALIDATED_WAVE_BEFORE_PAUSE; External state: "
+                "NONE; GitHub: NONE; AWS: DOCS_ONLY",
+                "HARNESS-004: unittest journey validation; COMMAND: python -m "
+                "unittest tests.test_product_journeys; EVIDENCE: "
+                "docs/project/VERIFY.md#harness-execution-evidence",
+            ):
+                self.assertIn(exact_owner_fact, rendered_gate_b)
             navigation_keys = set(briefs.GATE_B_NAVIGATION_LOCATOR_KEYS)
             self.assertTrue(
                 navigation_keys.issubset(
@@ -615,7 +655,7 @@ class ProductJourneyTests(unittest.TestCase):
                 "legacy/existing.txt",
                 "preserved legacy behavior\n",
                 {"kind": "BROWNFIELD_PRESERVE", "paths": ["legacy/**"]},
-                ["legacy/**", "tests/**"],
+                ["legacy/**", "tests/**", "dist/architecture/**"],
             ),
             (
                 "infrastructure-only",
@@ -623,7 +663,7 @@ class ProductJourneyTests(unittest.TestCase):
                 "infrastructure/template.yaml",
                 "Resources: {}\n",
                 {"kind": "NOT_APPLICABLE", "paths": []},
-                ["infrastructure/**", "tests/**"],
+                ["infrastructure/**", "tests/**", "dist/architecture/**"],
             ),
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -646,6 +686,7 @@ class ProductJourneyTests(unittest.TestCase):
                     baseline = fixture.approve_existing_project(
                         project,
                         work_kind=work_kind,
+                        architecture_board=True,
                     )
                     exit_code, report = self.run_doctor_cli(project)
 
@@ -678,6 +719,9 @@ class ProductJourneyTests(unittest.TestCase):
                     )
                     self.assertEqual(report["authorizations"]["aws"], "NONE")
                     self.assertEqual(report["external_authority"]["kind"], "NONE")
+                    handoff = engine_api.derive_architecture_board_handoff(report)
+                    self.assertTrue(handoff["eligible"], handoff["issues"])
+                    self.assertEqual(handoff["aws_authority"], "NONE")
                     self.assertEqual(
                         protected.read_text(encoding="utf-8"), protected_source
                     )
@@ -868,7 +912,9 @@ class ProductJourneyTests(unittest.TestCase):
 
             deliver_project = self.extract_template(temporary, "deliver")
             self.initialize(deliver_project)
-            fixture.approve_project(deliver_project, gate_b=True)
+            fixture.approve_project(
+                deliver_project, gate_b=True, architecture_board=True
+            )
             current = doctor.inspect_project(deliver_project)
             self.assertTrue(current["ok"], current["diagnostics"])
             self.assertEqual(current["next_prompt"], "TASK-10")
@@ -889,7 +935,53 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn(
                 "(docs/project/TASKS.md#current-progress)", after_gate_b_update
             )
+            handoff = engine_api.derive_architecture_board_handoff(current)
+            identity = {
+                **presenter.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
+                "valid": True,
+                "issues": [],
+            }
+            offer = presenter.render_architecture_board_offer(
+                current, handoff, identity, transition="GATE_B_ACCEPTED"
+            )
+            self.assertTrue(handoff["eligible"], handoff["issues"])
+            self.assertIn("Generate the planned AWS architecture board.", offer)
+            self.assertIn("Need from you: Nothing.", offer)
+            self.assertNotIn(
+                "Optional planned architecture board",
+                presenter.render_owner_update(current),
+            )
 
+            prd_path = deliver_project / "docs/project/PRD.md"
+            prd_text = prd_path.read_text(encoding="utf-8")
+            current_before_packet = json.dumps(current, sort_keys=True)
+            packet = engine_api.derive_architecture_board_request_packet(
+                current,
+                prd_text,
+                identity,
+                owner_request=engine_api.ARCHITECTURE_BOARD_OWNER_REQUEST,
+                source_model_target_exists=False,
+            )
+            manifest = json.loads(packet["manifest_text"])
+            output_root = deliver_project / Path(handoff["output_root"])
+            self.assertEqual(packet["status"], "READY")
+            self.assertEqual(packet["resume_route"], "TASK-10")
+            self.assertEqual(
+                manifest["authority"]["construction_authorization_id"],
+                current["authorizations"]["construction"],
+            )
+            self.assertEqual(
+                manifest["design"]["canonical_sha256"],
+                current["design_contract"]["canonical_sha256"],
+            )
+            self.assertEqual(manifest["source_model"]["mode"], "NEW_DERIVATION")
+            self.assertEqual(manifest["source_model"]["state"], "PENDING_DERIVATION")
+            self.assertFalse(output_root.exists())
+            self.assertFalse(
+                (deliver_project / Path(packet["source_model_path"])).exists()
+            )
+            self.assertEqual(prd_path.read_text(encoding="utf-8"), prd_text)
+            self.assertEqual(json.dumps(current, sort_keys=True), current_before_packet)
             verify_path = deliver_project / "docs/project/VERIFY.md"
             current_evidence = verify_path.read_text(encoding="utf-8")
             verify_path.write_text(
@@ -916,8 +1008,13 @@ class ProductJourneyTests(unittest.TestCase):
             self.assertIn("Project state changed: No.", side_answer)
             self.assertIn("Pending next action: Nothing.", side_answer)
             self.assertIn(
-                "Next: Codex will correct the reported in-scope failure and rerun "
-                "validation.",
+                "Next: Codex will correct DGN-0001 in docs/project/VERIFY.md; "
+                "task: NONE; write boundary: docs/project/VERIFY.md",
+                side_answer,
+            )
+            self.assertIn(
+                "then rerun the Engine with `python scripts/bootstrap_doctor.py "
+                "--root . --json --prior-remediation-fingerprint sha256:",
                 side_answer,
             )
 
@@ -1709,7 +1806,10 @@ class ProductJourneyTests(unittest.TestCase):
             ),
             answer="The preflight can inspect only the exact named scope.",
         )
-        self.assertIn("It grants no mutation.", read_scope_text)
+        self.assertIn("AWS read-only preflight receipt template", read_scope_text)
+        self.assertIn("the named reads remain unauthorized", read_scope_text)
+        self.assertIn("no mutation is permitted", read_scope_text)
+        self.assertNotIn("exact current receipt", read_scope_text)
         running_text = presenter.render_owner_update(
             presenter_fixtures.aws_progress_report("AWS_PREFLIGHT_RUNNING")
         )
@@ -1737,7 +1837,9 @@ class ProductJourneyTests(unittest.TestCase):
             ),
             answer="The preflight does not authorize deployment.",
         )
-        self.assertIn("deployment receipt", mutation_text)
+        self.assertIn("AWS deployment receipt template", mutation_text)
+        self.assertIn("no AWS mutation is authorized", mutation_text)
+        self.assertNotIn("exact current receipt", mutation_text)
         self.assertNotIn("teardown receipt", mutation_text)
 
     def test_failed_task_evidence_cannot_produce_false_done(self) -> None:
