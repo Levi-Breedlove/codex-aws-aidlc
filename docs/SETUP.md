@@ -119,8 +119,8 @@ minimize cost; no hard cap
 After initialization, Fastlane resumes from its recorded project state and
 does not repeat prerequisites, setup questions, or the Project Ready handoff.
 
-Ruff is only a Fastlane maintainer and CI check. Project owners do not install
-Ruff system-wide to use the template.
+Ruff is only a Fastlane maintainer qualification check. Project owners do not
+install Ruff system-wide to use the template.
 
 ## Privacy, hooks, and authority
 

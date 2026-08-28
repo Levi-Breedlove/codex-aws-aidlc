@@ -99,12 +99,15 @@ PR-gated flow:
 2. push only that short-lived branch and open a pull request targeting only
    `fast-lane`;
 3. require the pull request branch to be current with the customer tip; and
-4. merge only after all of these exact checks pass:
-   - `safety-tests (3.11)`;
-   - `safety-tests (3.12)`;
-   - `safety-tests (3.13)`;
-   - `windows-smoke`; and
-   - `macos-setup-smoke`.
+4. merge only after the exact-head local release qualification in
+   `references/qualification.md` passes and its sanitized evidence is reviewed.
+
+The customer template intentionally ships no recurring GitHub Actions workflow.
+Local release evidence is manually reviewed and is not a GitHub status check.
+The live branch rule must not require retired workflow contexts; changing that
+rule remains a separate repository-setting action and must preserve every other
+review and protection setting. Dependabot remains a weekly dependency monitor,
+never a test runner, approval, or auto-merge authority.
 
 A direct push to `fast-lane` requires explicit emergency publication
 authorization naming that branch and push. Never force-push or delete the

@@ -287,11 +287,17 @@ class RepositoryHygieneTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, dependabot.casefold())
 
-        workflow = (REPOSITORY_ROOT / ".github/workflows/ci.yml").read_text(
-            encoding="utf-8"
+        workflow_root = REPOSITORY_ROOT / ".github" / "workflows"
+        workflow_files = (
+            sorted(
+                path.relative_to(REPOSITORY_ROOT).as_posix()
+                for path in workflow_root.rglob("*")
+                if path.is_file() and path.suffix.casefold() in {".yml", ".yaml"}
+            )
+            if workflow_root.exists()
+            else []
         )
-        self.assertIn("Run extracted release and Fastlane Engine smoke", workflow)
-        self.assertNotIn("Run extracted release and doctor smoke", workflow)
+        self.assertEqual(workflow_files, [])
 
     def test_feedback_form_is_privacy_safe(self) -> None:
         form = (
