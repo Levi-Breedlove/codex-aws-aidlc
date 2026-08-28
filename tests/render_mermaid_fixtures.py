@@ -360,7 +360,7 @@ def collect_prd_fixtures() -> dict[str, tuple[str, dict[str, object]]]:
 
 
 def collect_mermaid_fixtures(_root: Path | None = None) -> dict[str, str]:
-    """Return the exact sanitized Mermaid sources rendered in CI."""
+    """Return the exact sanitized Mermaid sources used in qualification."""
 
     helper_source = _manifest_bound_text(GOLDEN_HELPER_PATH)
     pattern_source = _manifest_bound_text(GOLDEN_PATTERN_PATH)

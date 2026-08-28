@@ -191,7 +191,7 @@ flowchart TB
         WRITES["Validated canonical-record writes"]
         TASKSTATE["task_waves.py task-state mutation"]
         LOCAL["Approved application and infrastructure edits"]
-        CHECKS["Harness and CI observations"]
+        CHECKS["Harness and local evidence"]
         OPERATE["Operate Fastlane AWS"]
         ACCOUNT["Bounded AWS account action"]
         RESULTS["Observed local and AWS results"]

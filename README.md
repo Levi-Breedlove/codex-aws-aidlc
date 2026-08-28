@@ -2,11 +2,14 @@
 
 > Governed Codex delivery for AWS applications—from product idea to verified result.
 
-[![Fastlane CI](https://github.com/Levi-Breedlove/codex-aws-aidlc/actions/workflows/ci.yml/badge.svg?branch=fast-lane)](https://github.com/Levi-Breedlove/codex-aws-aidlc/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
 
-Current customer build: **1.2.46**.
+Current customer build: **1.2.47**.
+
+Fastlane intentionally avoids recurring hosted CI runs. Maintainers qualify an
+exact release candidate locally and record the observed environment plus any
+untested compatibility combinations before publication.
 
 Fastlane is a repository-native governance platform that turns Codex into a technical guide, AWS architecture consultant, implementation partner, and evidence-driven verifier.
 

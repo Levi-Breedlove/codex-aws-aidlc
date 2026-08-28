@@ -51,12 +51,22 @@ and validate it with `scripts/model_roleplay_eval.py`.
 
 ## Exact-head closure
 
-Require repository precheck, Python 3.11-3.13, Windows, and macOS jobs on the
-exact candidate commit. Any correction after a package build, rendered review,
-role-play, or CI run invalidates the affected evidence and requires a fresh run
-against the new exact head.
+Run the deterministic checks above on the exact candidate in one clean,
+supported local or Codespaces environment and record the observed operating
+system and Python version. Hosted CI, operating-system matrices, and
+multi-version matrices are not release gates. Additional platform results may
+be recorded only when they were actually observed; synthetic setup tests do not
+prove execution on that operating system. Any correction after a package build,
+rendered review, role-play, or local qualification run invalidates the affected
+evidence and requires a fresh run against the new exact head.
+
+The package's declared Python range is a compatibility contract, not evidence
+that every supported interpreter and platform was rerun. The release record
+must name each advertised combination that was not observed; one environment
+must never be described as cross-platform coverage.
 
 Record only sanitized aggregate results, exact commit and package digests,
-test counts, documented skips, CI jobs, and honest limitations. Deterministic,
-rendered, or model evidence never proves independent human comprehension or a
-real AWS deployment, rollback, recovery, or teardown.
+test counts, documented skips, the observed environment, and honest
+limitations. Deterministic, rendered, or model evidence never proves
+independent human comprehension or a real AWS deployment, rollback, recovery,
+or teardown.

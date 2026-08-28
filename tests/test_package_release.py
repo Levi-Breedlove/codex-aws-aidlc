@@ -136,184 +136,43 @@ class PackageReleaseTests(unittest.TestCase):
         self._git(root, "commit", "-m", "base package")
         return root, temporary, self._git(root, "rev-parse", "HEAD")
 
-    def test_ci_workflow_is_read_only_hosted_and_immutably_pinned(self) -> None:
-        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+    def test_repository_ships_no_hosted_actions_workflows(self) -> None:
+        workflow_root = REPOSITORY_ROOT / ".github" / "workflows"
+        workflow_files = (
+            sorted(
+                path.relative_to(REPOSITORY_ROOT).as_posix()
+                for path in workflow_root.rglob("*")
+                if path.is_file() and path.suffix.casefold() in {".yml", ".yaml"}
+            )
+            if workflow_root.exists()
+            else []
+        )
+        self.assertEqual(workflow_files, [])
+
+        manifest = json.loads(
+            (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
+        )
+        for inventory in ("required_files", "source_sha256"):
+            self.assertFalse(
+                any(
+                    path.startswith(".github/workflows/")
+                    for path in manifest[inventory]
+                ),
+                inventory,
+            )
+        self.assertIn(".github/dependabot.yml", manifest["required_files"])
+        self.assertIn(".github/dependabot.yml", manifest["source_sha256"])
+
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        policy = (REPOSITORY_ROOT / "docs/DEPENDENCY-POLICY.md").read_text(
             encoding="utf-8"
         )
-
-        def action_identities(document: str) -> list[str]:
-            uses = [
-                line.split("uses:", 1)[1].strip()
-                for line in document.splitlines()
-                if "uses:" in line
-            ]
-            immutable_pin = re.compile(
-                r"^(?P<identity>[a-z0-9_.-]+/[a-z0-9_.-]+)"
-                r"@(?P<sha>[0-9a-f]{40}) # v[0-9][0-9A-Za-z.-]*$"
-            )
-            matches = [immutable_pin.fullmatch(value) for value in uses]
-            self.assertTrue(all(match is not None for match in matches))
-            return [match.group("identity") for match in matches if match is not None]
-
-        expected_identities = [
-            "actions/checkout",
-            "actions/setup-python",
-            "actions/setup-node",
-            "astral-sh/ruff-action",
-            "actions/upload-artifact",
-        ] + ["actions/checkout", "actions/setup-python"] * 3
-        self.assertEqual(action_identities(workflow), expected_identities)
-
-        current_checkout = re.search(r"actions/checkout@([0-9a-f]{40})", workflow)
-        self.assertIsNotNone(current_checkout)
-        assert current_checkout is not None
-        synthetic_update = workflow.replace(
-            current_checkout.group(0),
-            "actions/checkout@" + "1" * 40,
-            1,
-        )
-        self.assertEqual(action_identities(synthetic_update), expected_identities)
-        for job in ("safety-tests:", "windows-smoke:", "macos-setup-smoke:"):
-            self.assertIn(job, synthetic_update)
-        self.assertEqual(workflow.count("persist-credentials: false"), 4)
-        self.assertIn("permissions:\n  contents: read\n", workflow)
-        for forbidden in (
-            "self-hosted",
-            "secrets.",
-            "pull_request_target",
-            "contents: write",
-            "actions: write",
-            "id-token: write",
-        ):
-            self.assertNotIn(forbidden, workflow)
-        self.assertEqual(workflow.count("actions/upload-artifact@"), 1)
+        self.assertNotIn("actions/workflows/", readme)
+        self.assertNotIn("weekly dependency monitoring", readme)
         self.assertIn(
-            "name: fastlane-golden-review-${{ env.FASTLANE_CANDIDATE_COMMIT }}",
-            workflow,
+            "intentionally ships no recurring GitHub Actions workflow", policy
         )
-        for suffix in ("md", "mmd", "svg"):
-            self.assertIn(
-                f"${{{{ runner.temp }}}}/fastlane-mermaid/*.{suffix}", workflow
-            )
-        self.assertIn("if-no-files-found: error", workflow)
-        self.assertIn("retention-days: 14", workflow)
-
-    def test_ci_push_branches_and_precheck_order_are_exact(self) -> None:
-        workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn(
-            "pull_request:\n"
-            "    types:\n"
-            "      - opened\n"
-            "      - synchronize\n"
-            "      - reopened\n"
-            "      - ready_for_review\n",
-            workflow,
-        )
-        self.assertIn(
-            "push:\n    branches:\n      - fast-lane\n      - fast-lane-foundation\n",
-            workflow,
-        )
-        self.assertNotIn("      - fast-lane-maint\n", workflow)
-        self.assertNotIn("      - legacy\n", workflow)
-        self.assertNotIn("      - Legacy\n", workflow)
-        self.assertNotIn("      - main\n", workflow)
-        self.assertEqual(workflow.count("needs: repository-precheck"), 3)
-        self.assertIn(
-            "FASTLANE_CANDIDATE_COMMIT: "
-            "${{ github.event.pull_request.head.sha || github.sha }}",
-            workflow,
-        )
-        self.assertEqual(workflow.count("ref: ${{ env.FASTLANE_CANDIDATE_COMMIT }}"), 4)
-        self.assertEqual(workflow.count("name: Verify exact candidate checkout"), 4)
-        self.assertEqual(workflow.count("git rev-parse HEAD"), 4)
-        self.assertEqual(workflow.count("if: ${{ always() }}"), 3)
-        self.assertEqual(
-            workflow.count("name: Require successful repository precheck"), 3
-        )
-        self.assertEqual(
-            workflow.count("needs.repository-precheck.result != 'success'"), 3
-        )
-        self.assertIn("fetch-depth: 0", workflow)
-        self.assertIn(
-            "FASTLANE_BASE_COMMIT: "
-            "${{ github.event.pull_request.base.sha || github.event.before }}",
-            workflow,
-        )
-        self.assertNotIn("github.event.repository.is_template", workflow)
-        self.assertIn(
-            "(github.event_name == 'pull_request' && github.base_ref == "
-            "'fast-lane') || (github.event_name == 'push' && "
-            "github.ref_name == 'fast-lane')",
-            workflow,
-        )
-        self.assertIn(
-            'package_release.py --check --base-commit "${FASTLANE_BASE_COMMIT}"',
-            workflow,
-        )
-        ordered_steps = (
-            "Validate Python syntax and indentation",
-            "Run Ruff lint",
-            "Verify Ruff formatting",
-            "Run repository governance monitors",
-            "Run Engine characterization contracts",
-            "Verify template manifest hashes",
-            "Render sanitized published and Golden Project diagrams",
-            "Preserve sanitized Golden Project review artifacts",
-            "Enforce customer package version identity",
-            "Verify deterministic release package",
-        )
-        positions = [workflow.index(f"name: {name}") for name in ordered_steps]
-        self.assertEqual(positions, sorted(positions))
-        self.assertEqual(workflow.count('version: "0.16.0"'), 1)
-        self.assertIn("args: check --no-cache", workflow)
-        self.assertIn(
-            "src: >-\n"
-            "            bootstrap.py\n"
-            "            scripts\n"
-            "            tests\n"
-            "            .codex/hooks\n",
-            workflow,
-        )
-        self.assertIn(
-            "ruff format --check --no-cache bootstrap.py scripts tests .codex/hooks",
-            workflow,
-        )
-        for forbidden in (
-            "git fetch",
-            "git tag",
-            "git push",
-            "gh release",
-        ):
-            self.assertNotIn(forbidden, workflow)
-        self.assertIn("@mermaid-js/mermaid-cli@11.16.0", workflow)
-        self.assertIn('node-version: "22.17.1"', workflow)
-        self.assertIn("python -m tests.render_mermaid_fixtures", workflow)
-        self.assertIn(
-            'puppeteer_config="${RUNNER_TEMP}/fastlane-mermaid-puppeteer.json"',
-            workflow,
-        )
-        self.assertIn(
-            'mermaid_config="${RUNNER_TEMP}/fastlane-mermaid-config.json"', workflow
-        )
-        self.assertEqual(workflow.count('{"args":["--no-sandbox"]}'), 1)
-        self.assertEqual(workflow.count('{"htmlLabels":false}'), 1)
-        self.assertNotIn('{"flowchart":{"htmlLabels":false}}', workflow)
-        self.assertEqual(
-            workflow.count('--puppeteerConfigFile "${puppeteer_config}"'), 1
-        )
-        self.assertEqual(workflow.count('--configFile "${mermaid_config}"'), 1)
-        self.assertNotIn("--disable-setuid-sandbox", workflow)
-        self.assertIn("for theme in default dark", workflow)
-        self.assertIn('--theme "${theme}"', workflow)
-        self.assertIn('background="white"', workflow)
-        self.assertIn('background="#333333"', workflow)
-        self.assertIn('--backgroundColor "${background}"', workflow)
-        self.assertIn('"${source%.mmd}.${theme}.svg"', workflow)
-        self.assertIn("-name '*.svg' | wc -l)\" -eq 22", workflow)
-        self.assertIn("grep -Eq '<text([ >])' \"${rendered}\"", workflow)
-        self.assertIn("! grep -Eq '<foreignObject([ >])' \"${rendered}\"", workflow)
+        self.assertIn("normally has nothing to update", policy)
 
     def test_active_project_documents_are_grouped_under_docs_project(self) -> None:
         document_names = ("BUGFIX.md", "PRD.md", "RUNBOOK.md", "TASKS.md", "VERIFY.md")
@@ -361,7 +220,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.2.46")
+        self.assertEqual(manifest["bootstrap_version"], "1.2.47")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())

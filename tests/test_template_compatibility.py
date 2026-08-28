@@ -42,6 +42,10 @@ class TemplateCompatibilityTests(unittest.TestCase):
         skill = (
             REPOSITORY_ROOT / ".agents/skills/maintain-fastlane/SKILL.md"
         ).read_text(encoding="utf-8")
+        qualification = (
+            REPOSITORY_ROOT
+            / ".agents/skills/maintain-fastlane/references/qualification.md"
+        ).read_text(encoding="utf-8")
         security = (REPOSITORY_ROOT / "SECURITY.md").read_text(encoding="utf-8")
         skill_words = " ".join(skill.split())
         for mode in ("AUDIT", "PLAN", "IMPLEMENT", "PUBLISH"):
@@ -61,14 +65,25 @@ class TemplateCompatibilityTests(unittest.TestCase):
             self.assertNotIn(stale_branch, skill)
             self.assertNotIn(stale_branch, security)
         self.assertIn("separate repository-setting action", skill_words)
-        for check in (
+        self.assertIn(
+            "intentionally ships no recurring GitHub Actions workflow", skill_words
+        )
+        self.assertIn("exact-head local release qualification", skill_words)
+        self.assertIn("is not a GitHub status check", skill_words)
+        self.assertIn("must not require retired workflow contexts", skill_words)
+        self.assertIn("compatibility contract", qualification)
+        self.assertIn("must name each advertised combination", qualification)
+        self.assertIn(
+            "must never be described as cross-platform coverage", qualification
+        )
+        for retired_check in (
             "safety-tests (3.11)",
             "safety-tests (3.12)",
             "safety-tests (3.13)",
             "windows-smoke",
             "macos-setup-smoke",
         ):
-            self.assertIn(f"`{check}`", skill)
+            self.assertNotIn(retired_check, skill)
 
     def test_maintenance_preflight_is_read_only_and_routed_only_to_maintenance(
         self,
