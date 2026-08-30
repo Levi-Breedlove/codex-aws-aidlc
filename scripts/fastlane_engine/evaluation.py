@@ -132,6 +132,11 @@ class EngineEvaluation:
             deliver={
                 "evidence_state": report["evidence_state"],
                 "release_evidence_cutoff": report["release_evidence_cutoff"],
+                **(
+                    {"release_claim": report["release_claim"]}
+                    if "release_claim" in report
+                    else {}
+                ),
                 "tasks": report["tasks"],
             },
             aws={

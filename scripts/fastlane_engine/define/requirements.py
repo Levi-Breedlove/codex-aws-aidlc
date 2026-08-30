@@ -3,14 +3,11 @@
 Canonical input is the current PRD plus an already-derived intake projection.
 Outputs are immutable requirements projections and ordered issue records. This
 module performs no I/O, routing, mutation, approval, authorization, or owner
-rendering. Requirements 1.4 and approved legacy grandfathering remain exactly
-compatible with the characterized pre-extraction behavior.
+rendering. Approved Requirements 1.4 and older grandfathering remain compatible.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from typing import Any
 
@@ -35,6 +32,23 @@ from .models import (
     RequirementsChangeLineage,
     RequirementsContract,
 )
+from .requirements_v15 import (
+    CROSS_CUTTING_RISK_HEADERS,
+    CROSS_CUTTING_RISK_HEADING,
+    DATASET_HEADERS,
+    DATASET_HEADING,
+    EXTERNAL_OBLIGATION_HEADERS,
+    EXTERNAL_OBLIGATION_HEADING,
+    OUTCOME_METRIC_HEADERS,
+    OUTCOME_METRIC_HEADING,
+    PROJECT_COMPLETION_TARGETS,  # noqa: F401 - stable compatibility re-export
+    Requirements15Extension,
+    derive_requirements_15_extension,
+)
+from .schema_compat import (
+    finalize_requirements_contract,
+    select_requirements_schema,
+)
 
 
 NORMATIVE_REQUIREMENT_HEADERS = (
@@ -53,7 +67,7 @@ LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
     "Acceptance form",
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
-PROJECT_CONTRACT_SCHEMA = "1.4"
+PROJECT_CONTRACT_SCHEMA = "1.5"
 REQUIREMENTS_CHANGE_LINEAGE_HEADING = "### Requirements change lineage"
 REQUIREMENTS_CHANGE_LINEAGE_HEADERS = (
     "Current revision",
@@ -653,6 +667,7 @@ def _current_contract_schema(
     dict[str, str],
     list[str],
     bool,
+    bool,
     RequirementsContract | None,
     list[tuple[str, str]],
 ]:
@@ -669,11 +684,9 @@ def _current_contract_schema(
         document = {}
         if required:
             issues.append(("PROJECT_CONTRACT_MIGRATION_REQUIRED", str(exc)))
-    project_schema = clean_cell(document.get("Project contract schema", ""))
     requirement_rows, acceptance_by_requirement, legacy_ids = (
         _schema_13_requirement_rows(text)
     )
-    observed_headers = {tuple(table[0]) for table in markdown_tables(text) if table}
     current_header_map = {
         NORMATIVE_REQUIREMENT_HEADERS: "Six-column normative requirements",
         ACTOR_HEADERS: ACTOR_HEADING,
@@ -684,125 +697,37 @@ def _current_contract_schema(
         REQUIREMENT_COVERAGE_HEADERS: REQUIREMENT_COVERAGE_HEADING,
         REQUIREMENTS_CHANGE_LINEAGE_HEADERS: REQUIREMENTS_CHANGE_LINEAGE_HEADING,
         ASSUMPTION_LIFECYCLE_HEADERS: ASSUMPTION_LIFECYCLE_HEADING,
+        OUTCOME_METRIC_HEADERS: OUTCOME_METRIC_HEADING,
+        DATASET_HEADERS: DATASET_HEADING,
+        EXTERNAL_OBLIGATION_HEADERS: EXTERNAL_OBLIGATION_HEADING,
+        CROSS_CUTTING_RISK_HEADERS: CROSS_CUTTING_RISK_HEADING,
     }
-    current_present_headers = observed_headers & set(current_header_map)
-    for heading, headers in (
-        (ACTOR_HEADING, ACTOR_HEADERS),
-        (JOURNEY_HEADING, JOURNEY_HEADERS),
-        (RICH_USE_CASE_APPLICABILITY_HEADING, RICH_USE_CASE_APPLICABILITY_HEADERS),
-        (RICH_USE_CASE_HEADING, RICH_USE_CASE_HEADERS),
-        (BUSINESS_RULE_HEADING, BUSINESS_RULE_HEADERS),
-        (REQUIREMENT_COVERAGE_HEADING, REQUIREMENT_COVERAGE_HEADERS),
-        (REQUIREMENTS_CHANGE_LINEAGE_HEADING, REQUIREMENTS_CHANGE_LINEAGE_HEADERS),
-        (ASSUMPTION_LIFECYCLE_HEADING, ASSUMPTION_LIFECYCLE_HEADERS),
-    ):
-        try:
-            if contract_table_after_heading(text, heading, headers) is not None:
-                current_present_headers.add(headers)
-        except ValueError:
-            pass
-    grandfather_schema_13 = bool(project_schema == "1.3" and grandfather_current_gate_a)
-    if project_schema == PROJECT_CONTRACT_SCHEMA or grandfather_schema_13:
-        return (
-            document,
-            requirement_rows,
-            acceptance_by_requirement,
-            legacy_ids,
-            grandfather_schema_13,
-            None,
-            issues,
-        )
-
-    legacy_headers = observed_headers & {
-        LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
-        LEGACY_REQUIREMENT_HEADERS,
-    }
-    real_legacy_ids = [
-        identifier
-        for identifier in legacy_ids
-        if STABLE_CONTRACT_ID.fullmatch(identifier)
-    ]
-    exact_legacy_shape = bool(
-        not project_schema
-        and real_legacy_ids
-        and len(real_legacy_ids) == len(legacy_ids)
-        and len(real_legacy_ids) == len(set(real_legacy_ids))
-        and len(legacy_headers) == 1
-        and not current_present_headers
-    )
-    if grandfather_current_gate_a and exact_legacy_shape:
-        approved_ids = tuple(sorted(real_legacy_ids))
-        legacy_rows = [
-            tuple(clean_cell(cell) for cell in row)
-            for table in markdown_tables(text)
-            if table
-            and tuple(table[0])
-            in {LEGACY_NORMATIVE_REQUIREMENT_HEADERS, LEGACY_REQUIREMENT_HEADERS}
-            for row in table[2:]
-        ]
-        canonical_bytes = (
-            b"PROJECT_CONTRACT_SCHEMA: 1.2\n"
-            + json.dumps(
-                (
-                    clean_cell(document.get("Current requirements revision", "")),
-                    legacy_rows,
-                ),
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ).encode("utf-8")
-            + b"\n"
-        )
-        contract = RequirementsContract(
-            schema_version="1.2",
-            status="GRANDFATHERED",
-            requirement_ids=approved_ids,
-            acceptance_ids=tuple(f"AC-{item}" for item in approved_ids),
-            canonical_sha256="sha256:" + hashlib.sha256(canonical_bytes).hexdigest(),
-            canonical_bytes=canonical_bytes,
-            grandfathered_approved_gate_a=True,
-        )
-        return (
-            document,
-            requirement_rows,
-            acceptance_by_requirement,
-            legacy_ids,
-            False,
-            contract,
-            [],
-        )
-    if not required:
-        return (
-            document,
-            requirement_rows,
-            acceptance_by_requirement,
-            legacy_ids,
-            False,
-            RequirementsContract(status="UNINITIALIZED"),
-            [],
-        )
-    migration_targets = ["Project contract schema 1.4"]
-    migration_targets.extend(
-        label
-        for headers, label in current_header_map.items()
-        if headers not in current_present_headers
-    )
-    contract = RequirementsContract(
-        status="MIGRATION_REQUIRED", missing_records=tuple(migration_targets)
-    )
-    migration_issue = (
-        "PROJECT_CONTRACT_MIGRATION_REQUIRED",
-        "Project contract schema 1.4 is required before Gate A readiness; "
-        "migrate only the listed generated records without inventing owner facts: "
-        + ", ".join(migration_targets),
-    )
-    return (
-        document,
-        requirement_rows,
-        acceptance_by_requirement,
-        legacy_ids,
-        False,
-        contract,
-        [migration_issue],
+    return select_requirements_schema(
+        text,
+        required=required,
+        grandfather_current_gate_a=grandfather_current_gate_a,
+        document=document,
+        document_issues=issues,
+        requirement_rows=requirement_rows,
+        acceptance_by_requirement=acceptance_by_requirement,
+        legacy_ids=legacy_ids,
+        current_schema=PROJECT_CONTRACT_SCHEMA,
+        current_header_map=current_header_map,
+        schema_14_headers={
+            REQUIREMENTS_CHANGE_LINEAGE_HEADERS,
+            ASSUMPTION_LIFECYCLE_HEADERS,
+        },
+        extension_headers={
+            OUTCOME_METRIC_HEADERS,
+            DATASET_HEADERS,
+            EXTERNAL_OBLIGATION_HEADERS,
+            CROSS_CUTTING_RISK_HEADERS,
+        },
+        legacy_headers={
+            LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
+            LEGACY_REQUIREMENT_HEADERS,
+        },
+        stable_contract_id=STABLE_CONTRACT_ID,
     )
 
 
@@ -829,7 +754,7 @@ def derive_requirements_contract(
     required: bool,
     grandfather_current_gate_a: bool,
 ) -> tuple[RequirementsContract, list[tuple[str, str]]]:
-    """SAFETY: Derive the owner-grounded schema 1.4 requirements projection.
+    """SAFETY: Derive the owner-grounded Requirements 1.5 projection.
 
     The remaining ordered validation pipeline stays cohesive in this extraction
     because diagnostic ordering is a public compatibility contract. Subsequent
@@ -842,6 +767,7 @@ def derive_requirements_contract(
         acceptance_by_requirement,
         legacy_ids,
         grandfather_schema_13,
+        compatible_schema_14,
         early_contract,
         issues,
     ) = _current_contract_schema(text, required, grandfather_current_gate_a)
@@ -864,7 +790,7 @@ def derive_requirements_contract(
     if required and intake_contract.status != "READY_FOR_REQUIREMENTS":
         add(
             "PROJECT_CONTRACT_OWNER_FACT_REQUIRED",
-            "Schema 1.4 actor and success-measure bases require a complete confirmed intake foundation",
+            "Requirements actor and success-measure bases require a complete confirmed intake foundation",
         )
 
     table_specs = (
@@ -913,7 +839,7 @@ def derive_requirements_contract(
     if legacy_ids:
         add(
             "PROJECT_CONTRACT_MIGRATION_REQUIRED",
-            "Migrate legacy normative rows to schema 1.4: " + ", ".join(legacy_ids),
+            "Migrate legacy normative rows to schema 1.5: " + ", ".join(legacy_ids),
         )
         missing_records.extend(legacy_ids)
     requirement_ids = [row[0] for row in requirement_rows]
@@ -931,7 +857,7 @@ def derive_requirements_contract(
     if not requirement_rows:
         add(
             "REQUIREMENT_COVERAGE_INVALID",
-            "Schema 1.4 requires at least one normative requirement",
+            "Requirements 1.5 requires at least one normative requirement",
         )
     acceptance_ids: list[str] = []
     for row in requirement_rows:
@@ -963,6 +889,18 @@ def derive_requirements_contract(
             "Duplicate acceptance IDs: " + ", ".join(duplicate_acceptance),
         )
     requirement_set = set(requirement_ids)
+    extension = Requirements15Extension()
+    if not grandfather_schema_13 and not compatible_schema_14:
+        extension, extension_missing, extension_issues = (
+            derive_requirements_15_extension(
+                text,
+                document,
+                requirement_set,
+                confirmed_intake_ids,
+            )
+        )
+        missing_records.extend(extension_missing)
+        issues.extend(extension_issues)
     change_lineage: RequirementsChangeLineage | None = None
     assumptions: list[AssumptionLifecycleRecord] = []
     if lineage_table is not None:
@@ -1611,95 +1549,51 @@ def derive_requirements_contract(
                 + ",".join(uncovered_journey_ids),
             )
 
-    canonical_bytes: bytes | None = None
-    canonical_sha256: str | None = None
-    if all(table is not None for table in contract_tables):
-        requirement_payload = (
-            json.dumps(
-                requirement_rows, ensure_ascii=False, separators=(",", ":")
-            ).encode("utf-8")
-            + b"\n"
-        )
-        canonical_bytes = (
-            ("1.3" if grandfather_schema_13 else PROJECT_CONTRACT_SCHEMA).encode(
-                "utf-8"
-            )
-            + b"\n"
-            + requirement_payload
-            + b"".join(
-                table.canonical_bytes for table in contract_tables if table is not None
-            )
-        )
-        canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
-    return RequirementsContract(
-        schema_version="1.3" if grandfather_schema_13 else PROJECT_CONTRACT_SCHEMA,
-        status=(
-            "GRANDFATHERED"
-            if grandfather_schema_13 and not issues
-            else "READY"
-            if not issues
-            else "BLOCKED"
-        ),
-        actor_ids=tuple(actor_ids),
-        journey_ids=tuple(journey_ids),
-        acceptance_ids=tuple(
-            acceptance_by_requirement.get(item, "") for item in sorted(requirement_set)
-        ),
-        use_case_ids=tuple(use_case_ids),
-        business_rule_ids=tuple(business_rule_ids),
-        requirement_ids=tuple(sorted(requirement_set)),
-        rich_use_case_triggers=tuple(sorted(declared_rich_triggers)),
+    contract = finalize_requirements_contract(
+        requirement_rows=requirement_rows,
+        contract_tables=contract_tables,
+        extension=extension,
+        grandfather_schema_13=grandfather_schema_13,
+        compatible_schema_14=compatible_schema_14,
+        issues=issues,
+        actor_ids=actor_ids,
+        journey_ids=journey_ids,
+        acceptance_by_requirement=acceptance_by_requirement,
+        requirement_ids=requirement_set,
+        use_case_ids=use_case_ids,
+        business_rule_ids=business_rule_ids,
+        rich_use_case_triggers=declared_rich_triggers,
         change_lineage=change_lineage,
-        assumptions=tuple(assumptions),
-        missing_records=tuple(dict.fromkeys(missing_records)),
-        canonical_sha256=canonical_sha256,
-        grandfathered_approved_gate_a=grandfather_schema_13,
-        presentation_labels=_requirements_presentation_labels(
-            actors, journeys, use_cases
+        assumptions=assumptions,
+        missing_records=missing_records,
+        presentation_labels=(
+            *_requirements_presentation_labels(actors, journeys, use_cases),
+            *extension.presentation_labels,
         ),
-        canonical_bytes=canonical_bytes,
-    ), issues
+        current_schema=PROJECT_CONTRACT_SCHEMA,
+    )
+    return contract, issues
 
 
-__all__ = (
-    "ACCEPTANCE_FORMS",
-    "ACCEPTANCE_ID",
-    "ACTOR_HEADERS",
-    "ACTOR_HEADING",
-    "ACTOR_ID",
-    "ASSUMPTION_ID",
-    "ASSUMPTION_LIFECYCLE_HEADERS",
-    "ASSUMPTION_LIFECYCLE_HEADING",
-    "ASSUMPTION_STATUSES",
-    "BUSINESS_RULE_HEADERS",
-    "BUSINESS_RULE_HEADING",
-    "BUSINESS_RULE_ID",
-    "EARS_FORMS",
-    "EARS_PATTERNS",
-    "JOURNEY_HEADERS",
-    "JOURNEY_HEADING",
-    "JOURNEY_ID",
-    "LEGACY_NORMATIVE_REQUIREMENT_HEADERS",
-    "LEGACY_REQUIREMENT_HEADERS",
-    "NORMATIVE_REQUIREMENT_HEADERS",
-    "PROJECT_CONTRACT_SCHEMA",
-    "QAS_HEADERS",
-    "REQUIREMENT_COVERAGE_HEADERS",
-    "REQUIREMENT_COVERAGE_HEADING",
-    "REQUIREMENTS_CHANGE_LINEAGE_HEADERS",
-    "REQUIREMENTS_CHANGE_LINEAGE_HEADING",
-    "RICH_USE_CASE_APPLICABILITY_HEADERS",
-    "RICH_USE_CASE_APPLICABILITY_HEADING",
-    "RICH_USE_CASE_HEADERS",
-    "RICH_USE_CASE_HEADING",
-    "RICH_USE_CASE_TRIGGERS",
-    "USE_CASE_ID",
-    "authoritative_requirement_ids",
-    "concrete_requirement_subject",
-    "derive_requirements_contract",
-    "gate_a_method_contract_issues",
-    "measurable_acceptance_is_bound",
-    "observable_requirement_response",
-    "quality_attribute_scenario_issues",
-    "requirement_method_issues",
+__all__ = tuple(
+    (
+        "ACCEPTANCE_FORMS ACCEPTANCE_ID ACTOR_HEADERS ACTOR_HEADING ACTOR_ID "
+        "ASSUMPTION_ID ASSUMPTION_LIFECYCLE_HEADERS ASSUMPTION_LIFECYCLE_HEADING "
+        "ASSUMPTION_STATUSES BUSINESS_RULE_HEADERS BUSINESS_RULE_HEADING "
+        "BUSINESS_RULE_ID CROSS_CUTTING_RISK_HEADERS CROSS_CUTTING_RISK_HEADING "
+        "DATASET_HEADERS DATASET_HEADING EARS_FORMS EARS_PATTERNS "
+        "EXTERNAL_OBLIGATION_HEADERS EXTERNAL_OBLIGATION_HEADING JOURNEY_HEADERS "
+        "JOURNEY_HEADING JOURNEY_ID LEGACY_NORMATIVE_REQUIREMENT_HEADERS "
+        "LEGACY_REQUIREMENT_HEADERS NORMATIVE_REQUIREMENT_HEADERS "
+        "OUTCOME_METRIC_HEADERS OUTCOME_METRIC_HEADING PROJECT_CONTRACT_SCHEMA "
+        "PROJECT_COMPLETION_TARGETS QAS_HEADERS REQUIREMENT_COVERAGE_HEADERS "
+        "REQUIREMENT_COVERAGE_HEADING REQUIREMENTS_CHANGE_LINEAGE_HEADERS "
+        "REQUIREMENTS_CHANGE_LINEAGE_HEADING RICH_USE_CASE_APPLICABILITY_HEADERS "
+        "RICH_USE_CASE_APPLICABILITY_HEADING RICH_USE_CASE_HEADERS "
+        "RICH_USE_CASE_HEADING RICH_USE_CASE_TRIGGERS USE_CASE_ID "
+        "authoritative_requirement_ids concrete_requirement_subject "
+        "derive_requirements_contract gate_a_method_contract_issues "
+        "measurable_acceptance_is_bound observable_requirement_response "
+        "quality_attribute_scenario_issues requirement_method_issues"
+    ).split()
 )

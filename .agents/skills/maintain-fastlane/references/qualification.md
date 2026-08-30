@@ -4,6 +4,32 @@ Use this maintainer-only procedure after source changes are coherent. It proves
 the exact candidate tree; it grants no merge, release, settings, or AWS
 authority.
 
+## Definition of complete
+
+Completion is a named, evidence-bound claim, not one global state. This policy
+creates no lifecycle gate or authority and does not change task-level `DONE`.
+
+- `FRAMEWORK_RELEASE_QUALIFIED` means the exact release head passed the current
+  compatibility, manifest, deterministic-package, Golden, role-play,
+  performance, rendered-review, and advertised-platform qualification.
+- `PROJECT_TARGET_COMPLETE(target)` binds one project target to current evidence:
+  `LOCAL` requires E2; `AWS_READ` requires E2 + E3; `DEPLOYED` requires E2 + E3
+  + E4; and `RECOVERY` requires E2 + E3 + E4 + E5.
+  For `RECOVERY`, E5 must record rollback or restore; teardown-only evidence
+  does not qualify `RECOVERY`.
+- `AWS_LANE_FIELD_QUALIFIED(lane)` means one named lane has current observed
+  deployment, failure or unknown-result reconciliation, recovery, cost,
+  separately authorized teardown, and residual-state evidence.
+- `PRODUCT_FIELD_VALIDATED` means framework qualification, the independent
+  pilot, and the named AWS lane bind the same release head and package digest.
+
+A failed or unobserved higher target does not erase a lower target that remains
+current and proven. Other AWS lanes remain unqualified. Fastlane 1.3.0 may claim
+`PRODUCT_FIELD_VALIDATED` only when the exact head is framework-qualified,
+validated by 5-8 first-time, non-author participants, field-qualified through
+one separately authorized disposable AWS lane, has no open P0/P1 truth defect,
+and has no expired complexity exception.
+
 ## Lock the candidate
 
 1. Record the exact base commit, candidate commit, version, prompt-contract

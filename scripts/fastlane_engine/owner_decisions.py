@@ -24,8 +24,16 @@ from .design import (
     JOURNEY_HEADING,
     ApplicationSourceDisposition,
     DesignContract,
-    TechnologyDecision,
-    technology_reasoning_parts,
+    TechnologyDecision,  # noqa: F401 - stable compatibility re-export
+)
+from .owner_decision_sections import (
+    design8_owner_decision_additions,
+    finalize_gate_b_inventory,
+    gate_a_owner_sections,
+    gate_b_technical_groups,
+    group_owner_technologies,
+    owner_decision_record,
+    technology_owner_reasoning,
 )
 
 try:
@@ -560,6 +568,58 @@ def _gate_a_success_text(
     return measure + "; acceptance records: " + acceptance
 
 
+def _gate_a_metric_text(requirements: RequirementsContract) -> str:
+    return (
+        "; ".join(
+            f"{item.metric_id}: {item.metric}; target {item.target}; "
+            f"window {item.measurement_window}; evidence {item.evidence_source}; "
+            f"owner {item.accountable_role}; guardrail {item.guardrail}; "
+            f"miss action {item.missed_target_action}"
+            for item in requirements.outcome_metrics
+        )
+        or "Not yet recorded."
+    )
+
+
+def _gate_a_dataset_text(requirements: RequirementsContract) -> str:
+    return (
+        "; ".join(
+            f"{item.dataset_id}: {item.dataset_category}; {item.classification}; "
+            f"source {item.source_of_truth}; access {item.access_boundary}; "
+            f"retention {item.retention}; deletion {item.deletion}; "
+            f"recovery {item.recovery}; residency {item.residency}; "
+            f"migration {item.migration}; audit {item.audit_obligation}; "
+            f"owner {item.accountable_role}"
+            for item in requirements.datasets
+        )
+        or "Not yet recorded."
+    )
+
+
+def _gate_a_obligation_text(requirements: RequirementsContract) -> str:
+    return (
+        "; ".join(
+            f"{item.obligation_id}: {item.applicability}; {item.obligation}; "
+            f"basis {item.source_basis}; owner {item.accountable_role}; "
+            f"review {item.review_trigger}"
+            for item in requirements.external_obligations
+        )
+        or "Not yet recorded."
+    )
+
+
+def _gate_a_risk_text(requirements: RequirementsContract) -> str:
+    return (
+        "; ".join(
+            f"{item.risk_id}: {item.risk}; {item.likelihood}/{item.impact}; "
+            f"owner {item.accountable_role}; mitigation {item.mitigation}; "
+            f"revisit {item.revisit_trigger}; status {item.status}"
+            for item in requirements.cross_cutting_risks
+        )
+        or "Not yet recorded."
+    )
+
+
 def _derive_gate_b_decision_inventory(
     design_contract: DesignContract,
     requirements_revision: str,
@@ -569,14 +629,12 @@ def _derive_gate_b_decision_inventory(
     status: str,
 ) -> tuple[dict[str, Any], list[str]]:
     """SAFETY: require one complete Gate B owner decision inventory."""
-
     issues: list[str] = []
-    grouped: dict[str, list[TechnologyDecision]] = {
-        domain: [] for domain in TECHNICAL_DOMAIN_ORDER
-    }
-    for technology in design_contract.technology_decisions:
-        grouped[_owner_technical_domain(technology.concern)].append(technology)
-
+    grouped = group_owner_technologies(
+        design_contract.technology_decisions,
+        TECHNICAL_DOMAIN_ORDER,
+        _owner_technical_domain,
+    )
     selection = design_contract.architecture.selection
     source_disposition = design_contract.project_contract.application_source_disposition
     all_evidence = list(design_contract.architecture.aws_evidence)
@@ -592,19 +650,10 @@ def _derive_gate_b_decision_inventory(
         decision_id, title, owner_effect, locator_keys = (
             OWNER_TECHNICAL_DOMAIN_METADATA[domain]
         )
-        rationales: list[str] = []
-        alternatives: list[str] = []
-        for technology in technologies:
-            try:
-                rationale, rejected = technology_reasoning_parts(
-                    technology.alternatives_and_rationale
-                )
-            except ValueError as exc:
-                if status == "READY":
-                    issues.append(f"{technology.decision_id}: {exc}")
-                continue
-            rationales.append(rationale)
-            alternatives.append(rejected)
+        rationales, alternatives, reasoning_issues = technology_owner_reasoning(
+            technologies, required=status == "READY"
+        )
+        issues.extend(reasoning_issues)
         basis_ids = _owner_stable_ids(
             [requirements_revision, design_revision, authorization_id]
             + [technology.basis_ids for technology in technologies]
@@ -676,42 +725,49 @@ def _derive_gate_b_decision_inventory(
             basis_ids = sorted(
                 set(basis_ids) | set(design_contract.harness.required_ids)
             )
+        extension = design_contract.project_contract.design_v8
+        additions = design8_owner_decision_additions(
+            domain,
+            extension,
+            enabled=design_contract.project_contract.schema_version >= 8,
+        )
+        selections.extend(additions.selections)
+        rationales.extend(additions.rationales)
+        alternatives.extend(additions.alternatives)
+        tradeoffs.extend(additions.tradeoffs)
+        safeguards.extend(additions.safeguards)
+        reconsider.extend(additions.reconsider)
+        basis_ids = sorted(set(basis_ids) | set(additions.basis_ids))
         evidence_ids = [item.evidence_id for item in evidence]
-        maturity = "SOURCE_VERIFIED" if evidence_ids else "PLANNED_AFTER_APPROVAL"
-        evidence_status = (
-            "SOURCE_VERIFIED — " + ", ".join(evidence_ids)
-            if evidence_ids
-            else "PLANNED_AFTER_APPROVAL — this canonical design decision has not been observed in a deployed environment."
-        )
+        evidence_ids = list(dict.fromkeys([*evidence_ids, *additions.evidence_ids]))
         decisions.append(
-            {
-                "decision_id": decision_id,
-                "domain": domain,
-                "title": title,
-                "selection": "; ".join(_unique_owner_text(selections)),
-                "source": "Canonical Design-7 architecture and technology records",
-                "maturity": maturity,
-                "owner_effect": owner_effect,
-                "why": " ".join(_unique_owner_text(rationales)),
-                "alternatives": " ".join(_unique_owner_text(alternatives)),
-                "tradeoff": " ".join(_unique_owner_text(tradeoffs)),
-                "risk_and_mitigation": " ".join(_unique_owner_text(safeguards)),
-                "evidence_status": evidence_status,
-                "reconsider_when": " ".join(_unique_owner_text(reconsider)),
-                "basis_ids": basis_ids,
-                "evidence_ids": evidence_ids,
-                "source_locator_keys": source_keys,
-            }
+            owner_decision_record(
+                decision_id=decision_id,
+                domain=domain,
+                title=title,
+                owner_effect=owner_effect,
+                selections=selections,
+                rationales=rationales,
+                alternatives=alternatives,
+                tradeoffs=tradeoffs,
+                safeguards=safeguards,
+                reconsider=reconsider,
+                basis_ids=basis_ids,
+                evidence_ids=evidence_ids,
+                source_evidence_complete=additions.source_evidence_complete,
+                source_keys=source_keys,
+                schema_version=design_contract.project_contract.schema_version,
+                unique_text=_unique_owner_text,
+            )
         )
-    projection = {
-        "schema_version": 1,
-        "kind": "GATE_B",
-        "status": status,
-        "required_domains": list(TECHNICAL_DOMAIN_ORDER),
-        "decisions": decisions,
-    }
-    finalized, validation_issues = finalize_owner_decision_inventory(projection)
-    return finalized, [*issues, *validation_issues]
+    finalized, combined_issues = finalize_gate_b_inventory(
+        status,
+        TECHNICAL_DOMAIN_ORDER,
+        decisions,
+        issues,
+        finalize_owner_decision_inventory,
+    )
+    return finalized, combined_issues
 
 
 def derive_owner_decision_brief(
@@ -794,71 +850,22 @@ def derive_owner_decision_brief(
         readable_journeys = _owner_readable_journeys(
             prd_text, requirements_contract.journey_ids
         )
-        sections = [
-            _owner_decision_section(
-                "GATE-A-OUTCOME",
-                "Outcome, users, and first useful journey",
-                [
-                    "Outcome: " + _gate_a_outcome_text(intake_selections, gate_a_card),
-                    "Owner and users: "
-                    + gate_a_card.get("Owner and users", "Not yet recorded."),
-                    "First-release journey: "
-                    + ("; ".join(readable_journeys) or "Not yet recorded."),
-                ],
-                [requirements_revision, *intake_contract.basis_ids],
-            ),
-            _owner_decision_section(
-                "GATE-A-BOUNDARY",
-                "First-release boundary",
-                [
-                    "First-release boundary: " + _gate_a_boundary(intake_selections),
-                    "Scope and non-goals: "
-                    + gate_a_card.get("Scope and non-goals", "Not yet recorded."),
-                    "Data and access: "
-                    + gate_a_card.get("Data boundary", "Not yet recorded.")
-                    + " "
-                    + gate_a_card.get(
-                        "Identity/security boundary", "Not yet recorded."
-                    ),
-                ],
-                [requirements_revision, *requirements_contract.requirement_ids],
-            ),
-            _owner_decision_section(
-                "GATE-A-SUCCESS",
-                "Success, resilience, Region, and cost",
-                [
-                    "Success measures: "
-                    + _gate_a_success_text(intake_selections, gate_a_card),
-                    "Recovery, Region, and cost: "
-                    + gate_a_card.get("Failure/recovery", "Not yet recorded.")
-                    + "; "
-                    + gate_a_card.get("Environment/Region", "Not yet recorded.")
-                    + "; "
-                    + gate_a_card.get("Cost posture", "Not yet recorded."),
-                ],
-                [requirements_revision, *requirements_contract.acceptance_ids],
-            ),
-            _owner_decision_section(
-                "GATE-A-RISK",
-                "Assumptions, risks, and change impact",
-                [
-                    "Assumptions: " + gate_a_card.get("Assumptions", "None recorded."),
-                    "Open decisions or findings: "
-                    + gate_a_analysis.get(
-                        "Open blocking decision IDs", "None recorded."
-                    )
-                    + "; "
-                    + gate_a_analysis.get(
-                        "Open blocking finding IDs", "None recorded."
-                    ),
-                    "Brownfield preservation: "
-                    + gate_a_card.get(
-                        "Brownfield baseline and preservation", "Not applicable."
-                    ),
-                ],
-                [requirements_revision, *requirements_contract.requirement_ids],
-            ),
-        ]
+        sections = gate_a_owner_sections(
+            section=_owner_decision_section,
+            requirements_revision=requirements_revision,
+            intake=intake_contract,
+            requirements=requirements_contract,
+            gate_a_card=gate_a_card,
+            gate_a_analysis=gate_a_analysis,
+            readable_journeys=readable_journeys,
+            outcome_text=_gate_a_outcome_text(intake_selections, gate_a_card),
+            boundary_text=_gate_a_boundary(intake_selections),
+            success_text=_gate_a_success_text(intake_selections, gate_a_card),
+            metric_text=_gate_a_metric_text(requirements_contract),
+            dataset_text=_gate_a_dataset_text(requirements_contract),
+            obligation_text=_gate_a_obligation_text(requirements_contract),
+            risk_text=_gate_a_risk_text(requirements_contract),
+        )
         claims = [
             owner_claim(
                 "The recorded product direction and confirmed intake facts came from the owner.",
@@ -967,30 +974,7 @@ def derive_owner_decision_brief(
                 ],
             )
         ]
-        technical_groups = [
-            {
-                "domain": decision["domain"],
-                "decisions": [
-                    {
-                        "decision_id": decision["decision_id"],
-                        "decision": decision["title"],
-                        "owner_effect": decision["owner_effect"],
-                        "selection": decision["selection"],
-                        "requirement_basis": ", ".join(decision["basis_ids"]),
-                        "why": decision["why"],
-                        "alternatives": decision["alternatives"],
-                        "tradeoff": decision["tradeoff"],
-                        "risk_and_mitigation": decision["risk_and_mitigation"],
-                        "evidence_status": decision["evidence_status"],
-                        "reconsider_when": decision["reconsider_when"],
-                        "basis_ids": decision["basis_ids"],
-                        "evidence_ids": decision["evidence_ids"],
-                        "source_locator_keys": decision["source_locator_keys"],
-                    }
-                ],
-            }
-            for decision in inventory.get("decisions", [])
-        ]
+        technical_groups = gate_b_technical_groups(inventory)
         evidence_ids = [
             item.evidence_id for item in design_contract.architecture.aws_evidence
         ]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import re
 import unittest
@@ -88,12 +89,34 @@ class EngineParityTests(unittest.TestCase):
         )
         self.assertEqual(
             self.oracle["approved_behavior_changes"],
-            parity.APPROVED_BEHAVIOR_CHANGES,
+            parity.FROZEN_APPROVED_BEHAVIOR_CHANGES,
+        )
+        self.assertEqual(
+            parity.QUALIFICATION_APPROVED_BEHAVIOR_CHANGES[
+                : len(parity.FROZEN_APPROVED_BEHAVIOR_CHANGES)
+            ],
+            parity.FROZEN_APPROVED_BEHAVIOR_CHANGES,
+        )
+        self.assertEqual(
+            parity.QUALIFICATION_APPROVED_BEHAVIOR_CHANGES[
+                len(parity.FROZEN_APPROVED_BEHAVIOR_CHANGES) :
+            ],
+            [parity.DEFINITION_OF_COMPLETE_CHANGE],
+        )
+        self.assertEqual(
+            hashlib.sha256(parity.ORACLE_PATH.read_bytes()).hexdigest(),
+            parity.FROZEN_ORACLE_SHA256,
         )
         self.assertEqual(
             parity.frozen_doctor_characterization(),
             self.oracle["doctor_characterization"],
         )
+
+    def test_frozen_oracle_has_no_writer_cli(self) -> None:
+        source = (REPOSITORY_ROOT / "tests/engine_parity_cases.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn('"--write-oracle"', source)
 
     def test_report_cases_preserve_truthful_summary_semantics(self) -> None:
         reports = parity.build_parity_reports()
@@ -165,6 +188,11 @@ class EngineParityTests(unittest.TestCase):
                 self.assertEqual(fields["First-release boundary"], boundary)
                 self.assertEqual(fields["Updated"], updated)
                 self.assertEqual(fields["Construction authorization"], construction)
+                self.assertEqual(
+                    fields["Current AWS authority"],
+                    "NONE — planned maximum only",
+                )
+                self.assertEqual(fields["AWS account work"], "Not authorized")
 
     def test_summary_truth_change_preserves_every_other_report_contract(self) -> None:
         reports = parity.build_parity_reports()
@@ -174,11 +202,95 @@ class EngineParityTests(unittest.TestCase):
             )
             for name, case in reports.items()
         }
-        self.assertEqual(observed, parity.SUMMARY_TRUTH_COMPATIBILITY_DIGESTS)
+        self.assertEqual(observed, parity.CURRENT_COMPATIBILITY_DIGESTS)
+        observed_additions = {
+            name: parity.canonical_digest(parity.approved_behavior_additions_case(case))
+            for name, case in reports.items()
+        }
+        self.assertEqual(
+            observed_additions,
+            parity.CURRENT_APPROVED_BEHAVIOR_ADDITION_DIGESTS,
+        )
         self.assertEqual(
             self.oracle["summary_truth_compatibility"]["report_case_digests"],
             parity.SUMMARY_TRUTH_COMPATIBILITY_DIGESTS,
         )
+
+    def test_compatibility_projection_preserves_safety_critical_contracts(self) -> None:
+        case = self.oracle["report_cases"]["gate_b_approved"]
+        projected = parity.approved_behavior_compatibility_case(case)
+        original_report = case["report"]
+        projected_report = projected["report"]
+        for field in (
+            "ok",
+            "status",
+            "resume_safe",
+            "lifecycle_state",
+            "next_prompt",
+            "interaction",
+            "gates",
+            "authorizations",
+            "write_authority",
+            "external_authority",
+            "aws_action_transition",
+            "aws_execution",
+            "aws_deployment",
+            "aws_teardown",
+            "diagnostics",
+            "remediation",
+        ):
+            with self.subTest(field=field):
+                self.assertEqual(projected_report[field], original_report[field])
+        for field in (
+            "active_ids",
+            "budget_status",
+            "maximum_initial_bytes",
+            "maximum_initial_source_bytes",
+            "on_demand_slices",
+            "overflow_records",
+            "source_slices",
+        ):
+            with self.subTest(context_plan=field):
+                self.assertEqual(
+                    projected_report["context_plan"][field],
+                    original_report["context_plan"][field],
+                )
+        for owner_field, retained in {
+            "owner_answer_confirmation": (
+                "schema_version",
+                "status",
+                "owner_response_id",
+                "card_binding",
+                "recorded",
+                "project_effect",
+                "correction_prompt",
+                "basis_ids",
+            ),
+            "owner_decision_brief": (
+                "schema_version",
+                "kind",
+                "status",
+                "basis",
+                "claims",
+                "authorization_effect",
+                "formal_receipt_required",
+            ),
+            "owner_decision_inventory": (
+                "schema_version",
+                "kind",
+                "status",
+                "required_domains",
+            ),
+        }.items():
+            for field in retained:
+                with self.subTest(owner_projection=owner_field, field=field):
+                    self.assertEqual(
+                        projected_report[owner_field][field],
+                        original_report[owner_field][field],
+                    )
+        for field in ("exit_code", "human_output"):
+            with self.subTest(case_field=field):
+                self.assertEqual(projected[field], case[field])
 
     def test_adaptive_kickoff_matches_independent_owner_meaning(self) -> None:
         reports = parity.build_parity_reports()
@@ -309,12 +421,17 @@ class EngineParityTests(unittest.TestCase):
         self.assertEqual(tuple(observed), parity.REPORT_CASES)
         for name in parity.REPORT_CASES:
             with self.subTest(case=name):
-                expected_case = self.oracle["report_cases"][name]
-                difference = first_difference(expected_case, observed[name])
+                expected_case = parity.approved_behavior_compatibility_case(
+                    self.oracle["report_cases"][name]
+                )
+                observed_case = parity.approved_behavior_compatibility_case(
+                    observed[name]
+                )
+                difference = first_difference(expected_case, observed_case)
                 self.assertIsNone(difference, difference)
                 self.assertEqual(
-                    parity.canonical_digest(observed[name]),
-                    self.oracle["report_case_digests"][name],
+                    parity.canonical_digest(observed_case),
+                    parity.CURRENT_COMPATIBILITY_DIGESTS[name],
                 )
 
     def test_current_architecture_reports_match_independent_owner_meaning(self) -> None:
@@ -368,7 +485,8 @@ class EngineParityTests(unittest.TestCase):
         )
         self.assertEqual(oracle["baseline"]["report_schema_version"], 2)
         self.assertEqual(
-            oracle["approved_behavior_changes"], parity.APPROVED_BEHAVIOR_CHANGES
+            oracle["approved_behavior_changes"],
+            parity.QUALIFICATION_APPROVED_BEHAVIOR_CHANGES,
         )
         observed = parity.build_qualification_reports()
         self.assertEqual(tuple(observed), parity.QUALIFICATION_REPORT_CASES)
@@ -462,6 +580,26 @@ class EngineParityTests(unittest.TestCase):
         }
         self.assertEqual(
             self.qualification_oracle["design_scenario_coverage"], expected
+        )
+        discovered = discovered_test_selectors()
+        for scenario, selectors in expected.items():
+            self.assertTrue(selectors, scenario)
+            for selector in selectors:
+                with self.subTest(scenario=scenario, selector=selector):
+                    self.assertIn(selector, discovered)
+
+    def test_qualification_definition_of_complete_is_bound_to_independent_regressions(
+        self,
+    ) -> None:
+        expected = {
+            name: list(selectors)
+            for name, selectors in (
+                parity.QUALIFICATION_DEFINITION_OF_COMPLETE_SCENARIO_COVERAGE.items()
+            )
+        }
+        self.assertEqual(
+            self.qualification_oracle["definition_of_complete_scenario_coverage"],
+            expected,
         )
         discovered = discovered_test_selectors()
         for scenario, selectors in expected.items():

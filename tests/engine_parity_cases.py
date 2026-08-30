@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import os
+import platform
 import re
 import statistics
 import subprocess
@@ -50,11 +51,15 @@ GOLDEN_PRD_TRUTH_BASE_COMMIT = "f24bf4674a792a305acfae5cd9e9ad0077a9bf79"
 EXPLICIT_REGION_SELECTION_BASE_COMMIT = "c14f4a9eb7c57332d4332033c034ef1e9b33355a"
 QUALIFICATION_BASE_COMMIT = "f26a085170de2f99ad11450b5bf3c2ebaaf30501"
 QUALIFICATION_BASE_PACKAGE_VERSION = "1" + ".2.24"
+DEFINITION_OF_COMPLETE_BASE_COMMIT = "8909518c474aefbc34d501ba3ff7452713b32656"
 PACKAGE_VERSION_SENTINEL = "<PACKAGE_VERSION>"
 GIT_SHA_SENTINEL = "<GIT_SHA>"
 GIT_SHA = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])")
+FROZEN_ORACLE_SHA256 = (
+    "fe045b9afd14e171fc595dea5c82f3b4fac0a0e4d3956dc99e02d8eb09e87746"
+)
 
-APPROVED_BEHAVIOR_CHANGES = [
+FROZEN_APPROVED_BEHAVIOR_CHANGES = [
     {
         "id": "DOCUMENT_SUMMARY_TRUTH_1_2_19",
         "base_commit": SUMMARY_TRUTH_BASE_COMMIT,
@@ -210,6 +215,28 @@ APPROVED_BEHAVIOR_CHANGES = [
         ],
     },
 ]
+DEFINITION_OF_COMPLETE_CHANGE = {
+    "id": "DEFINITION_OF_COMPLETE_CONTRACTS_1_3_0",
+    "base_commit": DEFINITION_OF_COMPLETE_BASE_COMMIT,
+    "scope": [
+        "Requirements 1.5 completion target, outcome, dataset, external-obligation, and cross-cutting-risk projections with approved Requirements 1.4 compatibility",
+        "Design 8 data, environment, Well-Architected consideration, dependency-policy, and semantic relationship projections with approved Design 7 compatibility",
+        "typed release claims, target-specific qualified completion wording, owner decision additions, and Engine-derived current AWS authority",
+        "card-scoped Accept this recommendation. handling with the hidden exact legacy Accept all recommendations. compatibility alias",
+        "architecture-board direction, relationship category, edge kind, containment, and semantic-path parity",
+        "consequential PRD snapshot, current context selection, owner locator, and canonical digest changes",
+    ],
+    "prohibited": [
+        "lifecycle or route change for an equivalent legacy project",
+        "legacy Gate A, Gate B, AWS receipt, approval, or authority change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        "frozen pre-refactor oracle mutation",
+    ],
+}
+QUALIFICATION_APPROVED_BEHAVIOR_CHANGES = [
+    *FROZEN_APPROVED_BEHAVIOR_CHANGES,
+    DEFINITION_OF_COMPLETE_CHANGE,
+]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
         "93342ac776238cc2fb71393e51fb25e195bc70ef1c1561f2ec71988441a5dd7a"
@@ -232,6 +259,38 @@ SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "gate_b_approved": (
         "09899b548a21b9895404a6efd3a40158ffd5073fb10990f8802487ebeb31f7eb"
     ),
+}
+CURRENT_COMPATIBILITY_DIGESTS = {
+    "template_source": (
+        "4454ad024028fd38233fa7f210618137361bb8711a121277b55fc0c784731329"
+    ),
+    "unconfigured_template": (
+        "7f2724699186f3d97fed77d02a701cd01983b13bf34d434f3832c9f3d7376b47"
+    ),
+    "rendered_intake": (
+        "837e63b41a9023031d15ef3aa2cfb2fe71ec28bc5d47cc74a53f64bbd1ab54b9"
+    ),
+    "gate_a_pending": (
+        "62fec6727ce1ccba560db03c08a2697a29dadf130e99433b2c190ae769accd17"
+    ),
+    "gate_a_approved": (
+        "eceda55343f93c30149889cc73e5c0a37da9e8ed7197108b16ebc65f1c35e2b2"
+    ),
+    "gate_b_pending": (
+        "895e9dfa49f9583bcaacb4cbc59beffe19a2f885a506ac4cf9673fc9cc3f8eb1"
+    ),
+    "gate_b_approved": (
+        "5a1a44fcf0100651b2fb6c1977704f4f0ff900919eac91d40a30b1836b004076"
+    ),
+}
+CURRENT_APPROVED_BEHAVIOR_ADDITION_DIGESTS = {
+    "template_source": "ce1a7a795663022d71d2783dddfb591cc3d1eb28f2f0ded26655992c7db0e639",
+    "unconfigured_template": "ccb26536c270baa45b425eb5f0a5b7d2b9b42b80d81232b44879d12e9732fbbb",
+    "rendered_intake": "f7ef14bd0d89bb154d4ceb616fc2cda134815f98b917a3c531ac988c00b6c257",
+    "gate_a_pending": "f306b2d406bac71f34c6d6d9cff9b12f06db49e22840d6f5d4ba7be01a20a32e",
+    "gate_a_approved": "599ff556332efd5b09342f3b4acea28b759368bc3d5c5e56df2935748400f32d",
+    "gate_b_pending": "8685e03ba02db682f424a7c8845f2e9b0dc139dbe27de5ab146f6e3ea7c0e441",
+    "gate_b_approved": "6646bf730371f33b1f074e488d9233042b4fab5629dc2df2dcc6ac9902b51fe0",
 }
 
 
@@ -487,6 +546,59 @@ QUALIFICATION_DESIGN_SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
     "architecture_traceability_digest_binding": (
         "tests.test_bootstrap_doctor.BootstrapDoctorTests."
         "test_architecture_contract_is_traceable_fail_closed_and_digest_bound",
+    ),
+}
+
+QUALIFICATION_DEFINITION_OF_COMPLETE_SCENARIO_COVERAGE: dict[str, tuple[str, ...]] = {
+    "requirements_15": (
+        "tests.test_requirements_v15.Requirements15Tests."
+        "test_complete_contract_projects_typed_side_registries",
+        "tests.test_requirements_v15.Requirements15Tests."
+        "test_approved_schema_14_keeps_exact_digest_without_legacy_bridge",
+        "tests.test_requirements_v15.Requirements15Tests."
+        "test_gate_a_brief_exposes_target_and_typed_owner_records",
+    ),
+    "design_8": (
+        "tests.test_design_v8.Design8ContractTests."
+        "test_complete_projection_is_typed_and_every_table_is_digest_bound",
+        "tests.test_design_v8.Design8ContractTests."
+        "test_dependency_policy_is_default_deny_and_prefix_is_never_sufficient",
+        "tests.test_design_v8.Design8ContractTests."
+        "test_exact_approved_design7_digest_is_compatible_but_partial_is_not",
+        "tests.test_design_v8.Design8ContractTests."
+        "test_gate_b_owner_inventory_projects_design8_without_a_new_domain",
+    ),
+    "release_claims": (
+        "tests.test_engine_composition.EngineCompositionTests."
+        "test_release_claim_derives_each_cumulative_target_without_authority",
+        "tests.test_engine_composition.EngineCompositionTests."
+        "test_release_claim_validator_rejects_overclaim_and_noncanonical_evidence",
+    ),
+    "aws_authority_projection": (
+        "tests.test_document_summaries.DocumentSummaryProjectionTests."
+        "test_current_aws_authority_projection_is_not_gate_b_digest_input",
+    ),
+    "recommendation_compatibility": (
+        "tests.test_intake_response.IntakeResponseAcceptanceTests."
+        "test_accept_phrase_applies_only_to_the_current_recommendation",
+        "tests.test_intake_response.IntakeResponseRejectionTests."
+        "test_legacy_accept_phrase_remains_an_exact_compatibility_alias",
+    ),
+    "architecture_board_semantics": (
+        "tests.test_engine_design.EngineDesignTests."
+        "test_architecture_board_cross_check_requires_semantic_path_parity",
+    ),
+    "completion_policy": (
+        "tests.test_template_compatibility.TemplateCompatibilityTests."
+        "test_fastlane_13_completion_policy_names_each_evidence_level",
+        "tests.test_prompt_contracts.PromptPackContractTests."
+        "test_project_completion_is_target_specific_and_monotonic",
+    ),
+    "context_selection_and_owner_locators": (
+        "tests.test_bootstrap_doctor.BootstrapDoctorTests."
+        "test_context_plan_is_route_bounded_ephemeral_and_complete",
+        "tests.test_owner_briefs.OwnerBriefProjectionTests."
+        "test_source_locator_is_repository_relative_and_digest_bound",
     ),
 }
 
@@ -889,8 +1001,41 @@ def canonical_digest(value: Any) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def approved_behavior_additions_case(case: Mapping[str, Any]) -> dict[str, Any]:
+    """Project every exact report subtree hidden by the 1.3 compatibility residue."""
+
+    report = case.get("report")
+    if not isinstance(report, Mapping):
+        return {}
+    projection: dict[str, Any] = {}
+    for field in (
+        "document_summaries",
+        "context_plan",
+        "owner_answer_confirmation",
+        "owner_decision_brief",
+        "owner_decision_inventory",
+        "requirements_contract",
+        "design_contract",
+    ):
+        if field in report:
+            projection[field] = copy.deepcopy(report[field])
+    intake = report.get("intake_foundation")
+    if isinstance(intake, Mapping):
+        projection["intake_foundation"] = {
+            field: copy.deepcopy(intake[field])
+            for field in ("next_question_guidance", "project_configuration")
+            if field in intake
+        }
+    basis = report.get("basis")
+    if isinstance(basis, Mapping) and "prd_snapshot_sha256" in basis:
+        projection["basis"] = {
+            "prd_snapshot_sha256": copy.deepcopy(basis["prd_snapshot_sha256"])
+        }
+    return projection
+
+
 def approved_behavior_compatibility_case(case: Mapping[str, Any]) -> dict[str, Any]:
-    """Remove only approved additive projections and locator-coordinate drift."""
+    """Return the frozen residue after separately pinned 1.3 additions."""
 
     normalized = copy.deepcopy(dict(case))
     report = normalized.get("report")
@@ -902,24 +1047,109 @@ def approved_behavior_compatibility_case(case: Mapping[str, Any]) -> dict[str, A
         intake.pop("next_question_guidance", None)
         intake.pop("project_configuration", None)
     context_plan = report.get("context_plan")
-    if not isinstance(context_plan, dict):
-        return normalized
-    context_plan.pop("actual_initial_source_bytes", None)
-    context_plan.pop("actual_initial_bytes", None)
-    for group in ("resolved_initial_slices", "resolved_on_demand_slices"):
-        slices = context_plan.get(group)
-        if not isinstance(slices, list):
-            continue
-        for source_slice in slices:
-            if not isinstance(source_slice, dict):
+    if isinstance(context_plan, dict):
+        for field in ("actual_initial_bytes", "actual_initial_source_bytes"):
+            context_plan.pop(field, None)
+        resolved_slices: list[dict[str, Any]] = []
+        for field in ("resolved_initial_slices", "resolved_on_demand_slices"):
+            entries = context_plan.pop(field, None)
+            if not isinstance(entries, list):
                 continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                for locator_field in (
+                    "canonical_sha256",
+                    "end_line",
+                    "source_bytes",
+                    "start_line",
+                ):
+                    entry.pop(locator_field, None)
+                resolved_slices.append(entry)
+        if resolved_slices:
+            context_plan["resolved_slices"] = sorted(
+                resolved_slices,
+                key=lambda entry: json.dumps(
+                    entry, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                ),
+            )
+    for owner_field in ("owner_answer_confirmation", "owner_decision_brief"):
+        owner_projection = report.get(owner_field)
+        if not isinstance(owner_projection, dict):
+            continue
+        owner_projection.pop("canonical_sha256", None)
+        locators = owner_projection.get("source_locators")
+        if not isinstance(locators, list):
+            continue
+        for locator in locators:
+            if not isinstance(locator, dict):
+                continue
+            for field in ("end_line", "section_sha256", "start_line"):
+                locator.pop(field, None)
+    owner_brief = report.get("owner_decision_brief")
+    if isinstance(owner_brief, dict):
+        owner_brief.pop("executive_sections", None)
+        owner_brief.pop("technical_decision_groups", None)
+        owner_basis = owner_brief.get("basis")
+        if (
+            isinstance(owner_basis, dict)
+            and owner_basis.get("design_contract_sha256") is not None
+        ):
+            owner_basis.pop("design_contract_sha256", None)
+    owner_inventory = report.get("owner_decision_inventory")
+    if isinstance(owner_inventory, dict):
+        owner_inventory.pop("canonical_sha256", None)
+        owner_inventory.pop("decisions", None)
+    basis = report.get("basis")
+    if isinstance(basis, dict):
+        basis.pop("prd_snapshot_sha256", None)
+    requirements = report.get("requirements_contract")
+    if isinstance(requirements, dict):
+        requirements_schema = requirements.get("schema_version")
+        if requirements_schema in ("1.4", "1.5"):
+            requirements.pop("canonical_sha256", None)
+        if requirements_schema == "1.5":
+            requirements["schema_version"] = "1.4"
             for field in (
-                "canonical_sha256",
-                "source_bytes",
-                "start_line",
-                "end_line",
+                "approved_schema_14_compatibility",
+                "completion_target",
+                "cross_cutting_risks",
+                "datasets",
+                "external_obligations",
+                "outcome_metrics",
             ):
-                source_slice.pop(field, None)
+                requirements.pop(field, None)
+    design = report.get("design_contract")
+    if not isinstance(design, dict):
+        return normalized
+    design_schema = design.get("schema_version")
+    if design_schema in (7, 8):
+        design.pop("canonical_sha256", None)
+    if design_schema == 8:
+        design["schema_version"] = 7
+    project_contract = design.get("project_contract")
+    if isinstance(project_contract, dict):
+        project_schema = project_contract.get("schema_version")
+        if project_schema in (7, 8):
+            project_contract.pop("canonical_sha256", None)
+        if project_schema == 8:
+            project_contract["schema_version"] = 7
+            project_contract.pop("design_v8", None)
+    diagram_contract = design.get("diagram_contract")
+    if isinstance(diagram_contract, dict):
+        if design_schema in (7, 8):
+            diagram_contract.pop("canonical_sha256", None)
+        records = diagram_contract.get("records")
+        if isinstance(records, list):
+            for record in records:
+                if not isinstance(record, dict):
+                    continue
+                if design_schema in (7, 8):
+                    for field in ("rendered_sha256", "semantic_sha256"):
+                        record.pop(field, None)
+                if design_schema == 8:
+                    for field in ("containment", "semantic_relationships"):
+                        record.pop(field, None)
     return normalized
 
 
@@ -954,7 +1184,7 @@ def build_oracle() -> dict[str, Any]:
             "package_version": BASELINE_PACKAGE_VERSION,
             "report_schema_version": 2,
         },
-        "approved_behavior_changes": APPROVED_BEHAVIOR_CHANGES,
+        "approved_behavior_changes": FROZEN_APPROVED_BEHAVIOR_CHANGES,
         "summary_truth_compatibility": {
             "base_commit": SUMMARY_TRUTH_BASE_COMMIT,
             "allowed_projection": [
@@ -1010,7 +1240,7 @@ def build_qualification_oracle() -> dict[str, Any]:
             "package_version": QUALIFICATION_BASE_PACKAGE_VERSION,
             "report_schema_version": 2,
         },
-        "approved_behavior_changes": APPROVED_BEHAVIOR_CHANGES,
+        "approved_behavior_changes": QUALIFICATION_APPROVED_BEHAVIOR_CHANGES,
         "normalization": {
             "allowed": [
                 "package version",
@@ -1037,6 +1267,12 @@ def build_qualification_oracle() -> dict[str, Any]:
             name: list(selectors)
             for name, selectors in QUALIFICATION_DESIGN_SCENARIO_COVERAGE.items()
         },
+        "definition_of_complete_scenario_coverage": {
+            name: list(selectors)
+            for name, selectors in (
+                QUALIFICATION_DEFINITION_OF_COMPLETE_SCENARIO_COVERAGE.items()
+            )
+        },
         "aws_scenario_coverage": {
             name: list(selectors)
             for name, selectors in QUALIFICATION_AWS_SCENARIO_COVERAGE.items()
@@ -1044,53 +1280,209 @@ def build_qualification_oracle() -> dict[str, Any]:
     }
 
 
-def benchmark_template_source(iterations: int = 5) -> dict[str, Any]:
-    """Measure the same-process template scenario without persisting machine data."""
+def _benchmark_platform() -> dict[str, str]:
+    distribution = ""
+    distribution_version = ""
+    if platform.system() == "Linux":
+        try:
+            release = platform.freedesktop_os_release()
+        except OSError:
+            release = {}
+        distribution = release.get("ID", "")
+        distribution_version = release.get("VERSION_ID", "")
+    return {
+        "system": platform.system(),
+        "release": platform.release(),
+        "machine": platform.machine(),
+        "distribution": distribution,
+        "distribution_version": distribution_version,
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+    }
 
+
+def _eight_task_plan() -> str:
+    blocks: list[str] = []
+    requirement_ids = doctor_fixtures.MODERN_APPROVED_REQUIREMENT_IDS
+    for index in range(8):
+        assigned = requirement_ids[index::8]
+        trace = [
+            "REQ-0001",
+            *(
+                identifier
+                for requirement_id in assigned
+                for identifier in (requirement_id, f"AC-{requirement_id}")
+            ),
+        ]
+        property_task = index == 0
+        if property_task:
+            trace.append("PROP-001")
+        block = doctor_fixtures.ready_task(
+            write_set=f"app/benchmark/task_{index + 1:03d}.py",
+            requirements="; ".join(trace),
+            design=(
+                "DES-0001; TECH: TECH-0001, TECH-0007"
+                if property_task
+                else "DES-0001; TECH: TECH-0001"
+            ),
+            command=(
+                "python -m unittest tests.test_properties"
+                if property_task
+                else "python -m unittest"
+            ),
+            property_projection=(
+                doctor_fixtures.property_execution_projection() if property_task else ""
+            ),
+        )
+        blocks.append(block.replace("TASK-001", f"TASK-{index + 1:03d}"))
+    return "".join(blocks)
+
+
+def _benchmark_projects(
+    temporary: Path,
+) -> dict[str, tuple[Callable[[], Any], str, int, int]]:
+    fixture = doctor_fixtures.BootstrapDoctorTests()
+
+    def copy(name: str) -> Path:
+        parent = temporary / name
+        parent.mkdir()
+        return fixture.copy_project(parent)
+
+    gate_a = copy("gate-a")
+    fixture.pending_gate_a(gate_a)
+    gate_b = copy("gate-b")
+    fixture.pending_gate_b(gate_b)
+    task_heavy = copy("eight-task-plan")
+    fixture.approve_project(task_heavy)
+    fixture.set_non_material_req_evidence(task_heavy)
+    fixture.initialize_task_plan(task_heavy, _eight_task_plan())
+    state_path = task_heavy / "bootstrap.yaml"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["execution"]["attempts"] = {f"TASK-{index:03d}": 0 for index in range(1, 9)}
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    doctor_fixtures.refresh_document_summaries(task_heavy)
+    return {
+        "template": (
+            lambda: doctor.inspect_project(REPOSITORY_ROOT, template_source=True),
+            "INTAKE_REQUIRED",
+            0,
+            0,
+        ),
+        "gate_a": (
+            lambda: doctor.inspect_project(gate_a),
+            "WAITING_GATE_A",
+            0,
+            0,
+        ),
+        "gate_b": (
+            lambda: doctor.inspect_project(gate_b),
+            "WAITING_GATE_B",
+            0,
+            0,
+        ),
+        "eight_task_plan": (
+            lambda: doctor.inspect_project(task_heavy),
+            "CONSTRUCTION_AUTONOMOUS",
+            8,
+            8,
+        ),
+    }
+
+
+def _assert_benchmark_report(
+    scenario: str,
+    report: Mapping[str, Any],
+    lifecycle: str,
+    task_total: int,
+    task_ready: int,
+) -> None:
+    tasks = report.get("tasks")
+    coherent = bool(
+        report.get("ok") is True
+        and report.get("lifecycle_state") == lifecycle
+        and isinstance(tasks, Mapping)
+        and tasks.get("total") == task_total
+        and tasks.get("ready") == task_ready
+    )
+    if not coherent:
+        raise RuntimeError(f"{scenario} benchmark scenario is not coherent")
+
+
+def benchmark_engine_scenarios(
+    warmups: int = 2,
+    iterations: int = 10,
+) -> dict[str, Any]:
+    """Measure four prebuilt lifecycle scenarios without persisting machine data."""
+
+    if warmups < 1:
+        raise ValueError("warmups must be positive")
     if iterations < 1:
         raise ValueError("iterations must be positive")
-    doctor.inspect_project(REPOSITORY_ROOT, template_source=True)
-    wall_ms: list[float] = []
-    cpu_ms: list[float] = []
-    for _index in range(iterations):
-        wall_start = time.perf_counter()
-        cpu_start = time.process_time()
-        report = doctor.inspect_project(REPOSITORY_ROOT, template_source=True)
-        cpu_ms.append((time.process_time() - cpu_start) * 1000)
-        wall_ms.append((time.perf_counter() - wall_start) * 1000)
-        if not report["ok"]:
-            raise RuntimeError("template-source benchmark scenario is not coherent")
-    tracemalloc.start()
-    doctor.inspect_project(REPOSITORY_ROOT, template_source=True)
-    _current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    results: dict[str, dict[str, Any]] = {}
+    with tempfile.TemporaryDirectory() as directory:
+        scenarios = _benchmark_projects(Path(directory))
+        for name, (inspect, lifecycle, task_total, task_ready) in scenarios.items():
+            for _index in range(warmups):
+                _assert_benchmark_report(
+                    name, inspect(), lifecycle, task_total, task_ready
+                )
+            wall_ms: list[float] = []
+            cpu_ms: list[float] = []
+            for _index in range(iterations):
+                wall_start = time.perf_counter()
+                cpu_start = time.process_time()
+                report = inspect()
+                cpu_ms.append((time.process_time() - cpu_start) * 1000)
+                wall_ms.append((time.perf_counter() - wall_start) * 1000)
+                _assert_benchmark_report(
+                    name, report, lifecycle, task_total, task_ready
+                )
+            tracemalloc.start()
+            try:
+                memory_report = inspect()
+                _current, peak = tracemalloc.get_traced_memory()
+            finally:
+                tracemalloc.stop()
+            _assert_benchmark_report(
+                name, memory_report, lifecycle, task_total, task_ready
+            )
+            results[name] = {
+                "lifecycle_state": lifecycle,
+                "task_total": task_total,
+                "task_ready": task_ready,
+                "peak_memory_mib": peak / (1024 * 1024),
+                "warm_median_cpu_ms": statistics.median(cpu_ms),
+                "warm_median_wall_ms": statistics.median(wall_ms),
+            }
     return {
+        "warmups": warmups,
         "iterations": iterations,
-        "peak_memory_mib": peak / (1024 * 1024),
-        "warm_median_cpu_ms": statistics.median(cpu_ms),
-        "warm_median_wall_ms": statistics.median(wall_ms),
+        "platform": _benchmark_platform(),
+        "scenarios": results,
     }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
-    action.add_argument("--write-oracle", action="store_true")
     action.add_argument("--write-qualification-oracle", action="store_true")
     action.add_argument("--benchmark", action="store_true")
-    parser.add_argument("--iterations", type=int, default=5)
+    parser.add_argument("--warmups", type=int, default=2)
+    parser.add_argument("--iterations", type=int, default=10)
     args = parser.parse_args(argv)
     if args.benchmark:
-        print(json.dumps(benchmark_template_source(args.iterations), indent=2))
+        print(
+            json.dumps(
+                benchmark_engine_scenarios(
+                    warmups=args.warmups,
+                    iterations=args.iterations,
+                ),
+                indent=2,
+            )
+        )
         return 0
-    output_path = (
-        QUALIFICATION_ORACLE_PATH if args.write_qualification_oracle else ORACLE_PATH
-    )
-    payload = (
-        build_qualification_oracle()
-        if args.write_qualification_oracle
-        else build_oracle()
-    )
+    output_path = QUALIFICATION_ORACLE_PATH
+    payload = build_qualification_oracle()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n",

@@ -23,6 +23,7 @@ from ..core.ids import (
     clean_cell,
     explicit_value,
 )
+from .requirements_v15 import PROJECT_COMPLETION_TARGETS
 
 
 REQ_ID = re.compile(r"REQ-\d{4,}")
@@ -47,6 +48,7 @@ BROWNFIELD_BASELINE_FIELDS = {
 }
 GATE_A_READINESS_FIELDS = {
     "Outcome",
+    "Project completion target",
     "Owner and users",
     "Scope and non-goals",
     "Measurable requirement/acceptance IDs",
@@ -232,18 +234,25 @@ def brownfield_contract_issues(text: str) -> list[tuple[str, str]]:
 
 def gate_a_readiness_card_issues(
     card: Mapping[str, str],
+    *,
+    completion_target_required: bool = True,
 ) -> list[tuple[str, str]]:
     """Validate the exact current Gate A readiness-card fields."""
 
     issues: list[tuple[str, str]] = []
-    if set(card) != GATE_A_READINESS_FIELDS:
+    expected_fields = (
+        GATE_A_READINESS_FIELDS
+        if completion_target_required
+        else GATE_A_READINESS_FIELDS - {"Project completion target"}
+    )
+    if set(card) != expected_fields:
         issues.append(
             (
                 "GATE_A_READINESS_CARD",
                 "GATE A readiness-card fields must be exact",
             )
         )
-    for field_name in sorted(GATE_A_READINESS_FIELDS):
+    for field_name in sorted(expected_fields):
         value = clean_cell(card.get(field_name, ""))
         if field_name == "Outstanding gaps" and value == "NONE":
             continue
@@ -258,6 +267,14 @@ def gate_a_readiness_card_issues(
                     f"{field_name} is not an explicit current decision basis",
                 )
             )
+    target = clean_cell(card.get("Project completion target", ""))
+    if completion_target_required and target not in PROJECT_COMPLETION_TARGETS:
+        issues.append(
+            (
+                "GATE_A_READINESS_CARD",
+                "Project completion target must be LOCAL, AWS_READ, DEPLOYED, or RECOVERY",
+            )
+        )
     return issues
 
 

@@ -100,6 +100,20 @@ repeated owner action fails the evidence contract.
 
 ## Pilot metrics and privacy
 
+Use 5-8 first-time, non-author participants against one locked candidate. The
+pilot passes only with:
+
+- 100 percent correct understanding of Gate A, Gate B, local completion, and
+  separate AWS authority;
+- at least 80 percent completion of the core flow without facilitator
+  intervention;
+- median clarity and confidence of at least 4/5; and
+- No safety-critical misunderstanding.
+
+Any P0/P1 truth finding requires correction, a new candidate lock, and a fresh
+pilot. Aggregate evidence binds the exact commit and package digest; it never
+stores participant identities or raw private transcripts.
+
 Retain only non-sensitive aggregate metrics such as prerequisite retries,
 clarification rounds, gate timing, architecture candidates, stale-gate events,
 task completions, validation retries, and owner actions. Tracked files contain
@@ -120,6 +134,15 @@ including `STRUCTURED_API` and `REVIEWED_SCRIPT` when applicable, through the
 existing Gate A, Gate B, AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 contracts.
 Field qualification introduces no scorer, lifecycle stage, gate, or routine
 owner action.
+
+For Fastlane 1.3.0, the only named candidate lane is
+`AWS_SAM_CLOUDFORMATION_NONPROD` in `us-west-2`, using synthetic data and a USD
+20.00 cost ceiling. Read preflight, deployment or update, recovery,
+reconciliation after an interrupted or unknown local observation, and teardown
+each require their own exact current authorization. Evidence must bind the
+immutable artifact and change set, the direct result, rollback, final resources,
+cost, residual state, and separately authorized teardown. No result qualifies
+another AWS lane.
 
 Keep complete evidence outside the reusable template. Reasoning, procedure
 selection, or documentation evidence is not deployment, rollback, recovery, or

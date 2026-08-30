@@ -338,6 +338,7 @@ class ProductJourneyTests(unittest.TestCase):
                 "No recommendation\u2014choose the option that matches your situation.",
                 resumed,
             )
+            self.assertNotIn("Accept this recommendation.", resumed)
             self.assertNotIn("Accept all recommendations.", resumed)
             self.assertNotIn("INTAKE-CARD", resumed)
             self.assertNotIn(str(card["reply_token"]), resumed)
@@ -507,6 +508,10 @@ class ProductJourneyTests(unittest.TestCase):
             rendered_gate_b = presenter.render_owner_decision_brief(gate_b, "GATE_B")
             self.assertIn("Gate B Technical Owner Decision Brief", rendered_gate_b)
             self.assertIn("Technical decision index", rendered_gate_b)
+            self.assertIn(
+                "Current AWS authority: NONE — planned maximum only",
+                rendered_gate_b,
+            )
             for exact_owner_fact in (
                 "Recommendation: CAND-0001 — MANAGED_SERVERLESS_BASELINE: bounded "
                 "managed entry, compute, and data services",
@@ -2468,6 +2473,7 @@ class ProductJourneyTests(unittest.TestCase):
         self.assertIn("\n\nB. A change to an existing application", rendered)
         self.assertIn("\n\nC. A repair", rendered)
         self.assertNotIn("<choose A, B, or C>", rendered)
+        self.assertNotIn("Accept this recommendation.", rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("validation boundary", rendered)
         self.assertNotIn("FASTLANE · WELCOME", rendered)

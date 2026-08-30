@@ -1,13 +1,12 @@
 # Fastlane workflow and operating model
 
-This guide owns the complete customer lifecycle, gate behavior, technical
-control plane, project-record flow, and AWS authority boundaries. Start with the
-[README](../README.md) for the product overview and quick start.
+This guide owns the lifecycle, gates, project records, control plane, and AWS
+authority. See the [README](../README.md) for the overview and quick start.
 
-Fastlane turns an idea or bounded change into owner-approved requirements, an
-AWS-informed design, a tested local build, and an evidence-backed release
-decision. Codex guides and delivers; AWS Core supplies current guidance; the
-Fastlane Engine keeps state, routing, evidence, and authority consistent.
+Fastlane turns a bounded change into approved requirements, an AWS-informed
+design, a tested local build, and honest release evidence. Codex guides and
+delivers; AWS Core advises; the Engine keeps state, routing, evidence, and
+authority aligned.
 
 ## First run
 
@@ -43,7 +42,7 @@ To correct it, reply:
 Change <plain field> to <new value>.
 ```
 
-`Accept all recommendations.` applies only to the current explained choice. A
+`Accept this recommendation.` applies only to the current explained choice. A
 correction never approves a gate. After a side question, Fastlane restores the
 same pending action.
 
@@ -68,7 +67,7 @@ flowchart TB
     IDEA["Describe the outcome or bounded change"]
     DEFINE["Define users, journeys, scope, data, risks, and success"]
     GATEA{"Gate A: approve the Product Agreement?"}
-    DESIGN["Compare complete AWS-informed system designs"]
+    DESIGN["Compare AWS-informed system designs"]
     GATEB{"Gate B: approve the plan and local boundary?"}
     TASKS["Create dependency-aware bounded tasks"]
     BUILD["Build inside approved local paths"]
@@ -101,7 +100,7 @@ flowchart TB
 |---|---|---|
 | Setup and Define | Learns the outcome, users, scope, data, risks, and success | Answer one current question |
 | Gate A | Presents the complete Product Owner Brief | Approve requirements or request a correction |
-| Design | Uses current AWS Core guidance and compares complete solutions | Nothing unless a business decision is missing |
+| Design | Uses current AWS Core guidance, compares complete solutions, and binds environment and dependency controls | Nothing unless a business decision is missing |
 | Gate B | Presents the complete Technical Owner Brief | Approve the design and local construction boundary or request a correction |
 | Tasks and Build | Creates dependency-aware work, builds locally, tests, and records evidence | No task-by-task approval |
 | Release review | Reconciles what is verified, failed, planned, or still unobserved | Resolve only a genuine release decision |
@@ -150,10 +149,12 @@ and rejection reasons, tradeoffs, risks and mitigations, current evidence, claim
 status, and a measurable reason to reconsider it. The exact Gate B receipt
 appears last.
 
-Gate B authorizes only the recorded local boundary, never AWS. If it includes
-`dist/architecture/**`, Fastlane may once offer a planned board without blocking
-task planning. An exact request binds the approved Mermaid and derives its
-schema-2 model; no gate or AWS authority results.
+Gate B authorizes only its recorded local boundary, never AWS. If it includes
+`dist/architecture/**`, Fastlane may offer one non-blocking planned board. The
+brief shows `Current AWS authority: NONE — planned maximum only`. An exact
+request binds approved Mermaid, checks both views for direction, relation, edge
+kind, path, and containment parity, and derives schema 2; it grants no gate or
+AWS authority.
 
 ## How the control plane works
 
@@ -283,19 +284,24 @@ Fastlane requires the current official
 evidence is required when service behavior, Region support, identity, security,
 reliability, cost, or operations materially affects a decision.
 
-Codex compares complete designs across security, reliability, performance,
-cost, sustainability, and operations. AWS Core supplies attributable guidance;
-Codex applies it; the owner approves Gate B. Guidance is not account observation
-or an official AWS Well-Architected Review.
+Codex evaluates all six Well-Architected areas with attributable AWS Core
+guidance. The owner approves Gate B; this is neither account observation nor an
+official AWS Well-Architected Review.
 
-An AWS lane is a plan, not authority. Preflight, deployment, reconciliation,
-residual review, and teardown use the explicit AWS operation path. Reads,
-mutations, and teardown keep separate boundaries; tools and credentials never
-grant permission.
+Completion is target-specific:
 
-Reconciliation means Fastlane compared expected and observed AWS state. It does
-not, by itself, mean a deployment succeeded. Failure, partial completion, an
-unknown terminal result, and verified success remain distinct outcomes.
+| Target | Evidence |
+|---|---|
+| Local | E2 |
+| AWS read | E2 + E3 |
+| Deployed | E2 + E3 + E4 |
+| Recovery | E2 + E3 + E4 + E5 |
+
+Teardown-only E5 evidence does not qualify Recovery; rollback or restore is
+required. A failed or unobserved higher target does not erase a lower target
+that remains current and proven. Other AWS lanes remain unqualified.
+Reconciliation means Fastlane compared expected and observed AWS state. It
+proves neither success nor authority; credentials grant no permission.
 
 <details>
 <summary>Optional internal AWS stage labels</summary>

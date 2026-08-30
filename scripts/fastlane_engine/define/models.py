@@ -57,8 +57,130 @@ class AssumptionLifecycleRecord:
 
 
 @dataclass(frozen=True)
+class OutcomeMetric:
+    metric_id: str
+    applicability: str
+    outcome_basis_ids: tuple[str, ...]
+    metric: str
+    baseline: str
+    target: str
+    measurement_window: str
+    evidence_source: str
+    accountable_role: str
+    guardrail: str
+    missed_target_action: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "metric_id": self.metric_id,
+            "applicability": self.applicability,
+            "outcome_basis_ids": list(self.outcome_basis_ids),
+            "metric": self.metric,
+            "baseline": self.baseline,
+            "target": self.target,
+            "measurement_window": self.measurement_window,
+            "evidence_source": self.evidence_source,
+            "accountable_role": self.accountable_role,
+            "guardrail": self.guardrail,
+            "missed_target_action": self.missed_target_action,
+        }
+
+
+@dataclass(frozen=True)
+class DatasetObligation:
+    dataset_id: str
+    dataset_category: str
+    purpose: str
+    classification: str
+    source_of_truth: str
+    access_boundary: str
+    retention: str
+    deletion: str
+    recovery: str
+    residency: str
+    migration: str
+    audit_obligation: str
+    accountable_role: str
+    requirement_basis_ids: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dataset_id": self.dataset_id,
+            "dataset_category": self.dataset_category,
+            "purpose": self.purpose,
+            "classification": self.classification,
+            "source_of_truth": self.source_of_truth,
+            "access_boundary": self.access_boundary,
+            "retention": self.retention,
+            "deletion": self.deletion,
+            "recovery": self.recovery,
+            "residency": self.residency,
+            "migration": self.migration,
+            "audit_obligation": self.audit_obligation,
+            "accountable_role": self.accountable_role,
+            "requirement_basis_ids": list(self.requirement_basis_ids),
+        }
+
+
+@dataclass(frozen=True)
+class ExternalObligation:
+    obligation_id: str
+    obligation: str
+    source_basis: str
+    applicability: str
+    affected_scope: str
+    required_behavior: str
+    accountable_role: str
+    requirement_ids: tuple[str, ...]
+    evidence_requirement: str
+    review_trigger: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "obligation_id": self.obligation_id,
+            "obligation": self.obligation,
+            "source_basis": self.source_basis,
+            "applicability": self.applicability,
+            "affected_scope": self.affected_scope,
+            "required_behavior": self.required_behavior,
+            "accountable_role": self.accountable_role,
+            "requirement_ids": list(self.requirement_ids),
+            "evidence_requirement": self.evidence_requirement,
+            "review_trigger": self.review_trigger,
+        }
+
+
+@dataclass(frozen=True)
+class CrossCuttingRisk:
+    risk_id: str
+    category: str
+    risk: str
+    likelihood: str
+    impact: str
+    accountable_role: str
+    mitigation: str
+    revisit_trigger: str
+    requirement_ids: tuple[str, ...]
+    status: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "risk_id": self.risk_id,
+            "category": self.category,
+            "risk": self.risk,
+            "likelihood": self.likelihood,
+            "impact": self.impact,
+            "accountable_role": self.accountable_role,
+            "mitigation": self.mitigation,
+            "revisit_trigger": self.revisit_trigger,
+            "requirement_ids": list(self.requirement_ids),
+            "status": self.status,
+        }
+
+
+@dataclass(frozen=True)
 class RequirementsContract:
-    schema_version: str = "1.4"
+    schema_version: str = "1.5"
     status: str = "UNINITIALIZED"
     actor_ids: tuple[str, ...] = ()
     requirement_ids: tuple[str, ...] = ()
@@ -76,11 +198,18 @@ class RequirementsContract:
     presentation_labels: tuple[tuple[str, str], ...] = field(
         default=(), repr=False, compare=False
     )
+    completion_target: str | None = None
+    outcome_metrics: tuple[OutcomeMetric, ...] = ()
+    datasets: tuple[DatasetObligation, ...] = ()
+    external_obligations: tuple[ExternalObligation, ...] = ()
+    cross_cutting_risks: tuple[CrossCuttingRisk, ...] = ()
+    approved_schema_14_compatibility: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "status": self.status,
+            "completion_target": self.completion_target,
             "actor_ids": list(self.actor_ids),
             "requirement_ids": list(self.requirement_ids),
             "journey_ids": list(self.journey_ids),
@@ -92,9 +221,18 @@ class RequirementsContract:
                 self.change_lineage.to_dict() if self.change_lineage else None
             ),
             "assumptions": [item.to_dict() for item in self.assumptions],
+            "outcome_metrics": [item.to_dict() for item in self.outcome_metrics],
+            "datasets": [item.to_dict() for item in self.datasets],
+            "external_obligations": [
+                item.to_dict() for item in self.external_obligations
+            ],
+            "cross_cutting_risks": [
+                item.to_dict() for item in self.cross_cutting_risks
+            ],
             "missing_records": list(self.missing_records),
             "canonical_sha256": self.canonical_sha256,
             "grandfathered_approved_gate_a": self.grandfathered_approved_gate_a,
+            "approved_schema_14_compatibility": (self.approved_schema_14_compatibility),
         }
 
 

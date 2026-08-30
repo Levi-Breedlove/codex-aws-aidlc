@@ -535,16 +535,19 @@ class FastlanePresenterTests(unittest.TestCase):
         self.assertNotIn("deployment receipt", rendered)
 
     def test_architecture_board_completion_names_observed_local_evidence(self) -> None:
-        current = json.loads(
-            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
-                encoding="utf-8"
-            )
-        )["report_cases"]["gate_b_approved"]["report"]
+        current = design_fixtures._architecture_board_report_fixture()
         current["write_authority"]["approved_write_roots"].append(
             "dist/architecture/**"
         )
         prd_text = doctor_fixtures.complete_design_contract(
             (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        current_design, design_issues = doctor_fixtures.doctor.derive_design_contract(
+            prd_text, "DES-0001", required=True
+        )
+        self.assertEqual(design_issues, [])
+        current["design_contract"]["diagram_contract"] = (
+            current_design.diagram_contract.to_dict()
         )
         identity = {
             **engine_api.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,
@@ -2057,6 +2060,7 @@ class FastlanePresenterTests(unittest.TestCase):
         card = foundation["pending_card"]
         assert isinstance(card, dict)
         self.assertNotIn(str(card["reply_token"]), rendered)
+        self.assertNotIn("Accept this recommendation.", rendered)
         self.assertNotIn("Accept all recommendations.", rendered)
         self.assertNotIn("INTAKE-CARD", rendered)
         self.assertNotIn("sha256:", rendered)
@@ -2169,13 +2173,14 @@ class FastlanePresenterTests(unittest.TestCase):
 
         rendered = presenter.render_owner_update(current)
 
-        self.assertEqual(rendered.count("Accept all recommendations."), 1)
+        self.assertEqual(rendered.count("Accept this recommendation."), 1)
+        self.assertNotIn("Accept all recommendations.", rendered)
         self.assertIn("A. Recommended \u2014 A new application.", rendered)
-        self.assertIn("You may also reply `Accept all recommendations.`", rendered)
+        self.assertIn("You may also reply `Accept this recommendation.`", rendered)
         self.assertIn("Copyable reply:\nA", rendered)
         self.assertNotIn(str(card["reply_token"]), rendered)
         accepted = intake_response.parse_intake_owner_response(
-            "Accept all recommendations.",
+            "Accept this recommendation.",
             card,
             expected_card_id=str(card["card_id"]),
             expected_revision=int(card["revision"]),

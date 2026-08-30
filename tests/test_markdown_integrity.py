@@ -446,6 +446,33 @@ sequenceDiagram
         self.assertNotIn("| Messaging or orchestration |", section)
         self.assertNotIn("| Networking |", section)
 
+    def test_fresh_prd_uses_canonical_design_status_and_targeted_release_acceptance(
+        self,
+    ) -> None:
+        prd = (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        self.assertNotIn("| Design status |", prd)
+        document_status = prd.split("## Document status", 1)[1].split(
+            "### Delivery profile overlays", 1
+        )[0]
+        self.assertEqual(document_status.count("| Current design revision |"), 1)
+        self.assertEqual(document_status.count("| Gate B derived status |"), 1)
+        release = prd.split("## 26. Release acceptance", 1)[1].split(
+            "# Gate B Review", 1
+        )[0]
+        normalized_release = " ".join(release.split())
+        for statement in (
+            "Local release work is complete only when:",
+            "AWS targets are accepted independently",
+            "`READY_TO_DEPLOY` does not mean deployed",
+            "`RELEASE_VERIFIED` does not imply recovery or teardown",
+            "Unobserved AWS work remains explicit",
+        ):
+            self.assertIn(statement, normalized_release)
+        self.assertNotIn(
+            "deployment, monitoring, rollback, recovery, and cleanup are verified",
+            release,
+        )
+
     def test_each_mermaid_block_is_checked_independently(self) -> None:
         fixture = """
 ```mermaid

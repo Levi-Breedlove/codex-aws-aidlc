@@ -23,6 +23,13 @@ from ..core.contracts import (
     without_fenced_code,
 )
 from ..core.ids import STABLE_CONTRACT_ID, clean_cell, parse_exact_id_list, unresolved
+from .diagram_semantics import (
+    DIAGRAM_MEMBERSHIP_NODE,
+    DIAGRAM_MEMBERSHIP_SUBGRAPH,
+    controlled_relationship_category_issues,
+    diagram_record_semantics,
+    semantic_subgraph_memberships as _semantic_subgraph_memberships,
+)
 from .models import (
     ArchitectureContract,
     DiagramContract,
@@ -110,12 +117,6 @@ DIAGRAM_ACC_DESCRIPTION = re.compile(r"^\s*accDescr:\s*(?P<value>.+?)\s*$", re.I
 DIAGRAM_SUBGRAPH = re.compile(
     r'^\s*subgraph\s+(?P<id>[A-Z][A-Z0-9_]*)\["(?P<label>[^"\r\n]+)"\]\s*$', re.I
 )
-
-DIAGRAM_MEMBERSHIP_SUBGRAPH = re.compile(
-    r"^\s*subgraph\s+(?P<id>[A-Z][A-Z0-9_]*)(?:\[[^\]\r\n]*\])?\s*$", re.I
-)
-
-DIAGRAM_MEMBERSHIP_NODE = re.compile(r"^\s*(?P<id>[A-Z][A-Z0-9_]*-\d{3,})\s*(?:\[|\()")
 
 DIAGRAM_CLASS_DEF = re.compile(
     r"^\s*classDef\s+(?P<name>[a-z][a-z0-9_-]*)\s+(?P<body>.+?);?\s*$", re.I
@@ -1443,39 +1444,6 @@ def _diagram_connectivity_issues(
     return issues
 
 
-def _semantic_subgraph_memberships(
-    lines: Iterable[str], referenced_ids: Iterable[str]
-) -> list[list[str]]:
-    """Bind modern containment without binding labels, layout order, or group IDs."""
-
-    included = set(referenced_ids)
-    stack: list[str] = []
-    descendants: dict[str, set[str]] = {}
-    for line in lines:
-        if (subgraph := DIAGRAM_MEMBERSHIP_SUBGRAPH.fullmatch(line)) is not None:
-            identifier = subgraph.group("id").upper()
-            descendants.setdefault(identifier, set())
-            stack.append(identifier)
-        elif line.strip().casefold() == "end":
-            if stack:
-                stack.pop()
-        elif (node := DIAGRAM_MEMBERSHIP_NODE.match(line)) is not None:
-            if node.group("id") not in included:
-                continue
-            for identifier in stack:
-                descendants[identifier].add(node.group("id"))
-    return [
-        list(members)
-        for members in sorted(
-            {
-                tuple(sorted(identifiers))
-                for identifiers in descendants.values()
-                if identifiers
-            }
-        )
-    ]
-
-
 def _diagram_semantic_payload(
     kind: str,
     basis_ids: Iterable[str],
@@ -1529,6 +1497,8 @@ def _modern_diagram_issues(
     relationships: tuple[tuple[str, str, str], ...],
     endpoint_ids: set[str],
     context: _DiagramPresentationContext,
+    *,
+    require_controlled_relation_categories: bool,
 ) -> tuple[list[str], list[str]]:
     """Validate the modern human view against normalized canonical design facts."""
 
@@ -1563,6 +1533,14 @@ def _modern_diagram_issues(
     ]
     if any(not relation for _source, relation, _target in relationships):
         semantic_issues.append(f"{diagram_id}: relationship labels must not be empty")
+    semantic_issues.extend(
+        controlled_relationship_category_issues(
+            diagram_id,
+            kind,
+            relationships,
+            required=require_controlled_relation_categories,
+        )
+    )
     missing_labels = sorted(set(referenced_ids) - set(context.labels_by_id))
     if missing_labels:
         semantic_issues.append(
@@ -2016,6 +1994,7 @@ def _derive_current_diagram_contract(
             issues.append(f"{diagram_id}: rendered project diagram is STALE")
 
         relationships: tuple[tuple[str, str, str], ...] = ()
+        semantic_relationships, containment = (), ()
         semantic_sha256: str | None = None
         rendered_sha256: str | None = None
         if must_be_current and status == "CURRENT":
@@ -2116,6 +2095,9 @@ def _derive_current_diagram_contract(
                         relationships,
                         endpoint_ids,
                         presentation_context,
+                        require_controlled_relation_categories=(
+                            project_contract.schema_version >= 8
+                        ),
                     )
                     issues.extend(semantic_issues)
                     issues.extend(_presentation_issues(presentation_issues))
@@ -2129,6 +2111,12 @@ def _derive_current_diagram_contract(
                     referenced_ids,
                     parsed_relationships_with_kind,
                     body,
+                    modern_contract=modern_contract,
+                )
+                semantic_relationships, containment = diagram_record_semantics(
+                    parsed_relationships_with_kind,
+                    body,
+                    referenced_ids,
                     modern_contract=modern_contract,
                 )
                 semantic_bytes = (
@@ -2156,6 +2144,8 @@ def _derive_current_diagram_contract(
                 relationships=relationships,
                 semantic_sha256=semantic_sha256,
                 rendered_sha256=rendered_sha256,
+                semantic_relationships=semantic_relationships,
+                containment=containment,
             )
         )
 

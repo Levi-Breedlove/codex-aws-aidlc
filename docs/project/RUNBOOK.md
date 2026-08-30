@@ -10,7 +10,7 @@ tear down the project. It never grants approval or AWS authority.
 |---|---|
 | Environment | Not yet initialized |
 | Deployment state | Not deployed |
-| Current AWS authority | None |
+| Current AWS authority | NONE — planned maximum only |
 | Construction approval | Not yet initialized |
 | Safest available operation | Local validation only |
 | Deployment approval | Not authorized |

@@ -8,7 +8,6 @@ routing, mutation, approval, authorization, or owner-facing rendering.
 from __future__ import annotations
 
 
-import hashlib
 import re
 from dataclasses import replace
 from typing import Any, Callable, Sequence
@@ -18,9 +17,7 @@ from ..core.contracts import (
     _heading_section_lines,
     contract_table_after_heading,
     contract_table_in_section,
-    markdown_tables,
     table_after_heading,
-    without_fenced_code,
 )
 from ..core.ids import (
     EVIDENCE_PLACEHOLDER_PATTERN,
@@ -32,6 +29,13 @@ from ..core.ids import (
 )
 
 from .architecture import _derive_architecture_contract
+from .contract_v8 import (
+    DESIGN8_HEADERS,
+    DESIGN8_HEADINGS,
+    canonical_project_design_bytes,
+    derive_project_design8_state,
+    project_design_is_uninitialized,
+)
 from .diagrams import (
     DIAGRAM_CONTRACT_HEADERS,
     DIAGRAM_CONTRACT_HEADING,
@@ -44,12 +48,19 @@ from .models import (
     ARCHITECTURE_ID,
     ApplicationSourceDisposition,
     DesignContract,
+    Design8Extension,  # noqa: F401 - stable compatibility re-export
     FirstWaveContract,
     HarnessContract,
     ProjectDesignContract,
     PropertyExecution,
     SpikeContract,
     TechnologyDecision,
+)
+from .schema_compat import (
+    ProjectSchemaCompatibility,
+    aggregate_design_sha256,
+    bind_approved_schema7_compatibility,
+    project_schema_state,
 )
 from .source import (
     parse_application_source_disposition,
@@ -110,7 +121,7 @@ def _owner_visible_design_issues(text: str) -> list[str]:
     return issues
 
 
-PROJECT_DESIGN_CONTRACT_SCHEMA = "7"
+PROJECT_DESIGN_CONTRACT_SCHEMA = "8"
 
 
 JOURNEY_HEADING = "### Journey register"
@@ -261,6 +272,58 @@ SPIKE_HEADERS = (
 SPIKE_ID = re.compile(r"SPIKE-\d{3,}")
 
 
+PROJECT_SCHEMA_COMPATIBILITY = ProjectSchemaCompatibility(
+    current_schema=PROJECT_DESIGN_CONTRACT_SCHEMA,
+    diagram_heading=DIAGRAM_CONTRACT_HEADING,
+    diagram_headers=DIAGRAM_CONTRACT_HEADERS,
+    partial_upgrade_headings=tuple(sorted(DESIGN8_HEADINGS)),
+    partial_upgrade_headers=tuple(sorted(DESIGN8_HEADERS)),
+    current_headers=(
+        INTERFACE_HEADERS,
+        LAYER_BOUNDARY_HEADERS,
+        STATE_APPLICABILITY_HEADERS,
+        STATE_REGISTER_HEADERS,
+        FIRST_WAVE_HEADERS,
+        SPIKE_HEADERS,
+        DIAGRAM_CONTRACT_HEADERS,
+    ),
+    legacy_interface_headers=LEGACY_INTERFACE_HEADERS_V4,
+    interface_id=INTERFACE_ID,
+    pre_schema_seven_fields=(APPLICATION_SOURCE_DISPOSITION_FIELD,),
+    schema_five_only_headings=(
+        LAYER_BOUNDARY_HEADING,
+        STATE_APPLICABILITY_HEADING,
+        STATE_REGISTER_HEADING,
+        FIRST_WAVE_HEADING,
+        SPIKE_HEADING,
+    ),
+    legacy_required_ids=(
+        ARCHITECTURE_ID,
+        TECHNOLOGY_DECISION_ID,
+        PROPERTY_ID,
+        HARNESS_ID,
+    ),
+    migration_records=(
+        "Project design contract schema 8",
+        APPLICATION_SOURCE_DISPOSITION_FIELD,
+        INTERFACE_HEADING,
+        LAYER_BOUNDARY_HEADING,
+        STATE_APPLICABILITY_HEADING,
+        STATE_REGISTER_HEADING,
+        FIRST_WAVE_HEADING,
+        SPIKE_HEADING,
+        DIAGRAM_CONTRACT_HEADING,
+        *tuple(sorted(DESIGN8_HEADINGS)),
+    ),
+    migration_issue=(
+        "Project design contract schema 8 requires an application source "
+        "disposition plus current interface, layer-boundary, state-applicability, "
+        "first-wave, spike, diagram, data-implementation, environment/promotion, "
+        "Well-Architected-consideration, and dependency-policy records"
+    ),
+)
+
+
 MEASURABLE_INTERFACE_BOUND = re.compile(
     r"(?:\b\d+(?:\.\d+)?\s*(?:ns|nanoseconds?|us|microseconds?|ms|"
     r"milliseconds?|s|secs?|seconds?|minutes?|hours?|days?|weeks?|bytes?|"
@@ -394,140 +457,6 @@ def _design_reference_issues(
     return issues
 
 
-def _project_schema_state(
-    text: str,
-    legacy_design_ids: set[str],
-    *,
-    required: bool,
-    grandfather_approved_v4: bool,
-) -> tuple[
-    dict[str, str],
-    bool,
-    bool,
-    list[str],
-    tuple[ProjectDesignContract, list[str]] | None,
-]:
-    """COMPATIBILITY: Select current, grandfathered, or migration semantics."""
-
-    issues: list[str] = []
-    try:
-        document = table_after_heading(text, "## Document status")
-    except ValueError as exc:
-        document = {}
-        if required:
-            issues.append(str(exc))
-    design_schema = clean_cell(document.get("Project design contract schema", ""))
-    grandfather_schema_6 = bool(design_schema == "6" and grandfather_approved_v4)
-    grandfather_schema_5 = bool(
-        design_schema == "5"
-        and grandfather_approved_v4
-        and DIAGRAM_CONTRACT_HEADING not in without_fenced_code(text)
-    )
-    if (
-        design_schema == PROJECT_DESIGN_CONTRACT_SCHEMA
-        or grandfather_schema_6
-        or grandfather_schema_5
-    ):
-        return document, grandfather_schema_5, grandfather_schema_6, issues, None
-
-    observed_tables = [table for table in markdown_tables(text) if table]
-    observed_headers = {tuple(table[0]) for table in observed_tables}
-    current_headers = {
-        INTERFACE_HEADERS,
-        LAYER_BOUNDARY_HEADERS,
-        STATE_APPLICABILITY_HEADERS,
-        STATE_REGISTER_HEADERS,
-        FIRST_WAVE_HEADERS,
-        SPIKE_HEADERS,
-        DIAGRAM_CONTRACT_HEADERS,
-    }
-    legacy_interface_tables = [
-        table
-        for table in observed_tables
-        if tuple(table[0]) == LEGACY_INTERFACE_HEADERS_V4
-    ]
-    legacy_interface_ids = [
-        clean_cell(row[0])
-        for table in legacy_interface_tables
-        for row in table[2:]
-        if len(row) == len(LEGACY_INTERFACE_HEADERS_V4)
-    ]
-    structural_text = without_fenced_code(text)
-    schema_five_only_headings = (
-        LAYER_BOUNDARY_HEADING,
-        STATE_APPLICABILITY_HEADING,
-        STATE_REGISTER_HEADING,
-        FIRST_WAVE_HEADING,
-        SPIKE_HEADING,
-    )
-    exact_legacy_shape = bool(
-        not design_schema
-        and len(legacy_interface_tables) == 1
-        and legacy_interface_ids
-        and all(INTERFACE_ID.fullmatch(item) for item in legacy_interface_ids)
-        and not (observed_headers & current_headers)
-        and not any(
-            re.search(rf"^{re.escape(heading)}[ \t]*$", structural_text, re.MULTILINE)
-            for heading in schema_five_only_headings
-        )
-        and any(ARCHITECTURE_ID.fullmatch(item) for item in legacy_design_ids)
-        and any(TECHNOLOGY_DECISION_ID.fullmatch(item) for item in legacy_design_ids)
-        and any(PROPERTY_ID.fullmatch(item) for item in legacy_design_ids)
-        and any(HARNESS_ID.fullmatch(item) for item in legacy_design_ids)
-    )
-    if grandfather_approved_v4 and exact_legacy_shape:
-        return (
-            document,
-            False,
-            False,
-            [],
-            (
-                ProjectDesignContract(
-                    schema_version=4, status="GRANDFATHERED", grandfathered_v4=True
-                ),
-                [],
-            ),
-        )
-    if not required:
-        return (
-            document,
-            False,
-            False,
-            [],
-            (
-                ProjectDesignContract(status="UNINITIALIZED"),
-                [],
-            ),
-        )
-    return (
-        document,
-        False,
-        False,
-        [],
-        (
-            ProjectDesignContract(
-                status="MIGRATION_REQUIRED",
-                missing_records=(
-                    "Project design contract schema 7",
-                    APPLICATION_SOURCE_DISPOSITION_FIELD,
-                    INTERFACE_HEADING,
-                    LAYER_BOUNDARY_HEADING,
-                    STATE_APPLICABILITY_HEADING,
-                    STATE_REGISTER_HEADING,
-                    FIRST_WAVE_HEADING,
-                    SPIKE_HEADING,
-                    DIAGRAM_CONTRACT_HEADING,
-                ),
-            ),
-            [
-                "Project design contract schema 7 requires an application source "
-                "disposition plus current interface, layer-boundary, state-applicability, "
-                "first-wave, spike, and diagram records"
-            ],
-        ),
-    )
-
-
 def _project_presentation_labels(
     interfaces: ContractTable | None,
     boundaries: ContractTable | None,
@@ -568,13 +497,15 @@ def derive_project_design_contract(
         document,
         grandfather_schema_5,
         grandfather_schema_6,
+        approved_schema_7_candidate,
         issues,
         early_result,
-    ) = _project_schema_state(
+    ) = project_schema_state(
         text,
         legacy_design_ids,
         required=required,
-        grandfather_approved_v4=grandfather_approved_v4,
+        grandfather_approved=grandfather_approved_v4,
+        compatibility=PROJECT_SCHEMA_COMPATIBILITY,
     )
     if early_result is not None:
         return early_result
@@ -602,7 +533,7 @@ def derive_project_design_contract(
         if not raw_disposition or unresolved(raw_disposition):
             if required:
                 add(
-                    "APPLICATION_SOURCE_DISPOSITION_MISSING: schema 7 requires "
+                    "APPLICATION_SOURCE_DISPOSITION_MISSING: schema 8 requires "
                     "Application source disposition before Gate B"
                 )
                 missing_records.append(APPLICATION_SOURCE_DISPOSITION_FIELD)
@@ -1077,59 +1008,54 @@ def derive_project_design_contract(
             required_next_action=next_action,
         )
 
-    canonical_parts: list[bytes] = [
-        f"PROJECT_DESIGN_CONTRACT_SCHEMA: "
-        f"{'5' if grandfather_schema_5 else '6' if grandfather_schema_6 else PROJECT_DESIGN_CONTRACT_SCHEMA}\n".encode(
-            "utf-8"
+    known_design_ids = (
+        set(allowed_basis_ids)
+        | set(legacy_design_ids)
+        | requirement_ids
+        | current_validation_ids
+        | set(interface_ids)
+        | set(boundary_ids)
+        | set(state_ids)
+        | {item.risk_id for item in requirements_contract.cross_cutting_risks}
+        | {item.dataset_id for item in requirements_contract.datasets}
+    )
+    design_v8, effective_schema, design_v8_issues, design_v8_missing = (
+        derive_project_design8_state(
+            text,
+            requirements_contract,
+            coverage_contract,
+            known_design_ids,
+            grandfather_schema_5=grandfather_schema_5,
+            grandfather_schema_6=grandfather_schema_6,
+            approved_schema_7=approved_schema_7_candidate,
         )
-    ]
-    if source_disposition is not None:
-        canonical_parts.append(
-            (
-                "APPLICATION_SOURCE_DISPOSITION: "
-                + source_disposition.canonical_value
-                + "\n"
-            ).encode("utf-8")
+    )
+    issues.extend(design_v8_issues)
+    missing_records.extend(design_v8_missing)
+    canonical_bytes, canonical_sha256, canonical_issues = (
+        canonical_project_design_bytes(
+            effective_schema=effective_schema,
+            source_disposition=source_disposition,
+            requirements_contract=requirements_contract,
+            current_tables=(interfaces, boundaries, state_applicability, states),
+            extension=design_v8,
+            first_wave_table=first_wave_table,
+            first_wave_sentinel=first_wave_sentinel,
+            spike_table=spike_table,
+            spike_sentinel=spike_sentinel,
+            expected_spike_id=expected_spike_id,
         )
-    if (
-        requirements_contract.grandfathered_approved_gate_a
-        and requirements_contract.canonical_sha256 is None
-    ):
-        add(
-            "Grandfathered Gate A design requires a canonical legacy requirements projection"
-        )
-    elif requirements_contract.grandfathered_approved_gate_a:
-        canonical_parts.append(
-            f"LEGACY_GATE_A_BRIDGE: {requirements_contract.canonical_sha256}\n".encode(
-                "utf-8"
-            )
-        )
-    for table in (interfaces, boundaries, state_applicability, states):
-        if table is not None:
-            canonical_parts.append(table.canonical_bytes)
-    if first_wave_table is not None:
-        canonical_parts.append(first_wave_table.canonical_bytes)
-    elif first_wave_sentinel is not None:
-        canonical_parts.append(first_wave_sentinel)
-    if spike_table is not None and expected_spike_id is not None:
-        canonical_parts.append(spike_table.canonical_bytes)
-    elif spike_sentinel is not None:
-        canonical_parts.append(spike_sentinel)
-    canonical_bytes = b"".join(canonical_parts)
-    canonical_sha256 = "sha256:" + hashlib.sha256(canonical_bytes).hexdigest()
-    if not required and any(
-        unresolved(cell)
-        for table in (interfaces, boundaries, state_applicability, states)
-        if table is not None
-        for row in table.rows
-        for cell in row
+    )
+    issues.extend(canonical_issues)
+    if not required and project_design_is_uninitialized(
+        (interfaces, boundaries, state_applicability, states),
+        effective_schema,
+        design_v8,
     ):
         return ProjectDesignContract(status="UNINITIALIZED"), []
     return (
         ProjectDesignContract(
-            schema_version=(
-                5 if grandfather_schema_5 else 6 if grandfather_schema_6 else 7
-            ),
+            schema_version=(effective_schema),
             status=(
                 "GRANDFATHERED"
                 if (grandfather_schema_5 or grandfather_schema_6) and not issues
@@ -1150,6 +1076,7 @@ def derive_project_design_contract(
             canonical_sha256=canonical_sha256,
             grandfathered_v5=grandfather_schema_5,
             grandfathered_v6=grandfather_schema_6,
+            design_v8=design_v8,
             canonical_bytes=canonical_bytes,
         ),
         issues,
@@ -1702,51 +1629,29 @@ def derive_design_contract(
         if trace_issues:
             architecture = replace(architecture, status="BLOCKED")
 
-    canonical_sha256: str | None = None
-    if (
-        technology_table is not None
-        and applicability_table is not None
-        and definition_table is not None
-        and execution_table is not None
-        and (harness.canonical_bytes is not None or harness.grandfathered_v1)
-        and (change_impact.canonical_bytes is not None or grandfather_approved_v1)
-        and (
-            project_contract.canonical_bytes is not None
-            or project_contract.grandfathered_v4
-        )
-        and (example_table is not None or project_contract.grandfathered_v4)
-        and (
-            diagram_contract.canonical_bytes is not None
-            or project_contract.grandfathered_v4
-            or project_contract.grandfathered_v5
-        )
-        and (design_support_bytes is not None or not bind_design_support)
-    ):
-        architecture_bytes = architecture.canonical_bytes or b""
-        harness_bytes = harness.canonical_bytes or b""
-        change_impact_bytes = change_impact.canonical_bytes or b""
-        project_contract_bytes = project_contract.canonical_bytes or b""
-        diagram_contract_bytes = diagram_contract.canonical_bytes or b""
-        canonical_sha256 = (
-            "sha256:"
-            + hashlib.sha256(
-                architecture_bytes
-                + harness_bytes
-                + change_impact_bytes
-                + project_contract_bytes
-                + diagram_contract_bytes
-                + technology_table.canonical_bytes
-                + (example_table.canonical_bytes if example_table is not None else b"")
-                + applicability_table.canonical_bytes
-                + definition_table.canonical_bytes
-                + execution_table.canonical_bytes
-                + (
-                    design_support_bytes
-                    if bind_design_support and design_support_bytes is not None
-                    else b""
-                )
-            ).hexdigest()
-        )
+    canonical_sha256 = aggregate_design_sha256(
+        technology_table=technology_table,
+        applicability_table=applicability_table,
+        definition_table=definition_table,
+        execution_table=execution_table,
+        architecture=architecture,
+        harness=harness,
+        change_impact=change_impact,
+        project_contract=project_contract,
+        example_table=example_table,
+        diagram_contract=diagram_contract,
+        design_support_bytes=design_support_bytes,
+        bind_design_support=bind_design_support,
+        grandfather_approved=grandfather_approved_v1,
+    )
+    project_contract, schema_compatibility_issues = bind_approved_schema7_compatibility(
+        text,
+        project_contract,
+        canonical_sha256,
+        grandfather_approved=grandfather_approved_v1,
+        design8_headings=tuple(DESIGN8_HEADINGS),
+    )
+    issues.extend(schema_compatibility_issues)
     blocking_issues = [
         issue for issue in issues if not is_diagram_presentation_issue(issue)
     ]
@@ -1766,7 +1671,7 @@ def derive_design_contract(
                 if project_contract.grandfathered_v5
                 else 6
                 if project_contract.grandfathered_v6
-                else 7
+                else project_contract.schema_version
             ),
             status=status,
             design_revision=design_revision,

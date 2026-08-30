@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import subprocess
 import sys
@@ -65,6 +66,17 @@ class MaintenancePreflightTests(unittest.TestCase):
             "publication": None,
         }
 
+    def publication(
+        self, commit: str, operations: tuple[str, ...] = ("COMMIT",)
+    ) -> dict[str, object]:
+        payload = self.contract(commit, "PUBLISH")
+        payload["publication"] = {
+            "operations": list(operations),
+            "targets": ["maintenance"],
+            "authorization_reference": "owner-request-001",
+        }
+        return payload
+
     def test_implement_accepts_only_declared_changes_and_budget(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -112,6 +124,13 @@ class MaintenancePreflightTests(unittest.TestCase):
             result, passed = preflight.validate_contract(publish, root)
             self.assertTrue(passed, result["errors"])
 
+            mixed = self.publication(commit, ("PUSH", "OPEN_PR", "MERGE"))
+            result, passed = preflight.validate_contract(mixed, root)
+            self.assertFalse(passed)
+            self.assertTrue(
+                any("only one operation" in item for item in result["errors"])
+            )
+
     def test_missing_scope_and_wrong_baseline_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -126,6 +145,207 @@ class MaintenancePreflightTests(unittest.TestCase):
             result, passed = preflight.validate_contract(payload, root)
             self.assertFalse(passed)
             self.assertTrue(any("baseline" in item for item in result["errors"]))
+
+    def test_public_api_rejects_observation_injection(self) -> None:
+        with self.assertRaises(TypeError):
+            preflight.validate_contract(
+                {}, Path.cwd(), _observed=("maintenance", "f" * 40, [], 0, ())
+            )
+
+    def test_commit_requires_exact_fully_staged_implementation_and_emits_receipt(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = self.repository(root)
+            (root / "change.txt").write_text("candidate\n", encoding="utf-8")
+            subprocess.run(["git", "add", "change.txt"], cwd=root, check=True)
+            before = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            result, passed = preflight.validate_contract(
+                self.publication(baseline), root, self.contract(baseline)
+            )
+            after = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertTrue(passed, result["errors"])
+            self.assertEqual(before, after)
+            self.assertRegex(
+                result["implementation_contract_sha256"], r"^sha256:[0-9a-f]{64}$"
+            )
+            self.assertRegex(result["staged_diff_sha256"], r"^sha256:[0-9a-f]{64}$")
+            with tempfile.TemporaryDirectory() as contract_directory:
+                publish_path = Path(contract_directory) / "publish.json"
+                implement_path = Path(contract_directory) / "implement.json"
+                publish_path.write_text(
+                    json.dumps(self.publication(baseline)), encoding="utf-8"
+                )
+                implement_path.write_text(
+                    json.dumps(self.contract(baseline)), encoding="utf-8"
+                )
+                cli = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--contract",
+                        str(publish_path),
+                        "--implementation-contract",
+                        str(implement_path),
+                        "--root",
+                        str(root),
+                        "--json",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+            self.assertEqual(cli.returncode, 0, cli.stdout + cli.stderr)
+            self.assertEqual(json.loads(cli.stdout)["status"], "PASS")
+
+            subprocess.run(
+                ["git", "commit", "-m", "candidate"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+            parent = subprocess.run(
+                ["git", "rev-parse", "HEAD^"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            patch = subprocess.run(
+                [
+                    "git",
+                    "diff",
+                    "--binary",
+                    "--full-index",
+                    "--no-ext-diff",
+                    "HEAD^",
+                    "HEAD",
+                    "--",
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            digest = "sha256:" + hashlib.sha256(patch.encode()).hexdigest()
+            self.assertEqual(parent, baseline)
+            self.assertEqual(digest, result["staged_diff_sha256"])
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout,
+                "",
+            )
+
+    def test_commit_rejects_partial_staging_mixed_operations_and_wrong_scope(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = self.repository(root)
+            change = root / "change.txt"
+            change.write_text("staged\n", encoding="utf-8")
+            subprocess.run(["git", "add", "change.txt"], cwd=root, check=True)
+            change.write_text("staged\nunstaged\n", encoding="utf-8")
+            result, passed = preflight.validate_contract(
+                self.publication(baseline), root, self.contract(baseline)
+            )
+            self.assertFalse(passed)
+            self.assertTrue(any("unstaged" in item for item in result["errors"]))
+
+            mixed, passed = preflight.validate_contract(
+                self.publication(baseline, ("COMMIT", "PUSH")),
+                root,
+                self.contract(baseline),
+            )
+            self.assertFalse(passed)
+            self.assertTrue(
+                any("only one operation" in item for item in mixed["errors"])
+            )
+
+            wrong = self.contract("f" * 40)
+            result, passed = preflight.validate_contract(
+                self.publication(baseline), root, wrong
+            )
+            self.assertFalse(passed)
+            self.assertTrue(any("branch/baseline" in item for item in result["errors"]))
+
+    def test_commit_rejects_empty_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = self.repository(root)
+            result, passed = preflight.validate_contract(
+                self.publication(baseline), root, self.contract(baseline)
+            )
+            self.assertFalse(passed)
+            self.assertTrue(any("nonempty staged" in item for item in result["errors"]))
+
+    def test_commit_rejects_unmerged_and_active_git_operation_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.repository(root)
+            subprocess.run(["git", "switch", "-c", "other"], cwd=root, check=True)
+            (root / "tracked.txt").write_text("other\n", encoding="utf-8")
+            subprocess.run(["git", "commit", "-am", "other"], cwd=root, check=True)
+            subprocess.run(["git", "switch", "maintenance"], cwd=root, check=True)
+            (root / "tracked.txt").write_text("maintenance\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "commit", "-am", "maintenance"], cwd=root, check=True
+            )
+            baseline = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            merge = subprocess.run(
+                ["git", "merge", "other"], cwd=root, check=False, capture_output=True
+            )
+            self.assertNotEqual(merge.returncode, 0)
+            implementation = self.contract(baseline)
+            implementation["allowed_files"] = ["tracked.txt"]
+            result, passed = preflight.validate_contract(
+                self.publication(baseline), root, implementation
+            )
+            self.assertFalse(passed)
+            self.assertTrue(any("unmerged" in item for item in result["errors"]))
+            self.assertTrue(
+                any("active Git operation" in item for item in result["errors"])
+            )
+
+    def test_implementation_contract_is_rejected_for_non_commit_publication(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = self.repository(root)
+            result, passed = preflight.validate_contract(
+                self.publication(baseline, ("PUSH",)),
+                root,
+                self.contract(baseline),
+            )
+            self.assertFalse(passed)
+            self.assertTrue(
+                any("allowed only for COMMIT" in item for item in result["errors"])
+            )
 
     def test_cli_is_read_only_and_json(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

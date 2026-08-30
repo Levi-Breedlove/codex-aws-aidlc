@@ -48,6 +48,11 @@ def serialize_evaluation(evaluation: EngineEvaluation) -> dict[str, Any]:
         "gates": thaw_evaluation_value(evaluation.gates),
         "evidence_state": deliver["evidence_state"],
         "release_evidence_cutoff": deliver["release_evidence_cutoff"],
+        **(
+            {"release_claim": deliver["release_claim"]}
+            if "release_claim" in deliver
+            else {}
+        ),
         "aws_core_evidence": aws["aws_core_evidence"],
         "authorizations": authority["authorizations"],
         "write_authority": authority["write_authority"],

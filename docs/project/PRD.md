@@ -15,6 +15,7 @@ Canonical path: `docs/project/PRD.md`.
 | Last completed milestone | None |
 | Region and cost | Not yet recorded |
 | Construction authorization | None |
+| Current AWS authority | NONE — planned maximum only |
 | AWS account work | Not authorized |
 | Current records | Not yet initialized |
 | Updated | Not yet initialized |
@@ -33,8 +34,7 @@ Canonical path: `docs/project/PRD.md`.
 ## Current project state
 
 This document owns the product agreement, technical plan, and both owner gates.
-The current state table above shows what Fastlane needs now and what remains
-unapproved or unauthorized.
+The current state table above shows what Fastlane needs now and what remains unapproved or unauthorized.
 
 - Gate A approves the product requirements.
 - Gate B approves the technical plan and bounded local construction.
@@ -53,8 +53,8 @@ status above explains the practical project state.
 |---|---|
 | Bootstrap release | TODO (release version and source commit/tag) |
 | Workflow mode | `codex-native` |
-| Project contract schema | `1.4` |
-| Project design contract schema | `7` |
+| Project contract schema | `1.5` |
+| Project design contract schema | `8` |
 | Project mode | `greenfield` / `brownfield` |
 | Delivery profile | `quick-mvp` / `standard` / `high-risk` |
 | Effective risk | `low` / `moderate` / `high` / `critical` |
@@ -65,8 +65,8 @@ status above explains the practical project state.
 | Current design revision | `DES-0001` |
 | Current construction authorization ID | `AUTH-0001` |
 | Gate B derived status | `BLOCKED` |
-| Design status | Not started |
 | Target release | TODO |
+| Project completion target | `LOCAL` |
 | Last reviewed | TODO |
 | Primary owner | TODO |
 
@@ -274,6 +274,12 @@ approved outcome.
 | FR-001 | TODO | UBIQUITOUS | AC-FR-001 | TODO | MEASURABLE |
 | FR-002 | TODO | UNWANTED_BEHAVIOR | AC-FR-002 | TODO | GHERKIN |
 
+### Product outcome measurement
+
+| Metric ID | Applicability | Outcome basis IDs | Metric | Baseline | Target | Measurement window | Evidence source | Accountable role | Guardrail | Missed-target action |
+|---|---|---|---|---|---|---|---|---|---|---|
+| METRIC-001 | APPLICABLE | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+
 </details>
 
 ## 7. Primary, alternate, and failure flows
@@ -356,8 +362,14 @@ kept, how it is deleted, and whether it must be recoverable.
 <details>
 <summary>Exact data requirements and acceptance checks</summary>
 
-This table preserves each data obligation and the evidence needed to confirm
-storage, access, deletion, residency, and recovery behavior.
+This table preserves each data obligation and its evidence. When no persistent
+data exists, use one `NO PERSISTENT DATA` row with every other value `NONE`.
+
+### Project data inventory
+
+| Dataset ID | Dataset/category | Purpose | Classification | Source of truth | Access boundary | Retention | Deletion | Recovery | Residency | Migration | Audit obligation | Accountable role | Requirement basis IDs |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| DATASET-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
 | ID | Requirement | EARS form | Acceptance ID | Acceptance criteria | Acceptance form |
 |---|---|---|---|---|---|
@@ -504,7 +516,14 @@ teardown outcomes required for safe operation.
 <summary>Exact quality-scenario and requirement-coverage records</summary>
 
 These records connect material quality concerns and every approved requirement
-to the scenario or journey that demonstrates its coverage.
+to demonstrated coverage. `NONE_IDENTIFIED` obligations keep only a concrete
+source/basis and review trigger; every other obligation field is `NONE`.
+
+### External obligations
+
+| Obligation ID | Obligation | Source/basis | Applicability | Affected users/data/journeys | Required behavior | Accountable role | Requirement IDs | Evidence requirement | Review/expiration trigger |
+|---|---|---|---|---|---|---|---|---|---|
+| OBL-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
 ### Quality attribute scenarios
 
@@ -538,6 +557,12 @@ last in the owner acceptance record. After approval, Codex continues to Design.
 These records show the findings, changes, assumptions, and unresolved decisions
 behind the Gate A recommendation and the current AWS-guidance basis.
 
+### Cross-cutting risk register
+
+| Risk ID | Category | Cross-cutting risk | Likelihood | Impact | Accountable role | Mitigation | Revisit trigger | Requirement IDs | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| RISK-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+
 ### Findings
 
 | ID | Type | Requirements involved | Finding | Resolution or decision | Blocking? | Status |
@@ -567,6 +592,7 @@ behind the Gate A recommendation and the current AWS-guidance basis.
 | Field | Agent-recorded value |
 |---|---|
 | Requirements revision analyzed | TODO |
+| Requirements contract SHA-256 analyzed | TODO |
 | Reviewed commit (optional) | TODO / `NOT_RECORDED` |
 | Analysis performed by | TODO |
 | Analysis completed at | TODO (ISO 8601 with timezone) |
@@ -587,6 +613,7 @@ behind the Gate A recommendation and the current AWS-guidance basis.
 | Field | Current requirements decision basis |
 |---|---|
 | Outcome | TODO |
+| Project completion target | `LOCAL` |
 | Owner and users | TODO |
 | Scope and non-goals | TODO |
 | Measurable requirement/acceptance IDs | TODO |
@@ -838,6 +865,17 @@ the valid states, transitions, and safeguards for each one.
 |---|---|---|---|---|---|---|---|---|
 | STATE-001 | RESOURCE-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 
+### Dataset implementation mapping
+
+Every current `DATASET-*` row maps to exactly one concrete store or component,
+its safeguards and lifecycle mechanisms, and the checks that will prove the
+design. An approved compatible Requirements contract with no typed datasets
+uses the exact no-dataset statement instead of inventing owner facts.
+
+| Dataset ID | Store/component | Implementation IDs | Access and encryption enforcement | Retention and deletion mechanism | Backup and recovery mechanism | Residency and migration mechanism | Audit mechanism | Validation IDs |
+|---|---|---|---|---|---|---|---|---|
+| DATASET-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+
 </details>
 
 ### State view
@@ -921,6 +959,27 @@ The recommendation records the material operating, security, reliability,
 performance, cost, and sustainability consequences. This review does not add
 another gate.
 
+### Well-Architected considerations
+
+<details>
+<summary>Exact Well-Architected consideration records</summary>
+
+This is a project design consideration review, not an official AWS Well-Architected Review or AWS Well-Architected Tool result.
+
+These exact records preserve the basis, safeguards, validation maturity, and
+revisit trigger without claiming an observed AWS workload review.
+
+| Pillar | Applicability | Requirement/risk basis IDs | Design IDs | Consideration and tradeoff | Safeguard | Validation/evidence IDs | Evidence maturity | Revisit trigger |
+|---|---|---|---|---|---|---|---|---|
+| Operational Excellence | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| Security | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| Reliability | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| Performance Efficiency | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| Cost Optimization | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| Sustainability | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+
+</details>
+
 ## 21. Implementation boundaries and order
 
 Fastlane builds only the approved components, compatibility boundary, rollout,
@@ -941,6 +1000,17 @@ investigation appears only when a blocking technical unknown must be resolved.
 - Feature flags or staged rollout: TODO
 - Rollback boundary: TODO
 - Explicitly deferred work: TODO
+
+### Environment and promotion model
+
+These rows describe intended environments and immutable-artifact promotion.
+Production uses exact `ISOLATED: <boundary>` and `SEPARATE_OWNER_AUTHORIZATION:
+<evidence>` prefixes; no classification authorizes AWS access or a change.
+
+| Environment ID | Class | Purpose | Account/Region boundary | Artifact boundary | Configuration, secrets, and data boundary | Promotion source | Promotion criteria/evidence | Rollback/teardown boundary | Basis IDs | Validation IDs |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ENV-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+
 ### First construction wave
 
 | Wave contract ID | Work kind | Walking-skeleton journey ID | Requirement IDs | Acceptance/test IDs | End-to-end Harness ID | Blocking spike ID |
@@ -1122,15 +1192,20 @@ and billable-test boundaries behind the validation plan.
 
 ## 26. Release acceptance
 
-Release is acceptable when:
+Local release work is complete only when:
 
 - primary, alternate, and failure flows work;
 - requirements-analysis blockers are resolved;
 - architecture and interfaces are implemented as approved;
 - required example and property-based tests pass;
 - security and reliability evidence passes;
-- deployment, monitoring, rollback, recovery, and cleanup are verified;
 - `docs/project/VERIFY.md` records the exact release decision and remaining gaps.
+
+AWS targets are accepted independently only when they apply, the owner separately
+authorized the operation, and current evidence proves that named target.
+`READY_TO_DEPLOY` does not mean deployed. `RELEASE_VERIFIED` does not imply
+recovery or teardown without their own evidence. Unobserved AWS work remains
+explicit.
 
 # Gate B Review
 
@@ -1265,6 +1340,16 @@ repository, GitHub, or AWS action outside it remains unauthorized.
 | Authorization expiry or completion condition | `Expires at <ISO 8601 with timezone>; earlier completion: <exact condition>` |
 
 This table is the complete bounded local-construction authority presented at Gate B.
+
+### Dependency acquisition policy
+
+Dependency acquisition defaults to `DENY_UNDECLARED`. A row may permit only one
+tooling-only, SHA-256-bound HTTPS wheel via exact `python -m pip install`,
+`--no-deps`, `--only-binary=:all:`, and `--no-index`; it must declare no lockfile
+mutation and only the wheel host. Other acquisition stays denied. Local
+permissions never override construction or external-state boundaries.
+
+DENY_UNDECLARED — no dependency acquisition is approved by this design
 
 </details>
 

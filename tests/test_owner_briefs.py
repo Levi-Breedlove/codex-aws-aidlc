@@ -314,13 +314,18 @@ class OwnerBriefProjectionTests(unittest.TestCase):
         ]
         finalized, issues = briefs.finalize_owner_decision_brief(projection)
         self.assertEqual(issues, [])
-        rendered = presenter.render_owner_decision_brief(
-            {
-                "owner_decision_brief": finalized,
-                "owner_decision_inventory": inventory,
+        report = {
+            "owner_decision_brief": finalized,
+            "owner_decision_inventory": inventory,
+            "aws_mode_boundary": {
+                "gate_b_maximum": "MUTATE_LISTED_RESOURCES",
+                "external_authority_kind": "NONE",
+                "external_authority_validity": "NONE",
+                "account_access_authorized": False,
+                "mutation_authorized": False,
             },
-            "GATE_B",
-        )
+        }
+        rendered = presenter.render_owner_decision_brief(report, "GATE_B")
         for label in (
             "Meaning and selection:",
             "Basis and rationale:",
@@ -331,6 +336,21 @@ class OwnerBriefProjectionTests(unittest.TestCase):
         ):
             self.assertIn(label, rendered)
         self.assertIn("Change the design: <correction>.", rendered)
+        self.assertIn(
+            "Current AWS authority: NONE — planned maximum only",
+            rendered,
+        )
+        current_authority = dict(report)
+        current_authority["aws_mode_boundary"] = {
+            **report["aws_mode_boundary"],
+            "external_authority_kind": "AWS_READ_ONLY",
+            "external_authority_validity": "CURRENT",
+            "account_access_authorized": True,
+        }
+        with self.assertRaisesRegex(
+            presenter.PresentationError, "current exact AWS authority"
+        ):
+            presenter.render_owner_decision_brief(current_authority, "GATE_B")
         self.assertIn("docs/project/PRD.md#selected-architecture", rendered)
         expected_links = (
             "[View the complete proposed architecture]"
