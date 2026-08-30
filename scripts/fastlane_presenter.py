@@ -25,7 +25,8 @@ try:
         finalize_owner_decision_brief,
         finalize_owner_decision_inventory,
     )
-    from intake_response import intake_reply_token
+    from fastlane_document_summaries import CURRENT_AWS_AUTHORITY_NONE
+    from intake_response import ACCEPT_THIS_RECOMMENDATION, intake_reply_token
     from fastlane_stdio import configure_utf8_standard_streams
 except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit tests.
     from scripts.fastlane_engine.api import (
@@ -40,7 +41,11 @@ except ModuleNotFoundError:  # Loaded as scripts.fastlane_presenter in unit test
         finalize_owner_decision_brief,
         finalize_owner_decision_inventory,
     )
-    from scripts.intake_response import intake_reply_token
+    from scripts.fastlane_document_summaries import CURRENT_AWS_AUTHORITY_NONE
+    from scripts.intake_response import (
+        ACCEPT_THIS_RECOMMENDATION,
+        intake_reply_token,
+    )
     from scripts.fastlane_stdio import configure_utf8_standard_streams
 
 
@@ -1699,7 +1704,7 @@ def _render_intake_card(
         )
     )
     if card["accept_all_allowed"]:
-        lines.append("You may also reply `Accept all recommendations.`")
+        lines.append(f"You may also reply `{ACCEPT_THIS_RECOMMENDATION}`")
     lines.extend(("", *_intake_reply_guidance(card)))
     return "\n".join(lines)
 
@@ -2178,7 +2183,7 @@ def render_side_question_response(
             lines.extend(("", "The pending questions are unchanged:"))
             lines.extend(_intake_question_lines(card, prompt=prompt))
             if card["accept_all_allowed"]:
-                lines.append("You may also reply `Accept all recommendations.`")
+                lines.append(f"You may also reply `{ACCEPT_THIS_RECOMMENDATION}`")
             lines.extend(("", *_intake_reply_guidance(card)))
     if required and action_kind == "CHOOSE_AWS_RESIDUAL_DISPOSITION":
         lines.extend(("", "Copyable reply:", COPYABLE_REPLIES[action_kind]))
@@ -2504,6 +2509,25 @@ def _owner_source_link(
     return f"[{link_label or label}]({path}#{_markdown_anchor(heading)})"
 
 
+def _gate_b_current_aws_authority(report: Mapping[str, Any]) -> str:
+    """Render the Engine boundary without turning Gate B scope into authority."""
+
+    boundary = report.get("aws_mode_boundary")
+    if not isinstance(boundary, Mapping):
+        raise PresentationError("Gate B owner brief is missing the AWS mode boundary")
+    expected = {
+        "external_authority_kind": "NONE",
+        "external_authority_validity": "NONE",
+        "account_access_authorized": False,
+        "mutation_authorized": False,
+    }
+    if any(boundary.get(key) != value for key, value in expected.items()):
+        raise PresentationError(
+            "Gate B owner brief conflicts with current exact AWS authority"
+        )
+    return CURRENT_AWS_AUTHORITY_NONE
+
+
 def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -> str:
     """Render one deterministic Gate A or Gate B owner decision view."""
 
@@ -2655,6 +2679,10 @@ def render_owner_decision_brief(report: Mapping[str, Any], expected_kind: str) -
         lines.extend(("", "</details>"))
 
     lines.extend(("", "## Evidence and authorization"))
+    if expected_kind == "GATE_B":
+        lines.append(
+            f"- Current AWS authority: {_gate_b_current_aws_authority(report)}"
+        )
     for claim in brief["claims"]:
         lines.append(
             f"- {OWNER_MATURITY_LABELS[str(claim['maturity'])]}: {claim['text']}"

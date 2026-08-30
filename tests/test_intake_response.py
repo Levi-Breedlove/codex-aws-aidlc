@@ -187,17 +187,22 @@ class IntakeResponseAcceptanceTests(unittest.TestCase):
             "The first zone is 1A; 1B is a label in the source material.",
         )
 
-    def test_accept_all_applies_only_to_the_current_recommendation(self) -> None:
-        result = parse(
-            " \tAccept all recommendations.\r\n",
-            decision_card(recommended="A"),
-        )
-        self.assertEqual(result.status, "PASS", result.to_dict())
-        self.assertEqual(
-            [(answer.reply_key, answer.selection) for answer in result.answers],
-            [("1", "A")],
-        )
-        self.assertIsNone(result.answers[0].detail)
+    def test_accept_phrase_applies_only_to_the_current_recommendation(self) -> None:
+        for phrase in (
+            intake.ACCEPT_THIS_RECOMMENDATION,
+            intake.ACCEPT_ALL_RECOMMENDATIONS,
+        ):
+            with self.subTest(phrase=phrase):
+                result = parse(
+                    f" \t{phrase}\r\n",
+                    decision_card(recommended="A"),
+                )
+                self.assertEqual(result.status, "PASS", result.to_dict())
+                self.assertEqual(
+                    [(answer.reply_key, answer.selection) for answer in result.answers],
+                    [("1", "A")],
+                )
+                self.assertIsNone(result.answers[0].detail)
 
     def test_normalized_result_binds_to_exact_card_without_raw_echo(self) -> None:
         raw_response = "\t1:\tUser-visible   outcome\r\n"
@@ -367,9 +372,13 @@ class IntakeResponseRejectionTests(unittest.TestCase):
                 self.assertEqual(result.status, "FAIL")
                 self.assertNotIn(hostile, json.dumps(result.to_dict(), sort_keys=True))
 
-    def test_accept_all_phrase_is_exact_and_card_scoped(self) -> None:
+    def test_accept_phrase_is_exact_and_card_scoped(self) -> None:
         card = decision_card(recommended="A")
         for raw_response in (
+            "accept this recommendation.",
+            "ACCEPT THIS RECOMMENDATION.",
+            "Accept this recommendation",
+            "Accept this recommendation. extra",
             "accept all recommendations.",
             "ACCEPT ALL RECOMMENDATIONS.",
             "Accept all recommendations",
@@ -377,10 +386,15 @@ class IntakeResponseRejectionTests(unittest.TestCase):
         ):
             with self.subTest(raw_response=raw_response):
                 self.assertEqual(parse(raw_response, card).status, "FAIL")
-        self.assert_failed_with(
-            parse(intake.ACCEPT_ALL_RECOMMENDATIONS, decision_card()),
-            "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
-        )
+        for phrase in (
+            intake.ACCEPT_THIS_RECOMMENDATION,
+            intake.ACCEPT_ALL_RECOMMENDATIONS,
+        ):
+            with self.subTest(phrase=phrase):
+                self.assert_failed_with(
+                    parse(phrase, decision_card()),
+                    "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
+                )
 
     def test_accept_all_rejects_incomplete_or_detail_dependent_choice(self) -> None:
         factual = fact_card()
@@ -391,11 +405,25 @@ class IntakeResponseRejectionTests(unittest.TestCase):
             decision_card(recommended="A", required_detail_for=("A",)),
         ):
             card["accept_all_allowed"] = True
-            with self.subTest(card=card):
-                self.assert_failed_with(
-                    parse(intake.ACCEPT_ALL_RECOMMENDATIONS, card),
-                    "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
-                )
+            for phrase in (
+                intake.ACCEPT_THIS_RECOMMENDATION,
+                intake.ACCEPT_ALL_RECOMMENDATIONS,
+            ):
+                with self.subTest(card=card, phrase=phrase):
+                    self.assert_failed_with(
+                        parse(phrase, card),
+                        "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
+                    )
+
+    def test_legacy_accept_phrase_remains_an_exact_compatibility_alias(self) -> None:
+        self.assertEqual(
+            intake.ACCEPT_ALL_RECOMMENDATIONS,
+            "Accept all recommendations.",
+        )
+        self.assertNotEqual(
+            intake.ACCEPT_THIS_RECOMMENDATION,
+            intake.ACCEPT_ALL_RECOMMENDATIONS,
+        )
 
     def test_unicode_whitespace_and_confusable_characters_are_rejected(self) -> None:
         for raw_response in ("1:\u00a0Users", "1:\u2003Users"):

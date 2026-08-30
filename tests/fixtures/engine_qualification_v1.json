@@ -159,6 +159,24 @@
         "requirement, design, diagram, or construction-envelope semantic change",
         "AWS access, execution, deployment, recovery, or teardown evidence claim"
       ]
+    },
+    {
+      "id": "DEFINITION_OF_COMPLETE_CONTRACTS_1_3_0",
+      "base_commit": "8909518c474aefbc34d501ba3ff7452713b32656",
+      "scope": [
+        "Requirements 1.5 completion target, outcome, dataset, external-obligation, and cross-cutting-risk projections with approved Requirements 1.4 compatibility",
+        "Design 8 data, environment, Well-Architected consideration, dependency-policy, and semantic relationship projections with approved Design 7 compatibility",
+        "typed release claims, target-specific qualified completion wording, owner decision additions, and Engine-derived current AWS authority",
+        "card-scoped Accept this recommendation. handling with the hidden exact legacy Accept all recommendations. compatibility alias",
+        "architecture-board direction, relationship category, edge kind, containment, and semantic-path parity",
+        "consequential PRD snapshot, current context selection, owner locator, and canonical digest changes"
+      ],
+      "prohibited": [
+        "lifecycle or route change for an equivalent legacy project",
+        "legacy Gate A, Gate B, AWS receipt, approval, or authority change",
+        "AWS access, execution, deployment, recovery, or teardown evidence claim",
+        "frozen pre-refactor oracle mutation"
+      ]
     }
   ],
   "normalization": {
@@ -176,8 +194,8 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "d66cf08f8eb523a52015c08b3f056acf8a30bcd9e307ad704808715d233d1810",
-    "task_ready": "cb219f32b2503106b55f6a7f7aa51ec7533df061a70e83ba0a7dfdb8526e3d28"
+    "stale_gate_a_summary": "3ea795acbef2cc24c3d3ff539f73e032378809ba637638b08c6be4be20075535",
+    "task_ready": "111be545e01686a02745fb190e5f4483c0e0355c56cbb85d435b2d10537ca11e"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -298,7 +316,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 6803,
+          "actual_initial_source_bytes": 6872,
           "budget_status": "WITHIN_LIMIT",
           "resolved_initial_slices": [
             {
@@ -308,8 +326,8 @@
               "start_line": 5,
               "end_line": 40,
               "active_ids": [],
-              "canonical_sha256": "sha256:a9d6c2c57078c0860f0eb6942ebe113ddbdda480e734ac80d6f3f632b45002d7",
-              "source_bytes": 4692,
+              "canonical_sha256": "sha256:61d045323e144d772a1cb30804f5b9b6113396524438ad4e76cbb564dc9b0c4e",
+              "source_bytes": 4753,
               "reason": "Current phase procedure"
             },
             {
@@ -358,8 +376,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:66fde5fa7368cb2ca3d16ab7e99a0e3894be66619d66c34a7aa11a6f10661abb",
-              "source_bytes": 2111,
+              "canonical_sha256": "sha256:c55087276327d3137f227ccc9b0af10a0ed7982b0c93144f9ce4451c2889a335",
+              "source_bytes": 2119,
               "reason": "Controlling PRD record"
             }
           ],
@@ -369,7 +387,7 @@
               "selector_kind": "HEADING",
               "selector": "Product Agreement",
               "start_line": 89,
-              "end_line": 562,
+              "end_line": 581,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -409,8 +427,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:4a6137a499d89ac39169f71ba8f65574ab24a868ed1cf394d6cd4e1fe5c5fa9a",
-              "source_bytes": 35469,
+              "canonical_sha256": "sha256:c854af7ea20d627879f9b943c3c0ef7f65b49f3a7816f152f949972385338bff",
+              "source_bytes": 37617,
               "reason": "Controlling PRD record"
             },
             {
@@ -420,8 +438,8 @@
               "start_line": 41,
               "end_line": 53,
               "active_ids": [],
-              "canonical_sha256": "sha256:153350b4d82ee241fc231fe9bfe5600aaaa8ab96d8db3be774ca46b793494aa7",
-              "source_bytes": 3044,
+              "canonical_sha256": "sha256:943532e0cf0422e4efeddb06fd420eee4470f867d3f1a537796562846d1c0939",
+              "source_bytes": 3859,
               "reason": "On-demand canonical source"
             },
             {
@@ -431,8 +449,8 @@
               "start_line": 54,
               "end_line": 61,
               "active_ids": [],
-              "canonical_sha256": "sha256:d2889a176c5b04b14119366b5664069b557b601b14f4b5bb64e95fae9f08b319",
-              "source_bytes": 2108,
+              "canonical_sha256": "sha256:603dbef6ca204e139ac6087ac57ad4f36b4bd1d4b8cda1ec5c026af31bc4e059",
+              "source_bytes": 2156,
               "reason": "On-demand canonical source"
             },
             {
@@ -450,8 +468,8 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Gate A Review",
-              "start_line": 563,
-              "end_line": 679,
+              "start_line": 582,
+              "end_line": 706,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -492,8 +510,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:50f3ddf6ff74f18e27f5b88c4958e44d754cb3f1ddb43f1d965764ee5731f985",
-              "source_bytes": 4713,
+              "canonical_sha256": "sha256:718d7cdc0118125e25307e0ca858f1fce313de05e3aa56c03d45a5fd8a2e3aab",
+              "source_bytes": 5350,
               "reason": "On-demand canonical source"
             }
           ],
@@ -782,7 +800,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:ef521140ba9ae93f9b6db3b6dfe0d8d49065ee32c20ced01b0634865538d8721"
+          "prd_snapshot_sha256": "sha256:449adafc78be20265cab2e6fdee68b4ca37d2468264c6474000ebff28df1b41b"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -1005,6 +1023,12 @@
                   "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
+                  "label": "Current AWS authority",
+                  "value": "NONE — planned maximum only",
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
+                },
+                {
                   "label": "AWS account work",
                   "value": "Not authorized",
                   "basis_ids": [],
@@ -1059,8 +1083,8 @@
                 "need_from_owner": "interaction.owner_action_kind",
                 "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
               },
-              "summary_basis_sha256": "sha256:fec7cde8be94f87463d3ecadc30d17d6b69dd887ead1c617a7499489d56febc8",
-              "rendered_sha256": "sha256:de1174f8e2c6c196ea5995cab10096c351e4c0531877c66dae57bd5b64e49415"
+              "summary_basis_sha256": "sha256:d5bba41557cd76b2e5caed1a0f2a6e165ba500f6131ca4eb1bc1f65f9d75d831",
+              "rendered_sha256": "sha256:3a520350b6d323b113936dfa3b306b58938510dcd1cbbe6cb6e70a9f06585549"
             },
             {
               "path": "docs/project/TASKS.md",
@@ -1305,7 +1329,7 @@
                 },
                 {
                   "label": "Current AWS authority",
-                  "value": "None",
+                  "value": "NONE — planned maximum only",
                   "basis_ids": [],
                   "source": "authority.external.kind + authority.external.validity"
                 },
@@ -1393,8 +1417,8 @@
                 "need_from_owner": "interaction.owner_action_kind",
                 "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
               },
-              "summary_basis_sha256": "sha256:8decf2684b0095c78e1b9616e77c5d44f800e08ccfc1d9456a05880ca3c805db",
-              "rendered_sha256": "sha256:b72595aff865e5fb6b4516e13af00d3c07a96cf95426e576c2543617d27fb594"
+              "summary_basis_sha256": "sha256:b6e1e3f0f4cb075bbd94c74ae24dd562c22c678d8e4ffb3bb13d6a6bd1c3fe8d",
+              "rendered_sha256": "sha256:3647bc88bc88905c67ccd75afe50e87a9e58b6382544f8aba9a93c2ca128b0f2"
             },
             {
               "path": "docs/project/BUGFIX.md",
@@ -1545,8 +1569,11 @@
               "title": "First-release boundary",
               "items": [
                 "First-release boundary: Include one local outcome view; defer external integrations.",
+                "Completion target: LOCAL",
                 "Scope and non-goals: FR-001 in scope; production is out of scope",
-                "Data and access: Synthetic internal test data only Local development identity; no public access"
+                "Data and access: Synthetic internal test data only Local development identity; no public access",
+                "Data categories: DATASET-001: Synthetic development outcome data; INTERNAL; source Generated local fixture; access Project developer and local test process only; retention Delete within 30 days; deletion Owner can delete the local fixture and derived output; recovery Recreate from source fixtures; no backup promise; residency Owner-approved operating geography; migration NOT_APPLICABLE - greenfield fixture has no migration; audit Record access and deletion test results; owner Product owner",
+                "External obligations: OBL-001: NONE_IDENTIFIED; NONE IDENTIFIED; basis Owner review of intended users, data, and geography found no applicable external obligation; owner NONE; review Reassess when users, data, geography, or governing terms change"
               ],
               "basis_ids": [
                 "COST-001",
@@ -1559,8 +1586,10 @@
                 "DATA-003",
                 "DATA-004",
                 "DATA-005",
+                "DATASET-001",
                 "FR-001",
                 "FR-002",
+                "OBL-001",
                 "OPS-001",
                 "OPS-002",
                 "OPS-003",
@@ -1594,6 +1623,7 @@
               "title": "Success, resilience, Region, and cost",
               "items": [
                 "Success measures: An invited tester can view the approved outcome without help; acceptance records: FR-001, EX-001",
+                "Outcome measurements: METRIC-001: Core-flow completion without facilitator intervention; target at least 80 percent of first-time users complete the core flow; window Each independent pilot session; evidence Sanitized pilot scorecard bound to the release candidate; owner Product owner; guardrail No safety-critical misunderstanding; miss action Block release, correct the finding, and repeat the measurement",
                 "Recovery, Region, and cost: Fail closed; local rollback to baseline; Development; us-west-2; MINIMIZE_TOTAL_COST; HARD_CAP_NOT_STATED"
               ],
               "basis_ids": [
@@ -1634,6 +1664,7 @@
                 "AC-SUS-002",
                 "AC-SUS-003",
                 "AC-SUS-004",
+                "METRIC-001",
                 "REQ-0001"
               ]
             },
@@ -1643,7 +1674,8 @@
               "items": [
                 "Assumptions: None recorded.",
                 "Open decisions or findings: NONE; NONE",
-                "Brownfield preservation: Not applicable."
+                "Brownfield preservation: Not applicable.",
+                "Cross-cutting risks: RISK-001: Users could mistake local evidence for deployed AWS evidence; MEDIUM/MEDIUM; owner Product owner; mitigation Keep completion targets and evidence levels explicit; revisit Revisit when the target or AWS lane changes; status MITIGATING"
               ],
               "basis_ids": [
                 "COST-001",
@@ -1673,6 +1705,7 @@
                 "REL-004",
                 "REL-005",
                 "REQ-0001",
+                "RISK-001",
                 "SEC-001",
                 "SEC-002",
                 "SEC-003",
@@ -1786,8 +1819,8 @@
               "path": "docs/project/PRD.md",
               "heading": "6. Feature specifications",
               "start_line": 256,
-              "end_line": 288,
-              "section_sha256": "sha256:f073a97e77d3a4cb5fe86e6993c163ad63881bd3ef61d3fd9090eaef58d1275a",
+              "end_line": 294,
+              "section_sha256": "sha256:3a565557fe26ddb608ff442cecb24c89bfa52438c431a4a46881d65843ec11e6",
               "required": true
             },
             {
@@ -1795,8 +1828,8 @@
               "label": "First-release journeys",
               "path": "docs/project/PRD.md",
               "heading": "7. Primary, alternate, and failure flows",
-              "start_line": 289,
-              "end_line": 354,
+              "start_line": 295,
+              "end_line": 360,
               "section_sha256": "sha256:46577225af278004d2dd5f8c7ad404a59db7af64bdd02d90dcab7dd453f0eeef",
               "required": true
             },
@@ -1805,9 +1838,9 @@
               "label": "Data requirements",
               "path": "docs/project/PRD.md",
               "heading": "8. Data requirements",
-              "start_line": 355,
-              "end_line": 375,
-              "section_sha256": "sha256:f1c2ed5147a7d6df8625bf51b284842c36c6707da8111b431021308c6f2145ec",
+              "start_line": 361,
+              "end_line": 387,
+              "section_sha256": "sha256:2c8090b54d7a908f8074acfedf50d3841ba68ef95cd0a206c6ac9d6fe2fd95ed",
               "required": true
             },
             {
@@ -1815,8 +1848,8 @@
               "label": "Security and privacy requirements",
               "path": "docs/project/PRD.md",
               "heading": "9. Security and privacy requirements",
-              "start_line": 376,
-              "end_line": 398,
+              "start_line": 388,
+              "end_line": 410,
               "section_sha256": "sha256:88b1c5e88682505fbdb8a1383e39d3fc5f596f6fdc4aa4fcfdd90512ca15134d",
               "required": true
             },
@@ -1825,8 +1858,8 @@
               "label": "Reliability requirements",
               "path": "docs/project/PRD.md",
               "heading": "10. Reliability requirements",
-              "start_line": 399,
-              "end_line": 419,
+              "start_line": 411,
+              "end_line": 431,
               "section_sha256": "sha256:1122a2547a206c2749442b78e8fe0cb592fbe3e69c7d2cafa395bfc20fe8ee40",
               "required": true
             },
@@ -1835,8 +1868,8 @@
               "label": "Performance and cost",
               "path": "docs/project/PRD.md",
               "heading": "11. Performance, cost, and sustainability requirements",
-              "start_line": 420,
-              "end_line": 485,
+              "start_line": 432,
+              "end_line": 497,
               "section_sha256": "sha256:0487a63263d80c22b657655e1272bae3974be23df6adc2491778a70e2be807af",
               "required": true
             },
@@ -1845,9 +1878,9 @@
               "label": "Gate A readiness",
               "path": "docs/project/PRD.md",
               "heading": "Gate A — readiness card",
-              "start_line": 622,
-              "end_line": 636,
-              "section_sha256": "sha256:b5a4745e52384c6a2aad35b6509425cda8299f3dc536e55789c97db3e1177f21",
+              "start_line": 648,
+              "end_line": 663,
+              "section_sha256": "sha256:bca62caf3c18eb9a60ea295798fd4dd520bc222c701baae0956c118734393165",
               "required": true
             },
             {
@@ -1855,8 +1888,8 @@
               "label": "Gate A acceptance record",
               "path": "docs/project/PRD.md",
               "heading": "Gate A — owner acceptance record",
-              "start_line": 637,
-              "end_line": 659,
+              "start_line": 664,
+              "end_line": 686,
               "section_sha256": "sha256:d2b78bf171294661d14edb369c53ce246460b516bba5cf6b5c7762c45669c229",
               "required": true
             }
@@ -1870,7 +1903,7 @@
             ]
           },
           "formal_receipt_required": false,
-          "canonical_sha256": "sha256:582c27d0711b34168a4730945526a84eecb7202ef479fbf252b221e87f56c961"
+          "canonical_sha256": "sha256:35af4ddd9c6a1b5aced65b6c3db5d057ec38045434ac46009ebe969fe41414a4"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -2204,8 +2237,9 @@
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
-          "schema_version": "1.4",
+          "schema_version": "1.5",
           "status": "READY",
+          "completion_target": "LOCAL",
           "actor_ids": [
             "ACT-001"
           ],
@@ -2343,9 +2377,83 @@
             "required_revalidation": []
           },
           "assumptions": [],
+          "outcome_metrics": [
+            {
+              "metric_id": "METRIC-001",
+              "applicability": "APPLICABLE",
+              "outcome_basis_ids": [
+                "INTAKE-0004",
+                "INTAKE-0006"
+              ],
+              "metric": "Core-flow completion without facilitator intervention",
+              "baseline": "NOT_YET_MEASURED - baseline will be captured in the first validation run",
+              "target": "at least 80 percent of first-time users complete the core flow",
+              "measurement_window": "Each independent pilot session",
+              "evidence_source": "Sanitized pilot scorecard bound to the release candidate",
+              "accountable_role": "Product owner",
+              "guardrail": "No safety-critical misunderstanding",
+              "missed_target_action": "Block release, correct the finding, and repeat the measurement"
+            }
+          ],
+          "datasets": [
+            {
+              "dataset_id": "DATASET-001",
+              "dataset_category": "Synthetic development outcome data",
+              "purpose": "Support local workflow verification",
+              "classification": "INTERNAL",
+              "source_of_truth": "Generated local fixture",
+              "access_boundary": "Project developer and local test process only",
+              "retention": "Delete within 30 days",
+              "deletion": "Owner can delete the local fixture and derived output",
+              "recovery": "Recreate from source fixtures; no backup promise",
+              "residency": "Owner-approved operating geography",
+              "migration": "NOT_APPLICABLE - greenfield fixture has no migration",
+              "audit_obligation": "Record access and deletion test results",
+              "accountable_role": "Product owner",
+              "requirement_basis_ids": [
+                "DATA-001",
+                "DATA-002",
+                "DATA-003",
+                "DATA-004",
+                "DATA-005"
+              ]
+            }
+          ],
+          "external_obligations": [
+            {
+              "obligation_id": "OBL-001",
+              "obligation": "NONE IDENTIFIED",
+              "source_basis": "Owner review of intended users, data, and geography found no applicable external obligation",
+              "applicability": "NONE_IDENTIFIED",
+              "affected_scope": "NONE",
+              "required_behavior": "NONE",
+              "accountable_role": "NONE",
+              "requirement_ids": [],
+              "evidence_requirement": "NONE",
+              "review_trigger": "Reassess when users, data, geography, or governing terms change"
+            }
+          ],
+          "cross_cutting_risks": [
+            {
+              "risk_id": "RISK-001",
+              "category": "DELIVERY_TRUTH",
+              "risk": "Users could mistake local evidence for deployed AWS evidence",
+              "likelihood": "MEDIUM",
+              "impact": "MEDIUM",
+              "accountable_role": "Product owner",
+              "mitigation": "Keep completion targets and evidence levels explicit",
+              "revisit_trigger": "Revisit when the target or AWS lane changes",
+              "requirement_ids": [
+                "FR-001",
+                "OPS-002"
+              ],
+              "status": "MITIGATING"
+            }
+          ],
           "missing_records": [],
-          "canonical_sha256": "sha256:235a8b11bc5950c7c258c8afa46070ede34b84bafdb980380841c5316d878bae",
-          "grandfathered_approved_gate_a": false
+          "canonical_sha256": "sha256:1c2c3089e6f7fdb941f75df719a24226a800145f52d1cfaab838b4c5129f7178",
+          "grandfathered_approved_gate_a": false,
+          "approved_schema_14_compatibility": false
         },
         "coverage_plan": {
           "schema_version": 1,
@@ -2410,7 +2518,7 @@
           "compatibility_full_coverage": false
         },
         "design_contract": {
-          "schema_version": 7,
+          "schema_version": 8,
           "status": "BLOCKED",
           "design_revision": "DES-0001",
           "technology_decisions": [
@@ -2847,7 +2955,7 @@
           },
           "canonical_sha256": null,
           "project_contract": {
-            "schema_version": 7,
+            "schema_version": 8,
             "status": "UNINITIALIZED",
             "application_source_disposition": null,
             "interface_ids": [],
@@ -2859,7 +2967,17 @@
             "canonical_sha256": null,
             "grandfathered_v4": false,
             "grandfathered_v5": false,
-            "grandfathered_v6": false
+            "grandfathered_v6": false,
+            "design_v8": {
+              "schema_version": 8,
+              "status": "ACQUISITION_PROHIBITED",
+              "dataset_implementations": [],
+              "environments": [],
+              "well_architected": [],
+              "dependency_additions": [],
+              "acquisition_prohibited": true,
+              "canonical_sha256": null
+            }
           },
           "application_source_disposition": null
         },
@@ -3019,11 +3137,11 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1434,
-              "end_line": 1490,
+              "start_line": 1509,
+              "end_line": 1575,
               "active_ids": [],
-              "canonical_sha256": "sha256:dcfc7ccb7295e01e54f5d544376a31513bf568d6f61351d9ef6c3bc0e4a01b21",
-              "source_bytes": 4129,
+              "canonical_sha256": "sha256:ebf8e83b9445ff1541a913db0806e50aea58674c0763db0bc225a86b993a07e5",
+              "source_bytes": 4618,
               "reason": "On-demand canonical source"
             },
             {
@@ -3041,8 +3159,8 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "Task completion evidence",
-              "start_line": 192,
-              "end_line": 200,
+              "start_line": 203,
+              "end_line": 211,
               "active_ids": [],
               "canonical_sha256": "sha256:9021b258e9ca2c35d9da019f1d222649a361a03a4180246ec32723a894bfa438",
               "source_bytes": 437,
@@ -3052,8 +3170,8 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "Construction and release readiness checks",
-              "start_line": 248,
-              "end_line": 277,
+              "start_line": 268,
+              "end_line": 297,
               "active_ids": [],
               "canonical_sha256": "sha256:41a6a04132b57437b2b45865b3163850c224b3839551b9e8b006c87589196c2a",
               "source_bytes": 2750,
@@ -3362,7 +3480,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:307e45cc3bd6d6118e547f1c05e02f42c0cbdd886838faa3b2899d0189d6d367"
+          "prd_snapshot_sha256": "sha256:fd7c9de821f4ed9bb2eb164f18b2efbdfeb28e65b8206291f967868f78b30dcd"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -3581,6 +3699,12 @@
                   "source": "authority.write.valid + authority.write.authorization_id"
                 },
                 {
+                  "label": "Current AWS authority",
+                  "value": "NONE — planned maximum only",
+                  "basis_ids": [],
+                  "source": "authority.external.kind + authority.external.validity"
+                },
+                {
                   "label": "AWS account work",
                   "value": "Not authorized",
                   "basis_ids": [],
@@ -3635,8 +3759,8 @@
                 "need_from_owner": "interaction.owner_action_kind",
                 "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
               },
-              "summary_basis_sha256": "sha256:1b7a4e94e1d3e805afa8527c7c1316e21bc6132ae9c73a87ba537bd7630981da",
-              "rendered_sha256": "sha256:83644450864861f7d38ea38d234fb5e74a611f0e1ba02becf6da61b0ce7f35b4"
+              "summary_basis_sha256": "sha256:e281330a1c6ac5596586f72e670d6d81323a6b788018ed35613575bc36f7b706",
+              "rendered_sha256": "sha256:820f31de288a43a2813d460d58d7793dbc09427a2906d5c844b61c8f6fbb32e5"
             },
             {
               "path": "docs/project/TASKS.md",
@@ -3889,7 +4013,7 @@
                 },
                 {
                   "label": "Current AWS authority",
-                  "value": "None",
+                  "value": "NONE — planned maximum only",
                   "basis_ids": [],
                   "source": "authority.external.kind + authority.external.validity"
                 },
@@ -3977,8 +4101,8 @@
                 "need_from_owner": "interaction.owner_action_kind",
                 "next_action": "interaction.owner_action_kind + interaction.route_reason_code + remediation.next_action.action_kind + routing.next_prompt"
               },
-              "summary_basis_sha256": "sha256:351bc09413294ac21f6a6ab0620a992b560e24275264117581a721f9d81fc3b4",
-              "rendered_sha256": "sha256:1c883c137b21f47be60e9cda39d12e835d48b96130b43a0b93dbe3fdb1e77cd2"
+              "summary_basis_sha256": "sha256:6a50374be163da226e03a4e692e0974d3114f0e423ab70113726da16df50eb43",
+              "rendered_sha256": "sha256:b50b22b439301b8ed2adc37b5db651ccb494c979f96a9704bdc1599c9b3fd56c"
             },
             {
               "path": "docs/project/BUGFIX.md",
@@ -4223,8 +4347,9 @@
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
-          "schema_version": "1.4",
+          "schema_version": "1.5",
           "status": "READY",
+          "completion_target": "LOCAL",
           "actor_ids": [
             "ACT-001"
           ],
@@ -4362,9 +4487,83 @@
             "required_revalidation": []
           },
           "assumptions": [],
+          "outcome_metrics": [
+            {
+              "metric_id": "METRIC-001",
+              "applicability": "APPLICABLE",
+              "outcome_basis_ids": [
+                "INTAKE-0004",
+                "INTAKE-0006"
+              ],
+              "metric": "Core-flow completion without facilitator intervention",
+              "baseline": "NOT_YET_MEASURED - baseline will be captured in the first validation run",
+              "target": "at least 80 percent of first-time users complete the core flow",
+              "measurement_window": "Each independent pilot session",
+              "evidence_source": "Sanitized pilot scorecard bound to the release candidate",
+              "accountable_role": "Product owner",
+              "guardrail": "No safety-critical misunderstanding",
+              "missed_target_action": "Block release, correct the finding, and repeat the measurement"
+            }
+          ],
+          "datasets": [
+            {
+              "dataset_id": "DATASET-001",
+              "dataset_category": "Synthetic development outcome data",
+              "purpose": "Support local workflow verification",
+              "classification": "INTERNAL",
+              "source_of_truth": "Generated local fixture",
+              "access_boundary": "Project developer and local test process only",
+              "retention": "Delete within 30 days",
+              "deletion": "Owner can delete the local fixture and derived output",
+              "recovery": "Recreate from source fixtures; no backup promise",
+              "residency": "Owner-approved operating geography",
+              "migration": "NOT_APPLICABLE - greenfield fixture has no migration",
+              "audit_obligation": "Record access and deletion test results",
+              "accountable_role": "Product owner",
+              "requirement_basis_ids": [
+                "DATA-001",
+                "DATA-002",
+                "DATA-003",
+                "DATA-004",
+                "DATA-005"
+              ]
+            }
+          ],
+          "external_obligations": [
+            {
+              "obligation_id": "OBL-001",
+              "obligation": "NONE IDENTIFIED",
+              "source_basis": "Owner review of intended users, data, and geography found no applicable external obligation",
+              "applicability": "NONE_IDENTIFIED",
+              "affected_scope": "NONE",
+              "required_behavior": "NONE",
+              "accountable_role": "NONE",
+              "requirement_ids": [],
+              "evidence_requirement": "NONE",
+              "review_trigger": "Reassess when users, data, geography, or governing terms change"
+            }
+          ],
+          "cross_cutting_risks": [
+            {
+              "risk_id": "RISK-001",
+              "category": "DELIVERY_TRUTH",
+              "risk": "Users could mistake local evidence for deployed AWS evidence",
+              "likelihood": "MEDIUM",
+              "impact": "MEDIUM",
+              "accountable_role": "Product owner",
+              "mitigation": "Keep completion targets and evidence levels explicit",
+              "revisit_trigger": "Revisit when the target or AWS lane changes",
+              "requirement_ids": [
+                "FR-001",
+                "OPS-002"
+              ],
+              "status": "MITIGATING"
+            }
+          ],
           "missing_records": [],
-          "canonical_sha256": "sha256:235a8b11bc5950c7c258c8afa46070ede34b84bafdb980380841c5316d878bae",
-          "grandfathered_approved_gate_a": false
+          "canonical_sha256": "sha256:1c2c3089e6f7fdb941f75df719a24226a800145f52d1cfaab838b4c5129f7178",
+          "grandfathered_approved_gate_a": false,
+          "approved_schema_14_compatibility": false
         },
         "coverage_plan": {
           "schema_version": 1,
@@ -4429,7 +4628,7 @@
           "compatibility_full_coverage": false
         },
         "design_contract": {
-          "schema_version": 7,
+          "schema_version": 8,
           "status": "READY",
           "design_revision": "DES-0001",
           "technology_decisions": [
@@ -5166,8 +5365,129 @@
                     "to_id": "TECH-0001"
                   }
                 ],
-                "semantic_sha256": "sha256:f8a222d373be341997bfca9e2562446d66ac449f1f2af145976a512058b9d0dc",
-                "rendered_sha256": "sha256:30080b0e54eb23d7483a6c5e0eb9b60e6986f0b81e4d639f91c5f5a31ce1546b"
+                "semantic_sha256": "sha256:f859874a4478c130b946d43925751e77a9d7a4f98faa147c6aa98b8f1b527923",
+                "rendered_sha256": "sha256:cb6651049687751c5d2e064d4c834249267c7868aae558f24cb0d80d3dba7586",
+                "semantic_relationships": [
+                  {
+                    "from_id": "ACT-001",
+                    "edge_kind": "SOLID",
+                    "relation": "sends a review request through",
+                    "to_id": "TECH-0013"
+                  },
+                  {
+                    "from_id": "API-001",
+                    "edge_kind": "SOLID",
+                    "relation": "invokes",
+                    "to_id": "TECH-0002"
+                  },
+                  {
+                    "from_id": "ARCH-0001",
+                    "edge_kind": "DASHED",
+                    "relation": "emits operational signals to",
+                    "to_id": "TECH-0014"
+                  },
+                  {
+                    "from_id": "ARCH-0001",
+                    "edge_kind": "SOLID",
+                    "relation": "stores owner records in",
+                    "to_id": "TECH-0011"
+                  },
+                  {
+                    "from_id": "BOUNDARY-001",
+                    "edge_kind": "SOLID",
+                    "relation": "allows requests to",
+                    "to_id": "API-001"
+                  },
+                  {
+                    "from_id": "TECH-0001",
+                    "edge_kind": "SOLID",
+                    "relation": "implements",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0002",
+                    "edge_kind": "SOLID",
+                    "relation": "runs on",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0004",
+                    "edge_kind": "DASHED",
+                    "relation": "defines changes for",
+                    "to_id": "TECH-0009"
+                  },
+                  {
+                    "from_id": "TECH-0008",
+                    "edge_kind": "DASHED",
+                    "relation": "protects code, data, and secrets posture for",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0009",
+                    "edge_kind": "DASHED",
+                    "relation": "deploys",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0010",
+                    "edge_kind": "DASHED",
+                    "relation": "provides token issuer trust to",
+                    "to_id": "TECH-0013"
+                  },
+                  {
+                    "from_id": "TECH-0013",
+                    "edge_kind": "SOLID",
+                    "relation": "routes authenticated requests into",
+                    "to_id": "BOUNDARY-001"
+                  },
+                  {
+                    "from_id": "TECH-0015",
+                    "edge_kind": "DASHED",
+                    "relation": "restores",
+                    "to_id": "TECH-0001"
+                  }
+                ],
+                "containment": [
+                  [
+                    "ACT-001"
+                  ],
+                  [
+                    "API-001",
+                    "ARCH-0001",
+                    "BOUNDARY-001",
+                    "TECH-0001",
+                    "TECH-0002"
+                  ],
+                  [
+                    "API-001",
+                    "ARCH-0001",
+                    "BOUNDARY-001",
+                    "TECH-0001",
+                    "TECH-0002",
+                    "TECH-0004",
+                    "TECH-0008",
+                    "TECH-0009",
+                    "TECH-0010",
+                    "TECH-0011",
+                    "TECH-0013",
+                    "TECH-0014",
+                    "TECH-0015"
+                  ],
+                  [
+                    "TECH-0004",
+                    "TECH-0008",
+                    "TECH-0009",
+                    "TECH-0014",
+                    "TECH-0015"
+                  ],
+                  [
+                    "TECH-0010",
+                    "TECH-0013"
+                  ],
+                  [
+                    "TECH-0011"
+                  ]
+                ]
               },
               {
                 "diagram_id": "DIAGRAM-0002",
@@ -5196,7 +5516,22 @@
                   }
                 ],
                 "semantic_sha256": "sha256:36bbf81154e669440d57af1d381481d2d6acf8581c53ccd4afe4603cdd68c7f7",
-                "rendered_sha256": "sha256:5c16f47e0022bae1318ed9a2d2b115dc296bfe505a4bde4525f94508a4544f5f"
+                "rendered_sha256": "sha256:5c16f47e0022bae1318ed9a2d2b115dc296bfe505a4bde4525f94508a4544f5f",
+                "semantic_relationships": [
+                  {
+                    "from_id": "ACT-001",
+                    "edge_kind": "SOLID",
+                    "relation": "submits a review request to",
+                    "to_id": "API-001"
+                  },
+                  {
+                    "from_id": "API-001",
+                    "edge_kind": "SOLID",
+                    "relation": "returns the validated review to",
+                    "to_id": "ACT-001"
+                  }
+                ],
+                "containment": []
               },
               {
                 "diagram_id": "DIAGRAM-0003",
@@ -5220,7 +5555,16 @@
                   }
                 ],
                 "semantic_sha256": "sha256:0465ae349d42797e923a1bceab81d9d40abab6ac6a686e43e88824999232ee4a",
-                "rendered_sha256": "sha256:3e6abc7ce300e3fe7cff64a867a6c8616df05cfbb28091b99ea11726cb037925"
+                "rendered_sha256": "sha256:3e6abc7ce300e3fe7cff64a867a6c8616df05cfbb28091b99ea11726cb037925",
+                "semantic_relationships": [
+                  {
+                    "from_id": "API-001",
+                    "edge_kind": "SOLID",
+                    "relation": "validates and stores in",
+                    "to_id": "TECH-0011"
+                  }
+                ],
+                "containment": []
               },
               {
                 "diagram_id": "DIAGRAM-0004",
@@ -5244,7 +5588,16 @@
                   }
                 ],
                 "semantic_sha256": "sha256:3363c93b8b4fdf7c5ec429fe37f9d1dd2d38da667beb6aa6c9eda6648eb143fb",
-                "rendered_sha256": "sha256:e625a0e19fd32fbb4562861e2de3e2593cd5cdab50ed4fd9174a99e10f22cbd7"
+                "rendered_sha256": "sha256:e625a0e19fd32fbb4562861e2de3e2593cd5cdab50ed4fd9174a99e10f22cbd7",
+                "semantic_relationships": [
+                  {
+                    "from_id": "API-001",
+                    "edge_kind": "SOLID",
+                    "relation": "fails safely and invokes",
+                    "to_id": "TECH-0015"
+                  }
+                ],
+                "containment": []
               },
               {
                 "diagram_id": "DIAGRAM-0005",
@@ -5358,15 +5711,111 @@
                   }
                 ],
                 "semantic_sha256": "sha256:44af223f3f8526b8798541903c701eb07c4be94e0964b8dfe842497813cc4225",
-                "rendered_sha256": "sha256:2fa9ad5f009f39335f87650e1fc68a9410fdee95c49b9c201021cb0707d74cc4"
+                "rendered_sha256": "sha256:2fa9ad5f009f39335f87650e1fc68a9410fdee95c49b9c201021cb0707d74cc4",
+                "semantic_relationships": [
+                  {
+                    "from_id": "ARCH-0001",
+                    "edge_kind": "DASHED",
+                    "relation": "emits signals to",
+                    "to_id": "TECH-0014"
+                  },
+                  {
+                    "from_id": "ARCH-0001",
+                    "edge_kind": "SOLID",
+                    "relation": "reads and writes",
+                    "to_id": "TECH-0011"
+                  },
+                  {
+                    "from_id": "TECH-0001",
+                    "edge_kind": "SOLID",
+                    "relation": "implements",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0002",
+                    "edge_kind": "SOLID",
+                    "relation": "runs on",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0004",
+                    "edge_kind": "DASHED",
+                    "relation": "defines changes for",
+                    "to_id": "TECH-0009"
+                  },
+                  {
+                    "from_id": "TECH-0008",
+                    "edge_kind": "DASHED",
+                    "relation": "protects",
+                    "to_id": "ARCH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0009",
+                    "edge_kind": "DASHED",
+                    "relation": "deploys",
+                    "to_id": "TECH-0001"
+                  },
+                  {
+                    "from_id": "TECH-0010",
+                    "edge_kind": "DASHED",
+                    "relation": "provides token issuer trust to",
+                    "to_id": "TECH-0013"
+                  },
+                  {
+                    "from_id": "TECH-0013",
+                    "edge_kind": "SOLID",
+                    "relation": "routes authenticated requests to",
+                    "to_id": "TECH-0002"
+                  },
+                  {
+                    "from_id": "TECH-0015",
+                    "edge_kind": "DASHED",
+                    "relation": "restores",
+                    "to_id": "TECH-0001"
+                  }
+                ],
+                "containment": [
+                  [
+                    "ARCH-0001",
+                    "TECH-0001",
+                    "TECH-0002"
+                  ],
+                  [
+                    "ARCH-0001",
+                    "TECH-0001",
+                    "TECH-0002",
+                    "TECH-0004",
+                    "TECH-0008",
+                    "TECH-0009",
+                    "TECH-0010",
+                    "TECH-0011",
+                    "TECH-0013",
+                    "TECH-0014",
+                    "TECH-0015"
+                  ],
+                  [
+                    "TECH-0004",
+                    "TECH-0008",
+                    "TECH-0009",
+                    "TECH-0014",
+                    "TECH-0015"
+                  ],
+                  [
+                    "TECH-0010",
+                    "TECH-0013"
+                  ],
+                  [
+                    "TECH-0011"
+                  ]
+                ]
               }
             ],
-            "canonical_sha256": "sha256:a0ff2ed8c5bb7f11dfa737d6cca301ba64955fbf3dce3c915d343d7a29095930",
+            "canonical_sha256": "sha256:ef26dbdd5b5a5a16e6a38b9ab6917a02b90dfb060bdedea221c95f24adfd2bba",
             "grandfathered_schema5": false
           },
-          "canonical_sha256": "sha256:032b993f616b656fe4a34354f64b6bf842731d106169277015ee7fe80914c146",
+          "canonical_sha256": "sha256:c527a26e1653b016bf93fb5c9c59d593b9efe8b7bcda3d971f29c191cbcf5125",
           "project_contract": {
-            "schema_version": 7,
+            "schema_version": 8,
             "status": "READY",
             "application_source_disposition": {
               "kind": "GREENFIELD_APP_ROOT",
@@ -5396,10 +5845,179 @@
             },
             "spike": null,
             "missing_records": [],
-            "canonical_sha256": "sha256:252c4f62cffdbb4a5a8a4817d5b67c20201d4c57414596b86e198a82f9f3f4e9",
+            "canonical_sha256": "sha256:c1358047f98d7607152b1ae6410de641f34738f98d84842fc0278152017f3c97",
             "grandfathered_v4": false,
             "grandfathered_v5": false,
-            "grandfathered_v6": false
+            "grandfathered_v6": false,
+            "design_v8": {
+              "schema_version": 8,
+              "status": "READY",
+              "dataset_implementations": [
+                {
+                  "dataset_id": "DATASET-001",
+                  "store_component": "Amazon DynamoDB owner-record component behind the local adapter",
+                  "implementation_ids": [
+                    "ARCH-0001",
+                    "API-001",
+                    "TECH-0011"
+                  ],
+                  "access_encryption": "Server-side owner authorization and managed encryption at rest",
+                  "retention_deletion": "Thirty-day fixture expiry and owner-scoped deletion",
+                  "backup_recovery": "Recreate synthetic fixtures and validate the recovery boundary",
+                  "residency_migration": "Owner-approved geography with versioned greenfield fixture compatibility",
+                  "audit_mechanism": "Access and deletion outcomes are recorded without sensitive values",
+                  "validation_ids": [
+                    "AC-DATA-001",
+                    "HARNESS-003"
+                  ]
+                }
+              ],
+              "environments": [
+                {
+                  "environment_id": "ENV-001",
+                  "environment_class": "LOCAL",
+                  "purpose": "Validate the approved walking skeleton with synthetic fixtures",
+                  "account_region_boundary": "Local development; no AWS account or Region authority",
+                  "artifact_boundary": "IMMUTABLE: authorized baseline commit and package digest",
+                  "configuration_secrets_data": "Local configuration; no stored secrets; synthetic INTERNAL data",
+                  "promotion_source": "NONE",
+                  "promotion_criteria_evidence": "Gate B plus current required local Harness evidence",
+                  "rollback_teardown_boundary": "Restore the authorized baseline and remove temporary fixtures",
+                  "basis_ids": [
+                    "DES-0001",
+                    "FR-001"
+                  ],
+                  "validation_ids": [
+                    "HARNESS-004"
+                  ]
+                }
+              ],
+              "well_architected": [
+                {
+                  "pillar": "Operational Excellence",
+                  "applicability": "APPLICABLE",
+                  "basis_ids": [
+                    "FR-001",
+                    "RISK-001"
+                  ],
+                  "design_ids": [
+                    "ARCH-0001",
+                    "TECH-0014"
+                  ],
+                  "consideration_tradeoff": "Operational Excellence consequences are planned for the bounded local-first design",
+                  "safeguard": "Keep the selected managed boundary and exact Harness evidence current",
+                  "validation_evidence_ids": [
+                    "AWS-EV-0005",
+                    "HARNESS-010"
+                  ],
+                  "evidence_maturity": "SOURCE_VERIFIED",
+                  "revisit_trigger": "Revisit when workload, target, risk, or selected technology changes"
+                },
+                {
+                  "pillar": "Security",
+                  "applicability": "APPLICABLE",
+                  "basis_ids": [
+                    "FR-001",
+                    "RISK-001"
+                  ],
+                  "design_ids": [
+                    "ARCH-0001",
+                    "TECH-0008"
+                  ],
+                  "consideration_tradeoff": "Security consequences are planned for the bounded local-first design",
+                  "safeguard": "Keep the selected managed boundary and exact Harness evidence current",
+                  "validation_evidence_ids": [
+                    "AWS-EV-0007",
+                    "HARNESS-006"
+                  ],
+                  "evidence_maturity": "SOURCE_VERIFIED",
+                  "revisit_trigger": "Revisit when workload, target, risk, or selected technology changes"
+                },
+                {
+                  "pillar": "Reliability",
+                  "applicability": "APPLICABLE",
+                  "basis_ids": [
+                    "FR-001",
+                    "RISK-001"
+                  ],
+                  "design_ids": [
+                    "ARCH-0001",
+                    "TECH-0015"
+                  ],
+                  "consideration_tradeoff": "Reliability consequences are planned for the bounded local-first design",
+                  "safeguard": "Keep the selected managed boundary and exact Harness evidence current",
+                  "validation_evidence_ids": [
+                    "AWS-EV-0006",
+                    "HARNESS-007"
+                  ],
+                  "evidence_maturity": "SOURCE_VERIFIED",
+                  "revisit_trigger": "Revisit when workload, target, risk, or selected technology changes"
+                },
+                {
+                  "pillar": "Performance Efficiency",
+                  "applicability": "APPLICABLE",
+                  "basis_ids": [
+                    "FR-001",
+                    "RISK-001"
+                  ],
+                  "design_ids": [
+                    "ARCH-0001",
+                    "TECH-0001"
+                  ],
+                  "consideration_tradeoff": "Performance Efficiency consequences are planned for the bounded local-first design",
+                  "safeguard": "Keep the selected managed boundary and exact Harness evidence current",
+                  "validation_evidence_ids": [
+                    "AWS-EV-0001",
+                    "HARNESS-008"
+                  ],
+                  "evidence_maturity": "SOURCE_VERIFIED",
+                  "revisit_trigger": "Revisit when workload, target, risk, or selected technology changes"
+                },
+                {
+                  "pillar": "Cost Optimization",
+                  "applicability": "APPLICABLE",
+                  "basis_ids": [
+                    "FR-001",
+                    "RISK-001"
+                  ],
+                  "design_ids": [
+                    "ARCH-0001",
+                    "TECH-0001"
+                  ],
+                  "consideration_tradeoff": "Cost Optimization consequences are planned for the bounded local-first design",
+                  "safeguard": "Keep the selected managed boundary and exact Harness evidence current",
+                  "validation_evidence_ids": [
+                    "AWS-EV-0001",
+                    "HARNESS-008"
+                  ],
+                  "evidence_maturity": "SOURCE_VERIFIED",
+                  "revisit_trigger": "Revisit when workload, target, risk, or selected technology changes"
+                },
+                {
+                  "pillar": "Sustainability",
+                  "applicability": "APPLICABLE",
+                  "basis_ids": [
+                    "FR-001",
+                    "RISK-001"
+                  ],
+                  "design_ids": [
+                    "ARCH-0001",
+                    "TECH-0001"
+                  ],
+                  "consideration_tradeoff": "Sustainability consequences are planned for the bounded local-first design",
+                  "safeguard": "Keep the selected managed boundary and exact Harness evidence current",
+                  "validation_evidence_ids": [
+                    "AWS-EV-0001",
+                    "HARNESS-008"
+                  ],
+                  "evidence_maturity": "SOURCE_VERIFIED",
+                  "revisit_trigger": "Revisit when workload, target, risk, or selected technology changes"
+                }
+              ],
+              "dependency_additions": [],
+              "acquisition_prohibited": true,
+              "canonical_sha256": "sha256:99791432c4e7cea4008e4c24b6ae1e201bdd511989b3e69c89ff7fbe3f204c70"
+            }
           },
           "application_source_disposition": {
             "kind": "GREENFIELD_APP_ROOT",
@@ -5918,6 +6536,41 @@
     ],
     "architecture_traceability_digest_binding": [
       "tests.test_bootstrap_doctor.BootstrapDoctorTests.test_architecture_contract_is_traceable_fail_closed_and_digest_bound"
+    ]
+  },
+  "definition_of_complete_scenario_coverage": {
+    "requirements_15": [
+      "tests.test_requirements_v15.Requirements15Tests.test_complete_contract_projects_typed_side_registries",
+      "tests.test_requirements_v15.Requirements15Tests.test_approved_schema_14_keeps_exact_digest_without_legacy_bridge",
+      "tests.test_requirements_v15.Requirements15Tests.test_gate_a_brief_exposes_target_and_typed_owner_records"
+    ],
+    "design_8": [
+      "tests.test_design_v8.Design8ContractTests.test_complete_projection_is_typed_and_every_table_is_digest_bound",
+      "tests.test_design_v8.Design8ContractTests.test_dependency_policy_is_default_deny_and_prefix_is_never_sufficient",
+      "tests.test_design_v8.Design8ContractTests.test_exact_approved_design7_digest_is_compatible_but_partial_is_not",
+      "tests.test_design_v8.Design8ContractTests.test_gate_b_owner_inventory_projects_design8_without_a_new_domain"
+    ],
+    "release_claims": [
+      "tests.test_engine_composition.EngineCompositionTests.test_release_claim_derives_each_cumulative_target_without_authority",
+      "tests.test_engine_composition.EngineCompositionTests.test_release_claim_validator_rejects_overclaim_and_noncanonical_evidence"
+    ],
+    "aws_authority_projection": [
+      "tests.test_document_summaries.DocumentSummaryProjectionTests.test_current_aws_authority_projection_is_not_gate_b_digest_input"
+    ],
+    "recommendation_compatibility": [
+      "tests.test_intake_response.IntakeResponseAcceptanceTests.test_accept_phrase_applies_only_to_the_current_recommendation",
+      "tests.test_intake_response.IntakeResponseRejectionTests.test_legacy_accept_phrase_remains_an_exact_compatibility_alias"
+    ],
+    "architecture_board_semantics": [
+      "tests.test_engine_design.EngineDesignTests.test_architecture_board_cross_check_requires_semantic_path_parity"
+    ],
+    "completion_policy": [
+      "tests.test_template_compatibility.TemplateCompatibilityTests.test_fastlane_13_completion_policy_names_each_evidence_level",
+      "tests.test_prompt_contracts.PromptPackContractTests.test_project_completion_is_target_specific_and_monotonic"
+    ],
+    "context_selection_and_owner_locators": [
+      "tests.test_bootstrap_doctor.BootstrapDoctorTests.test_context_plan_is_route_bounded_ephemeral_and_complete",
+      "tests.test_owner_briefs.OwnerBriefProjectionTests.test_source_locator_is_repository_relative_and_digest_bound"
     ]
   },
   "aws_scenario_coverage": {

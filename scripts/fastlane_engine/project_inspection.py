@@ -50,6 +50,15 @@ from .define.models import (
     RequirementsChangeLineage,
 )
 from .define.requirements import (
+    CROSS_CUTTING_RISK_HEADERS,  # noqa: F401 - stable compatibility re-export
+    CROSS_CUTTING_RISK_HEADING,  # noqa: F401 - stable compatibility re-export
+    DATASET_HEADERS,  # noqa: F401 - stable compatibility re-export
+    DATASET_HEADING,  # noqa: F401 - stable compatibility re-export
+    EXTERNAL_OBLIGATION_HEADERS,  # noqa: F401 - stable compatibility re-export
+    EXTERNAL_OBLIGATION_HEADING,  # noqa: F401 - stable compatibility re-export
+    OUTCOME_METRIC_HEADERS,  # noqa: F401 - stable compatibility re-export
+    OUTCOME_METRIC_HEADING,  # noqa: F401 - stable compatibility re-export
+    PROJECT_COMPLETION_TARGETS,  # noqa: F401 - stable compatibility re-export
     concrete_requirement_subject,
     measurable_acceptance_is_bound,
     observable_requirement_response,
@@ -151,6 +160,7 @@ ENGINE_RUNTIME_CONTROL_FILES = {
     "scripts/fastlane_engine/aws/models.py",
     "scripts/fastlane_engine/aws/preflight.py",
     "scripts/fastlane_engine/aws/teardown.py",
+    "scripts/fastlane_engine/completion.py",
     "scripts/fastlane_engine/composition.py",
     "scripts/fastlane_engine/core/__init__.py",
     "scripts/fastlane_engine/core/contracts.py",
@@ -165,17 +175,24 @@ ENGINE_RUNTIME_CONTROL_FILES = {
     "scripts/fastlane_engine/define/models.py",
     "scripts/fastlane_engine/define/project.py",
     "scripts/fastlane_engine/define/requirements.py",
+    "scripts/fastlane_engine/define/requirements_v15.py",
+    "scripts/fastlane_engine/define/schema_compat.py",
     "scripts/fastlane_engine/define/source_assist.py",
     "scripts/fastlane_engine/design/__init__.py",
     "scripts/fastlane_engine/design/adr.py",
     "scripts/fastlane_engine/design/architecture.py",
     "scripts/fastlane_engine/design/architecture_board.py",
     "scripts/fastlane_engine/design/architecture_board_validation.py",
+    "scripts/fastlane_engine/design/architecture_semantics.py",
+    "scripts/fastlane_engine/design/contract_v8.py",
+    "scripts/fastlane_engine/design/diagram_semantics.py",
     "scripts/fastlane_engine/design/diagrams.py",
     "scripts/fastlane_engine/design/envelope.py",
     "scripts/fastlane_engine/design/harness.py",
     "scripts/fastlane_engine/design/models.py",
     "scripts/fastlane_engine/design/project.py",
+    "scripts/fastlane_engine/design/relationship_semantics.py",
+    "scripts/fastlane_engine/design/schema_compat.py",
     "scripts/fastlane_engine/design/source.py",
     "scripts/fastlane_engine/design/support.py",
     "scripts/fastlane_engine/deliver/__init__.py",
@@ -188,12 +205,15 @@ ENGINE_RUNTIME_CONTROL_FILES = {
     "scripts/fastlane_engine/evaluation.py",
     "scripts/fastlane_engine/orchestration.py",
     "scripts/fastlane_engine/owner_decisions.py",
+    "scripts/fastlane_engine/owner_decision_sections.py",
     "scripts/fastlane_engine/package/__init__.py",
     "scripts/fastlane_engine/package/manifest.py",
     "scripts/fastlane_engine/package/state.py",
     "scripts/fastlane_engine/project_delivery.py",
+    "scripts/fastlane_engine/project_delivery_validation.py",
     "scripts/fastlane_engine/project_inspection.py",
     "scripts/fastlane_engine/project_validation.py",
+    "scripts/fastlane_engine/project_validation_sections.py",
     "scripts/fastlane_engine/remediation.py",
     "scripts/fastlane_engine/report.py",
     "scripts/fastlane_engine/routing.py",
@@ -384,7 +404,7 @@ LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
     "Acceptance form",
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
-PROJECT_CONTRACT_SCHEMA = "1.4"
+PROJECT_CONTRACT_SCHEMA = "1.5"
 REQUIREMENTS_CHANGE_LINEAGE_HEADING = "### Requirements change lineage"
 REQUIREMENTS_CHANGE_LINEAGE_HEADERS = (
     "Current revision",
@@ -903,6 +923,7 @@ BROWNFIELD_BASELINE_FIELDS = {
 }
 GATE_A_READINESS_FIELDS = {
     "Outcome",
+    "Project completion target",
     "Owner and users",
     "Scope and non-goals",
     "Measurable requirement/acceptance IDs",
@@ -1566,6 +1587,15 @@ COMPATIBILITY_EXPORTS = (
     "LEGACY_NORMATIVE_REQUIREMENT_HEADERS",
     "LEGACY_REQUIREMENT_HEADERS",
     "PROJECT_CONTRACT_SCHEMA",
+    "PROJECT_COMPLETION_TARGETS",
+    "OUTCOME_METRIC_HEADING",
+    "OUTCOME_METRIC_HEADERS",
+    "DATASET_HEADING",
+    "DATASET_HEADERS",
+    "EXTERNAL_OBLIGATION_HEADING",
+    "EXTERNAL_OBLIGATION_HEADERS",
+    "CROSS_CUTTING_RISK_HEADING",
+    "CROSS_CUTTING_RISK_HEADERS",
     "REQUIREMENTS_CHANGE_LINEAGE_HEADING",
     "REQUIREMENTS_CHANGE_LINEAGE_HEADERS",
     "ASSUMPTION_LIFECYCLE_HEADING",

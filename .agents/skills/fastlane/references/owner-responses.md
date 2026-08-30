@@ -120,9 +120,9 @@ new owner message may resolve it.
   internal numeric reply key; preserve punctuation such as semicolons as part
   of that one answer. A decision may use `A`, `B: <required detail>`, or
   `C: <required detail>`. Legacy keyed forms remain accepted but are not the
-  preferred owner-facing format. When every recommendation
+  preferred owner-facing format. When the current recommendation
   is independently safe and complete, allow plain
-  `Accept all recommendations.` and clarify that it records
+  `Accept this recommendation.` and clarify that it records
   planning decisions only, not AWS access or spending.
 - On a new message that may answer the pending card, parse before any project
   write and use the parser's deterministic owner-safe status. If parsing fails,
@@ -145,10 +145,12 @@ new owner message may resolve it.
   requirements, treat it as a requirements conflict: do not preserve Gate A,
   do not write it as design-only state, and route through the requirements
   correction path.
-- The `Accept all recommendations.` payload is available only after the current
+- The `Accept this recommendation.` payload is available only after the current
   card is presented and only when the current question is a decision with a complete
   recommendation that requires no detail. A factual question, missing
   recommendation, required detail, stale card, or altered phrase makes it unavailable.
+  The exact legacy phrase `Accept all recommendations.` remains a hidden parser-only
+  compatibility alias and is never displayed.
 - “Explain this question” or the legacy “Explain these questions” is a clarification, not learning mode. Explain each
   pending choice directly, state `Project state changed: No.`, rerun the Engine,
   and restore the same pending decision through the side-question presenter.

@@ -21,7 +21,6 @@ from .define.requirements import _schema_13_requirement_rows
 from .design import (
     PROPERTY_ID,
     TECHNOLOGY_DECISION_ID,
-    command_matches_prefix,
     parse_property_run_target,
     parsed_numeric_version,
     parse_authorized_ids,
@@ -81,6 +80,7 @@ from .project_inspection import (
     parse_task_write_set,
     safe_read_text,
 )
+from .project_delivery_validation import task_command_boundary_issues
 
 try:
     from fastlane_contracts import (
@@ -283,9 +283,9 @@ def validate_tasks_against_envelope(
     snapshot: dict[str, str],
     state: dict[str, Any],
     envelope: dict[str, str],
+    design_contract: DesignContract,
 ) -> None:
     """SAFETY: intersect every task with the construction envelope."""
-
     try:
         maximum_tasks = int(envelope.get("Maximum generated tasks", ""))
         maximum_workers = int(envelope.get("Maximum parallel workers", ""))
@@ -480,22 +480,15 @@ def validate_tasks_against_envelope(
                 TASKS_FILE,
             )
         if task.status in {"READY", "IN_PROGRESS", "DONE"}:
-            try:
-                commands = validation_commands(
-                    sections.get("Validation", ""), task.task_id
-                )
-                for command in commands:
-                    if not any(
-                        command_matches_prefix(command, prefix)
-                        for prefix in command_prefixes
-                    ):
-                        ctx.error(
-                            "TASK_COMMAND_BOUNDARY",
-                            f"{task.task_id} command {command!r} is outside AUTH",
-                            TASKS_FILE,
-                        )
-            except ValueError as exc:
-                ctx.error("TASK_COMMAND_BOUNDARY", str(exc), TASKS_FILE)
+            command_issues = task_command_boundary_issues(
+                task.task_id,
+                sections.get("Validation", ""),
+                command_prefixes,
+                design_contract.project_contract.schema_version,
+                design_contract.project_contract.design_v8,
+            )
+            for code, message in command_issues:
+                ctx.error(code, message, TASKS_FILE)
         try:
             if task.attempt_budget > maximum_attempts:
                 ctx.error(
@@ -978,6 +971,31 @@ def record_task_graph_validation_errors(ctx: Context, message: str) -> None:
         ctx.error("TASK_GRAPH_INVALID", "\n".join(remaining), TASKS_FILE)
 
 
+def _validate_task_resume_and_repository(
+    ctx: Context,
+    tasks_text: str,
+    snapshot: dict[str, str],
+    tasks: list[InspectedTask],
+    verify_text: str | None,
+    execution_state: str,
+    gate_b_state: str,
+) -> None:
+    construction_states = {"RUNNING", "CHECKPOINTED", "BLOCKED", "COMPLETE"}
+    resumable_states = {"CHECKPOINTED", "BLOCKED", "COMPLETE"}
+    if execution_state in resumable_states:
+        validate_checkpoint_record(ctx, tasks_text, snapshot, tasks, verify_text)
+    if (
+        gate_b_state == "APPROVED_FOR_CONSTRUCTION"
+        or execution_state in construction_states
+    ):
+        validate_construction_repository(
+            ctx,
+            snapshot,
+            tasks_text=tasks_text,
+            reconcile_worktree=execution_state in resumable_states,
+        )
+
+
 def validate_tasks(
     ctx: Context,
     state: dict[str, Any],
@@ -1363,21 +1381,18 @@ def validate_tasks(
                 STATE_FILE,
             )
     if prd_fields.get("gate_b") == "APPROVED_FOR_CONSTRUCTION" or tasks:
-        validate_tasks_against_envelope(ctx, tasks, snapshot, state, envelope)
-    construction_states = {"RUNNING", "CHECKPOINTED", "BLOCKED", "COMPLETE"}
-    if execution_state in {"CHECKPOINTED", "BLOCKED", "COMPLETE"}:
-        validate_checkpoint_record(ctx, text, snapshot, tasks, verify_text)
-    if (
-        prd_fields.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
-        or execution_state in construction_states
-    ):
-        validate_construction_repository(
-            ctx,
-            snapshot,
-            tasks_text=text,
-            reconcile_worktree=execution_state
-            in {"CHECKPOINTED", "BLOCKED", "COMPLETE"},
+        validate_tasks_against_envelope(
+            ctx, tasks, snapshot, state, envelope, design_contract
         )
+    _validate_task_resume_and_repository(
+        ctx,
+        text,
+        snapshot,
+        tasks,
+        verify_text,
+        execution_state,
+        prd_fields.get("gate_b", ""),
+    )
     return summary
 
 

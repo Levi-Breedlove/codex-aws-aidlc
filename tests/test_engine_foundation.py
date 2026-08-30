@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 from datetime import datetime, timezone
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -41,6 +42,20 @@ from tests.engine_complexity_exceptions import (
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE_ROOT = ROOT / "scripts" / "fastlane_engine"
+
+
+def _semantic_version(value: str) -> tuple[int, int, int]:
+    match = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", value)
+    if match is None:
+        raise ValueError(f"Invalid semantic version {value!r}")
+    major, minor, patch = match.groups()
+    return int(major), int(minor), int(patch)
+
+
+def _exception_expiry_is_current(expiry: str, candidate: str) -> bool:
+    return expiry == "PERMANENT" or _semantic_version(expiry) > _semantic_version(
+        candidate
+    )
 
 
 class EngineFoundationTests(unittest.TestCase):
@@ -401,6 +416,8 @@ class EngineFoundationTests(unittest.TestCase):
     def test_engine_complexity_overages_require_explicit_reviewed_exceptions(
         self,
     ) -> None:
+        manifest = json.loads((ROOT / doctor.MANIFEST_FILE).read_text(encoding="utf-8"))
+        candidate_version = str(manifest["bootstrap_version"])
         configuration = {
             "module_hard_review_lines": 1_800,
             "function_review_lines": 100,
@@ -462,12 +479,19 @@ class EngineFoundationTests(unittest.TestCase):
                 exception = REVIEWED_MODULE_SIZE_EXCEPTIONS[key]
                 self.assertEqual(exception["reviewed_lines"], line_count)
                 self.assertTrue(str(exception["reason"]).strip())
+                self.assertTrue(str(exception["risk"]).strip())
                 self.assertRegex(
                     str(exception["reviewed_in"]), r"^[0-9]+\.[0-9]+\.[0-9]+$"
                 )
                 self.assertRegex(
                     str(exception["expires"]),
                     r"^(?:PERMANENT|[0-9]+\.[0-9]+\.[0-9]+)$",
+                )
+                self.assertTrue(
+                    _exception_expiry_is_current(
+                        str(exception["expires"]), candidate_version
+                    ),
+                    f"{key} expires at or before candidate {candidate_version}",
                 )
 
         self.assertEqual(
@@ -483,9 +507,16 @@ class EngineFoundationTests(unittest.TestCase):
                     r"^[0-9]+\.[0-9]+\.[0-9]+$",
                 )
                 self.assertTrue(str(exception["reason"]).strip())
+                self.assertTrue(str(exception["risk"]).strip())
                 self.assertRegex(
                     str(exception["expires"]),
                     r"^(?:PERMANENT|[0-9]+\.[0-9]+\.[0-9]+)$",
+                )
+                self.assertTrue(
+                    _exception_expiry_is_current(
+                        str(exception["expires"]), candidate_version
+                    ),
+                    f"{key} expires at or before candidate {candidate_version}",
                 )
                 self.assertEqual(exception["reviewed_lines"], metrics["lines"])
                 self.assertEqual(
@@ -495,6 +526,12 @@ class EngineFoundationTests(unittest.TestCase):
                 self.assertLessEqual(
                     metrics["complexity"], exception["maximum_complexity"]
                 )
+
+    def test_complexity_expiry_rejects_candidate_or_earlier(self) -> None:
+        self.assertFalse(_exception_expiry_is_current("1.2.99", "1.3.0"))
+        self.assertFalse(_exception_expiry_is_current("1.3.0", "1.3.0"))
+        self.assertTrue(_exception_expiry_is_current("1.4.0", "1.3.0"))
+        self.assertTrue(_exception_expiry_is_current("PERMANENT", "1.3.0"))
 
 
 if __name__ == "__main__":

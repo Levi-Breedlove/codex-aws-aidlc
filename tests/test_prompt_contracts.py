@@ -167,7 +167,7 @@ class PromptPackContractTests(unittest.TestCase):
             "`A`",
             "`B: <requested detail>`",
             "`C: <requested detail>`",
-            "`Accept all recommendations.`",
+            "`Accept this recommendation.`",
             "`Change the requirements: <correction>.`",
             "`Change the design: <correction>.`",
             "`$operate-fastlane-aws`",
@@ -176,6 +176,7 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertIn("Reply naturally; no numeric prefix is required", self.prompts)
         self.assertNotIn("`1A`", self.prompts)
         self.assertIn("Can you explain this question?", self.prompts)
+        self.assertNotIn("Accept all recommendations.", self.prompts)
         self.assertNotIn("<choose A, B, or C>", self.prompts)
         self.assertNotRegex(self.prompts, r"R-[A-F0-9]{8,}")
         self.assertIn("one plain-language\nquestion per turn", self.prompts)
@@ -232,7 +233,7 @@ class PromptPackContractTests(unittest.TestCase):
         ):
             self.assertIn(expected, self.fastlane_skill)
         for expected in (
-            "applicable new Design-7 project",
+            "applicable new Design-8 project",
             "include `dist/architecture/**` in the proposed Gate B allowed repository write set",
             "do not ask another owner question",
             "create a third gate",
@@ -533,6 +534,7 @@ class PromptPackContractTests(unittest.TestCase):
     def test_requirements_procedure_owns_intake_and_requirement_grammar(self) -> None:
         for phrase in (
             "exactly one question",
+            "Accept this recommendation.",
             "Accept all recommendations.",
             "R-*",
             "one owner decision per turn",
@@ -836,6 +838,28 @@ class PromptPackContractTests(unittest.TestCase):
                 self.assertIsNone(re.search(r"\bdoctor\b", source, re.IGNORECASE))
         self.assertIn("Fastlane Engine", self.readme)
 
+    def test_project_completion_is_target_specific_and_monotonic(self) -> None:
+        combined = " ".join((self.workflow + "\n" + self.verify).split())
+        for target, evidence in (
+            ("Local", "E2_LOCALLY_VALIDATED"),
+            ("AWS read", "E3_AWS_READ_OBSERVED"),
+            ("Deployed", "E4_DEPLOYED_OBSERVED"),
+            ("Recovery", "E5_RECOVERY_OBSERVED"),
+        ):
+            self.assertIn(target, combined)
+            self.assertIn(evidence, combined)
+        self.assertIn(
+            "does not erase a lower target that remains current and proven",
+            combined,
+        )
+        self.assertIn("Other AWS lanes remain unqualified", combined)
+        self.assertIn("Teardown-only E5 evidence does not qualify Recovery", combined)
+        self.assertIn("Rollback or restore behavior was exercised", combined)
+        self.assertNotIn(
+            "Rollback, restore, or teardown behavior was exercised", combined
+        )
+        self.assertNotIn("A third completion gate", combined)
+
     def test_instruction_surfaces_keep_context_headroom(self) -> None:
         self.assertLessEqual(len(read("AGENTS.md").encode("utf-8")), 5_900)
         self.assertLessEqual(
@@ -847,9 +871,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.2.47")
-        self.assertIn("**Pack version:** 1.2.47", self.prompts)
-        self.assertIn("Current customer build: **1.2.47**", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.3.0")
+        self.assertIn("**Pack version:** 1.3.0", self.prompts)
+        self.assertIn("Current customer build: **1.3.0**", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

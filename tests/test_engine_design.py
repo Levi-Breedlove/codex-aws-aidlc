@@ -21,7 +21,11 @@ from scripts.fastlane_engine import api as engine_api
 from scripts.fastlane_engine import design
 from scripts.fastlane_engine.define.models import RequirementsContract
 from scripts.fastlane_engine.design import adr as design_adr
+from scripts.fastlane_engine.design import architecture_board as board_contracts
 from scripts.fastlane_engine.design import diagrams as design_diagrams
+from scripts.fastlane_engine.design.relationship_semantics import (
+    diagram_relation_category,
+)
 from scripts.fastlane_engine.design.models import (
     ArchitectureSelection,
     ProjectDesignContract,
@@ -210,6 +214,70 @@ def _board_presentation_sha256(root: ET.Element, kind: str) -> str:
         ):
             graph.attrib.pop(key, None)
     return _board_sha256(ET.tostring(normalized, encoding="utf-8"))
+
+
+_BOARD_DASHED_RELATIONS = frozenset(
+    {
+        "defines changes for",
+        "deploys",
+        "emits operational signals to",
+        "emits signals to",
+        "protects",
+        "protects code, data, and secrets posture for",
+        "provides token issuer trust to",
+        "restores",
+    }
+)
+
+
+def _architecture_board_report_fixture(*, schema_version: int = 7) -> dict[str, object]:
+    report = copy.deepcopy(
+        json.loads(
+            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )["report_cases"]["gate_b_approved"]["report"]
+    )
+    design_contract = report["design_contract"]
+    project_contract = design_contract["project_contract"]
+    design_contract["schema_version"] = schema_version
+    project_contract["schema_version"] = schema_version
+    if schema_version == 8:
+        project_contract["design_v8"] = {"schema_version": 8, "status": "READY"}
+    records = design_contract["diagram_contract"]["records"]
+    groups = {
+        "DIAGRAM-0001": [
+            ["ACT-001"],
+            ["API-001", "ARCH-0001", "BOUNDARY-001", "TECH-0001", "TECH-0002"],
+            ["TECH-0004", "TECH-0008", "TECH-0009", "TECH-0014", "TECH-0015"],
+            ["TECH-0010", "TECH-0013"],
+            ["TECH-0011"],
+        ],
+        "DIAGRAM-0008": [
+            ["ARCH-0001", "TECH-0001", "TECH-0002"],
+            ["TECH-0004", "TECH-0008", "TECH-0009", "TECH-0014", "TECH-0015"],
+            ["TECH-0010", "TECH-0013"],
+            ["TECH-0011"],
+        ],
+    }
+    for record in records:
+        diagram_id = record["diagram_id"]
+        if diagram_id not in groups:
+            continue
+        record["semantic_relationships"] = [
+            {
+                **edge,
+                "edge_kind": (
+                    "DASHED" if edge["relation"] in _BOARD_DASHED_RELATIONS else "SOLID"
+                ),
+            }
+            for edge in record["relationships"]
+        ]
+        record["containment"] = [
+            sorted(record["referenced_ids"]),
+            *groups[diagram_id],
+        ]
+    return report
 
 
 def _board_edge_projection() -> dict[str, object]:
@@ -990,12 +1058,7 @@ class EngineDesignTests(unittest.TestCase):
     def test_architecture_board_handoff_is_current_bound_and_non_authorizing(
         self,
     ) -> None:
-        fixture = json.loads(
-            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        report = fixture["report_cases"]["gate_b_approved"]["report"]
+        report = _architecture_board_report_fixture()
         original = json.dumps(report, sort_keys=True)
         self.assertIn(
             "DIAGRAM_OUTPUT_NOT_AUTHORIZED",
@@ -1019,19 +1082,40 @@ class EngineDesignTests(unittest.TestCase):
         report["write_authority"]["approved_write_roots"].pop()
         self.assertEqual(json.dumps(report, sort_keys=True), original)
 
+        current = _architecture_board_report_fixture(schema_version=8)
+        current["write_authority"]["approved_write_roots"].append(
+            "dist/architecture/**"
+        )
+        self.assertTrue(
+            engine_api.derive_architecture_board_handoff(current)["eligible"]
+        )
+
     def test_architecture_board_handoff_fails_closed_without_changing_route(
         self,
     ) -> None:
-        fixture = json.loads(
-            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
-                encoding="utf-8"
-            )
-        )["report_cases"]["gate_b_approved"]["report"]
+        fixture = _architecture_board_report_fixture()
         fixture["write_authority"]["approved_write_roots"].append(
             "dist/architecture/**"
         )
         cases = {
             "stale-gate": lambda row: row["gates"].update(gate_b="STALE"),
+            "unapproved-design-7": lambda row: row["gates"].update(
+                gate_b="PENDING_OWNER_APPROVAL"
+            ),
+            "partial-design-7": lambda row: row["design_contract"][
+                "project_contract"
+            ].update(status="MIGRATION_REQUIRED"),
+            "unsupported-schema": lambda row: (
+                row["design_contract"].update(schema_version=6),
+                row["design_contract"]["project_contract"].update(schema_version=6),
+            ),
+            "mismatched-schema": lambda row: row["design_contract"][
+                "project_contract"
+            ].update(schema_version=8),
+            "incomplete-design-8": lambda row: (
+                row["design_contract"].update(schema_version=8),
+                row["design_contract"]["project_contract"].update(schema_version=8),
+            ),
             "legacy": lambda row: row["design_contract"]["diagram_contract"].update(
                 grandfathered_schema5=True
             ),
@@ -1070,6 +1154,14 @@ class EngineDesignTests(unittest.TestCase):
         diagrams["records"][7]["relationships"] = [
             {"from_id": "TECH-0013", "relation": "reverses", "to_id": "ACT-001"}
         ]
+        diagrams["records"][7]["semantic_relationships"] = [
+            {
+                "from_id": "TECH-0013",
+                "edge_kind": "SOLID",
+                "relation": "reverses",
+                "to_id": "ACT-001",
+            }
+        ]
         handoff = engine_api.derive_architecture_board_handoff(conflict)
         self.assertEqual(handoff["status"], "SEMANTIC_CONFLICT")
         self.assertEqual(handoff["failure_route"], "DESIGN-10")
@@ -1078,9 +1170,182 @@ class EngineDesignTests(unittest.TestCase):
         redirect["design_contract"]["diagram_contract"]["records"][7]["relationships"][
             0
         ]["to_id"] = "TECH-0009"
+        redirect["design_contract"]["diagram_contract"]["records"][7][
+            "semantic_relationships"
+        ][0]["to_id"] = "TECH-0009"
         handoff = engine_api.derive_architecture_board_handoff(redirect)
         self.assertEqual(handoff["status"], "SEMANTIC_CONFLICT")
         self.assertEqual(handoff["failure_route"], "DESIGN-10")
+
+    def test_architecture_board_cross_check_requires_semantic_path_parity(
+        self,
+    ) -> None:
+        fixture = _architecture_board_report_fixture()
+        fixture["write_authority"]["approved_write_roots"].append(
+            "dist/architecture/**"
+        )
+
+        def board_records(candidate: dict[str, object]) -> tuple[dict, dict]:
+            records = candidate["design_contract"]["diagram_contract"]["records"]
+            return records[0], records[7]
+
+        def reverse_direction(candidate: dict[str, object]) -> None:
+            _primary, cross = board_records(candidate)
+            for key in ("relationships", "semantic_relationships"):
+                edge = cross[key][0]
+                edge["from_id"], edge["to_id"] = edge["to_id"], edge["from_id"]
+
+        def change_relation(candidate: dict[str, object]) -> None:
+            _primary, cross = board_records(candidate)
+            for key in ("relationships", "semantic_relationships"):
+                cross[key][0]["relation"] = "deploys"
+
+        def use_uncontrolled_relation(candidate: dict[str, object]) -> None:
+            _primary, cross = board_records(candidate)
+            for key in ("relationships", "semantic_relationships"):
+                cross[key][0]["relation"] = "passes through"
+
+        def change_edge_kind(candidate: dict[str, object]) -> None:
+            _primary, cross = board_records(candidate)
+            cross["semantic_relationships"][0]["edge_kind"] = "SOLID"
+
+        def change_containment(candidate: dict[str, object]) -> None:
+            _primary, cross = board_records(candidate)
+            cross["containment"][2].remove("TECH-0008")
+            cross["containment"][4].append("TECH-0008")
+
+        def add_ambiguous_path(candidate: dict[str, object]) -> None:
+            primary, _cross = board_records(candidate)
+            additions = (
+                ("ARCH-0001", "TECH-0004"),
+                ("TECH-0004", "TECH-0011"),
+            )
+            for source, target in additions:
+                primary["relationships"].append(
+                    {
+                        "from_id": source,
+                        "relation": "reads and writes",
+                        "to_id": target,
+                    }
+                )
+                primary["semantic_relationships"].append(
+                    {
+                        "from_id": source,
+                        "edge_kind": "SOLID",
+                        "relation": "reads and writes",
+                        "to_id": target,
+                    }
+                )
+
+        for name, mutate in {
+            "reversed-direction": reverse_direction,
+            "wrong-relation-family": change_relation,
+            "uncontrolled-relation": use_uncontrolled_relation,
+            "wrong-edge-kind": change_edge_kind,
+            "wrong-containment": change_containment,
+            "ambiguous-path": add_ambiguous_path,
+        }.items():
+            with self.subTest(name=name):
+                candidate = copy.deepcopy(fixture)
+                mutate(candidate)
+                handoff = engine_api.derive_architecture_board_handoff(candidate)
+                self.assertEqual(handoff["status"], "SEMANTIC_CONFLICT")
+                self.assertEqual(handoff["failure_route"], "DESIGN-10")
+
+    def test_architecture_board_accepts_controlled_non_fixture_relation_alias(
+        self,
+    ) -> None:
+        fixture = _architecture_board_report_fixture()
+        fixture["write_authority"]["approved_write_roots"].append(
+            "dist/architecture/**"
+        )
+        records = fixture["design_contract"]["diagram_contract"]["records"]
+        cross = records[7]
+        for key in ("relationships", "semantic_relationships"):
+            edge = next(
+                item
+                for item in cross[key]
+                if item["from_id"] == "ARCH-0001" and item["to_id"] == "TECH-0014"
+            )
+            edge["relation"] = "publishes telemetry to"
+
+        handoff = engine_api.derive_architecture_board_handoff(fixture)
+
+        self.assertEqual(
+            diagram_relation_category("publishes telemetry to"), "OBSERVABILITY"
+        )
+        self.assertEqual(diagram_relation_category("sends metrics to"), "OBSERVABILITY")
+        self.assertEqual(
+            diagram_relation_category("publishes order event to"), "MESSAGING"
+        )
+        self.assertEqual(
+            diagram_relation_category("sends order message to"), "MESSAGING"
+        )
+        self.assertEqual(
+            diagram_relation_category("publishes telemetry event to"),
+            "OBSERVABILITY",
+        )
+        self.assertIsNone(diagram_relation_category("sends request event to"))
+        self.assertIsNone(diagram_relation_category("passes through"))
+        self.assertTrue(handoff["eligible"], handoff["issues"])
+
+    def test_architecture_board_records_require_canonical_semantic_projection(
+        self,
+    ) -> None:
+        fixture = _architecture_board_report_fixture()
+        fixture["write_authority"]["approved_write_roots"].append(
+            "dist/architecture/**"
+        )
+
+        def duplicate_relationship(candidate: dict[str, object]) -> None:
+            record = candidate["design_contract"]["diagram_contract"]["records"][0]
+            record["semantic_relationships"].append(
+                copy.deepcopy(record["semantic_relationships"][0])
+            )
+
+        def duplicate_containment(candidate: dict[str, object]) -> None:
+            record = candidate["design_contract"]["diagram_contract"]["records"][0]
+            record["containment"].append(copy.deepcopy(record["containment"][1]))
+
+        for name, mutate in {
+            "duplicate-relationship": duplicate_relationship,
+            "duplicate-containment": duplicate_containment,
+        }.items():
+            with self.subTest(name=name):
+                candidate = copy.deepcopy(fixture)
+                mutate(candidate)
+                handoff = engine_api.derive_architecture_board_handoff(candidate)
+                self.assertEqual(handoff["status"], "INELIGIBLE")
+                self.assertIn("SYSTEM_CONTEXT_DIAGRAM_REQUIRED", handoff["issues"])
+                self.assertIsNone(handoff["failure_route"])
+
+    def test_architecture_board_unique_path_check_is_bounded_on_dense_graphs(
+        self,
+    ) -> None:
+        nodes = [f"NODE-{index:03d}" for index in range(30)]
+        edges = [
+            {
+                "from_id": source,
+                "edge_kind": "SOLID",
+                "relation": "invokes",
+                "to_id": target,
+            }
+            for source_index, source in enumerate(nodes)
+            for target in nodes[source_index + 1 :]
+        ]
+        edges.append(
+            {
+                "from_id": nodes[0],
+                "edge_kind": "SOLID",
+                "relation": "invokes",
+                "to_id": "TARGET",
+            }
+        )
+
+        path = board_contracts._unique_directed_path(edges, nodes[0], "TARGET")
+
+        self.assertIsNotNone(path)
+        self.assertEqual(len(path), 1)
 
     def test_architecture_board_source_is_exactly_the_approved_mermaid(self) -> None:
         source = (
@@ -1104,14 +1369,17 @@ class EngineDesignTests(unittest.TestCase):
             engine_api.architecture_board_mermaid_source(source, handoff)
 
     def test_architecture_board_request_packet_is_exact_and_fail_closed(self) -> None:
-        report = json.loads(
-            (REPOSITORY_ROOT / "tests/fixtures/engine_parity_v1.json").read_text(
-                encoding="utf-8"
-            )
-        )["report_cases"]["gate_b_approved"]["report"]
+        report = _architecture_board_report_fixture()
         report["write_authority"]["approved_write_roots"].append("dist/architecture/**")
         prd_text = doctor_fixtures.complete_design_contract(
             (REPOSITORY_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        )
+        current_design, design_issues = doctor.derive_design_contract(
+            prd_text, "DES-0001", required=True
+        )
+        self.assertEqual(design_issues, [])
+        report["design_contract"]["diagram_contract"] = (
+            current_design.diagram_contract.to_dict()
         )
         identity = {
             **engine_api.ARCHITECTURE_DIAGRAM_SKILL_IDENTITY,

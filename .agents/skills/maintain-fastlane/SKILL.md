@@ -66,11 +66,11 @@ project authority or another lifecycle.
    state-changing code in the existing public mutators, and require every new
    packaged Engine module in all independent control inventories.
 
-4. Before `IMPLEMENT` or `PUBLISH`, validate the ephemeral scope contract with
-   `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`.
-   The preflight is read-only; keep the contract outside tracked product state.
-   Then make the smallest coherent change and direct regression tests inside the
-   validated scope. Unrelated discoveries are report-only.
+4. Before `IMPLEMENT` or any `PUBLISH`, validate its ephemeral contract with `python scripts/maintenance_preflight.py --contract <contract.json> --root . --json`; keep contracts outside tracked product state.
+   For `COMMIT`, first validate `IMPLEMENT`, run required checks, and stage the exact observed files; staging is local preparation and grants no publication authority.
+   Then pass the separate COMMIT-only PUBLISH contract plus `--implementation-contract <implement.json>`; a commit cannot share a contract with another operation.
+   `PUSH`, `OPEN_PR`, and `MERGE` keep separate clean-tree contracts. After commit, verify its parent, committed-diff digest against the preflight digest, and a clean tree.
+   Make only the smallest coherent in-scope change and direct regressions; unrelated discoveries are report-only.
 5. For bounded framework or brownfield refactoring, use the Mikado Method:
    attempt the smallest target change; identify a blocking prerequisite;
    preserve or revert unsafe exploratory edits; implement only the in-scope

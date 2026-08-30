@@ -24,6 +24,13 @@ from .architecture_board_validation import (
     _rgba_crop,
     _validate_actual_xml,
 )
+from .architecture_semantics import (
+    _BOARD_SHA256,
+    _architecture_board_conflict,
+    _architecture_board_record,
+    _architecture_board_report_current,
+    _unique_directed_path,  # noqa: F401 - stable compatibility re-export
+)
 
 ARCHITECTURE_DIAGRAM_SKILL_IDENTITY = {
     "name": "aws-architecture-diagrams",
@@ -90,93 +97,6 @@ _ARCHITECTURE_BOARD_VISUAL_CHECKS = frozenset(
         "callouts_match_notes",
     }
 )
-
-_BOARD_SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
-_BOARD_RECORDS = {
-    "DIAGRAM-0001": ("SYSTEM_CONTEXT", "proposed-system-at-a-glance"),
-    "DIAGRAM-0008": ("AWS_IMPLEMENTATION", "aws-implementation-at-a-glance"),
-}
-
-
-def _architecture_board_record(
-    diagrams: Mapping[str, Any], diagram_id: str
-) -> dict[str, Any] | None:
-    rows = [
-        row
-        for row in diagrams.get("records", [])
-        if isinstance(row, Mapping) and row.get("diagram_id") == diagram_id
-    ]
-    if len(rows) != 1:
-        return None
-    row = rows[0]
-    kind, anchor = _BOARD_RECORDS[diagram_id]
-    valid = (
-        row.get("kind") == kind
-        and row.get("applicability") == "REQUIRED"
-        and row.get("status") == "CURRENT"
-        and row.get("anchor") == anchor
-        and isinstance(row.get("relationships"), list)
-        and bool(row["relationships"])
-        and all(isinstance(edge, Mapping) for edge in row["relationships"])
-        and all(
-            _BOARD_SHA256.fullmatch(str(row.get(key, "")))
-            for key in ("semantic_sha256", "rendered_sha256")
-        )
-    )
-    return dict(row) if valid else None
-
-
-def _architecture_board_report_current(
-    report: Mapping[str, Any], parts: tuple[Any, ...]
-) -> bool:
-    if not all(isinstance(item, Mapping) for item in parts):
-        return False
-    gates, design, project, diagrams, authority, auth, external = parts
-    return bool(
-        report.get("schema_version") == 2
-        and report.get("ok") is True
-        and gates.get("gate_a") == "APPROVED_FOR_DESIGN"
-        and gates.get("gate_b") == "APPROVED_FOR_CONSTRUCTION"
-        and design.get("schema_version") == project.get("schema_version") == 7
-        and design.get("status") == project.get("status") == "READY"
-        and not any(project.get(f"grandfathered_v{version}") for version in (4, 5, 6))
-        and diagrams.get("status") == "CURRENT"
-        and diagrams.get("grandfathered_schema5") is False
-        and authority.get("valid") is True
-        and authority.get("active_task") == "NONE"
-        and authority.get("authorization_id") == auth.get("construction")
-        and auth.get("construction") != "NONE"
-        and auth.get("aws") == "NONE"
-        and external.get("kind") == external.get("validity") == "NONE"
-    )
-
-
-def _architecture_board_conflict(
-    diagrams: Mapping[str, Any] | None,
-    primary: Mapping[str, Any] | None,
-    cross_check: Mapping[str, Any] | None,
-) -> bool:
-    if diagrams is None or primary is None or cross_check is None:
-        return False
-
-    primary_edges = {(e["from_id"], e["to_id"]) for e in primary["relationships"]}
-    cross_edges = {(e["from_id"], e["to_id"]) for e in cross_check["relationships"]}
-
-    def reaches(source: str, target: str) -> bool:
-        frontier = {right for left, right in primary_edges if left == source}
-        for _ in primary.get("referenced_ids", []):
-            frontier |= {right for left, right in primary_edges if left in frontier}
-        return target in frontier
-
-    basis = diagrams.get("architecture_basis_id")
-    return bool(
-        basis not in primary.get("basis_ids", [])
-        or basis not in cross_check.get("basis_ids", [])
-        or not set(cross_check.get("referenced_ids", [])).issubset(
-            primary.get("referenced_ids", [])
-        )
-        or any(not reaches(source, target) for source, target in cross_edges)
-    )
 
 
 def _architecture_board_output(

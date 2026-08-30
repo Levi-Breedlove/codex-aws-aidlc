@@ -13,6 +13,7 @@ SCHEMA_VERSION = 1
 SUMMARY_BEGIN = "<!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->"
 SUMMARY_END = "<!-- FASTLANE:DOCUMENT_SUMMARY:END -->"
 SUMMARY_AUTHORITY = "DERIVED_NON_AUTHORITATIVE"
+CURRENT_AWS_AUTHORITY_NONE = "NONE — planned maximum only"
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 FORBIDDEN_VISIBLE_VALUE = re.compile(
     r"(?i)(?:[A-Z]:\\"
@@ -679,7 +680,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
     if template:
         tasks = {"progress": "No tasks generated", "wave": "None", "active": "None", "readiness": "Not yet initialized", "blocker": "None", "checkpoint": "None", "known_green": "None", "updated": updated}
         verify = {"release_result": "Not yet initialized", "observed_count": "0", "failed_count": "0", "unobserved": "Local build, AWS deployment, recovery, and teardown", "cutoff": "Not yet recorded", "updated": updated, "claims": verify.get("claims", [])}
-        operations = {"environment": "Not yet initialized", "deployment_state": "Not deployed", "authority": "None", "safe_action": "Local validation only", "deployment_approval": "Not authorized", "teardown_approval": "Not authorized", "recovery_state": "Not yet observed", "emergency_state": "No deployed environment exists", "updated": updated}
+        operations = {"environment": "Not yet initialized", "deployment_state": "Not deployed", "authority": CURRENT_AWS_AUTHORITY_NONE, "safe_action": "Local validation only", "deployment_approval": "Not authorized", "teardown_approval": "Not authorized", "recovery_state": "Not yet observed", "emergency_state": "No deployed environment exists", "updated": updated}
         bugfix = {**bugfix, "updated": updated}
     # fmt: on
 
@@ -731,6 +732,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
             ("Last completed milestone", milestone, req, des),
             ("Region and cost", state.get("region_and_cost", "Not yet recorded"), req),
             ("Construction authorization", construction_authorization, auth),
+            ("Current AWS authority", operations.get("authority", CURRENT_AWS_AUTHORITY_NONE), aws_id),
             ("AWS account work", aws_boundary, aws_id),
             ("Current records", state.get("record_identities", "Not yet initialized"), req, des, auth),
             ("Updated", updated, req, des),
@@ -754,7 +756,7 @@ def build_summary_specifications(state: Mapping[str, Any]) -> list[dict[str, Any
         "docs/project/RUNBOOK.md": (
             ("Environment", operations.get("environment", "Development")),
             ("Deployment state", operations.get("deployment_state", "Not deployed")),
-            ("Current AWS authority", operations.get("authority", "None"), aws_id),
+            ("Current AWS authority", operations.get("authority", CURRENT_AWS_AUTHORITY_NONE), aws_id),
             ("Construction approval", construction_status, auth),
             ("Safest available operation", operations.get("safe_action", "Local validation only")),
             ("Deployment approval", operations.get("deployment_approval", "Not authorized")),

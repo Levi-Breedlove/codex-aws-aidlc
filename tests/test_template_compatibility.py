@@ -116,6 +116,43 @@ class TemplateCompatibilityTests(unittest.TestCase):
         self.assertIn("tests/test_product_journeys.py", evaluation)
         self.assertRegex(evaluation, r"mandatory deterministic\s+workflow baseline")
 
+    def test_fastlane_13_completion_policy_names_each_evidence_level(self) -> None:
+        qualification = (
+            REPOSITORY_ROOT
+            / ".agents/skills/maintain-fastlane/references/qualification.md"
+        ).read_text(encoding="utf-8")
+        evaluation = (
+            REPOSITORY_ROOT
+            / ".agents/skills/maintain-fastlane/references/evaluation.md"
+        ).read_text(encoding="utf-8")
+        combined = " ".join((qualification + "\n" + evaluation).split())
+        for claim in (
+            "FRAMEWORK_RELEASE_QUALIFIED",
+            "PROJECT_TARGET_COMPLETE(target)",
+            "AWS_LANE_FIELD_QUALIFIED(lane)",
+            "PRODUCT_FIELD_VALIDATED",
+        ):
+            self.assertIn(f"`{claim}`", combined)
+        for target, evidence in (
+            ("LOCAL", "E2"),
+            ("AWS_READ", "E2 + E3"),
+            ("DEPLOYED", "E2 + E3 + E4"),
+            ("RECOVERY", "E2 + E3 + E4 + E5"),
+        ):
+            self.assertIn(f"`{target}` requires {evidence}", combined)
+        self.assertIn("5-8 first-time, non-author participants", combined)
+        self.assertIn("at least 80 percent", combined)
+        self.assertIn("at least 4/5", combined)
+        self.assertIn("No safety-critical misunderstanding", combined)
+        self.assertIn("AWS_SAM_CLOUDFORMATION_NONPROD", combined)
+        self.assertIn("`us-west-2`", combined)
+        self.assertIn("USD 20.00", combined)
+        self.assertIn("no open P0/P1 truth defect", combined)
+        self.assertIn("no expired complexity exception", combined)
+        self.assertIn("creates no lifecycle gate", combined)
+        self.assertIn("does not change task-level `DONE`", combined)
+        self.assertIn("teardown-only evidence does not qualify `RECOVERY`", combined)
+
     def test_field_qualification_replaces_fixed_canary_subsystem(self) -> None:
         retired_doc = "AWS-" + "CANARY"
         retired_script = "aws_" + "canary_eval"

@@ -117,8 +117,19 @@ describes. They do not approve repository, GitHub, or AWS actions.
 | `STALE` | Earlier evidence no longer matches the current revision, artifact, environment, or target state |
 | `NOT_APPLICABLE` | Excluded with an explicit rationale |
 
-A stale result no longer proves the current project. Local work may be complete
-while a required AWS check is still pending; the release remains not ready.
+A stale result no longer proves the current project. Completion is target-specific:
+Local requires `E2_LOCALLY_VALIDATED`; AWS read adds `E3_AWS_READ_OBSERVED`;
+Deployed adds `E4_DEPLOYED_OBSERVED`; and Recovery adds `E5_RECOVERY_OBSERVED`.
+A failed or unobserved higher target does not erase a current proven lower target;
+other AWS lanes remain unqualified. Teardown-only E5 does not qualify Recovery;
+Recovery requires rollback or restore evidence. These claims create no gate or
+authority and do not change task-level `DONE`.
+
+An AWS-30 recovery observation uses exactly
+`ROLLBACK_OBSERVED: EV-nnnn; RESULT: PASS|VERIFIED` or
+`RESTORE_OBSERVED: EV-nnnn; RESULT: PASS|VERIFIED` in `Rollback result`; the EV
+ID must also appear in that row's acceptance evidence and differ from the
+AWS-30 row's own evidence ID.
 
 ### Evidence levels
 
@@ -129,7 +140,7 @@ while a required AWS check is still pending; the release remains not ready.
 | `E2_LOCALLY_VALIDATED` | Exact local code, test, policy, IaC, or package check passed | Command, artifact/revision, and evidence ID |
 | `E3_AWS_READ_OBSERVED` | Authorized read-only AWS observation confirms the target state | Account/Region scope and AWS evidence ID |
 | `E4_DEPLOYED_OBSERVED` | Authorized deployment and smoke evidence confirms deployed behavior | Deployment authority, artifact/plan, and evidence ID |
-| `E5_RECOVERY_OBSERVED` | Rollback, restore, or teardown behavior was exercised | Recovery/teardown authority and evidence ID |
+| `E5_RECOVERY_OBSERVED` | Rollback or restore behavior was exercised | Recovery authority and evidence ID |
 
 The level shows how far a claim has actually been checked. A recommendation,
 local result, AWS observation, deployment, and recovery exercise remain distinct.
@@ -244,6 +255,15 @@ earlier defect.
 | Evidence ID | Task ID | REQ / DES / AUTH | Property ID | Framework TECH ID | Framework selection | Observed exact version | Exact command | Observed run | Replay seed or exact command | Minimized counterexample | Failure class / resolution | Result | Observed at | Commit / worktree / artifact | Durable source |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | EV-0001 | TASK-0001 | REQ-0001 / DES-0001 / AUTH-0001 | PROP-001 | TECH-0007 | TODO | TODO | TODO | TODO | TODO | `NONE` | `NONE` | `NOT_STARTED` | TODO | TODO | TODO |
+
+## Dependency acquisition evidence
+
+An approved Design 8 dependency row permits only its planned exact command. A
+completed evidence row records what was actually resolved and observed; it does
+not broaden the command, source, network, license, construction, or AWS boundary.
+
+| Evidence ID | DEP ID | Task ID | REQ / DES / AUTH | Exact command | Manager/version | Source observed | Lockfile and SHA-256 | Integrity result | Lifecycle scripts | Network origins | SPDX/license result | Artifact/commit | Actor | Observed at | Durable source | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Construction and release readiness checks
 

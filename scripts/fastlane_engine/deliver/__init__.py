@@ -54,7 +54,12 @@ from .models import (
     TaskSummary,
     TaskWaiver,
 )
-from .release import parse_release_decision_record
+from .release import (
+    RELEASE_RECOVERY_OBSERVATION,
+    derive_release_claim_projection,
+    parse_release_decision_record,
+    validate_release_claim_projection,
+)
 from .repository import (
     explicit_human_approver,
     external_target_contains,
@@ -128,6 +133,8 @@ __all__ = (
     "parse_observed_property_run",
     "parse_property_test_evidence",
     "parse_release_decision_record",
+    "RELEASE_RECOVERY_OBSERVATION",
+    "derive_release_claim_projection",
     "parse_harness_projection_rows",
     "parse_harness_evidence",
     "parse_property_execution_rows",
@@ -154,6 +161,7 @@ __all__ = (
     "validate_task_property_projection",
     "validate_task_completion_evidence",
     "validate_new_build_delivery_order",
+    "validate_release_claim_projection",
     "validate_task_graph",
     "validate_task_snapshot",
     "validate_gate_b_execution_binding",

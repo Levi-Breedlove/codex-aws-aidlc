@@ -32,7 +32,6 @@ from .define.models import (
 from .define.project import (
     brownfield_contract_issues,
     derive_req_aws_materiality,
-    gate_a_product_truth_issues,
     gate_a_readiness_card_issues,
 )
 from .define.requirements import (
@@ -97,6 +96,10 @@ from .project_inspection import (
     safe_read_required_binary,
     safe_read_text,
     validate_aws_cost_ceiling,
+)
+from .project_validation_sections import (
+    current_requirements_gate_issues,
+    gate_a_readiness_projection_issues,
 )
 
 try:
@@ -310,10 +313,18 @@ def validate_brownfield_contract(ctx: Context, text: str) -> None:
         ctx.error(code, message, PRD_FILE)
 
 
-def validate_gate_a_readiness_card(ctx: Context, card: Mapping[str, str]) -> None:
+def validate_gate_a_readiness_card(
+    ctx: Context,
+    card: Mapping[str, str],
+    *,
+    completion_target_required: bool = True,
+) -> None:
     """Record pure Gate A readiness-card issues on the legacy Context."""
 
-    for code, message in gate_a_readiness_card_issues(card):
+    for code, message in gate_a_readiness_card_issues(
+        card,
+        completion_target_required=completion_target_required,
+    ):
         ctx.error(code, message, PRD_FILE)
 
 
@@ -975,22 +986,15 @@ def validate_prd(
         required=coverage_required,
         grandfather_current_gate_a=grandfather_approved_v1_requirements,
     )
-    if coverage_required:
-        for code, issue in requirements_contract_issues:
-            ctx.error(code, issue, PRD_FILE)
-        if requirements_contract.status != "GRANDFATHERED":
-            for code, issue in gate_a_product_truth_issues(
-                text,
-                gate_a_agent,
-                set(requirements_contract.requirement_ids),
-            ):
-                ctx.error(code, issue, PRD_FILE)
-        if requirements_contract.status not in {"READY", "GRANDFATHERED"}:
-            ctx.error(
-                "PROJECT_CONTRACT_MIGRATION_REQUIRED",
-                "Gate A requires a complete schema 1.4 requirements contract or an unchanged approved legacy Gate A",
-                PRD_FILE,
-            )
+    requirements_gate_issues = current_requirements_gate_issues(
+        text,
+        gate_a_agent,
+        requirements_contract,
+        requirements_contract_issues,
+        required=coverage_required,
+    )
+    for code, issue in requirements_gate_issues:
+        ctx.error(code, issue, PRD_FILE)
     design_contract_required = gate_b_agent_ready or gate_b_ready_or_current
     grandfather_approved_v1_design = bool(
         fields["gate_b"] == "APPROVED_FOR_CONSTRUCTION"
@@ -1025,17 +1029,19 @@ def validate_prd(
             text,
             grandfather_approved_v1=grandfather_approved_v1_requirements,
         )
-        validate_gate_a_readiness_card(ctx, gate_a_card)
-        try:
-            parse_cost_posture(card_cost_posture)
-        except ValueError as exc:
-            ctx.error("GATE_A_COST_POSTURE", str(exc), PRD_FILE)
-        if card_cost_posture != project.get("cost_posture"):
-            ctx.error(
-                "STATE_PRD_DRIFT",
-                "Gate A Cost posture does not match bootstrap state",
-                STATE_FILE,
-            )
+        validate_gate_a_readiness_card(
+            ctx,
+            gate_a_card,
+            completion_target_required=requirements_contract.schema_version == "1.5",
+        )
+        readiness_projection_issues = gate_a_readiness_projection_issues(
+            card_cost_posture,
+            gate_a_card,
+            requirements_contract,
+            project.get("cost_posture"),
+        )
+        for code, issue, path in readiness_projection_issues:
+            ctx.error(code, issue, path)
     if gate_b_agent_ready or gate_b_ready_or_current:
         validate_readiness_card(ctx, gate_b_card, GATE_B_READINESS_FIELDS, "GATE_B")
         expected_technology_ids = ", ".join(

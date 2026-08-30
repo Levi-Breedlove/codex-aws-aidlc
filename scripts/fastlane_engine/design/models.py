@@ -332,9 +332,11 @@ class DiagramRecord:
     relationships: tuple[tuple[str, str, str], ...]
     semantic_sha256: str | None
     rendered_sha256: str | None
+    semantic_relationships: tuple[tuple[str, str, str, str], ...] = ()
+    containment: tuple[tuple[str, ...], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "diagram_id": self.diagram_id,
             "kind": self.kind,
             "applicability": self.applicability,
@@ -349,6 +351,18 @@ class DiagramRecord:
             "semantic_sha256": self.semantic_sha256,
             "rendered_sha256": self.rendered_sha256,
         }
+        if self.semantic_relationships:
+            result["semantic_relationships"] = [
+                {
+                    "from_id": source,
+                    "edge_kind": edge_kind,
+                    "relation": relation,
+                    "to_id": target,
+                }
+                for source, edge_kind, relation, target in self.semantic_relationships
+            ]
+            result["containment"] = [list(group) for group in self.containment]
+        return result
 
 
 @dataclass(frozen=True)
@@ -388,8 +402,152 @@ class ApplicationSourceDisposition:
 
 
 @dataclass(frozen=True)
+class DatasetImplementation:
+    dataset_id: str
+    store_component: str
+    implementation_ids: tuple[str, ...]
+    access_encryption: str
+    retention_deletion: str
+    backup_recovery: str
+    residency_migration: str
+    audit_mechanism: str
+    validation_ids: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dataset_id": self.dataset_id,
+            "store_component": self.store_component,
+            "implementation_ids": list(self.implementation_ids),
+            "access_encryption": self.access_encryption,
+            "retention_deletion": self.retention_deletion,
+            "backup_recovery": self.backup_recovery,
+            "residency_migration": self.residency_migration,
+            "audit_mechanism": self.audit_mechanism,
+            "validation_ids": list(self.validation_ids),
+        }
+
+
+@dataclass(frozen=True)
+class EnvironmentPromotion:
+    environment_id: str
+    environment_class: str
+    purpose: str
+    account_region_boundary: str
+    artifact_boundary: str
+    configuration_secrets_data: str
+    promotion_source: str
+    promotion_criteria_evidence: str
+    rollback_teardown_boundary: str
+    basis_ids: tuple[str, ...]
+    validation_ids: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "environment_id": self.environment_id,
+            "environment_class": self.environment_class,
+            "purpose": self.purpose,
+            "account_region_boundary": self.account_region_boundary,
+            "artifact_boundary": self.artifact_boundary,
+            "configuration_secrets_data": self.configuration_secrets_data,
+            "promotion_source": self.promotion_source,
+            "promotion_criteria_evidence": self.promotion_criteria_evidence,
+            "rollback_teardown_boundary": self.rollback_teardown_boundary,
+            "basis_ids": list(self.basis_ids),
+            "validation_ids": list(self.validation_ids),
+        }
+
+
+@dataclass(frozen=True)
+class WellArchitectedConsideration:
+    pillar: str
+    applicability: str
+    basis_ids: tuple[str, ...]
+    design_ids: tuple[str, ...]
+    consideration_tradeoff: str
+    safeguard: str
+    validation_evidence_ids: tuple[str, ...]
+    evidence_maturity: str
+    revisit_trigger: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "pillar": self.pillar,
+            "applicability": self.applicability,
+            "basis_ids": list(self.basis_ids),
+            "design_ids": list(self.design_ids),
+            "consideration_tradeoff": self.consideration_tradeoff,
+            "safeguard": self.safeguard,
+            "validation_evidence_ids": list(self.validation_evidence_ids),
+            "evidence_maturity": self.evidence_maturity,
+            "revisit_trigger": self.revisit_trigger,
+        }
+
+
+@dataclass(frozen=True)
+class DependencyAddition:
+    dependency_id: str
+    technology_id: str
+    scope: str
+    ecosystem_package: str
+    immutable_version: str
+    approved_source: str
+    lockfile: str
+    integrity_rule: str
+    lifecycle_scripts: str
+    build_network: str
+    license_disposition: str
+    exact_acquisition_command: str
+    evidence_destination: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "dependency_id": self.dependency_id,
+            "technology_id": self.technology_id,
+            "scope": self.scope,
+            "ecosystem_package": self.ecosystem_package,
+            "immutable_version": self.immutable_version,
+            "approved_source": self.approved_source,
+            "lockfile": self.lockfile,
+            "integrity_rule": self.integrity_rule,
+            "lifecycle_scripts": self.lifecycle_scripts,
+            "build_network": self.build_network,
+            "license_disposition": self.license_disposition,
+            "exact_acquisition_command": self.exact_acquisition_command,
+            "evidence_destination": self.evidence_destination,
+        }
+
+
+@dataclass(frozen=True)
+class Design8Extension:
+    status: str = "ACQUISITION_PROHIBITED"
+    dataset_implementations: tuple[DatasetImplementation, ...] = ()
+    environments: tuple[EnvironmentPromotion, ...] = ()
+    well_architected: tuple[WellArchitectedConsideration, ...] = ()
+    dependency_additions: tuple[DependencyAddition, ...] = ()
+    acquisition_prohibited: bool = True
+    canonical_sha256: str | None = None
+    canonical_bytes: bytes | None = field(default=None, repr=False, compare=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 8,
+            "status": self.status,
+            "dataset_implementations": [
+                item.to_dict() for item in self.dataset_implementations
+            ],
+            "environments": [item.to_dict() for item in self.environments],
+            "well_architected": [item.to_dict() for item in self.well_architected],
+            "dependency_additions": [
+                item.to_dict() for item in self.dependency_additions
+            ],
+            "acquisition_prohibited": self.acquisition_prohibited,
+            "canonical_sha256": self.canonical_sha256,
+        }
+
+
+@dataclass(frozen=True)
 class ProjectDesignContract:
-    schema_version: int = 7
+    schema_version: int = 8
     status: str = "UNINITIALIZED"
     application_source_disposition: ApplicationSourceDisposition | None = None
     interface_ids: tuple[str, ...] = ()
@@ -406,9 +564,11 @@ class ProjectDesignContract:
     presentation_labels: tuple[tuple[str, str], ...] = field(
         default=(), repr=False, compare=False
     )
+    approved_schema7_compatibility: bool = False
+    design_v8: Design8Extension = field(default_factory=Design8Extension)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "schema_version": self.schema_version,
             "status": self.status,
             "application_source_disposition": (
@@ -427,6 +587,9 @@ class ProjectDesignContract:
             "grandfathered_v5": self.grandfathered_v5,
             "grandfathered_v6": self.grandfathered_v6,
         }
+        if self.schema_version >= 8:
+            result["design_v8"] = self.design_v8.to_dict()
+        return result
 
 
 class ChangeImpactProjection(Protocol):

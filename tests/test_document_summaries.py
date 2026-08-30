@@ -7,7 +7,9 @@ from pathlib import Path
 
 from scripts import bootstrap_doctor as doctor
 from scripts.fastlane_engine.composition import derive_document_summary_specifications
+from scripts.fastlane_engine.design import canonical_envelope_sha256
 from scripts.fastlane_document_summaries import (
+    CURRENT_AWS_AUTHORITY_NONE,
     SUMMARY_AUTHORITY,
     SUMMARY_BEGIN,
     SUMMARY_END,
@@ -700,6 +702,19 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
                 )
 
     def test_current_aws_authority_uses_plain_exact_scope(self) -> None:
+        no_authority = self.summary_specifications()
+        no_authority_fields = {
+            item["label"]: item["value"]
+            for item in no_authority["docs/project/RUNBOOK.md"]["fields"]
+        }
+        self.assertEqual(
+            no_authority_fields["Current AWS authority"],
+            "NONE — planned maximum only",
+        )
+        self.assertEqual(
+            no_authority_fields["Current AWS authority"],
+            CURRENT_AWS_AUTHORITY_NONE,
+        )
         by_path = self.summary_specifications(
             external_authority={"kind": "AWS_READ_ONLY", "validity": "CURRENT"}
         )
@@ -711,6 +726,25 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
         self.assertEqual(
             fields["Safest available operation"],
             "Only the exact authorized AWS operation",
+        )
+
+    def test_current_aws_authority_projection_is_not_gate_b_digest_input(
+        self,
+    ) -> None:
+        prd = canonical_sources()["docs/project/PRD.md"]
+        projected = prd.replace(
+            "| Current AWS authority | NONE — planned maximum only |",
+            "| Current AWS authority | Read-only AWS access |",
+            1,
+        )
+        self.assertNotEqual(prd, projected)
+        self.assertEqual(
+            canonical_bytes_without_generated_summary(prd),
+            canonical_bytes_without_generated_summary(projected),
+        )
+        self.assertEqual(
+            canonical_envelope_sha256(prd),
+            canonical_envelope_sha256(projected),
         )
 
     def test_engine_template_derivation_matches_the_committed_generated_views(
@@ -1069,6 +1103,7 @@ class DocumentSummaryProjectionTests(unittest.TestCase):
                 "Technical design",
                 "Region and cost",
                 "Construction authorization",
+                "Current AWS authority",
             },
             "docs/project/TASKS.md": {
                 "Progress",

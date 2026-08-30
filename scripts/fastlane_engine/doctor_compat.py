@@ -141,6 +141,17 @@ _LEGACY_NAMES = frozenset(
     """.split()
 )
 
+_CURRENT_DOCTOR_NAMES = frozenset(
+    """
+    DATASET_IMPLEMENTATION_HEADERS DATASET_IMPLEMENTATION_HEADING
+    DATASET_IMPLEMENTATION_NONE DEPENDENCY_ACQUISITION_NONE
+    DEPENDENCY_POLICY_HEADERS DEPENDENCY_POLICY_HEADING
+    ENVIRONMENT_PROMOTION_HEADERS ENVIRONMENT_PROMOTION_HEADING
+    WELL_ARCHITECTED_DISCLAIMER WELL_ARCHITECTED_HEADERS
+    WELL_ARCHITECTED_HEADING WELL_ARCHITECTED_PILLARS
+    """.split()
+)
+
 _LEGACY_ALIASES = {
     "_derive_aws_execution_projection_core": "derive_aws_execution_projection",
     "_derive_deployment_sequence_state_core": "derive_deployment_sequence_state",
@@ -159,7 +170,7 @@ def install_legacy_doctor_exports(namespace: dict[str, object]) -> None:
 
     modules = _source_modules()
     unresolved: list[str] = []
-    for name in sorted(_LEGACY_NAMES):
+    for name in sorted(_LEGACY_NAMES | _CURRENT_DOCTOR_NAMES):
         if name in namespace:
             continue
         for module in modules:

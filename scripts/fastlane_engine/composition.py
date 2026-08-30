@@ -39,6 +39,10 @@ from .aws import (
     derive_aws_residual_disposition,
     release_lifecycle_intent_boundary_is_settled,
 )
+from .completion import (
+    classify_local_evidence_ids,
+    derive_deliver_projection,
+)
 from .core.contracts import table_after_heading
 from .core.ids import clean_cell, explicit_value, validate_relative_path
 from .define.models import (
@@ -57,8 +61,6 @@ from .evaluation import EngineEvaluation
 from .deliver import (
     TaskSummary,
     inspect_task_blocks,
-    parse_task_completion_evidence,
-    parse_verification_matrix,
     task_remediation_validation_evidence,
 )
 from .owner_decisions import (
@@ -103,12 +105,14 @@ except ModuleNotFoundError:
     from scripts.fastlane_contracts import split_markdown_table_row, without_fenced_code
 try:
     from fastlane_document_summaries import (
+        CURRENT_AWS_AUTHORITY_NONE,
         build_summary_specifications,
         canonical_bytes_without_generated_summary,
         project_document_summaries,
     )
 except ModuleNotFoundError:
     from scripts.fastlane_document_summaries import (
+        CURRENT_AWS_AUTHORITY_NONE,
         build_summary_specifications,
         canonical_bytes_without_generated_summary,
         project_document_summaries,
@@ -555,36 +559,6 @@ def _summary_section_has_value(text: str, heading: str) -> bool:
     return any(explicit_value(value, allow_none=False) for value in values)
 
 
-def _summary_evidence_ids(verify_text: str) -> tuple[set[str], set[str]]:
-    """Derive local passing and failed IDs from typed canonical evidence rows."""
-
-    passing: set[str] = set()
-    failed: set[str] = set()
-    try:
-        completion_rows = parse_task_completion_evidence(verify_text)
-    except ValueError:
-        completion_rows = []
-    for row in completion_rows:
-        status = clean_cell(row.status).upper()
-        if status in {"LOCAL_PASS", "VERIFIED"}:
-            passing.add(row.evidence_id)
-        elif status in {"FAILED", "STALE", "BLOCKED"}:
-            failed.add(row.evidence_id)
-
-    try:
-        matrix_rows = parse_verification_matrix(verify_text)
-    except ValueError:
-        matrix_rows = []
-    for row in matrix_rows:
-        evidence_id = clean_cell(row.get("Evidence ID", ""))
-        status = clean_cell(row.get("Status", "")).upper()
-        if re.fullmatch(r"EV-\d{4,}", evidence_id) is None:
-            continue
-        if status in {"FAILED", "STALE", "BLOCKED"}:
-            failed.add(evidence_id)
-    return passing, failed
-
-
 def _summary_aws_core_evidence(
     aws_core_usage: Mapping[str, Any],
 ) -> tuple[bool, str]:
@@ -790,7 +764,7 @@ def derive_document_summary_specifications(
         cutoff=cutoff,
     )
 
-    observed_ids, failed_ids = _summary_evidence_ids(verify_text)
+    observed_ids, failed_ids = classify_local_evidence_ids(verify_text)
 
     local_observed = bool(observed_ids) and release_decision in {
         "READY_TO_DEPLOY",
@@ -977,7 +951,7 @@ def derive_document_summary_specifications(
         "operations": {
             "environment": environment,
             "deployment_state": deployment["state"],
-            "authority": authority_label if account_access else "None",
+            "authority": authority_label if account_access else CURRENT_AWS_AUTHORITY_NONE,
             "safe_action": "Only the exact authorized AWS operation" if account_access else "Local validation only",
             "deployment_approval": "Authorized only for the current deployment" if account_access and external_authority.get("kind") == "AWS_DEPLOYMENT" else "Not authorized",
             "teardown_approval": "Authorized only for the current teardown" if account_access and external_authority.get("kind") == "AWS_TEARDOWN" else "Not authorized",
@@ -1654,23 +1628,23 @@ def build_evaluation(
         next_prompt,
         external_authority,
     )
-    task_projection = {
-        "total": tasks.total,
-        "completed": len(tasks.done),
-        "skipped": len(tasks.skipped),
-        "blocked": len(tasks.blocked),
-        "ready": len(tasks.ready),
-        "in_progress": len(tasks.active),
-        "ready_ids": tasks.ready,
-        "active_ids": tasks.active,
-        "blocked_ids": tasks.blocked,
-        "requirement_coverage_complete": tasks.requirement_coverage_complete,
-        "requirement_coverage": [
-            tasks.requirement_coverage[requirement_id]
-            for requirement_id in sorted(tasks.requirement_coverage)
-        ],
-        "missing_requirement_ids": tasks.missing_requirement_ids,
-    }
+    deliver_projection = derive_deliver_projection(
+        tasks=tasks,
+        tasks_text=ctx.texts.get(TASKS_FILE, ""),
+        verify_text=ctx.texts.get(VERIFY_FILE, ""),
+        requirements_schema=requirements_contract.schema_version,
+        completion_target=requirements_contract.completion_target,
+        requirements_revision=prd_fields.get("requirements_revision", ""),
+        design_revision=prd_fields.get("design_revision", ""),
+        construction_authorization=prd_fields.get("construction_authorization", ""),
+        artifact_sha256=active_artifact,
+        lane=str(lane or "NONE"),
+        release_state=release_decision,
+        evidence_cutoff=release_evidence_cutoff,
+        preflight=aws_execution_projection.get("preflight", {}),
+        deployment=deployment_sequence_projection,
+        diagnostics=ctx.diagnostics,
+    )
     return EngineEvaluation(
         schema_version=2,
         package={
@@ -1707,11 +1681,7 @@ def build_evaluation(
             "design_contract": design_contract.to_dict(),
             "adr_rationale": adr_rationale_projection,
         },
-        deliver={
-            "evidence_state": release_decision,
-            "release_evidence_cutoff": release_evidence_cutoff,
-            "tasks": task_projection,
-        },
+        deliver=deliver_projection,
         aws={
             "aws_access": aws_access,
             "aws_mode_boundary": aws_mode_boundary,

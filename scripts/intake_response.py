@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 
+ACCEPT_THIS_RECOMMENDATION = "Accept this recommendation."
+# Exact parser-only compatibility alias. Owner-facing surfaces use the singular form.
 ACCEPT_ALL_RECOMMENDATIONS = "Accept all recommendations."
+ACCEPT_RECOMMENDATION_PHRASES = frozenset(
+    {ACCEPT_THIS_RECOMMENDATION, ACCEPT_ALL_RECOMMENDATIONS}
+)
 CARD_ID = re.compile(r"INTAKE-CARD-\d{4,}")
 QUESTION_ID = re.compile(r"INTAKE-Q-\d{4,}")
 OWNER_RESPONSE_ID = re.compile(r"OWNER-MSG-\d{4,}")
@@ -662,12 +667,12 @@ def parse_intake_owner_response(
     if not normalized:
         errors.append(_error("INTAKE_RESPONSE_EMPTY", "Owner response is empty"))
     selected: dict[str, tuple[str, str | None]] = {}
-    if normalized == ACCEPT_ALL_RECOMMENDATIONS:
+    if normalized in ACCEPT_RECOMMENDATION_PHRASES:
         if not pending_card.get("accept_all_allowed"):
             errors.append(
                 _error(
                     "INTAKE_ACCEPT_ALL_NOT_ALLOWED",
-                    "Current card does not allow accepting all recommendations",
+                    "Current card does not allow accepting this recommendation",
                 )
             )
         else:
@@ -687,11 +692,13 @@ def parse_intake_owner_response(
                     break
                 selected[str(question["reply_key"])] = (str(recommended), None)
     else:
-        if normalized.casefold() == ACCEPT_ALL_RECOMMENDATIONS.casefold():
+        if normalized.casefold() in {
+            phrase.casefold() for phrase in ACCEPT_RECOMMENDATION_PHRASES
+        }:
             errors.append(
                 _error(
                     "INTAKE_ACCEPT_ALL_EXACT",
-                    "Use the exact phrase 'Accept all recommendations.'",
+                    "Use the exact phrase 'Accept this recommendation.'",
                 )
             )
         else:

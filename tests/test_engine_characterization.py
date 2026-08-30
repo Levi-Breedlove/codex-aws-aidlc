@@ -6,6 +6,7 @@ import os
 import tomllib
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tests import engine_parity_cases as parity
 
@@ -93,6 +94,7 @@ class EngineCharacterizationTests(unittest.TestCase):
     def test_characterization_thresholds_are_explicit_and_non_runtime(self) -> None:
         self.assertEqual(self.configuration["baseline_commit"], parity.BASELINE_COMMIT)
         self.assertEqual(self.configuration["maximum_warm_median_ms"], 964)
+        self.assertEqual(self.configuration["preferred_warm_median_ms"], 700)
         self.assertEqual(self.configuration["maximum_peak_memory_mib"], 30)
         self.assertEqual(self.configuration["doctor_hard_review_lines"], 1200)
         self.assertEqual(self.configuration["module_hard_review_lines"], 1800)
@@ -102,21 +104,60 @@ class EngineCharacterizationTests(unittest.TestCase):
     def test_same_process_benchmark_is_ephemeral_and_strict_when_requested(
         self,
     ) -> None:
-        result = parity.benchmark_template_source(iterations=1)
-        self.assertEqual(result["iterations"], 1)
-        self.assertGreater(result["warm_median_wall_ms"], 0)
-        self.assertGreater(result["warm_median_cpu_ms"], 0)
-        self.assertLessEqual(
-            result["peak_memory_mib"],
-            self.configuration["maximum_peak_memory_mib"],
+        strict = os.environ.get("FASTLANE_ENFORCE_PERFORMANCE_BUDGET") == "1"
+        result = parity.benchmark_engine_scenarios(
+            warmups=2 if strict else 1,
+            iterations=10 if strict else 1,
         )
-        ceiling = self.configuration["maximum_warm_median_ms"]
-        if os.environ.get("FASTLANE_ENFORCE_PERFORMANCE_BUDGET") == "1":
-            self.assertLessEqual(result["warm_median_wall_ms"], ceiling)
-        else:
-            self.assertLessEqual(result["warm_median_wall_ms"], ceiling * 4)
+        self.assertEqual(result["warmups"], 2 if strict else 1)
+        self.assertEqual(result["iterations"], 10 if strict else 1)
+        expected = {
+            "template": ("INTAKE_REQUIRED", 0, 0),
+            "gate_a": ("WAITING_GATE_A", 0, 0),
+            "gate_b": ("WAITING_GATE_B", 0, 0),
+            "eight_task_plan": ("CONSTRUCTION_AUTONOMOUS", 8, 8),
+        }
+        self.assertEqual(set(result["scenarios"]), set(expected))
+        for name, (lifecycle, total, ready) in expected.items():
+            with self.subTest(scenario=name):
+                scenario = result["scenarios"][name]
+                self.assertEqual(scenario["lifecycle_state"], lifecycle)
+                self.assertEqual(scenario["task_total"], total)
+                self.assertEqual(scenario["task_ready"], ready)
+                self.assertGreater(scenario["warm_median_wall_ms"], 0)
+                self.assertGreater(scenario["warm_median_cpu_ms"], 0)
+                self.assertLess(
+                    scenario["peak_memory_mib"],
+                    self.configuration["maximum_peak_memory_mib"],
+                )
+                if strict:
+                    self.assertLessEqual(
+                        scenario["warm_median_wall_ms"],
+                        self.configuration["maximum_warm_median_ms"],
+                    )
+        if strict:
+            self.assertEqual(result["iterations"], 10)
+            self.assertEqual(result["platform"]["system"], "Linux")
+            self.assertEqual(result["platform"]["distribution"], "ubuntu")
+            self.assertRegex(result["platform"]["python_version"], r"^3\.12\.")
         tracked_results = list(REPOSITORY_ROOT.glob("*benchmark*.json"))
         self.assertEqual(tracked_results, [])
+
+    def test_benchmark_defaults_and_positive_counts_are_explicit(self) -> None:
+        with (
+            mock.patch.object(
+                parity,
+                "benchmark_engine_scenarios",
+                return_value={"scenarios": {}},
+            ) as benchmark,
+            mock.patch("builtins.print"),
+        ):
+            self.assertEqual(parity.main(["--benchmark"]), 0)
+        benchmark.assert_called_once_with(warmups=2, iterations=10)
+        with self.assertRaisesRegex(ValueError, "warmups must be positive"):
+            parity.benchmark_engine_scenarios(warmups=0, iterations=1)
+        with self.assertRaisesRegex(ValueError, "iterations must be positive"):
+            parity.benchmark_engine_scenarios(warmups=1, iterations=0)
 
 
 if __name__ == "__main__":
