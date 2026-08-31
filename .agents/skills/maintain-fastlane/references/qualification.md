@@ -24,7 +24,7 @@ creates no lifecycle gate or authority and does not change task-level `DONE`.
   pilot, and the named AWS lane bind the same release head and package digest.
 
 A failed or unobserved higher target does not erase a lower target that remains
-current and proven. Other AWS lanes remain unqualified. Fastlane 1.3.0 may claim
+current and proven. Other AWS lanes remain unqualified. Fastlane 1.3.1 may claim
 `PRODUCT_FIELD_VALIDATED` only when the exact head is framework-qualified,
 validated by 5-8 first-time, non-author participants, field-qualified through
 one separately authorized disposable AWS lane, has no open P0/P1 truth defect,
