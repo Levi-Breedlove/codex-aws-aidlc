@@ -1,12 +1,16 @@
 # Fastlane workflow and operating model
 
-This guide owns the lifecycle, gates, project records, control plane, and AWS
-authority. See the [README](../README.md) for the overview and quick start.
+This guide owns the lifecycle, gates, records, control plane, and AWS authority.
+Start with the [README](../README.md) for the overview
+and quick start.
 
-Fastlane turns a bounded change into approved requirements, an AWS-informed
-design, a tested local build, and honest release evidence. Codex guides and
-delivers; AWS Core advises; the Engine keeps state, routing, evidence, and
-authority aligned.
+**Contents:** [First run](#first-run) · [Lifecycle](#customer-delivery-lifecycle) ·
+[Gate A](#gate-a--product-owner-brief) ·
+[Design and Gate B](#design-and-gate-b--technical-owner-brief) ·
+[Control plane](#how-the-control-plane-works) ·
+[Records](#canonical-records-and-traceability) ·
+[AWS authority](#aws-core-and-aws-authority) ·
+[Build and resume](#build-resume-and-optional-hooks)
 
 ## First run
 
@@ -219,21 +223,19 @@ flowchart TB
     RESULTS -->|"Return for canonical evidence recording"| COORD
 ```
 
-The diagram represents six deliberate boundaries:
+The diagram enforces six boundaries:
 
-1. **Canonical state:** each project fact has one authoritative repository home.
-2. **One coherent observation:** an immutable `ProjectSnapshot` captures the
-   current files, repository facts, project identity, lifecycle state, and one
-   evaluation time.
-3. **Deterministic evaluation:** the Package, Define, Design, Deliver, and AWS
-   domains compose into one immutable `EngineEvaluation`.
-4. **Authority by intersection:** already validated facts are narrowed to the
-   current action. Missing, stale, conflicting, expired, or broader input fails
-   closed.
-5. **Dedicated mutation paths:** the Engine evaluates; task and AWS actions use
-   separate bounded procedures.
-6. **Evidence-backed presentation:** reporting serializes evaluated state and
-   the presenter explains it without inventing policy or authority.
+1. **Canonical state:** each project fact has one repository home.
+2. **One coherent observation:** `ProjectSnapshot` binds files, repository
+   facts, project identity, lifecycle state, and evaluation time.
+3. **Deterministic evaluation:** all domains compose into one immutable
+   `EngineEvaluation`.
+4. **Authority by intersection:** validated facts narrow the current action;
+   missing, stale, conflicting, expired, or broader input fails closed.
+5. **Dedicated mutation paths:** task and AWS actions use separate bounded
+   procedures while the Engine remains read-only.
+6. **Evidence-backed presentation:** reporting explains evaluated state without
+   inventing policy or authority.
 
 Codex may vary its wording, never the evaluated decision, evidence maturity,
 authority boundary, or required owner action.

@@ -1,11 +1,13 @@
 # Fastlane
 
-> Governed Codex delivery for AWS applications—from product idea to verified result.
+> Governed Codex delivery for AWS software and infrastructure—from product intent to an evidence-backed local result.
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
 
-Current customer build: **1.3.1**.
+Current customer build: **1.3.2** · [Release](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.3.2) · [SHA-256 checksum](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/download/v1.3.2/aws-codex-fastlane-1.3.2.zip.sha256)
+
+**Start here:** [Use this template](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate) · [Setup](docs/SETUP.md) · [Understand the workflow](docs/WORKFLOW.md) · [Resume an initialized project](docs/WORKFLOW.md#build-resume-and-optional-hooks)
 
 Fastlane is a repository-native governance platform that turns Codex into a technical guide, AWS architecture consultant, implementation partner, and evidence-driven verifier.
 
@@ -86,16 +88,15 @@ Gate A approves what should be built. Gate B approves the technical plan and exa
 
 | Term | Plain-language meaning |
 |---|---|
-| Guided consultation | One consequential owner decision at a time, with context, practical options, and a recommendation only when evidence supports one |
 | Gate A | Your approval of the Product Agreement—not architecture, construction, or AWS access |
 | Gate B | Your approval of the technical plan and exact local build boundary—not deployment |
-| Canonical project records | Repository files that preserve current project truth instead of relying on chat history |
 | Evidence maturity | The distinction between a plan, an approval, verified guidance, a local observation, and an AWS observation |
-| AWS Core | Current AWS expertise used to inform material requirements and design decisions; it never grants authority |
 
-The read-only deterministic Fastlane Engine observes the current project records, identifies the next safe action, and fails closed when required facts or authority are missing. Owner-facing summaries explain that evaluated state; they do not approve or authorize anything themselves.
+See how [canonical project records](docs/WORKFLOW.md#canonical-records-and-traceability), the [Fastlane Engine](docs/WORKFLOW.md#how-the-control-plane-works), and [AWS Core](docs/WORKFLOW.md#aws-core-and-aws-authority) keep project truth, routing, guidance, and authority separate.
 
-## Start in minutes
+<a name="start-in-minutes"></a>
+
+## Quick start
 
 1. Select [Use this template](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate) and clone your new repository.
 2. Follow the [setup guide](docs/SETUP.md) to install Codex, platform sandbox support, `uv` through `pipx`, and the official AWS Core plugin; then sign in and verify the integration.
@@ -105,7 +106,7 @@ The read-only deterministic Fastlane Engine observes the current project records
    init template
    ```
 
-4. Provide the project name, one exact preferred AWS Region, and development budget once. If you reply `recommend one`, Fastlane explains one option and waits for your explicit Region confirmation; it never chooses a default. Fastlane then explains the consultation and asks one project question at a time.
+4. Provide the project name, one exact preferred AWS Region, and development cost posture or hard cap once. If you reply `recommend one`, Fastlane explains one option and waits for your explicit Region confirmation; it never chooses a default. Fastlane then explains the consultation and asks one project question at a time.
 
 Initialization is credential-free and never accesses an AWS account. Missing prerequisites appear in one consolidated checklist.
 
@@ -120,7 +121,7 @@ No AWS credentials are needed for requirements, design, or local construction.
 - AWS reads, mutations, reconciliation, and teardown keep separate boundaries.
 - Fastlane never claims deployment, rollback, recovery, or teardown without separately observed evidence.
 
-Fastlane is contract-tested and ready for controlled adopter use. Specific AWS execution lanes remain unqualified until they are separately run and observed.
+Fastlane `1.3.2` is **`FRAMEWORK_RELEASE_QUALIFIED`** for the exact published package. It does not claim adopter-pilot results, AWS execution, deployment, rollback, recovery, teardown, or **`PRODUCT_FIELD_VALIDATED`**; each requires separate observed evidence.
 
 ## Go deeper
 

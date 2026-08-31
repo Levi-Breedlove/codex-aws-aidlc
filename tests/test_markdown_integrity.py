@@ -929,6 +929,7 @@ sequenceDiagram
         self.assertLessEqual(len(guide.read_text(encoding="utf-8").splitlines()), 70)
         self.assertLessEqual(len(workflow.read_bytes()), 15_500)
         index_text = index.read_text(encoding="utf-8")
+        self.assertIn("Mermaid", index_text)
         for target in (
             "SETUP.md",
             "WORKFLOW.md",
@@ -959,12 +960,57 @@ sequenceDiagram
         ):
             self.assertFalse((REPOSITORY_ROOT / removed).exists(), removed)
 
+    def test_customer_document_navigation_is_role_and_action_oriented(self) -> None:
+        workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
+        dependency = (REPOSITORY_ROOT / "docs/DEPENDENCY-POLICY.md").read_text(
+            encoding="utf-8"
+        )
+        troubleshooting = (REPOSITORY_ROOT / "docs/TROUBLESHOOTING.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("**Contents:**", workflow)
+        for target in (
+            "#first-run",
+            "#customer-delivery-lifecycle",
+            "#gate-a--product-owner-brief",
+            "#design-and-gate-b--technical-owner-brief",
+            "#how-the-control-plane-works",
+            "#canonical-records-and-traceability",
+            "#aws-core-and-aws-authority",
+            "#build-resume-and-optional-hooks",
+        ):
+            self.assertIn(f"]({target})", workflow)
+
+        self.assertIn("**Project owners:**", dependency)
+        self.assertIn("**Maintainers:**", dependency)
+        for target in (
+            "#aws-core",
+            "#privacy-and-authority",
+            "#ruff",
+            "#mermaid-rendering",
+            "#github-actions",
+        ):
+            self.assertIn(f"]({target})", dependency)
+
+        self.assertIn("| Symptom | Start here |", troubleshooting)
+        for target in (
+            "#read-only-checks",
+            "#init-template-repeats-setup",
+            "#aws-core-is-missing",
+            "#aws-core-research-fails-later",
+            "#a-gate-becomes-stale",
+            "#optional-hooks-deny-a-valid-action",
+            "#another-blocker-appears",
+        ):
+            self.assertIn(f"]({target})", troubleshooting)
+
         setup = (REPOSITORY_ROOT / "docs/SETUP.md").read_text(encoding="utf-8")
         self.assertIn("pipx install uv", setup)
         self.assertIn("uvx --version", setup)
         self.assertIn("docs.astral.sh/uv/getting-started/installation", setup)
 
-        owner_workflow = workflow.read_text(encoding="utf-8")
+        owner_workflow = workflow
         self.assertEqual(owner_workflow.count("```mermaid"), 2)
         self.assertEqual(owner_workflow.count("flowchart TB"), 2)
         self.assertNotIn("<br", owner_workflow)
@@ -1001,7 +1047,7 @@ sequenceDiagram
             "## Fastlane at a glance",
             "## What you receive",
             "## The important terms",
-            "## Start in minutes",
+            "## Quick start",
             "## Trust by design",
             "## Go deeper",
         )
@@ -1028,6 +1074,49 @@ sequenceDiagram
             "Separate, exact permission",
         ):
             self.assertIn(product_claim, readme)
+        for professional_surface in (
+            "AWS software and infrastructure",
+            "evidence-backed local result",
+            '<a name="start-in-minutes"></a>',
+            "development cost posture or hard cap",
+        ):
+            self.assertIn(professional_surface, readme)
+        release_line = (
+            "Current customer build: **1.3.2** · "
+            "[Release](https://github.com/Levi-Breedlove/codex-aws-aidlc/"
+            "releases/tag/v1.3.2) · "
+            "[SHA-256 checksum](https://github.com/Levi-Breedlove/"
+            "codex-aws-aidlc/releases/download/v1.3.2/"
+            "aws-codex-fastlane-1.3.2.zip.sha256)"
+        )
+        start_line = (
+            "**Start here:** [Use this template](https://github.com/"
+            "Levi-Breedlove/codex-aws-aidlc/generate) · "
+            "[Setup](docs/SETUP.md) · "
+            "[Understand the workflow](docs/WORKFLOW.md) · "
+            "[Resume an initialized project]"
+            "(docs/WORKFLOW.md#build-resume-and-optional-hooks)"
+        )
+        qualification_statement = (
+            "Fastlane `1.3.2` is **`FRAMEWORK_RELEASE_QUALIFIED`** for the "
+            "exact published package. It does not claim adopter-pilot results, "
+            "AWS execution, deployment, rollback, recovery, teardown, or "
+            "**`PRODUCT_FIELD_VALIDATED`**; each requires separate observed "
+            "evidence."
+        )
+        first_section = readme.index("## Why teams use Fastlane")
+        self.assertLess(readme.index(release_line), first_section)
+        self.assertLess(readme.index(start_line), first_section)
+        self.assertLess(readme.index(release_line), readme.index(start_line))
+        self.assertIn(qualification_statement, readme)
+        self.assertIsNone(re.search(r"\b[0-9a-fA-F]{64}\b", readme))
+        for retired_surface in (
+            "## Start in minutes",
+            "development budget once",
+            "contract-tested and ready for controlled adopter use",
+            "Codespaces",
+        ):
+            self.assertNotIn(retired_surface, readme)
         self.assertEqual(readme.count("```mermaid"), 1)
         self.assertEqual(readme.count("flowchart TB"), 1)
         self.assertEqual(readme.count("accTitle:"), 1)
