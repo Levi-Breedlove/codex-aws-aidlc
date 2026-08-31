@@ -3,6 +3,16 @@
 Fastlane reports one current action whenever possible. Start with that action;
 do not regenerate an initialized project to clear an error.
 
+| Symptom | Start here |
+|---|---|
+| You need safe diagnostic output | [Read-only checks](#read-only-checks) |
+| Setup repeats | [`init template` repeats setup](#init-template-repeats-setup) |
+| AWS Core is unavailable | [AWS Core is missing](#aws-core-is-missing) |
+| Current AWS guidance cannot be retrieved | [AWS Core research fails later](#aws-core-research-fails-later) |
+| A prior approval is no longer current | [A gate becomes stale](#a-gate-becomes-stale) |
+| An optional hook blocks valid work | [Optional hooks deny a valid action](#optional-hooks-deny-a-valid-action) |
+| The Engine reports another blocker | [Another blocker appears](#another-blocker-appears) |
+
 ## Read-only checks
 
 Run these from the repository root when Codex asks for diagnostic output:

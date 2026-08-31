@@ -33,8 +33,8 @@ in the same document; Fastlane never creates a separate human PRD.
 
 - [Hooks](../.codex/hooks/README.md) — optional post-Gate-B defense in depth. Fastlane remains
   correct when hooks are disabled.
-- [Dependency policy](DEPENDENCY-POLICY.md) — AWS Core, Ruff, and GitHub Actions
-  maintenance boundaries.
+- [Dependency policy](DEPENDENCY-POLICY.md) — AWS Core, Ruff, Mermaid, and
+  GitHub Actions maintenance boundaries.
 
 Fastlane has exactly two routine owner gates. Tool availability, hooks, AWS
 Core, and GitHub access never create approval or authorization.

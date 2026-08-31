@@ -3,6 +3,11 @@
 This page tells project owners and maintainers which external tools Fastlane
 expects and who is responsible for them.
 
+**Project owners:** [AWS Core](#aws-core) · [Privacy and authority](#privacy-and-authority)
+
+**Maintainers:** [Ruff](#ruff) · [Mermaid rendering](#mermaid-rendering) ·
+[GitHub Actions](#github-actions)
+
 ## AWS Core
 
 Fastlane uses the current official AWS Core plugin:
