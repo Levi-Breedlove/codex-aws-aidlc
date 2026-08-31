@@ -5,11 +5,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
 
-Current customer build: **1.3.0**.
-
-Fastlane intentionally avoids recurring hosted CI runs. Maintainers qualify an
-exact release candidate locally and record the observed environment plus any
-untested compatibility combinations before publication.
+Current customer build: **1.3.1**.
 
 Fastlane is a repository-native governance platform that turns Codex into a technical guide, AWS architecture consultant, implementation partner, and evidence-driven verifier.
 
