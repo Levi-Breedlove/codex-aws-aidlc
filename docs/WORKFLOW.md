@@ -7,6 +7,7 @@ and quick start.
 **Contents:** [First run](#first-run) · [Lifecycle](#customer-delivery-lifecycle) ·
 [Gate A](#gate-a--product-owner-brief) ·
 [Design and Gate B](#design-and-gate-b--technical-owner-brief) ·
+[Diagrams](#architecture-diagrams-and-the-professional-board) ·
 [Control plane](#how-the-control-plane-works) ·
 [Records](#canonical-records-and-traceability) ·
 [AWS authority](#aws-core-and-aws-authority) ·
@@ -71,7 +72,8 @@ flowchart TB
     IDEA["Describe the outcome or bounded change"]
     DEFINE["Define users, journeys, scope, data, risks, and success"]
     GATEA{"Gate A: approve the Product Agreement?"}
-    DESIGN["Compare AWS-informed system designs"]
+    DESIGN["Compare complete AWS-informed system designs"]
+    DIAGRAMS["Create and validate the project architecture diagrams"]
     GATEB{"Gate B: approve the plan and local boundary?"}
     TASKS["Create dependency-aware bounded tasks"]
     BUILD["Build inside approved local paths"]
@@ -83,10 +85,8 @@ flowchart TB
     AWSRESULT["Record the observed AWS result"]
 
     IDEA --> DEFINE --> GATEA
-    GATEA -->|"Approve"| DESIGN
+    GATEA -->|"Approve"| DESIGN --> DIAGRAMS --> GATEB
     GATEA -. "Request changes" .-> DEFINE
-
-    DESIGN --> GATEB
     GATEB -->|"Approve"| TASKS
     GATEB -. "Request changes" .-> DESIGN
 
@@ -104,7 +104,7 @@ flowchart TB
 |---|---|---|
 | Setup and Define | Learns the outcome, users, scope, data, risks, and success | Answer one current question |
 | Gate A | Presents the complete Product Owner Brief | Approve requirements or request a correction |
-| Design | Uses current AWS Core guidance, compares complete solutions, and binds environment and dependency controls | Nothing unless a business decision is missing |
+| Design | Uses current AWS Core guidance, compares complete solutions, and creates the traceable project diagram set | Nothing unless a business decision is missing |
 | Gate B | Presents the complete Technical Owner Brief | Approve the design and local construction boundary or request a correction |
 | Tasks and Build | Creates dependency-aware work, builds locally, tests, and records evidence | No task-by-task approval |
 | Release review | Reconciles what is verified, failed, planned, or still unobserved | Resolve only a genuine release decision |
@@ -153,12 +153,27 @@ and rejection reasons, tradeoffs, risks and mitigations, current evidence, claim
 status, and a measurable reason to reconsider it. The exact Gate B receipt
 appears last.
 
-Gate B authorizes only its recorded local boundary, never AWS. If it includes
-`dist/architecture/**`, Fastlane may offer one non-blocking planned board. The
-brief shows `Current AWS authority: NONE — planned maximum only`. An exact
-request binds approved Mermaid, checks both views for direction, relation, edge
-kind, path, and containment parity, and derives schema 2; it grants no gate or
-AWS authority.
+### Architecture diagrams and the professional board
+
+Before Gate B, Fastlane turns the selected design into a traceable Mermaid set.
+Every project includes system-context, primary-outcome, and AWS-implementation
+views. It adds data-lifecycle, failure-and-recovery, migration, journey, or state
+views only when those behaviors are material.
+
+Each view answers one owner question and uses only current project actors,
+components, boundaries, interfaces, data, states, and relationships. Fastlane
+checks the source against those records, then renders it to review direction,
+containment, relationship kind, labels, accessibility, and readability. A visual
+layout correction may preserve the design; changed endpoints, containment, or
+relationships are a design change and return through Design before Gate B.
+
+Gate B presents the complete technical recommendation and diagram set. It
+authorizes only its recorded local boundary, never AWS. If that boundary includes
+`dist/architecture/**`, Fastlane may offer one non-blocking professional planned
+board after approval. An exact owner request binds the approved Mermaid and checks
+both views for direction, relation, edge kind, path, and containment parity. The
+board is a presentation derivative—not a third gate, implementation evidence,
+deployment evidence, or AWS authority—and Fastlane then restores the current route.
 
 ## How the control plane works
 
