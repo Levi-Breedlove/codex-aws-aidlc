@@ -2,7 +2,7 @@
 
 ## Supported state
 
-Fastlane 1.2 is maintained on the protected customer branch `fast-lane`. The
+Fastlane 1.3.4 is maintained on the protected customer branch `fast-lane`. The
 protected `fast-lane-foundation` branch preserves the 1.0.5 predecessor and
 remains outside the customer release flow. A published release identifies the
 exact template revision it contains.

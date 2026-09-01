@@ -1,131 +1,110 @@
-# Fastlane
+# AWS Codex Fastlane
 
-> Governed Codex delivery for AWS software and infrastructure—from product intent to an evidence-backed local result.
+> Owner-controlled AWS delivery for Codex.
 
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![License](https://img.shields.io/github/license/Levi-Breedlove/codex-aws-aidlc)](LICENSE)
+[![Release v1.3.3](https://img.shields.io/badge/release-v1.3.3-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.3.3)
+![Python requirement: 3.11 or newer](https://img.shields.io/badge/python-%E2%89%A53.11-3776AB)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2da44e)](LICENSE)
 
-Current customer build: **1.3.3** · [Release](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.3.3) · [SHA-256 checksum](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/download/v1.3.3/aws-codex-fastlane-1.3.3.zip.sha256)
+AWS Codex Fastlane is an owner-controlled AWS delivery workflow for Codex. Built for developers delivering AWS software and infrastructure, it turns a product idea, existing application change, or infrastructure task into an evidence-backed local result while keeping project truth in the repository. You approve two decisions—what should be built and the technical boundary for local construction—then Codex plans, edits, tests, and records what it actually observed. AWS account reads, deployments, recovery actions, and teardown stay separate, exact, owner-authorized operations; credentials and the two gates never count as AWS permission.
 
-**Start here:** [Use this template](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate) · [Setup](docs/SETUP.md) · [Understand the workflow](docs/WORKFLOW.md) · [Resume an initialized project](docs/WORKFLOW.md#build-resume-and-optional-hooks)
-
-Fastlane is a repository-native governance platform that makes Codex an AWS architecture consultant, builder, and evidence-driven verifier. It turns an idea, brief, or bounded change into durable decisions, work, and evidence, then validates locally within the approved boundary. Tools and credentials never grant permission.
-
-## Why teams use Fastlane
-
-| Common problem | What Fastlane provides |
-|---|---|
-| Decisions disappear into chat | Repository records for requirements, design, tasks, and evidence |
-| Cloud plans become service lists | Complete options grounded in the project and current AWS guidance |
-| Agent freedom is unclear | Two owner approvals and an exact local construction boundary |
-| Existing planning gets repeated | Source-assisted Define reuses a brief without importing claims or approvals |
-| A test is mistaken for production proof | Honest confirmed, verified, observed, failed, stale, and unobserved labels |
-| Credentials look like authority | Separate, exact permission for AWS reads, deployment, and teardown |
-
-## Where it fits
-
-- **New AWS applications:** approve an idea before construction.
-- **Existing applications:** protect behavior, data, interfaces, and source paths.
-- **Infrastructure-only work:** design without inventing an application tree.
-- **Existing product briefs:** reuse a PRD while reconfirming its claims.
-- **Bounded repairs:** constrain a defect fix and retain regression evidence.
-
-## Fastlane at a glance
-
-```mermaid
-flowchart TB
-    accTitle: Fastlane customer delivery lifecycle
-    accDescr: The owner approves product and technical boundaries. Fastlane defines, diagrams, plans, builds, and verifies locally; corrections return to the affected stage, while separately authorized AWS results return to release review.
-    IDEA["Outcome or bounded change"]; DEFINE["Users, journeys, scope, data, risk, success"]
-    GATEA{"Gate A: approve the Product Agreement?"}; DESIGN["Compare complete AWS-informed designs"]
-    DIAGRAMS["Create and validate architecture diagrams"]; GATEB{"Gate B: approve plan and local boundary?"}
-    TASKS["Plan bounded tasks"]; BUILD["Build in approved local paths"]
-    VERIFY["Validate and classify evidence"]; RELEASE{"Review readiness"}
-    LOCAL["Verified local state"]; AWSAUTH{"Authorize one exact AWS operation?"}
-    AWSOPS["Preflight, act, reconcile, or tear down"]; AWSRESULT["Record observed AWS result"]
-    IDEA --> DEFINE --> GATEA; GATEA -->|"Approve"| DESIGN --> DIAGRAMS --> GATEB
-    GATEA -. "Request changes" .-> DEFINE; GATEB -->|"Approve"| TASKS
-    GATEB -. "Request changes" .-> DESIGN; TASKS --> BUILD --> VERIFY --> RELEASE
-    VERIFY -->|"Safe in-scope defect"| BUILD; VERIFY -. "Material product gap" .-> DEFINE
-    VERIFY -. "Material design gap" .-> DESIGN; RELEASE -->|"Local result"| LOCAL
-    RELEASE -. "Optional AWS path" .-> AWSAUTH; AWSAUTH -->|"Exact scope only"| AWSOPS --> AWSRESULT --> RELEASE
-```
-
-Gate A approves what should be built. Gate B approves the technical plan, project diagrams, and local construction boundary. Neither gate authorizes AWS account access, spending, deployment, or teardown. The [workflow guide](docs/WORKFLOW.md#customer-delivery-lifecycle) explains the control plane and evidence feedback.
-
-## How architecture diagrams are created
-
-```mermaid
-flowchart TB
-    accTitle: How Fastlane creates project architecture diagrams
-    accDescr: Approved requirements and current guidance shape the architecture. Fastlane creates and checks required and material Mermaid views for Gate B; an optional board may follow in an approved local path.
-    REQUIREMENTS["Gate A agreement and baseline"]; RESEARCH["Current AWS guidance and complete options"]
-    MODEL["Selected architecture, controls, risks, boundary"]; REQUIRED["Required project views"]
-    MATERIAL{"Focused view needed?"}; FOCUSED["Material data, recovery, migration, journey, or state view"]
-    REVIEW["Check semantics, accessibility, and render"]; GATEB{"Gate B: approve design and local boundary?"}
-    CONTINUE["Bounded tasks and local build"]; BOARDREQ["Optional professional board?"]
-    BOARD["Create in approved local path"]
-    REQUIREMENTS --> RESEARCH --> MODEL --> REQUIRED --> MATERIAL
-    MATERIAL -->|"Yes"| FOCUSED --> REVIEW; MATERIAL -->|"No"| REVIEW
-    REVIEW --> GATEB
-    GATEB -. "Request changes" .-> RESEARCH
-    GATEB -->|"Approve"| CONTINUE
-    GATEB -. "Optional after approval" .-> BOARDREQ --> BOARD --> CONTINUE
-```
-
-Every project gets system-context, primary-outcome, and AWS-implementation views. Fastlane adds data-lifecycle, failure-and-recovery, migration, journey, or state views when material, validates Mermaid against the recorded design, and presents the set at Gate B. The optional board is a post-Gate-B presentation derivative in an approved local path. It is not a third gate and does not prove implementation, testing, deployment, AWS access, or AWS results. [See the operating detail](docs/WORKFLOW.md#architecture-diagrams-and-the-professional-board).
-
-## What you receive
-
-- A **Product Agreement** for outcome, users, scope, non-goals, risk, and success.
-- A **Technical Owner Brief** for the design, alternatives, evidence, and local boundary.
-- A **Project Diagram Set** for context, outcome, AWS implementation, and material focused views.
-- An optional **Professional Architecture Board** after Gate B in an approved destination.
-- A **Bounded Task Plan**, **Evidence-Backed Release** decision, and non-authorizing **Operations Plan**.
-
-## The important terms
-
-| Term | Plain-language meaning |
-|---|---|
-| Gate A | Product Agreement approval—not architecture, construction, or AWS access |
-| Gate B | Technical plan, diagrams, and local build boundary—not deployment |
-| Evidence maturity | Separates plans, approvals, verified guidance, local results, and AWS results |
-
-See how [project records](docs/WORKFLOW.md#canonical-records-and-traceability), the [Fastlane Engine](docs/WORKFLOW.md#how-the-control-plane-works), and [AWS Core](docs/WORKFLOW.md#aws-core-and-aws-authority) separate truth, routing, guidance, and authority.
-
-<a name="start-in-minutes"></a>
+**[Use this template →](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate)**
 
 ## Quick start
 
-1. Select [Use this template](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate) and clone your new repository.
-2. Follow [setup](docs/SETUP.md) for Codex, sandbox support, `uv`, and the official AWS Core plugin; then sign in and verify it.
-3. Open the repository in a signed-in interactive Codex CLI session and send:
+1. Complete the [one-time setup](docs/SETUP.md) for Codex and the official AWS Core plugin, create a repository with the button above, clone your generated repository, and open it in a signed-in interactive Codex CLI session.
+2. Send this in the Codex conversation—not a shell:
 
    ```text
    init template
    ```
 
-4. Provide the project name, one exact preferred AWS Region, and development cost posture or hard cap. Reply `recommend one` for an explained option; it never chooses a default. Fastlane then asks one project question at a time.
+3. If Fastlane shows one consolidated checklist, complete it and send the same message again. Then provide the project name, one exact preferred AWS Region, and the development cost posture or hard cap. Reply `recommend one` for one explained Region option; it never chooses a default.
 
-Initialization is credential-free and never accesses an AWS account. Missing prerequisites appear in one consolidated checklist. No AWS credentials are needed for requirements, design, or local construction. Diagram creation and validation are also local and credential-free.
+Fastlane initializes the repository locally, presents **Project Ready**, and asks the first product question. No AWS credentials are needed for requirements, design, or local construction. Setup does not inspect credentials, access an AWS account, deploy, or authorize an AWS operation. An initialized project resumes without repeating setup.
 
-## Trust by design
+## Why Fastlane is different
 
-- One coordinator, one writer, and two owner gates preserve coherent state and human control.
-- Plans, approvals, guidance, local evidence, and AWS observations remain distinct claims.
-- Diagrams describe plans; hooks may deny, but neither creates permission.
-- AWS reads, changes, reconciliation, and teardown require separate authority and evidence.
+| Product boundary | What it changes |
+|---|---|
+| Repository truth | Canonical project records—not chat memory—determine facts, progress, and the next permitted action. |
+| Two owner gates | Gate A approves what should be built. Gate B approves the technical plan and bounded local construction. |
+| Bounded construction | After Gate B, Codex works only inside the recorded paths, commands, tasks, and attempt limits. |
+| Honest evidence | Plans, source guidance, local checks, AWS observations, deployed behavior, and recovery exercises remain distinct. |
+| Separate AWS authority | Every account read, mutation, and teardown needs its own exact, current owner authorization. Credentials are never authorization. |
 
-Fastlane `1.3.3` is **`FRAMEWORK_RELEASE_QUALIFIED`** for the exact published package. It does not claim adopter-pilot results, AWS execution, deployment, rollback, recovery, teardown, or **`PRODUCT_FIELD_VALIDATED`**; each requires separate observed evidence.
+The read-only Fastlane Engine evaluates repository state and fails closed when scope, evidence, approval, or authority is missing, stale, conflicting, or broader than recorded.
 
-## Go deeper
+## Product lifecycle
 
-- [Complete workflow](docs/WORKFLOW.md)
-- [Setup](docs/SETUP.md)
-- [Customer documentation](docs/README.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Security](SECURITY.md)
-- [Optional hooks](.codex/hooks/README.md)
-- [Project records](docs/project/README.md)
+Two owner gates release local work. Optional AWS operations stay on a separate, explicitly authorized path.
 
-Fastlane is released under the [MIT License](LICENSE).
+```mermaid
+flowchart TB
+    accTitle: AWS Codex Fastlane product lifecycle
+    accDescr: The owner approves requirements at Gate A and the technical plan and local construction boundary at Gate B. Fastlane then builds and verifies locally. An optional AWS operation requires separate exact owner authorization, and its observed result returns to release review.
+
+    DEFINE["Define the outcome and first release"]
+    GATEA{"Gate A: approve requirements?"}
+    DESIGN["Design the AWS solution"]
+    GATEB{"Gate B: approve design and local boundary?"}
+    LOCAL["Build and verify locally"]
+    REVIEW["Review evidence and release state"]
+    AWS["Optional AWS operation"]
+
+    DEFINE --> GATEA
+    GATEA -->|"Approve"| DESIGN
+    GATEA -. "Revise" .-> DEFINE
+    DESIGN --> GATEB
+    GATEB -->|"Approve"| LOCAL
+    GATEB -. "Revise" .-> DESIGN
+    LOCAL --> REVIEW
+    REVIEW -. "Separate exact authorization" .-> AWS
+    AWS -->|"Record observed result"| REVIEW
+```
+
+**Build never deploys.** Gate A and Gate B do not authorize GitHub publication or AWS account work. Read the [complete workflow](docs/WORKFLOW.md) for corrections, resume behavior, architecture diagrams, and optional AWS stages.
+
+## Supported project work
+
+| Project shape | Fastlane boundary |
+|---|---|
+| New AWS application | Uses the approved greenfield design and reserves `app/**` as the single application source root. |
+| Existing application | Records the brownfield baseline and preserves approved source roots, behavior, data, interfaces, and rollback boundaries. |
+| Infrastructure-only work | Records that application source is not applicable and limits construction to the approved infrastructure boundary. |
+
+Source-assisted Define can use an existing product brief as read-only input; the owner still confirms facts and approves both gates. Bounded features, repairs, refactors, migrations, and security changes follow the same truth and preservation rules.
+
+## What the repository retains
+
+| Durable record | What it contains |
+|---|---|
+| [PRD](docs/project/PRD.md) | Product Agreement, technical plan, architecture diagrams, Gate A, Gate B, and the local construction envelope |
+| [Tasks](docs/project/TASKS.md) | Dependency-aware work, attempts, checkpoints, and resumable progress |
+| [Verification](docs/project/VERIFY.md) | Attributable results, failures, stale evidence, and the exact limit of each claim |
+| [Runbook](docs/project/RUNBOOK.md) | Project-specific validation, deployment, rollback, recovery, and teardown procedures—not proof that they ran |
+| [Bugfix record](docs/project/BUGFIX.md) | One focused defect investigation when a bounded repair is active |
+
+Readable owner briefs and summaries are projections of these records, not competing sources of truth. The planned diagram set is part of the PRD; an optional professional architecture board remains planned design, not implementation or deployment evidence.
+
+## Trust and evidence boundary
+
+- Only the owner accepts assumptions, approves Gate A or Gate B, and authorizes external actions.
+- Codex is the sole project writer; challengers are read-only, and the Engine performs no AWS calls.
+- AWS Core supplies current official guidance but cannot select owner intent, approve a gate, or authorize account access.
+- Plugins, connectors, hooks, credentials, IAM capability, and passing checks are capabilities or evidence—not permission.
+- A local pass never proves AWS behavior. A started AWS request never proves execution. Failed, partial, unknown, stale, and unobserved results remain visible.
+- AWS claims require the applicable authorization and evidence observed from the named artifact and environment. Deployment never authorizes teardown.
+
+See the [security policy](SECURITY.md) for reporting, credentials, privacy, hooks, and defense-in-depth boundaries.
+
+## Documentation
+
+- [Setup](docs/SETUP.md) — owner-run prerequisites and first initialization
+- [Workflow](docs/WORKFLOW.md) — consultation, gates, diagrams, control plane, build, resume, and AWS boundaries
+- [Project record guide](docs/project/README.md) — the durable project handoff
+- [Troubleshooting](docs/TROUBLESHOOTING.md) — read-only diagnostics and safe recovery from blockers
+- [Security](SECURITY.md) — trust, privacy, credentials, hooks, and vulnerability reporting
+- [Latest release](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/latest) — exact package evidence and assets
+
+Licensed under the [MIT License](LICENSE).

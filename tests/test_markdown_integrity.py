@@ -1040,21 +1040,21 @@ sequenceDiagram
         ):
             self.assertNotIn(internal_term, owner_workflow)
 
-    def test_readme_is_a_compact_governance_platform_landing_page(self) -> None:
+    def test_readme_is_a_compact_product_first_landing_page(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
         workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(readme.splitlines()), 200)
-        self.assertLessEqual(len(readme.encode("utf-8")), 14_000)
+        self.assertLessEqual(len(readme.splitlines()), 140)
+        self.assertLessEqual(len(readme.encode("utf-8")), 9_000)
+        self.assertLess(len(readme.splitlines()), len(workflow.splitlines()) // 2)
+
         headings = (
-            "## Why teams use Fastlane",
-            "## Where it fits",
-            "## Fastlane at a glance",
-            "## How architecture diagrams are created",
-            "## What you receive",
-            "## The important terms",
             "## Quick start",
-            "## Trust by design",
-            "## Go deeper",
+            "## Why Fastlane is different",
+            "## Product lifecycle",
+            "## Supported project work",
+            "## What the repository retains",
+            "## Trust and evidence boundary",
+            "## Documentation",
         )
         for heading in headings:
             self.assertIn(heading, readme)
@@ -1062,107 +1062,74 @@ sequenceDiagram
             [readme.index(heading) for heading in headings],
             sorted(readme.index(heading) for heading in headings),
         )
+
+        pitch_match = re.search(
+            r"^AWS Codex Fastlane is an owner-controlled AWS delivery workflow "
+            r"for Codex\..*?AWS permission\.$",
+            readme,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(pitch_match)
+        pitch_words = re.findall(r"\b[\w’'-]+\b", pitch_match.group(0))
+        self.assertGreaterEqual(len(pitch_words), 70)
+        self.assertLessEqual(len(pitch_words), 95)
+
+        start_action = (
+            "**[Use this template →](https://github.com/"
+            "Levi-Breedlove/codex-aws-aidlc/generate)**"
+        )
+        self.assertLess(readme.index(start_action), readme.index("## Quick start"))
+        self.assertEqual(readme.count("img.shields.io/"), 3)
+        self.assertNotIn("actions/workflows/", readme)
+
         for product_claim in (
-            "repository-native governance platform",
-            "New AWS applications",
-            "Existing applications",
-            "Infrastructure-only work",
-            "Existing product briefs",
-            "Bounded repairs",
-            "Product Agreement",
-            "Technical Owner Brief",
-            "Project Diagram Set",
-            "Professional Architecture Board",
-            "Gate A approves what should be built",
-            "Gate B approves the technical plan",
-            "Neither gate authorizes AWS account access",
-            "Fastlane Engine",
-            "Separate, exact permission",
-        ):
-            self.assertIn(product_claim, readme)
-        for professional_surface in (
+            "owner-controlled AWS delivery workflow for Codex",
             "AWS software and infrastructure",
             "evidence-backed local result",
-            '<a name="start-in-minutes"></a>',
-            "development cost posture or hard cap",
+            "Canonical project records—not chat memory",
+            "Gate A approves what should be built",
+            "Gate B approves the technical plan and bounded local construction",
+            "Build never deploys",
+            "Source-assisted Define",
+            "New AWS application",
+            "Existing application",
+            "Infrastructure-only work",
+            "Product Agreement",
+            "Fastlane Engine",
+            "A local pass never proves AWS behavior",
+            "Deployment never authorizes teardown",
         ):
-            self.assertIn(professional_surface, readme)
-        release_line = (
-            "Current customer build: **1.3.3** · "
-            "[Release](https://github.com/Levi-Breedlove/codex-aws-aidlc/"
-            "releases/tag/v1.3.3) · "
-            "[SHA-256 checksum](https://github.com/Levi-Breedlove/"
-            "codex-aws-aidlc/releases/download/v1.3.3/"
-            "aws-codex-fastlane-1.3.3.zip.sha256)"
-        )
-        start_line = (
-            "**Start here:** [Use this template](https://github.com/"
-            "Levi-Breedlove/codex-aws-aidlc/generate) · "
-            "[Setup](docs/SETUP.md) · "
-            "[Understand the workflow](docs/WORKFLOW.md) · "
-            "[Resume an initialized project]"
-            "(docs/WORKFLOW.md#build-resume-and-optional-hooks)"
-        )
-        qualification_statement = (
-            "Fastlane `1.3.3` is **`FRAMEWORK_RELEASE_QUALIFIED`** for the "
-            "exact published package. It does not claim adopter-pilot results, "
-            "AWS execution, deployment, rollback, recovery, teardown, or "
-            "**`PRODUCT_FIELD_VALIDATED`**; each requires separate observed "
-            "evidence."
-        )
-        first_section = readme.index("## Why teams use Fastlane")
-        self.assertLess(readme.index(release_line), first_section)
-        self.assertLess(readme.index(start_line), first_section)
-        self.assertLess(readme.index(release_line), readme.index(start_line))
-        self.assertIn(qualification_statement, readme)
+            self.assertIn(product_claim, readme)
+
+        self.assertNotIn("## What has actually been proven", readme)
+        self.assertNotIn("FRAMEWORK_RELEASE_QUALIFIED", readme)
+        self.assertNotIn("PRODUCT_FIELD_VALIDATED", readme)
         self.assertIsNone(re.search(r"\b[0-9a-fA-F]{64}\b", readme))
-        for retired_surface in (
-            "## Start in minutes",
-            "development budget once",
-            "contract-tested and ready for controlled adopter use",
-            "Codespaces",
-        ):
-            self.assertNotIn(retired_surface, readme)
-        self.assertEqual(readme.count("```mermaid"), 2)
-        self.assertEqual(readme.count("flowchart TB"), 2)
-        self.assertEqual(readme.count("accTitle:"), 2)
-        self.assertEqual(readme.count("accDescr:"), 2)
-        self.assertEqual(readme.count("subgraph "), 0)
-        self.assertEqual(readme.count("classDef "), 0)
-        self.assertIn("accTitle: Fastlane customer delivery lifecycle", readme)
-        self.assertIn(
-            "accTitle: How Fastlane creates project architecture diagrams", readme
-        )
-        self.assertEqual(readme.count('GATEA{"Gate A:'), 1)
-        self.assertEqual(readme.count('GATEB{"Gate B:'), 2)
-        self.assertEqual(
-            readme.count('AWSAUTH{"Authorize one exact AWS operation?"}'), 1
-        )
+
+        self.assertEqual(readme.count("```mermaid"), 1)
+        self.assertEqual(readme.count("flowchart TB"), 1)
+        self.assertEqual(readme.count("accTitle:"), 1)
+        self.assertEqual(readme.count("accDescr:"), 1)
+        self.assertIn("accTitle: AWS Codex Fastlane product lifecycle", readme)
         for lifecycle_edge in (
-            "IDEA --> DEFINE --> GATEA",
-            'GATEA -->|"Approve"| DESIGN --> DIAGRAMS --> GATEB',
-            'GATEB -->|"Approve"| TASKS',
-            "TASKS --> BUILD --> VERIFY --> RELEASE",
-            'VERIFY -. "Material product gap" .-> DEFINE',
-            'VERIFY -. "Material design gap" .-> DESIGN',
-            'RELEASE -->|"Local result"| LOCAL',
-            'AWSAUTH -->|"Exact scope only"| AWSOPS --> AWSRESULT --> RELEASE',
+            "DEFINE --> GATEA",
+            'GATEA -->|"Approve"| DESIGN',
+            "DESIGN --> GATEB",
+            'GATEB -->|"Approve"| LOCAL',
+            "LOCAL --> REVIEW",
+            'REVIEW -. "Separate exact authorization" .-> AWS',
+            'AWS -->|"Record observed result"| REVIEW',
         ):
             self.assertIn(lifecycle_edge, readme)
-        for diagram_contract in (
-            "system-context, primary-outcome, and AWS-implementation views",
-            "data-lifecycle, failure-and-recovery, migration, journey, or state views",
-            "REQUIREMENTS --> RESEARCH --> MODEL --> REQUIRED --> MATERIAL",
-            'MATERIAL -->|"Yes"| FOCUSED --> REVIEW',
-            "REVIEW --> GATEB",
-            'GATEB -. "Optional after approval" .-> BOARDREQ --> BOARD --> CONTINUE',
-            "It is not a third gate",
-            "does not prove implementation, testing, deployment, AWS access, or AWS results",
+        for unsupported_mermaid in (
+            "subgraph ",
+            "classDef ",
+            "<br",
+            "flowchart TD",
+            "flowchart LR",
         ):
-            self.assertIn(diagram_contract, readme)
-        self.assertNotIn("<br", readme)
-        self.assertNotIn("flowchart TD", readme)
-        self.assertNotIn("flowchart LR", readme)
+            self.assertNotIn(unsupported_mermaid, readme)
+
         for implementation_detail in (
             "ProjectSnapshot",
             "EngineEvaluation",
