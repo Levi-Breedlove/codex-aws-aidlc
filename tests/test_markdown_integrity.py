@@ -927,7 +927,10 @@ sequenceDiagram
         workflow = REPOSITORY_ROOT / "docs" / "WORKFLOW.md"
         self.assertFalse((REPOSITORY_ROOT / "docs/AGENTS.md").exists())
         self.assertLessEqual(len(guide.read_text(encoding="utf-8").splitlines()), 70)
-        self.assertLessEqual(len(workflow.read_bytes()), 15_500)
+        self.assertLessEqual(
+            len(workflow.read_text(encoding="utf-8").splitlines()), 370
+        )
+        self.assertLessEqual(len(workflow.read_bytes()), 17_000)
         index_text = index.read_text(encoding="utf-8")
         self.assertIn("Mermaid", index_text)
         for target in (
@@ -975,6 +978,7 @@ sequenceDiagram
             "#customer-delivery-lifecycle",
             "#gate-a--product-owner-brief",
             "#design-and-gate-b--technical-owner-brief",
+            "#architecture-diagrams-and-the-professional-board",
             "#how-the-control-plane-works",
             "#canonical-records-and-traceability",
             "#aws-core-and-aws-authority",
@@ -1039,12 +1043,13 @@ sequenceDiagram
     def test_readme_is_a_compact_governance_platform_landing_page(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
         workflow = (REPOSITORY_ROOT / "docs/WORKFLOW.md").read_text(encoding="utf-8")
-        self.assertLessEqual(len(readme.splitlines()), 140)
-        self.assertLessEqual(len(readme.encode("utf-8")), 9_000)
+        self.assertLessEqual(len(readme.splitlines()), 200)
+        self.assertLessEqual(len(readme.encode("utf-8")), 14_000)
         headings = (
             "## Why teams use Fastlane",
             "## Where it fits",
             "## Fastlane at a glance",
+            "## How architecture diagrams are created",
             "## What you receive",
             "## The important terms",
             "## Quick start",
@@ -1066,7 +1071,8 @@ sequenceDiagram
             "Bounded repairs",
             "Product Agreement",
             "Technical Owner Brief",
-            "Complete Architecture Diagram",
+            "Project Diagram Set",
+            "Professional Architecture Board",
             "Gate A approves what should be built",
             "Gate B approves the technical plan",
             "Neither gate authorizes AWS account access",
@@ -1082,12 +1088,12 @@ sequenceDiagram
         ):
             self.assertIn(professional_surface, readme)
         release_line = (
-            "Current customer build: **1.3.2** · "
+            "Current customer build: **1.3.3** · "
             "[Release](https://github.com/Levi-Breedlove/codex-aws-aidlc/"
-            "releases/tag/v1.3.2) · "
+            "releases/tag/v1.3.3) · "
             "[SHA-256 checksum](https://github.com/Levi-Breedlove/"
-            "codex-aws-aidlc/releases/download/v1.3.2/"
-            "aws-codex-fastlane-1.3.2.zip.sha256)"
+            "codex-aws-aidlc/releases/download/v1.3.3/"
+            "aws-codex-fastlane-1.3.3.zip.sha256)"
         )
         start_line = (
             "**Start here:** [Use this template](https://github.com/"
@@ -1098,7 +1104,7 @@ sequenceDiagram
             "(docs/WORKFLOW.md#build-resume-and-optional-hooks)"
         )
         qualification_statement = (
-            "Fastlane `1.3.2` is **`FRAMEWORK_RELEASE_QUALIFIED`** for the "
+            "Fastlane `1.3.3` is **`FRAMEWORK_RELEASE_QUALIFIED`** for the "
             "exact published package. It does not claim adopter-pilot results, "
             "AWS execution, deployment, rollback, recovery, teardown, or "
             "**`PRODUCT_FIELD_VALIDATED`**; each requires separate observed "
@@ -1117,20 +1123,24 @@ sequenceDiagram
             "Codespaces",
         ):
             self.assertNotIn(retired_surface, readme)
-        self.assertEqual(readme.count("```mermaid"), 1)
-        self.assertEqual(readme.count("flowchart TB"), 1)
-        self.assertEqual(readme.count("accTitle:"), 1)
-        self.assertEqual(readme.count("accDescr:"), 1)
+        self.assertEqual(readme.count("```mermaid"), 2)
+        self.assertEqual(readme.count("flowchart TB"), 2)
+        self.assertEqual(readme.count("accTitle:"), 2)
+        self.assertEqual(readme.count("accDescr:"), 2)
         self.assertEqual(readme.count("subgraph "), 0)
         self.assertEqual(readme.count("classDef "), 0)
         self.assertIn("accTitle: Fastlane customer delivery lifecycle", readme)
+        self.assertIn(
+            "accTitle: How Fastlane creates project architecture diagrams", readme
+        )
         self.assertEqual(readme.count('GATEA{"Gate A:'), 1)
-        self.assertEqual(readme.count('GATEB{"Gate B:'), 1)
+        self.assertEqual(readme.count('GATEB{"Gate B:'), 2)
         self.assertEqual(
             readme.count('AWSAUTH{"Authorize one exact AWS operation?"}'), 1
         )
         for lifecycle_edge in (
             "IDEA --> DEFINE --> GATEA",
+            'GATEA -->|"Approve"| DESIGN --> DIAGRAMS --> GATEB',
             'GATEB -->|"Approve"| TASKS',
             "TASKS --> BUILD --> VERIFY --> RELEASE",
             'VERIFY -. "Material product gap" .-> DEFINE',
@@ -1139,6 +1149,17 @@ sequenceDiagram
             'AWSAUTH -->|"Exact scope only"| AWSOPS --> AWSRESULT --> RELEASE',
         ):
             self.assertIn(lifecycle_edge, readme)
+        for diagram_contract in (
+            "system-context, primary-outcome, and AWS-implementation views",
+            "data-lifecycle, failure-and-recovery, migration, journey, or state views",
+            "REQUIREMENTS --> RESEARCH --> MODEL --> REQUIRED --> MATERIAL",
+            'MATERIAL -->|"Yes"| FOCUSED --> REVIEW',
+            "REVIEW --> GATEB",
+            'GATEB -. "Optional after approval" .-> BOARDREQ --> BOARD --> CONTINUE',
+            "It is not a third gate",
+            "does not prove implementation, testing, deployment, AWS access, or AWS results",
+        ):
+            self.assertIn(diagram_contract, readme)
         self.assertNotIn("<br", readme)
         self.assertNotIn("flowchart TD", readme)
         self.assertNotIn("flowchart LR", readme)
@@ -1163,6 +1184,12 @@ sequenceDiagram
 
         self.assertIn("## Customer delivery lifecycle", workflow)
         self.assertIn("accTitle: Fastlane customer delivery lifecycle", workflow)
+        self.assertIn("### Architecture diagrams and the professional board", workflow)
+        self.assertIn(
+            "Every project includes system-context, primary-outcome, and AWS-implementation",
+            workflow,
+        )
+        self.assertIn("not a third gate", workflow)
         self.assertIn("## How the control plane works", workflow)
         self.assertIn("accTitle: Fastlane technical control plane", workflow)
         self.assertIn("ProjectSnapshot", workflow)

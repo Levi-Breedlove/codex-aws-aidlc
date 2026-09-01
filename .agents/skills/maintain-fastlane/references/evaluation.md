@@ -135,7 +135,7 @@ existing Gate A, Gate B, AWS-10, AWS-20, AWS-30, AWS-40, and AWS-50 contracts.
 Field qualification introduces no scorer, lifecycle stage, gate, or routine
 owner action.
 
-For Fastlane 1.3.2, the only named candidate lane is
+For Fastlane 1.3.3, the only named candidate lane is
 `AWS_SAM_CLOUDFORMATION_NONPROD` in `us-west-2`, using synthetic data and a USD
 20.00 cost ceiling. Read preflight, deployment or update, recovery,
 reconciliation after an interrupted or unknown local observation, and teardown
