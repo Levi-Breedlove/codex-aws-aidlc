@@ -26,6 +26,7 @@ from scripts.fastlane_project_identity import (
 from scripts.fastlane_stdio import configure_utf8_standard_streams
 from scripts.setup_assistant import (
     SetupError,
+    _is_link_or_reparse_point,
     read_ready_prerequisite_report,
 )
 
@@ -500,7 +501,7 @@ def validate_template_control_hashes(source: Path) -> None:
     for relative in sorted(RUNTIME_CONTROL_PATHS):
         expected = validate_digest(controls[relative], "control_sha256", relative)
         path = source / relative
-        if path.is_symlink() or not path.is_file():
+        if _is_link_or_reparse_point(path) or not path.is_file():
             raise ValueError(f"Runtime control is missing or unsafe: {relative}")
         actual = sha256_bytes(path.read_bytes())
         if actual != expected:
@@ -515,7 +516,7 @@ def validate_repository_dependencies(source: Path) -> None:
     # detected only by a later in-place or copy-path check.
     validate_template_control_hashes(source)
     script = source / "scripts" / "bootstrap_dependencies.py"
-    if script.is_symlink() or not script.is_file():
+    if _is_link_or_reparse_point(script) or not script.is_file():
         raise ValueError("Bootstrap dependency validator is missing or unsafe")
     try:
         result = subprocess.run(
@@ -548,7 +549,7 @@ def load_template_manifest(source: Path) -> dict[str, object]:
     """Load one structurally valid template manifest."""
 
     manifest_path = source / "bootstrap.manifest.json"
-    if manifest_path.is_symlink() or not manifest_path.is_file():
+    if _is_link_or_reparse_point(manifest_path) or not manifest_path.is_file():
         raise ValueError(f"Template manifest is missing or unsafe: {manifest_path}")
     try:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -596,7 +597,11 @@ def validate_template_source_hashes(source: Path, required: Sequence[str]) -> No
     for relative in sorted(expected_paths):
         expected = validate_digest(raw_hashes[relative], "source_sha256", relative)
         path = source.joinpath(*PurePosixPath(relative).parts)
-        if has_unsafe_parent(source, path) or path.is_symlink() or not path.is_file():
+        if (
+            has_unsafe_parent(source, path)
+            or _is_link_or_reparse_point(path)
+            or not path.is_file()
+        ):
             raise ValueError(f"Template source file is missing or unsafe: {relative}")
         observed = sha256_bytes(path.read_bytes())
         if observed != expected:
@@ -616,7 +621,7 @@ def validate_template_tree_inventory(source: Path, required: Sequence[str]) -> N
         folded_parts = {part.casefold() for part in relative_path.parts}
         if ".git" in folded_parts or "__pycache__" in folded_parts:
             continue
-        if item.is_symlink():
+        if _is_link_or_reparse_point(item):
             raise ValueError(
                 "In-place template tree contains an unsupported symbolic link: "
                 f"{relative_path.as_posix()}"
@@ -912,10 +917,12 @@ def rendered_bytes(
 def has_unsafe_parent(root: Path, destination: Path) -> bool:
     """Return true when an existing parent could redirect or block a write."""
 
+    if not destination.resolve().is_relative_to(root.resolve()):
+        return True
     current = root
     for part in destination.relative_to(root).parts[:-1]:
         current = current / part
-        if current.is_symlink():
+        if _is_link_or_reparse_point(current):
             return True
         if current.exists() and not current.is_dir():
             return True
@@ -951,7 +958,7 @@ def validate_copy_operation(operation: CopyOperation, root: Path) -> None:
             f"{operation.relative}: destination parent changed after preflight"
         )
     if operation.content is None:
-        if operation.destination.is_symlink() or (
+        if _is_link_or_reparse_point(operation.destination) or (
             operation.destination.exists() and not operation.destination.is_dir()
         ):
             raise ValueError(
@@ -959,13 +966,15 @@ def validate_copy_operation(operation: CopyOperation, root: Path) -> None:
             )
         return
     if operation.expected_destination_sha256 is None:
-        if operation.destination.exists() or operation.destination.is_symlink():
+        if operation.destination.exists() or _is_link_or_reparse_point(
+            operation.destination
+        ):
             raise ValueError(
                 f"{operation.relative}: destination appeared after preflight"
             )
         return
     if (
-        operation.destination.is_symlink()
+        _is_link_or_reparse_point(operation.destination)
         or not operation.destination.is_file()
         or sha256_bytes(operation.destination.read_bytes())
         != operation.expected_destination_sha256
@@ -1029,14 +1038,14 @@ def copy_template(
         for relative in allowed_files:
             canonical = validate_relative_path(relative)
             item = source.joinpath(*PurePosixPath(canonical).parts)
-            if has_unsafe_parent(source, item) or item.is_symlink():
+            if has_unsafe_parent(source, item) or _is_link_or_reparse_point(item):
                 raise ValueError(
                     f"Manifest file uses an unsafe source path: {canonical}"
                 )
             if not item.is_file():
                 raise ValueError(f"Manifest file is missing: {canonical}")
             discovered_items.append(item)
-    symlinks = [item for item in discovered_items if item.is_symlink()]
+    symlinks = [item for item in discovered_items if _is_link_or_reparse_point(item)]
     if symlinks:
         raise ValueError(
             f"Template source contains unsupported symbolic link: {symlinks[0]}"
@@ -1098,7 +1107,7 @@ def copy_template(
 
         destination = target / relative_path
         if item.is_dir():
-            if destination.is_symlink() or (
+            if _is_link_or_reparse_point(destination) or (
                 destination.exists() and not destination.is_dir()
             ):
                 report.collisions += 1
@@ -1125,7 +1134,7 @@ def copy_template(
             render=should_render_path(relative),
         )
         template_digest = sha256_bytes(content)
-        if destination.is_symlink() or (
+        if _is_link_or_reparse_point(destination) or (
             destination.exists() and not destination.is_file()
         ):
             report.collisions += 1
@@ -1207,7 +1216,7 @@ def copy_template(
             staged_destination = staging_target / relative_path
             if has_unsafe_parent(staging_target, staged_destination):
                 raise ValueError(f"{relative}: unsafe staging parent")
-            if staged_destination.is_symlink() or (
+            if _is_link_or_reparse_point(staged_destination) or (
                 staged_destination.exists() and not staged_destination.is_file()
             ):
                 raise ValueError(f"{relative}: unsafe staging collision")
@@ -1255,7 +1264,7 @@ def copy_template(
 
     for relative, destination, expected_digest in preserved_checks:
         if (
-            destination.is_symlink()
+            _is_link_or_reparse_point(destination)
             or not destination.is_file()
             or sha256_bytes(destination.read_bytes()) != expected_digest
         ):

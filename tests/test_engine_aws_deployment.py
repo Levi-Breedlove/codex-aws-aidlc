@@ -2297,6 +2297,22 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
                 before_read,
                 authorized_at="2026-07-29T00:02:00Z",
             )
+            expired_read, _expired_authority = self.bind_read_receipt(
+                before_read,
+                authorized_at="2026-07-29T00:02:00Z",
+                valid_until="2026-07-29T00:02:30Z",
+            )
+            verify_path.write_text(expired_read, encoding="utf-8")
+            expired_read_report = doctor.inspect_project(project)
+            self.assert_closure_context_is_resolved(expired_read_report)
+            self.assert_no_external_mutation_authority(expired_read_report)
+            self.assertEqual(
+                expired_read_report["external_authority"]["kind"],
+                "AWS_READ_PREFLIGHT_RECEIPT_REQUIRED",
+            )
+            self.assertFalse(
+                expired_read_report["interaction"]["automatic_continuation_allowed"]
+            )
             verify_path.write_text(read_bound, encoding="utf-8")
             read_report = doctor.inspect_project(project)
             self.assert_closure_context_is_resolved(read_report)

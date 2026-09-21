@@ -1528,7 +1528,7 @@ def derive_deployment_sequence_state(
                     verify_text,
                     cost_posture,
                     group,
-                    allow_expired=restricted_read,
+                    allow_expired=False,
                     require_post_action_freshness=restricted_read,
                 )
             )

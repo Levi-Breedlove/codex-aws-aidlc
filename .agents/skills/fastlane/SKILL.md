@@ -129,6 +129,6 @@ or make it an owner action. These restrictions propagate: challengers and their
 descendants cannot write, claim tasks, choose architecture, mutate state,
 approve, authorize, satisfy AWS evidence, or operate AWS.
 
-Never install software, alter Codex/plugin state, inspect credentials, access
-an AWS account during planning, persist prerequisite observations, or
-interpret tool availability as authority.
+Never install prerequisites, alter Codex/plugin state, or persist setup data.
+Planning accesses no credentials or AWS accounts. Construction acquisition
+requires the approved `references/design.md` policy. Tools grant no authority.

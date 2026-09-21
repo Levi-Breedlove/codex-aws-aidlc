@@ -109,7 +109,10 @@ description: Run Fastlane AWS preflight, authorized deployment, reconciliation, 
    Artifact/environment exactly
    `ARTIFACT: sha256:<64 lowercase>; ACCOUNT: <exact>; REGION: <exact>; ENVIRONMENT: <exact>`.
    After receipt expiry or replacement, derive historical authorization only
-   from that stored tuple; never infer allowed operations from observed reads.
+   from that stored tuple for an already recorded terminal row. Pending
+   reconciliation requires a currently valid read receipt, including after a
+   STALE row; historical evidence never renews account access. Never infer
+   allowed operations from observed reads.
    Do not append a repeated STALE or anything after COMPLETE or BLOCKED; repeated
    staleness is a safety-review blocker. COMPLETE or BLOCKED
    returns to RELEASE-10; the first STALE remains at AWS-30 until current

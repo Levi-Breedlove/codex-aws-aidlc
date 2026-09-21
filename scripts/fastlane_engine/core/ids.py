@@ -144,6 +144,8 @@ def validate_relative_path(value: Any) -> str | None:
     if (
         pure.is_absolute()
         or "\\" in value
+        or ":" in value
+        or "\x00" in value
         or any(part in {"", ".", ".."} for part in pure.parts)
     ):
         return None

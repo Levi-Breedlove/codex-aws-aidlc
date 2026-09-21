@@ -339,6 +339,77 @@ class EngineFoundationTests(unittest.TestCase):
         index = MarkdownDocumentIndex.build("# Record\n\n| incomplete\n")
         self.assertEqual(index.tables, ())
 
+    def test_heading_sections_preserve_nested_boundaries_and_digests(self) -> None:
+        import hashlib
+
+        text = "# A\r\n## B\r\n### C\r\n## D\r\n# E\r\n"
+        index = MarkdownDocumentIndex.build(text)
+        expected = (
+            "# A\r\n## B\r\n### C\r\n## D\r\n",
+            "## B\r\n### C\r\n",
+            "### C\r\n",
+            "## D\r\n",
+            "# E\r\n",
+        )
+        self.assertEqual([h.title for h in index.headings], list("ABCDE"))
+        for heading, section in zip(index.headings, expected):
+            self.assertEqual(text[heading.section.start : heading.section.end], section)
+            self.assertEqual(
+                heading.section_sha256,
+                "sha256:"
+                + hashlib.sha256(section.replace("\r\n", "\n").encode()).hexdigest(),
+            )
+        self.assertEqual([h.span.start_line for h in index.headings], [1, 2, 3, 4, 5])
+
+    def test_dense_heading_work_is_bounded_by_the_number_of_headings(self) -> None:
+        # Bound regex match visits, independently of wall-clock speed or allocation.
+        from scripts.fastlane_engine.core import markdown_index
+
+        original_finditer = re.finditer
+        visits = 0
+
+        class CountedMatch:
+            def __init__(self, match):
+                self.match = match
+
+            def group(self, *args):
+                nonlocal visits
+                visits += 1
+                return self.match.group(*args)
+
+            def start(self):
+                return self.match.start()
+
+            def end(self):
+                return self.match.end()
+
+        def counted(pattern, text, flags=0):
+            matches = original_finditer(pattern, text, flags)
+            return (
+                (CountedMatch(match) for match in matches)
+                if "(?P<marks>" in pattern
+                else matches
+            )
+
+        # A list subclass catches hidden quadratic suffix copies, even if each
+        # loop breaks immediately on same-level headings.
+        class NoSuffixCopies(list):
+            def __getitem__(self, key):
+                self_test.assertFalse(
+                    isinstance(key, slice), "heading suffix allocation"
+                )
+                return super().__getitem__(key)
+
+        self_test = self
+        text = "# heading\n" * 20_000
+        with (
+            mock.patch.object(markdown_index.re, "finditer", counted),
+            mock.patch.object(markdown_index, "list", NoSuffixCopies, create=True),
+        ):
+            index = MarkdownDocumentIndex.build(text)
+        self.assertEqual(len(index.headings), 20_000)
+        self.assertLessEqual(visits, 100_000)
+
     def test_modular_package_validators_match_legacy_diagnostics(self) -> None:
         manifest = json.loads((ROOT / doctor.MANIFEST_FILE).read_text(encoding="utf-8"))
         state = json.loads((ROOT / doctor.STATE_FILE).read_text(encoding="utf-8"))
