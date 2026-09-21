@@ -731,16 +731,6 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "reviewed_in": "1.3.0",
         "expires": "1.4.0",
     },
-    "owner_decisions.py:derive_owner_answer_confirmation": {
-        "maximum_lines": 81,
-        "maximum_complexity": 18,
-        "reviewed_lines": 81,
-        "reviewed_complexity": 18,
-        "reason": "Complete owner projection keeps each required decision and authority boundary together.",
-        "risk": "Further growth can obscure fail-closed diagnostic order or ownership; exact measurements and expiry force a new bounded review.",
-        "reviewed_in": "1.3.0",
-        "expires": "1.4.0",
-    },
     "package/state.py:_validate_project_identity": {
         "maximum_lines": 63,
         "maximum_complexity": 18,

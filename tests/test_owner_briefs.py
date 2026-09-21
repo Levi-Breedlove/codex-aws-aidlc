@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import unittest
+import tempfile
+from pathlib import Path
 
 from scripts import fastlane_owner_briefs as briefs
 from scripts import fastlane_presenter as presenter
+from scripts import intake_response
+from scripts.fastlane_engine import owner_decisions
+from scripts.fastlane_engine.define import intake as intake_contracts
+from tests import test_bootstrap_doctor as fixtures
 
 
 class OwnerBriefProjectionTests(unittest.TestCase):
@@ -424,6 +430,178 @@ class OwnerBriefProjectionTests(unittest.TestCase):
 
         self.assertTrue(any("output budget" in issue for issue in issues), issues)
         self.assertIsNone(finalized["canonical_sha256"])
+
+
+class IntakeCardAdvanceTests(unittest.TestCase):
+    def advanced_text(self) -> str:
+        text = (fixtures.REPOSITORY_ROOT / "docs/project/PRD.md").read_text(
+            encoding="utf-8"
+        )
+        contract, _issues = intake_contracts.derive_intake_foundation_contract(
+            text, "greenfield", grandfather_current_gate_a=False
+        )
+        card = contract.pending_card
+        self.assertIsNotNone(card)
+        parsed = intake_response.parse_intake_owner_response(
+            "A",
+            card.to_dict(),
+            expected_card_id=card.card_id,
+            expected_revision=card.revision,
+            expected_sha256=card.canonical_sha256,
+            owner_response_id="OWNER-MSG-0001",
+        )
+        self.assertEqual(parsed.status, "PASS")
+        provenance = fixtures.intake_provenance(
+            "OWNER-MSG-0001",
+            card.card_id,
+            card.revision,
+            card.canonical_sha256,
+            "INTAKE-Q-0001",
+            "A",
+        )
+        text = fixtures.confirm_intake_foundation(
+            text,
+            {"INTAKE-0001": "NEW_APPLICATION"},
+            {"INTAKE-0001": provenance},
+        )
+        text = fixtures.replace_contract_table(
+            text,
+            intake_contracts.INTAKE_RESPONSE_REGISTER_HEADING,
+            intake_contracts.INTAKE_RESPONSE_REGISTER_HEADERS,
+            [
+                (
+                    "OWNER-MSG-0001",
+                    card.card_id,
+                    str(card.revision),
+                    card.canonical_sha256,
+                    "1",
+                    "INTAKE-Q-0001",
+                    "A",
+                    "NONE",
+                    "INTAKE-0001",
+                )
+            ],
+        )
+        return fixtures.replace_contract_table(
+            text,
+            intake_contracts.INTAKE_CARD_HEADING,
+            intake_contracts.INTAKE_CARD_HEADERS,
+            [
+                (
+                    "INTAKE-CARD-0002",
+                    "1",
+                    "1",
+                    "INTAKE-Q-0002",
+                    "FACT",
+                    "INTAKE-0002, INTAKE-0003, INTAKE-0004",
+                    "What useful result should the new application provide for its users?",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "NONE",
+                    "RESPONSE",
+                    "Name the users, their current difficulty, and the first result they need.",
+                    "PENDING",
+                    "NONE",
+                    "NONE",
+                )
+            ],
+        )
+
+    def test_next_card_confirms_the_previous_answer_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = fixtures.BootstrapDoctorTests()
+            project = fixture.copy_project(Path(temporary))
+            text = self.advanced_text()
+            # Retain the initialized project's configuration, replacing intake only.
+            current = (project / "docs/project/PRD.md").read_text(encoding="utf-8")
+            for heading, headers in (
+                (
+                    intake_contracts.INTAKE_FOUNDATION_HEADING,
+                    intake_contracts.INTAKE_FOUNDATION_HEADERS,
+                ),
+                (
+                    intake_contracts.INTAKE_RESPONSE_REGISTER_HEADING,
+                    intake_contracts.INTAKE_RESPONSE_REGISTER_HEADERS,
+                ),
+                (
+                    intake_contracts.INTAKE_CARD_HEADING,
+                    intake_contracts.INTAKE_CARD_HEADERS,
+                ),
+            ):
+                table = intake_contracts.contract_table_after_heading(
+                    text, heading, headers
+                )
+                current = fixtures.replace_contract_table(
+                    current, heading, headers, table.rows
+                )
+            (project / "docs/project/PRD.md").write_text(current, encoding="utf-8")
+            fixtures.refresh_document_summaries(project)
+            report = fixtures.doctor.inspect_project(project)
+            self.assertTrue(report["ok"], report["diagnostics"])
+            self.assertEqual(report["next_prompt"], "INTAKE-10")
+            self.assertEqual(
+                len(report["intake_foundation"]["pending_card"]["questions"]), 1
+            )
+            rendered = presenter.render_answer_progress(report, "OWNER-MSG-0001")
+            self.assertEqual(
+                rendered.count("Recorded: Starting point: a new application."), 1
+            )
+            self.assertIn("Updated: Starting point: a new application.", rendered)
+            self.assertIn("1. What useful result", rendered)
+            self.assertNotIn("What kind of project", rendered)
+            self.assertNotIn("Recorded:", presenter.render_owner_update(report))
+            with self.assertRaises(presenter.PresentationError):
+                presenter.render_answer_progress(report, "OWNER-MSG-0002")
+
+    def test_historical_confirmation_rejects_unproven_foundation_values(self) -> None:
+        text = self.advanced_text()
+        contract, issues = intake_contracts.derive_intake_foundation_contract(
+            text, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertEqual(issues, [])
+        row = next(
+            line for line in text.splitlines() if line.startswith("| INTAKE-0001 |")
+        )
+        for replacement in (
+            row.replace("OWNER-MSG-0001", "OWNER-MSG-0002"),
+            row.replace("OWNER_FACT", "AGENT_RECOMMENDATION"),
+            row.replace("OWNER_WORK_CONTEXT", "PRIMARY_USERS"),
+            row.replace("CONFIRMED", "OPEN"),
+            row.replace("NEW_APPLICATION", "TODO"),
+            row.replace("NEW_APPLICATION", "EXISTING_APPLICATION_CHANGE"),
+            row + "\n" + row,
+            "",
+        ):
+            with self.subTest(replacement=replacement):
+                projection = owner_decisions.derive_owner_answer_confirmation(
+                    text.replace(row, replacement, 1), contract
+                )
+                self.assertEqual(projection["status"], "BLOCKED")
+                self.assertEqual(projection["recorded"], [])
+
+    def test_rejected_intake_cannot_be_presented_as_a_confirmed_answer(self) -> None:
+        text = self.advanced_text()
+        row = next(
+            line for line in text.splitlines() if line.startswith("| INTAKE-0001 |")
+        )
+        text = text.replace(
+            row, row.replace("NEW_APPLICATION", "EXISTING_APPLICATION_CHANGE"), 1
+        )
+        contract, issues = intake_contracts.derive_intake_foundation_contract(
+            text, "greenfield", grandfather_current_gate_a=False
+        )
+        self.assertEqual(contract.status, "BLOCKED")
+        self.assertIn(
+            "INTAKE_FOUNDATION_PROVENANCE_INVALID", [code for code, _message in issues]
+        )
+        projection = owner_decisions.derive_owner_answer_confirmation(text, contract)
+        self.assertEqual(projection["status"], "BLOCKED")
+        self.assertEqual(projection["recorded"], [])
+        with self.assertRaises(presenter.PresentationError):
+            presenter.render_answer_confirmation(
+                {"owner_answer_confirmation": projection}, "OWNER-MSG-0001"
+            )
 
 
 if __name__ == "__main__":

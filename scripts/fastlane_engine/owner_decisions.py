@@ -15,8 +15,18 @@ from typing import Any
 from .core.contracts import contract_table_after_heading, table_after_heading
 from .core.ids import clean_cell, explicit_value
 from .core.markdown_index import heading_title_span
-from .define.intake import INTAKE_FOUNDATION_HEADERS, INTAKE_FOUNDATION_HEADING
-from .define.models import IntakeFoundationContract, RequirementsContract
+from .define.intake import (
+    INTAKE_FOUNDATION_FIELDS,
+    INTAKE_FOUNDATION_HEADERS,
+    INTAKE_FOUNDATION_HEADING,
+    OWNER_WORK_CONTEXT_SELECTIONS,
+)
+from .define.models import (
+    IntakeFoundationContract,
+    IntakeQuestion,
+    NormalizedOwnerResponse,
+    RequirementsContract,
+)
 from .design import (
     APPLICATION_SOURCE_BROWNFIELD,
     APPLICATION_SOURCE_GREENFIELD,
@@ -1083,6 +1093,64 @@ def derive_owner_decision_brief(
     return finalized, inventory, issues
 
 
+def _confirmed_foundation_answer(
+    prd_text: str, response: NormalizedOwnerResponse
+) -> list[str] | None:
+    """Bind a historical card answer to its still-confirmed canonical values."""
+    try:
+        table = contract_table_after_heading(
+            prd_text, INTAKE_FOUNDATION_HEADING, INTAKE_FOUNDATION_HEADERS
+        )
+    except ValueError:
+        return None
+    recorded: list[str] = []
+    for basis_id in response.basis_ids:
+        rows = [row for row in table.rows if row[0] == basis_id]
+        if len(rows) != 1:
+            return None
+        _identifier, field, value, basis, status, provenance = rows[0]
+        metadata = OWNER_INTAKE_DECISION_METADATA.get(field)
+        if (
+            metadata is None
+            or dict(INTAKE_FOUNDATION_FIELDS).get(basis_id) != field
+            or basis != "OWNER_FACT"
+            or status != "CONFIRMED"
+            or provenance != response.provenance
+            or not explicit_value(value, allow_none=False)
+        ):
+            return None
+        if field == "OWNER_WORK_CONTEXT":
+            if value != OWNER_WORK_CONTEXT_SELECTIONS.get(response.selection):
+                return None
+            value = {
+                "NEW_APPLICATION": "a new application.",
+                "EXISTING_APPLICATION_CHANGE": "a change to an existing application.",
+                "REPAIR_OR_MIGRATION": "a repair, replacement, or migration.",
+            }.get(value, value)
+            if response.selection_detail:
+                value += f" ({response.selection_detail})"
+        recorded.append(f"{metadata[1]}: {value}")
+    return recorded or None
+
+
+def _recorded_intake_answer(
+    prd_text: str, response: NormalizedOwnerResponse, question: IntakeQuestion | None
+) -> list[str] | None:
+    if question is None:
+        return _confirmed_foundation_answer(prd_text, response)
+    if response.selection == "RESPONSE":
+        value = response.selection_detail or ""
+    else:
+        value = {
+            "A": question.option_a,
+            "B": question.option_b,
+            "C": question.option_c,
+        }.get(response.selection, "")
+        if response.selection_detail:
+            value += f" ({response.selection_detail})"
+    return [f"{question.prompt}: {value}"] if value else None
+
+
 def derive_owner_answer_confirmation(
     prd_text: str,
     intake_contract: IntakeFoundationContract,
@@ -1091,6 +1159,8 @@ def derive_owner_answer_confirmation(
 
     if not intake_contract.normalized_responses:
         return answer_confirmation()
+    if intake_contract.status == "BLOCKED":
+        return answer_confirmation(status="BLOCKED")
     latest_number = max(
         int(item.owner_response_id.rsplit("-", 1)[1])
         for item in intake_contract.normalized_responses
@@ -1118,21 +1188,10 @@ def derive_owner_answer_confirmation(
     fields: list[str] = []
     for response in latest:
         question = question_by_id.get(response.question_id)
-        if question is None:
+        values = _recorded_intake_answer(prd_text, response, question)
+        if values is None:
             return answer_confirmation(status="BLOCKED")
-        if response.selection == "RESPONSE":
-            value = response.selection_detail or ""
-        else:
-            value = {
-                "A": question.option_a,
-                "B": question.option_b,
-                "C": question.option_c,
-            }.get(response.selection, "")
-            if response.selection_detail:
-                value += f" ({response.selection_detail})"
-        if not value:
-            return answer_confirmation(status="BLOCKED")
-        recorded.append(f"{question.prompt}: {value}")
+        recorded.extend(values)
         fields.extend(
             OWNER_CONFIRMATION_FIELDS.get(item, "project answer")
             for item in response.basis_ids

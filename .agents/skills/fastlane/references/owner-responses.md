@@ -136,6 +136,9 @@ new owner message may resolve it.
   shown flag. If the same response also renders the next route, use presenter
   mode `answer-progress`; its `Updated:` line is derived from the recorded
   change and must not say `Nothing.`
+  When replacing the current question, retain normalized response and foundation
+  provenance. The Engine confirms the previous answer from those bound values;
+  do not retain a second current question or reconstruct an old choice from memory.
 - At Gate A, accept a correction only as
   "Change the requirements: <correction>." At Gate B, accept one only as
   "Change the design: <correction>." Parse before writing, record owner
