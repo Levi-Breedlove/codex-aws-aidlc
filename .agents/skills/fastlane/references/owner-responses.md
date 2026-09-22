@@ -78,6 +78,18 @@ status, Gate, evidence, remediation, and authority facts come from the current
 Engine projection and presenter; natural explanation may clarify but never
 alter them.
 
+For architecture or validation explanations, inspect the current canonical
+records before composing the answer. Name the actual data recovery mechanism
+and material interface failure, timeout, rate, and performance bounds. Explain
+each applicable property's concrete invariant and the project risk it protects,
+not merely that varied inputs are tested. Give every current required validation
+command or API, including applicable property and journey checks, with its
+recorded execution/replay bounds and exact evidence destination. State when a
+required detail is absent rather than inventing it. Keep planned obligations
+distinct from observed results; expose missing constraints rather than borrowing
+another project's records. A generic promise to run checks does not satisfy
+this explanation.
+
 ## Plain-language decisions
 For guided intake, render only the current Engine-validated
 `INTAKE-CARD-*`. Keep its stable reply key for internal parser binding, but
@@ -172,6 +184,9 @@ exactly these labels:
   fill every `<...>` placeholder and return the entire canonical block; and
 - `After that:` the work Fastlane will continue automatically.
 
+Keep source links and correction guidance inside those six labels; do not add
+a seventh decision-card label such as `Review:`.
+
 The card summarizes but never replaces or alters the exact gate receipt or the
 full canonical AWS template. A placeholder-bearing AWS block is a template, not
 an exact or current receipt, a copyable reply, or authority. Show the entire
@@ -218,13 +233,22 @@ a second editable brief.
   explaining the authority limit. For Gate B, name the actual selected architecture
   and principal rejected alternative, then state the exact
   allowed local write set, command boundary, attempt/checkpoint limits, and
-  exclusions from the current construction envelope. Restore the same pending
-  gate action and never repeat the formal receipt.
+  exclusions from the current construction envelope. Include its expiry and
+  earlier completion condition, dependency/external restrictions, and actual
+  recovery and teardown allowances. Distinguish a permitted local rollback
+  from AWS rollback requiring separate current authority; do not describe all
+  rollback as either permitted or requiring a new approval. Restore the same
+  pending gate action and never repeat the formal receipt.
 - A source-navigation reply uses only the current Engine-projected
   `source_locators`. Render a scannable list containing each locator key,
   repository-relative path, bound heading, and inclusive current line range.
   Never reuse offsets from a different raw, template, or previously rendered
-  PRD, and never estimate line numbers.
+  PRD, and never estimate line numbers. Verify every linked fragment against
+  the current document's actual anchor or existing working link; do not infer
+  one by shortening a heading, dropping its number, or collapsing punctuation.
+  If no fragment is verified, link the file and retain the exact heading and
+  line range instead of inventing an anchor. Apply this rule to consultation
+  links as well as navigation tables.
 - After DIAGRAM-10, claim completion only from observed current task evidence.
   Use presenter mode `architecture-board-completion` with the current request
   packet and an Engine-captured completion projection bound to the current
@@ -247,4 +271,13 @@ a second editable brief.
   write boundary, and exact validation commands/evidence destinations being
   rerun, followed by the exact one-time Engine rerun command and current
   remediation fingerprint. Do not reduce it to a generic statement that
-  validation failed.
+  validation failed. State explicitly when the current task is NONE. If the
+  correction projects no application-validation command or evidence destination,
+  say so and preserve the required Engine rerun; do not invent an application
+  check for metadata repair.
+- A failed task-completion reply also names the actual task, exact write set,
+  attempts used and remaining, focused failing command, any distinct broader
+  required command, and canonical evidence destination. Describe the bounded
+  recovery handoff concretely even when the response itself performs no repair.
+  Retain failed observations and distinguish an accepted evidence-record
+  transition from an observed test execution.
