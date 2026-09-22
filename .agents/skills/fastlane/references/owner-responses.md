@@ -88,7 +88,14 @@ recorded execution/replay bounds and exact evidence destination. State when a
 required detail is absent rather than inventing it. Keep planned obligations
 distinct from observed results; expose missing constraints rather than borrowing
 another project's records. A generic promise to run checks does not satisfy
-this explanation.
+this explanation. These duties also apply when architecture appears inside a
+Gate-comprehension answer or validation appears in a harness answer, including
+current interface/recovery drivers and explicit disclosure of absent constraints.
+Before drafting it, collect obligations from the current task and selected
+validation profile, the property execution contract, and the IaC/delivery
+validation contract. Include required checks that are outside the current
+command boundary, explaining the unresolved permission separately; another
+profile's not-applicable row does not cancel those obligations.
 
 ## Plain-language decisions
 For guided intake, render only the current Engine-validated
@@ -248,7 +255,9 @@ a second editable brief.
   one by shortening a heading, dropping its number, or collapsing punctuation.
   If no fragment is verified, link the file and retain the exact heading and
   line range instead of inventing an anchor. Apply this rule to consultation
-  links as well as navigation tables.
+  links as well as navigation tables. A file link does not validate adjacent
+  prose section names: copy current headings verbatim, including their numbers,
+  and retain the current locator range when one is supplied.
 - After DIAGRAM-10, claim completion only from observed current task evidence.
   Use presenter mode `architecture-board-completion` with the current request
   packet and an Engine-captured completion projection bound to the current
@@ -280,4 +289,7 @@ a second editable brief.
   required command, and canonical evidence destination. Describe the bounded
   recovery handoff concretely even when the response itself performs no repair.
   Retain failed observations and distinguish an accepted evidence-record
-  transition from an observed test execution.
+  transition from an observed test execution. Resolve evidence destinations
+  from the current observation or source record, retaining its actual directory
+  and heading. A familiar filename does not establish its parent directory;
+  never substitute the template's usual path for a differently bound source.
