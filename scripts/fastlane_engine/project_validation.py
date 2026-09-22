@@ -738,6 +738,36 @@ def _record_project_configuration_issues(
         )
 
 
+def _validate_gate_a_projection(
+    ctx,
+    text,
+    grandfather_approved_v1_requirements,
+    gate_a_card,
+    requirements_contract,
+    card_cost_posture,
+    project,
+):
+    validate_gate_a_method_contract(
+        ctx,
+        text,
+        grandfather_approved_v1=grandfather_approved_v1_requirements,
+    )
+    validate_gate_a_readiness_card(
+        ctx,
+        gate_a_card,
+        completion_target_required=requirements_contract.schema_version
+        in {"1.5", "1.6"},
+    )
+    readiness_projection_issues = gate_a_readiness_projection_issues(
+        card_cost_posture,
+        gate_a_card,
+        requirements_contract,
+        project.get("cost_posture"),
+    )
+    for code, issue, path in readiness_projection_issues:
+        ctx.error(code, issue, path)
+
+
 def validate_prd(
     ctx: Context,
     state: dict[str, Any],
@@ -1024,24 +1054,15 @@ def validate_prd(
                 ctx.error("DESIGN_CONTRACT_INVALID", issue, PRD_FILE)
     card_cost_posture = clean_cell(gate_a_card.get("Cost posture", ""))
     if gate_a_agent_ready or gate_a_ready_or_current:
-        validate_gate_a_method_contract(
+        _validate_gate_a_projection(
             ctx,
             text,
-            grandfather_approved_v1=grandfather_approved_v1_requirements,
-        )
-        validate_gate_a_readiness_card(
-            ctx,
-            gate_a_card,
-            completion_target_required=requirements_contract.schema_version == "1.5",
-        )
-        readiness_projection_issues = gate_a_readiness_projection_issues(
-            card_cost_posture,
+            grandfather_approved_v1_requirements,
             gate_a_card,
             requirements_contract,
-            project.get("cost_posture"),
+            card_cost_posture,
+            project,
         )
-        for code, issue, path in readiness_projection_issues:
-            ctx.error(code, issue, path)
     if gate_b_agent_ready or gate_b_ready_or_current:
         validate_readiness_card(ctx, gate_b_card, GATE_B_READINESS_FIELDS, "GATE_B")
         expected_technology_ids = ", ".join(

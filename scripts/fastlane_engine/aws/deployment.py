@@ -1652,4 +1652,41 @@ def derive_deployment_sequence_state(
     }
 
 
-__all__ = ("derive_deployment_sequence_state",)
+def validated_deployment_release_cutoff(
+    verify_text: str, sequence: Mapping[str, Any]
+) -> str | None:
+    """Consume a completed sequence evaluation of this exact immutable VERIFY text.
+
+    Empty validation issues plus a concrete attempt imply successful sequence,
+    scope, receipt, chronology and historical-group checks. This is evidence
+    proof only; it grants no current authority and preserves historical basis.
+    """
+    cutoff = sequence.get("release_evidence_cutoff")
+    attempt = sequence.get("attempt_id")
+    if (
+        sequence.get("issues") != []
+        or not isinstance(cutoff, str)
+        or re.fullmatch(r"EV-\d{4,}", cutoff) is None
+        or not isinstance(attempt, str)
+        or AWS_DEPLOYMENT_ATTEMPT_ID.fullmatch(attempt) is None
+    ):
+        return None
+    try:
+        matches = [
+            row
+            for row in parse_deployment_reconciliation_evidence(verify_text)
+            if clean_cell(row.get("Evidence ID", "")) == cutoff
+        ]
+    except ValueError:
+        return None
+    if len(matches) != 1:
+        return None
+    row = matches[0]
+    if clean_cell(row.get("Phase", "")) != "AWS-30" or clean_cell(
+        row.get("Status", "")
+    ) not in {"COMPLETE", "BLOCKED"}:
+        return None
+    return cutoff
+
+
+__all__ = ("derive_deployment_sequence_state", "validated_deployment_release_cutoff")

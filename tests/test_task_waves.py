@@ -363,6 +363,10 @@ def write_gate_b_bound_project(
         + "\n"
     )
     prd = doctor_fixtures.approve_gate_b(doctor_fixtures.approve_gate_a(prd))
+    from tests.alpha_project_fixture import bind_alpha_task_checks
+
+    tasks_text = bind_alpha_task_checks(prd, tasks_text)
+    tasks_path.write_text(tasks_text, encoding="utf-8")
     (tasks_path.parent / "PRD.md").write_text(prd, encoding="utf-8")
     (root / "bootstrap.manifest.json").write_text("{}\n", encoding="utf-8")
     return tasks_path, write_matching_state(root, tasks_text)

@@ -52,6 +52,7 @@ from .deliver import (
     parse_checkpoint_rows,
     parse_property_test_evidence as _parse_property_test_evidence_core,
     parse_release_decision_record as _parse_release_decision_record_core,
+    derive_local_release_check_evidence,
     task_requirement_evidence_dispositions,
     task_requirement_rules as _task_requirement_rules_core,
     technology_version_policy_allows as _technology_version_policy_allows_core,
@@ -209,6 +210,8 @@ def approved_delivery_contract_from_design(
             grandfathered=False,
             application_source_kind=source_kind,
             application_source_paths=source_paths,
+            validation_checks=project.validation_checks,
+            acceptance_criteria=project.acceptance_criteria,
         )
     first_wave = project.first_wave
     approved_spike: ApprovedSpikeContract | None = None
@@ -244,6 +247,8 @@ def approved_delivery_contract_from_design(
         application_source_kind=source_kind,
         application_source_paths=source_paths,
         spike=approved_spike,
+        validation_checks=project.validation_checks,
+        acceptance_criteria=project.acceptance_criteria,
     )
 
 
@@ -1396,12 +1401,46 @@ def validate_tasks(
     return summary
 
 
-def validate_release_decision_record(ctx: Context) -> dict[str, str]:
+def validate_release_decision_record(
+    ctx: Context,
+    design_contract: DesignContract | None = None,
+    prd_fields: Mapping[str, Any] | None = None,
+) -> dict[str, str]:
     """Observe VERIFY and delegate release validation to Delivery."""
 
     relative = VERIFY_FILE
     text = ctx.texts.get(relative) or safe_read_text(ctx, relative)
     record, issues = _parse_release_decision_record_core(text)
+    if (
+        design_contract is not None
+        and design_contract.project_contract.schema_version >= 9
+        and record["release_state"] != "NOT_READY"
+    ):
+        fields = prd_fields or {}
+        basis = " / ".join(
+            str(fields.get(field, ""))
+            for field in (
+                "requirements_revision",
+                "design_revision",
+                "construction_authorization",
+            )
+        )
+        try:
+            active_scope = table_after_heading(text or "", "## Active evidence scope")
+        except ValueError:
+            active_scope = {}
+        cutoff, local_issues = derive_local_release_check_evidence(
+            text or "",
+            design_contract.project_contract.validation_checks,
+            design_contract.canonical_sha256,
+            basis,
+            clean_cell(active_scope.get("Commit, tag, or image digest", "")),
+            ctx.observed_at,
+        )
+        if cutoff is not None:
+            record["local_check_evidence_cutoff"] = cutoff
+        for issue in local_issues:
+            ctx.error("RELEASE_CHECK_EVIDENCE", issue, relative)
     for code, message in issues:
         ctx.error(code, message, relative)
     return record

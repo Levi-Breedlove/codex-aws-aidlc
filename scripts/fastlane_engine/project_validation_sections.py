@@ -40,7 +40,7 @@ def current_requirements_gate_issues(
             )
         )
     if (
-        contract.schema_version == "1.5"
+        contract.schema_version in {"1.5", "1.6"}
         and gate_a_agent.get("Requirements contract SHA-256 analyzed")
         != contract.canonical_sha256
     ):
@@ -63,7 +63,7 @@ def gate_a_readiness_projection_issues(
 
     issues: list[tuple[str, str, str]] = []
     if (
-        contract.schema_version == "1.5"
+        contract.schema_version in {"1.5", "1.6"}
         and clean_cell(gate_a_card.get("Project completion target", ""))
         != contract.completion_target
     ):

@@ -1054,6 +1054,42 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
                 self.assertEqual(allowed["status"], "ACTION_TERMINAL_REQUIRED", allowed)
                 self.assertEqual(allowed["attempt_id"], "AWS-DEPLOY-0002")
                 self.assertEqual(allowed["deployment_authorization"], "AWS-AUTH-0002")
+                from scripts.fastlane_engine.aws import (
+                    validated_deployment_release_cutoff,
+                )
+                from scripts.fastlane_engine.orchestration import (
+                    _validate_release_evidence_cutoff,
+                )
+
+                verify_text, _ = self.deployment_verify_text(
+                    rows, lane=lane, explicit_authorization_id="AWS-AUTH-0002"
+                )
+                self.assertEqual(
+                    validated_deployment_release_cutoff(verify_text, allowed), "EV-2373"
+                )
+                record = {
+                    "local_check_evidence_cutoff": "EV-0001",
+                    "active_evidence_cutoff": "EV-2373",
+                }
+                ctx = doctor.Context(PROJECT_ROOT)
+                _validate_release_evidence_cutoff(ctx, record, {}, allowed, verify_text)
+                self.assertFalse(ctx.has_errors, ctx.diagnostics)
+                self.assertNotIn("validated_terminal_release_cutoff", allowed)
+                for broken in (
+                    {**allowed, "issues": ["historical receipt mismatch"]},
+                    {**allowed, "release_evidence_cutoff": "`EV-2373`"},
+                    {**allowed, "release_evidence_cutoff": "EV-2374"},
+                    {**allowed, "attempt_id": "NONE"},
+                ):
+                    self.assertIsNone(
+                        validated_deployment_release_cutoff(verify_text, broken)
+                    )
+                    rejected = doctor.Context(PROJECT_ROOT)
+                    _validate_release_evidence_cutoff(
+                        rejected, record, {}, broken, verify_text
+                    )
+                    self.assertTrue(rejected.has_errors)
+                self.assertIsNone(validated_deployment_release_cutoff("", allowed))
 
     def test_deployment_and_read_observations_cannot_precede_authorization(
         self,
@@ -2163,9 +2199,92 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
                 1,
             ).replace(
                 "- Active evidence cutoff: TODO",
-                "- Active evidence cutoff: NONE",
+                "- Active evidence cutoff: EV-9499",
                 1,
             )
+
+            from scripts.fastlane_engine.deliver.evidence import RELEASE_CHECK_HEADERS
+            from scripts.fastlane_engine.core.contracts import (
+                contract_table_after_heading,
+            )
+
+            design = doctor.inspect_project(project)["design_contract"]
+            local_rows = [
+                (
+                    row[0],
+                    design["canonical_sha256"],
+                    "EV-9499",
+                    row[3],
+                    "2.5",
+                    self._DEPLOYMENT_ARTIFACT,
+                    "2026-07-17T18:11:00Z",
+                    "docs/project/VERIFY.md#iac-validation-evidence",
+                    "LOCAL_PASS",
+                    "REQ-0001 / DES-0001 / AUTH-0001",
+                )
+                for row in design["project_contract"]["validation_checks"]
+                if row[2] == "LOCAL_RELEASE"
+            ]
+            self.assertTrue(local_rows)
+            verify_text = replace_contract_table(
+                verify_text,
+                "### Exact local check results",
+                RELEASE_CHECK_HEADERS,
+                local_rows,
+            )
+            anchor_text = support.task_completion_evidence_section(
+                (
+                    "EV-9499",
+                    "python -m unittest",
+                    "2026-07-17T18:10:00Z",
+                    self._DEPLOYMENT_ARTIFACT,
+                    "docs/project/VERIFY.md#ev-9499",
+                    "LOCAL_PASS",
+                )
+            )
+            task_start = verify_text.index("## Task completion evidence")
+            task_end = verify_text.index("\n## ", task_start + 1)
+            verify_text = (
+                verify_text[:task_start] + anchor_text + verify_text[task_end:]
+            )
+            matrix = contract_table_after_heading(
+                verify_text, "## Verification matrix", self._VERIFICATION_MATRIX_HEADERS
+            )
+            verify_text = replace_contract_table(
+                verify_text,
+                "## Verification matrix",
+                self._VERIFICATION_MATRIX_HEADERS,
+                [
+                    *matrix.rows,
+                    (
+                        "EV-9499",
+                        "FR-001",
+                        "TASK-001",
+                        "Local release anchor",
+                        "Exact local checks passed",
+                        "NONE",
+                        self._DEPLOYMENT_ARTIFACT,
+                        "LOCAL_PASS",
+                    ),
+                ],
+            )
+            local_ledger = contract_table_after_heading(
+                verify_text, "### Exact local check results", RELEASE_CHECK_HEADERS
+            ).rows
+            verify_path.write_text(
+                verify_text.replace(
+                    "- Active evidence cutoff: EV-9499",
+                    "- Active evidence cutoff: EV-9999",
+                ),
+                encoding="utf-8",
+            )
+            invalid_cutoff = doctor.inspect_project(project)
+            self.assertFalse(invalid_cutoff["ok"])
+            self.assertIn(
+                "RELEASE_CHECK_EVIDENCE",
+                {row["code"] for row in invalid_cutoff["diagnostics"]},
+            )
+            self.assert_no_external_mutation_authority(invalid_cutoff)
 
             started = self.deployment_row(
                 evidence_id="EV-9501",
@@ -2375,7 +2494,7 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
                 "- Release state: `RELEASE_VERIFIED`",
                 1,
             ).replace(
-                "- Active evidence cutoff: NONE",
+                "- Active evidence cutoff: EV-9499",
                 "- Active evidence cutoff: EV-9503",
                 1,
             )
@@ -2389,6 +2508,14 @@ class AwsDeploymentReconciliationRegressionTests(unittest.TestCase):
             self.assertFalse(consumed_report["write_authority"]["valid"])
             self.assertEqual(consumed_report["authorizations"]["construction"], "NONE")
             self.assertEqual(consumed_report["external_authority"]["kind"], "NONE")
+            self.assertEqual(
+                contract_table_after_heading(
+                    verify_path.read_text(encoding="utf-8"),
+                    "### Exact local check results",
+                    RELEASE_CHECK_HEADERS,
+                ).rows,
+                local_ledger,
+            )
 
     def test_stale_gate_b_closes_historical_attempt_without_reapproval(self) -> None:
         fixture = support.BootstrapDoctorTests()

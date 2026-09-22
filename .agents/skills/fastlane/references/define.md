@@ -41,11 +41,11 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A. The Engine owns routing and vali
 ## Requirements and Gate A
 
 - Keep owner facts, repository observations, Codex recommendations, assumptions, and open decisions distinct. Owner-controlled semantics are never inferred.
-- Requirements contract 1.5 retains the requirements change lineage and assumption lifecycle, binds one project completion target (`LOCAL`, `AWS_READ`, `DEPLOYED`, or `RECOVERY`), and adds typed `METRIC-*`, `DATASET-*`, `OBL-*`, and `RISK-*` records. Metrics name baseline, target, window, evidence source, accountable role, guardrail, and missed-target action. Dataset rows bind purpose, classification, source of truth, access, retention, deletion, recovery, residency, migration, audit, owner, and requirement basis; a project with no persistent data uses the single exact `NO PERSISTENT DATA`/`NONE` row and requires no invented Design mapping. External obligations record an applicable obligation or the canonical `NONE_IDENTIFIED` row, whose only concrete content is its source/basis and review trigger. Cross-cutting risks name owner, likelihood, impact, mitigation, trigger, linked requirements, and status.
+- Requirements contract 1.6 retains the requirements change lineage and assumption lifecycle, binds one project completion target (`LOCAL`, `AWS_READ`, `DEPLOYED`, or `RECOVERY`), and adds typed `METRIC-*`, `DATASET-*`, `OBL-*`, and `RISK-*` records. Metrics name baseline, target, window, evidence source, accountable role, guardrail, and missed-target action. Dataset rows bind purpose, classification, source of truth, access, retention, deletion, recovery, residency, migration, audit, owner, and requirement basis; a project with no persistent data uses the single exact `NO PERSISTENT DATA`/`NONE` row and requires no invented Design mapping. External obligations record an applicable obligation or the canonical `NONE_IDENTIFIED` row, whose only concrete content is its source/basis and review trigger. Cross-cutting risks name owner, likelihood, impact, mitigation, trigger, linked requirements, and status.
 - Give each normative requirement one stable ID, one observable obligation in the Fastlane EARS Contract, one canonical `AC-*`, and `GHERKIN` or `MEASURABLE` acceptance. `METRIC-*`, `DATASET-*`, `OBL-*`, and `RISK-*` are typed side registries and never enter delivery requirement coverage. Goals, stories, facts, assumptions, decisions, tasks, tests, receipts, and evidence are not EARS rows.
 - Build actors, journeys, conditional rich use cases, business rules, and exact requirement coverage from owner-grounded facts. Actor kinds are `PRIMARY_USER`, `SECONDARY_USER`, `OPERATOR`, or `EXTERNAL_SYSTEM`. Trace every first-release requirement exactly once and bind every `ACT-*` and `JOURNEY-*`. Never invent an owner fact to complete a record.
 - Rich-use-case triggers are `DISTINCT_PERMISSIONED_ACTORS`, `CONFIDENTIAL_OR_REGULATED_MUTATION`, `MONEY_OR_ENTITLEMENT`, `IRREVERSIBLE_ACTION`, `MIGRATION_OR_CUTOVER`, `ASYNCHRONOUS_WORK`, `PARTIAL_FAILURE`, or `NONE`. At low/moderate risk, each triggered journey owns a rich use case; at high/critical risk, every journey does. Keep applicability journey-specific.
-- Apply the Engine's requirements migration exactly: unchanged approved 1.4 contracts retain their exact 1.4 digest without entering the legacy Gate A bridge; older approved contracts retain only their exact historical shape. A 1.3 record containing 1.4 or 1.5 surfaces, or a 1.4 record containing 1.5 surfaces, is partially upgraded. New, unapproved, stale, partially upgraded, or requirements-changed records use 1.5 and invalidate both gates. Do not rewrite owner facts merely to modernize record shape.
+- Apply the Engine's requirements migration exactly: unchanged approved 1.4 contracts retain their exact 1.4 digest without entering the legacy Gate A bridge; older approved contracts retain only their exact historical shape. A 1.3 record containing 1.4 or 1.5 surfaces, or a 1.4 record containing 1.5 surfaces, is partially upgraded. New, unapproved, stale, partially upgraded, or requirements-changed records use 1.6 and invalidate both gates. Do not rewrite owner facts merely to modernize record shape.
 - Add `QAS-*` only for material performance, availability, reliability, recovery, scalability, security-response, or operational-response concerns; otherwise record `NOT_APPLICABLE — <concrete reason>`.
 - Derive the Adaptive Coverage Plan without another question. Confirmed `NEW_APPLICATION` requires `NEW_BUILD`, but never infer owner context from repository state or work kind. `SELECT`, `AMEND`, and `PRESERVE` change design coverage, not safeguards. Unsupported omissions or uncertain impact use full coverage; Quick MVP changes depth, never safety.
 - Use STRIDE only when material trust boundaries warrant it, LINDDUN only when materially privacy-sensitive data warrants it, and OWASP Top 10 only for a material application attack surface. Selecting and applying STRIDE, LINDDUN, or OWASP Top 10 is procedural coordinator review; record conclusions in existing requirements, controls, tests, Harness, and evidence, never a new stage or gate.
@@ -59,3 +59,26 @@ Use for BOOT-00, INTAKE-10, REQ-10, and Gate A. The Engine owns routing and vali
 - The coordinator writes the analysis and readiness card. Only the owner can approve the exact Gate A receipt.
 - The Gate A Owner Brief is the complete human review of the Product Agreement. It includes the completion target, outcome metrics, users, first-release journey, scope and non-goals, per-category data obligations, external obligations, cross-cutting risks and owners, Region and cost, measurable acceptance, every owner decision and source, claim maturity, corrections, unauthorized work, and what follows approval.
 - Resolve every Gate A source link from the current canonical PRD headings. Put those links before the exact receipt; after receipt-only approval, the first automatic Design update links back to Gate A and forward to the Technical Plan.
+
+
+## Concrete input and recovery contract
+
+Requirements 1.6 adds complete Recovery applicability, Recovery scenario
+classification, Input applicability, and Input boundaries tables. Bind every
+dataset to RESTORE, RECREATE, or NONE and every quality scenario to RECOVERY or
+OTHER. A recovery scenario uses the same mode and exact `RTO <minutes> minutes
+and RPO <minutes> minutes` measure as its dataset. Recreating synthetic fixtures
+cannot satisfy a backup or restore promise; reconcile both the requirement and
+its acceptance criterion before asking for Gate A.
+
+Enumerate every requirement in Input applicability. Use explicit NONE with a
+reason or concrete INPUT IDs. Each input boundary declares ENUM, TEXT_LENGTH,
+or NUMBER_RANGE, exact bounds or allowed JSON values, one valid JSON example,
+one invalid JSON example, and safe rejection behavior. Multiple constraints
+may describe one field. Do not infer unrecorded limits or invent owner facts.
+
+The Engine checks typed declarations and traceability; it cannot establish
+that arbitrary prose or tests fully express owner intent. Review that meaning
+against the owner-confirmed outcome. Unchanged approved 1.5 retains its exact
+digest only with no 1.6 surfaces. A heading-only or partial upgrade requires
+migration, including for older schemas. Requirements changes stale both gates.

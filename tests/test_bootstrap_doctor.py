@@ -187,21 +187,42 @@ def remove_markdown_section(text: str, heading: str) -> str:
     return text[:start] + text[tail_start + match.start() :]
 
 
+def remove_contract_heading_and_table(text: str, heading: str) -> str:
+    matches = list(re.finditer(r"^" + re.escape(heading) + r"[ \t]*\r?\n", text, re.M))
+    if len(matches) != 1:
+        raise AssertionError(f"Expected one exact heading: {heading!r}")
+    match = matches[0]
+    next_heading = re.search(r"^#{1,6}[ \t]+", text[match.end() :], re.M)
+    end = match.end() + next_heading.start() if next_heading else len(text)
+    body = text[match.end() : end]
+    table = re.search(
+        r"^\|[^\r\n]*(?:\r?\n|$)(?:^\|[^\r\n]*(?:\r?\n|$))*",
+        body,
+        re.M,
+    )
+    if table is not None:
+        body = body[: table.start()] + body[table.end() :]
+    return text[: match.start()] + body + text[end:]
+
+
 def without_design8_sections(text: str) -> str:
     headings = (
+        "### Validation check bindings",
         doctor.DATASET_IMPLEMENTATION_HEADING,
         doctor.ENVIRONMENT_PROMOTION_HEADING,
         doctor.WELL_ARCHITECTED_HEADING,
         doctor.DEPENDENCY_POLICY_HEADING,
     )
-    for heading in sorted(headings, key=text.index, reverse=True):
-        text = remove_markdown_section(text, heading)
+    for heading in sorted(
+        (h for h in headings if h in text), key=text.index, reverse=True
+    ):
+        text = remove_contract_heading_and_table(text, heading)
     return text
 
 
 def exact_legacy_requirements_projection(text: str) -> str:
     text = re.sub(
-        r"(?m)^\| Project contract schema \| `1\.5` \|\r?\n",
+        r"(?m)^\| Project contract schema \| `1\.6` \|\r?\n",
         "",
         text,
         count=1,
@@ -227,7 +248,7 @@ def exact_legacy_requirements_projection(text: str) -> str:
         return "\n".join(rows) + "\n"
 
     text = modern_pattern.sub(legacy_table, text)
-    for heading in (
+    headings = (
         doctor.ACTOR_HEADING,
         doctor.JOURNEY_HEADING,
         doctor.RICH_USE_CASE_APPLICABILITY_HEADING,
@@ -240,18 +261,22 @@ def exact_legacy_requirements_projection(text: str) -> str:
         doctor.DATASET_HEADING,
         doctor.EXTERNAL_OBLIGATION_HEADING,
         doctor.CROSS_CUTTING_RISK_HEADING,
+        "### Recovery applicability",
+        "### Recovery scenario classification",
+        "### Input applicability",
+        "### Input boundaries",
+    )
+    for heading in sorted(
+        (h for h in headings if h in text), key=text.index, reverse=True
     ):
-        heading_start = text.index(heading)
-        table_start = text.index("|", heading_start)
-        table_end = text.index("\n\n", table_start)
-        text = text[:table_start] + text[table_end + 2 :]
+        text = remove_contract_heading_and_table(text, heading)
     return text
 
 
 def exact_legacy_schema_four_projection(text: str) -> str:
     text = without_design8_sections(text)
     text = re.sub(
-        r"(?m)^\| Project design contract schema \| `8` \|\r?\n",
+        r"(?m)^\| Project design contract schema \| `9` \|\r?\n",
         "",
         text,
         count=1,
@@ -542,7 +567,7 @@ def complete_requirements_contract(text: str) -> str:
         "## Document status",
         "## 1. Workload profile",
         "Project contract schema",
-        "`1.5`",
+        "`1.6`",
     )
     text = set_table_value(
         text,
@@ -724,7 +749,9 @@ def complete_requirements_contract(text: str) -> str:
             )
         ],
     )
-    return text
+    from tests.alpha_project_fixture import complete_alpha_requirements
+
+    return complete_alpha_requirements(text, requirement_ids)
 
 
 def approve_gate_a(
@@ -805,7 +832,7 @@ def approve_gate_a(
         or requirements_contract.canonical_sha256 is None
     ):
         raise AssertionError(
-            "Test Gate A requires a complete Requirements 1.5 contract: "
+            "Test Gate A requires a complete Requirements 1.6 contract: "
             + "; ".join(
                 [
                     *(str(item) for item in intake_issues),
@@ -1573,7 +1600,7 @@ def complete_project_design_contract(text: str) -> str:
         "## Document status",
         "## 1. Workload profile",
         "Project design contract schema",
-        "`8`",
+        "`9`",
     )
     text = replace_contract_table(
         text,
@@ -1583,13 +1610,13 @@ def complete_project_design_contract(text: str) -> str:
             (
                 "API-001",
                 "API",
-                "FR-001",
+                "FR-001, FR-002",
                 "Local client",
                 "Trusted application service",
                 "Versioned request/response schema",
                 "NOT_APPLICABLE - local development fixture",
                 "Server verifies the caller may request the local outcome",
-                "Reject values outside the approved schema",
+                "INPUT-001",
                 "Return the approved outcome with success status",
                 "Return a safe error and preserve approved state",
                 "Compatible schema additions only",
@@ -2675,9 +2702,13 @@ def complete_design_contract(text: str) -> str:
             ),
         ],
     )
-    return complete_owner_visible_design(
-        complete_diagram_contract(
-            complete_design8_extension(complete_project_design_contract(text))
+    from tests.alpha_project_fixture import complete_alpha_design
+
+    return complete_alpha_design(
+        complete_owner_visible_design(
+            complete_diagram_contract(
+                complete_design8_extension(complete_project_design_contract(text))
+            )
         )
     )
 
@@ -2930,14 +2961,16 @@ def complete_legacy_design_bridge(text: str) -> str:
             )
         ],
     )
-    return complete_state_diagrams(text, actorless_primary=True)
+    return complete_state_diagrams(
+        schema_six_design_projection(text), actorless_primary=True
+    )
 
 
 def schema_six_design_projection(text: str) -> str:
     """Project a modern test design into the exact pre-AWS schema-six shape."""
 
     text = text.replace(
-        "| Project design contract schema | `8` |",
+        "| Project design contract schema | `9` |",
         "| Project design contract schema | `6` |",
         1,
     )
@@ -4052,6 +4085,11 @@ class BootstrapDoctorTests(unittest.TestCase):
             "| Task-plan state | `CURRENT` |",
             1,
         )
+        from tests.alpha_project_fixture import bind_alpha_task_checks
+
+        task_text = bind_alpha_task_checks(
+            (project / "docs/project/PRD.md").read_text(encoding="utf-8"), task_text
+        )
         tasks_path.write_text(text + task_text, encoding="utf-8")
 
     def pause_project_at_real_checkpoint(self, project: Path) -> str:
@@ -4182,7 +4220,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.3.5")
+        self.assertEqual(report["bootstrap_version"], "1.4.0")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -4204,7 +4242,16 @@ class BootstrapDoctorTests(unittest.TestCase):
             report["authorizations"],
             {"construction": "NONE", "aws": "NONE"},
         )
-        self.assertEqual(report["design_contract"]["schema_version"], 8)
+        self.assertEqual(report["design_contract"]["schema_version"], 9)
+        self.assertEqual(
+            report["design_contract"]["project_contract"]["schema_version"], 9
+        )
+        self.assertEqual(
+            report["design_contract"]["project_contract"]["status"], "UNINITIALIZED"
+        )
+        self.assertIsNone(
+            report["design_contract"]["project_contract"]["canonical_sha256"]
+        )
         self.assertIn(
             report["design_contract"]["status"],
             {"UNINITIALIZED", "BLOCKED"},
@@ -4430,11 +4477,8 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(
             doctor.quality_attribute_scenario_issues(text, requirement_ids), []
         )
-        broken = text.replace(
-            "A timed restore rehearsal meets RTO 60 minutes and RPO 15 minutes.",
-            "TODO",
-            1,
-        )
+        broken = text.replace("RTO 60 minutes and RPO 0 minutes", "TODO", 1)
+        self.assertNotEqual(broken, text)
         issues = doctor.quality_attribute_scenario_issues(broken, requirement_ids)
         self.assertTrue(
             any("QAS-001: Response measure is unresolved" in issue for issue in issues)
@@ -4989,13 +5033,17 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "Pay-per-use compute fits the approved request volume",
             ),
             "IaC validation": (
-                "sam validate, selected lint, and policy checks",
-                "sam validate, selected lint, policy checks, and template review",
+                "sam validate --lint --template-file infrastructure/template.yaml",
+                "sam validate --lint --template-file infrastructure/validated-template.yaml",
             ),
         }
         for label, (before, after) in support_changes.items():
             with self.subTest(support_digest=label):
-                candidate = complete.replace(before, after, 1)
+                candidate = (
+                    complete.replace(before, after)
+                    if label == "IaC validation"
+                    else complete.replace(before, after, 1)
+                )
                 self.assertNotEqual(candidate, complete)
                 changed, changed_issues = doctor.derive_design_contract(
                     candidate, "DES-0001", required=True
@@ -5007,7 +5055,12 @@ class BootstrapDoctorTests(unittest.TestCase):
                     changed.architecture.canonical_sha256,
                     ready.architecture.canonical_sha256,
                 )
-                self.assertEqual(
+                project_assertion = (
+                    self.assertNotEqual
+                    if label == "IaC validation"
+                    else self.assertEqual
+                )
+                project_assertion(
                     changed.project_contract.canonical_sha256,
                     ready.project_contract.canonical_sha256,
                 )
@@ -5531,7 +5584,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 8)
+        self.assertEqual(ready.schema_version, 9)
         self.assertEqual(ready.architecture.schema_version, 4)
         self.assertEqual(ready.change_impact.status, "READY")
         self.assertEqual(ready.architecture.status, "READY")
@@ -5892,9 +5945,9 @@ class BootstrapDoctorTests(unittest.TestCase):
             self.assertTrue(ready_report["ok"], ready_report["diagnostics"])
             self.assertEqual(ready_report["status"], "RESUME")
             self.assertEqual(ready_report["next_prompt"], "TASK-10")
-            self.assertEqual(contract["schema_version"], 8)
+            self.assertEqual(contract["schema_version"], 9)
             self.assertEqual(
-                ready_report["requirements_contract"]["schema_version"], "1.5"
+                ready_report["requirements_contract"]["schema_version"], "1.6"
             )
             self.assertEqual(ready_report["requirements_contract"]["status"], "READY")
             self.assertEqual(contract["project_contract"]["status"], "READY")
@@ -9041,7 +9094,7 @@ class BootstrapDoctorTests(unittest.TestCase):
                 "## 28. Construction envelope",
                 "## 29. Gate B owner authorization record",
                 "Local command boundary",
-                "`ALLOW_PREFIXES: uv add`",
+                "`ALLOW_PREFIXES: uv add; python -m unittest`",
             )
             prd_path.write_text(rebind_gate_b_envelope(text), encoding="utf-8")
             self.initialize_task_plan(
@@ -10675,7 +10728,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
         self.assertEqual(issues, [])
         self.assertEqual(contract.status, "READY")
-        self.assertEqual(contract.schema_version, "1.5")
+        self.assertEqual(contract.schema_version, "1.6")
         self.assertEqual(contract.actor_ids, ("ACT-001",))
         self.assertEqual(contract.journey_ids, ("JOURNEY-001",))
         self.assertEqual(
@@ -10703,7 +10756,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
 
         legacy = text.replace(
-            "| Project contract schema | `1.5` |",
+            "| Project contract schema | `1.6` |",
             "| Project contract schema | `1.2` |",
             1,
         )
@@ -10717,7 +10770,7 @@ class BootstrapDoctorTests(unittest.TestCase):
         self.assertEqual(migration.status, "MIGRATION_REQUIRED")
         self.assertEqual(
             migration.missing_records,
-            ("Project contract schema 1.5",),
+            ("Project contract schema 1.6",),
         )
         self.assertEqual(
             {code for code, _message in migration_issues},
@@ -13290,7 +13343,7 @@ flowchart LR
         )
         self.assertEqual(issues, [])
         self.assertEqual(ready.status, "READY")
-        self.assertEqual(ready.schema_version, 8)
+        self.assertEqual(ready.schema_version, 9)
         self.assertEqual(ready.project_contract.status, "READY")
         self.assertEqual(ready.project_contract.interface_ids, ("API-001",))
         self.assertEqual(ready.project_contract.boundary_ids, ("BOUNDARY-001",))
@@ -13300,11 +13353,15 @@ flowchart LR
         )
         self.assertIsNone(ready.project_contract.spike)
 
+        from tests.alpha_project_fixture import complete_alpha_design
+
         changed_text = complete.replace(
             "100 requests per minute",
             "200 requests per minute",
             1,
         )
+        self.assertNotEqual(changed_text, complete)
+        changed_text = complete_alpha_design(changed_text)
         changed, changed_issues = doctor.derive_design_contract(
             changed_text,
             "DES-0001",
@@ -13402,7 +13459,7 @@ flowchart LR
                 self.assertTrue(any(expected in issue for issue in issues), issues)
 
         mislabeled_current = complete.replace(
-            "| Project design contract schema | `8` |\n", "", 1
+            "| Project design contract schema | `9` |\n", "", 1
         )
         migration, migration_issues = doctor.derive_design_contract(
             mislabeled_current,
@@ -13694,7 +13751,9 @@ flowchart LR
     def test_real_approved_schema_12_gate_a_reaches_schema_six(self) -> None:
         source = (PROJECT_ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         approved_modern = complete_design_contract(approve_gate_a(source))
-        legacy_basis = exact_legacy_requirements_projection(approved_modern)
+        legacy_basis = schema_six_design_projection(
+            exact_legacy_requirements_projection(approved_modern)
+        )
         migrated = complete_legacy_design_bridge(source)
         self.assertEqual(
             legacy_basis.split("# Technical Plan", 1)[0],

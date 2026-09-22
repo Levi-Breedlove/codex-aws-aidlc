@@ -4,7 +4,10 @@ The package consumes observed canonical records and explicit authority inputs.
 It performs no AWS calls and cannot approve, authorize, deploy, or tear down.
 """
 
-from .deployment import derive_deployment_sequence_state
+from .deployment import (
+    derive_deployment_sequence_state,
+    validated_deployment_release_cutoff,
+)
 from .evidence import (
     aws_core_evidence_diagnostic_code,
     aws_core_phase_evidence_issues,
@@ -109,6 +112,7 @@ __all__ = (
     "derive_aws_execution_projection",
     "derive_aws_residual_disposition",
     "derive_deployment_sequence_state",
+    "validated_deployment_release_cutoff",
     "derive_read_preflight_state",
     "derive_teardown_route",
     "derive_teardown_sequence_state",

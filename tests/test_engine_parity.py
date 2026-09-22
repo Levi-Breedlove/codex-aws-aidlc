@@ -101,7 +101,10 @@ class EngineParityTests(unittest.TestCase):
             parity.QUALIFICATION_APPROVED_BEHAVIOR_CHANGES[
                 len(parity.FROZEN_APPROVED_BEHAVIOR_CHANGES) :
             ],
-            [parity.DEFINITION_OF_COMPLETE_CHANGE],
+            [
+                parity.DEFINITION_OF_COMPLETE_CHANGE,
+                parity.LOCAL_ALPHA_SPECIFICATION_CHANGE,
+            ],
         )
         self.assertEqual(
             hashlib.sha256(parity.ORACLE_PATH.read_bytes()).hexdigest(),

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from tests.alpha_project_fixture import no_persistent_data_details
 from scripts import bootstrap_doctor as doctor
 from scripts.fastlane_engine.define import requirements
 from scripts.fastlane_engine.design.models import DesignContract
@@ -40,7 +41,7 @@ class Requirements15Tests(unittest.TestCase):
 
         self.assertEqual(issues, [])
         self.assertEqual(contract.status, "READY")
-        self.assertEqual(contract.schema_version, "1.5")
+        self.assertEqual(contract.schema_version, "1.6")
         self.assertEqual(contract.completion_target, "LOCAL")
         self.assertEqual(
             [item.metric_id for item in contract.outcome_metrics], ["METRIC-001"]
@@ -122,7 +123,11 @@ class Requirements15Tests(unittest.TestCase):
         )
         for before, after, code, invalid in mutations:
             with self.subTest(before=before, after=after):
-                candidate = source.replace(before, after, 1)
+                candidate = (
+                    source.replace(before, after)
+                    if before == "DATASET-001"
+                    else source.replace(before, after, 1)
+                )
                 contract, issues = ready_contract(candidate)
                 if invalid:
                     self.assertEqual(contract.status, "BLOCKED")
@@ -234,6 +239,7 @@ class Requirements15Tests(unittest.TestCase):
             requirements.DATASET_HEADERS,
             [no_data],
         )
+        no_data_source = no_persistent_data_details(no_data_source)
         contract, issues = ready_contract(no_data_source)
         self.assertEqual(issues, [])
         self.assertEqual(contract.status, "READY")
@@ -286,7 +292,7 @@ class Requirements15Tests(unittest.TestCase):
 
     def test_partially_upgraded_schema_14_cannot_use_compatibility(self) -> None:
         source = approve_gate_a(PRD.read_text(encoding="utf-8")).replace(
-            "| Project contract schema | `1.5` |",
+            "| Project contract schema | `1.6` |",
             "| Project contract schema | `1.4` |",
             1,
         )

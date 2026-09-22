@@ -88,4 +88,18 @@ def serialize_evaluation(evaluation: EngineEvaluation) -> dict[str, Any]:
     }
 
 
-__all__ = ["serialize_evaluation"]
+def serialize_validation_explanation(
+    explanation, evaluation: EngineEvaluation
+) -> dict[str, Any]:
+    """Serialize a source-bound explanation without selecting another route."""
+    return {
+        "schema_version": 1,
+        "validation_explanation": thaw_evaluation_value(explanation.values),
+        "report": serialize_evaluation(evaluation),
+    }
+
+
+__all__ = (
+    "serialize_evaluation",
+    "serialize_validation_explanation",
+)

@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+from tests.alpha_project_fixture import (
+    no_persistent_data_details,
+    complete_alpha_design,
+)
+
 from scripts import bootstrap_doctor as doctor
 from scripts.fastlane_engine import owner_decisions
 from scripts.fastlane_engine.project_delivery_validation import (
@@ -161,7 +166,7 @@ class Design8ContractTests(unittest.TestCase):
         source = complete_design8()
         baseline, issues = self.derive(source)
         self.assertEqual(issues, [])
-        self.assertEqual(baseline.schema_version, 8)
+        self.assertEqual(baseline.schema_version, 9)
         self.assertEqual(baseline.status, "READY")
         extension = baseline.project_contract.design_v8
         self.assertEqual(extension.status, "READY")
@@ -267,6 +272,7 @@ class Design8ContractTests(unittest.TestCase):
                 )
             ],
         )
+        source = complete_alpha_design(no_persistent_data_details(source))
         source = replace_table_with_line(
             source,
             doctor.DATASET_IMPLEMENTATION_HEADING,
@@ -651,14 +657,14 @@ class Design8ContractTests(unittest.TestCase):
             by_domain["validation/construction"]["selection"],
         )
         self.assertIn(
-            "Canonical Design-8",
+            "Canonical Design-9",
             by_domain["validation/construction"]["source"],
         )
         deployment = by_domain["deployment/recovery"]
         self.assertEqual(deployment["maturity"], "SOURCE_VERIFIED")
         self.assertIn("AWS-EV-0001", deployment["evidence_ids"])
 
-    def test_design8_can_preserve_an_unchanged_approved_requirements14_basis(
+    def test_new_design8_over_approved_requirements14_requires_migration(
         self,
     ) -> None:
         source = design8_over_approved_requirements14()
@@ -668,8 +674,11 @@ class Design8ContractTests(unittest.TestCase):
             required=True,
             grandfather_approved_v1=True,
         )
-        self.assertEqual(issues, [])
-        self.assertEqual(contract.status, "READY")
+        self.assertTrue(
+            any("PROJECT_DESIGN_SCHEMA_MIGRATION_REQUIRED" in issue for issue in issues)
+        )
+        self.assertEqual(contract.status, "BLOCKED")
+        self.assertEqual(contract.project_contract.status, "MIGRATION_REQUIRED")
         self.assertEqual(contract.schema_version, 8)
         self.assertEqual(
             contract.project_contract.design_v8.dataset_implementations, ()

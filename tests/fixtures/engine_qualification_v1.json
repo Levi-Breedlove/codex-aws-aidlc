@@ -177,6 +177,23 @@
         "AWS access, execution, deployment, recovery, or teardown evidence claim",
         "frozen pre-refactor oracle mutation"
       ]
+    },
+    {
+      "id": "REQUIREMENTS_1_6_DESIGN_9_LOCAL_ALPHA_1_4_0",
+      "base_commit": "831a3ae5bfcc0597f7ca763d8de0f211ee053fe2",
+      "scope": [
+        "Requirements 1.6 exact recovery, scenario-classification, input-applicability and input-boundary bindings",
+        "Design 9 exact acceptance criteria and one-obligation validation checks with command, stage, time bound and evidence destination",
+        "Current task acceptance and local-build check projections",
+        "Consequential current source ranges, source bytes, canonical digests and owner recovery wording",
+        "Explicit required-task-record overflow under the unchanged context budget"
+      ],
+      "prohibited": [
+        "Frozen pre-refactor oracle or historical canonical digest changes",
+        "Changes to independently specified lifecycle, route, gate, authority, task-state or diagnostic meanings",
+        "Truncating required records or increasing context limits to conceal growth",
+        "Application, AWS, recovery or arbitrary narrative correctness claims inferred from structured fixture validation"
+      ]
     }
   ],
   "normalization": {
@@ -194,8 +211,8 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "3ea795acbef2cc24c3d3ff539f73e032378809ba637638b08c6be4be20075535",
-    "task_ready": "111be545e01686a02745fb190e5f4483c0e0355c56cbb85d435b2d10537ca11e"
+    "stale_gate_a_summary": "9fff326f15e5bf20a6056a7a519d796c775d7a63ab1309c972374d33be15cd48",
+    "task_ready": "8860c93a66df2384157816f71cfa9e12b52c113d91bc0bd7e15ae54e0779334f"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -376,7 +393,7 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:c55087276327d3137f227ccc9b0af10a0ed7982b0c93144f9ce4451c2889a335",
+              "canonical_sha256": "sha256:87ebeae5dd17b8cfa6f2b84f7d632c47f7fbb62fa6df9befb646496d1997fe66",
               "source_bytes": 2119,
               "reason": "Controlling PRD record"
             }
@@ -427,8 +444,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:c854af7ea20d627879f9b943c3c0ef7f65b49f3a7816f152f949972385338bff",
-              "source_bytes": 37617,
+              "canonical_sha256": "sha256:195df81301fd062ff7f26afc97dfa65a36f9b7d60ed3c1ecb83790927bf8204c",
+              "source_bytes": 37648,
               "reason": "Controlling PRD record"
             },
             {
@@ -438,7 +455,7 @@
               "start_line": 41,
               "end_line": 53,
               "active_ids": [],
-              "canonical_sha256": "sha256:943532e0cf0422e4efeddb06fd420eee4470f867d3f1a537796562846d1c0939",
+              "canonical_sha256": "sha256:1a57e70ba22a2d4320f00d3f6140d26c7905bc3500311b7805819734322090d1",
               "source_bytes": 3859,
               "reason": "On-demand canonical source"
             },
@@ -447,7 +464,7 @@
               "selector_kind": "HEADING",
               "selector": "Review and AWS evidence",
               "start_line": 54,
-              "end_line": 61,
+              "end_line": 63,
               "active_ids": [],
               "canonical_sha256": "sha256:603dbef6ca204e139ac6087ac57ad4f36b4bd1d4b8cda1ec5c026af31bc4e059",
               "source_bytes": 2156,
@@ -469,7 +486,7 @@
               "selector_kind": "HEADING",
               "selector": "Gate A Review",
               "start_line": 582,
-              "end_line": 706,
+              "end_line": 775,
               "active_ids": [
                 "COST-001",
                 "COST-002",
@@ -510,8 +527,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:718d7cdc0118125e25307e0ca858f1fce313de05e3aa56c03d45a5fd8a2e3aab",
-              "source_bytes": 5350,
+              "canonical_sha256": "sha256:8b7505f7a3f5f255066325e7e1a79a96b15b13d5ac5a13c3037c7c42139dab54",
+              "source_bytes": 9237,
               "reason": "On-demand canonical source"
             }
           ],
@@ -800,7 +817,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:449adafc78be20265cab2e6fdee68b4ca37d2468264c6474000ebff28df1b41b"
+          "prd_snapshot_sha256": "sha256:5ed6293cf917fc85dfa6293d951448256e35d08f2e7cb889674941a952082435"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -1572,7 +1589,7 @@
                 "Completion target: LOCAL",
                 "Scope and non-goals: FR-001 in scope; production is out of scope",
                 "Data and access: Synthetic internal test data only Local development identity; no public access",
-                "Data categories: DATASET-001: Synthetic development outcome data; INTERNAL; source Generated local fixture; access Project developer and local test process only; retention Delete within 30 days; deletion Owner can delete the local fixture and derived output; recovery Recreate from source fixtures; no backup promise; residency Owner-approved operating geography; migration NOT_APPLICABLE - greenfield fixture has no migration; audit Record access and deletion test results; owner Product owner",
+                "Data categories: DATASET-001: Synthetic development outcome data; INTERNAL; source Generated local fixture; access Project developer and local test process only; retention Delete within 30 days; deletion Owner can delete the local fixture and derived output; recovery RECREATE: Regenerate synthetic records from the versioned local fixture; residency Owner-approved operating geography; migration NOT_APPLICABLE - greenfield fixture has no migration; audit Record access and deletion test results; owner Product owner",
                 "External obligations: OBL-001: NONE_IDENTIFIED; NONE IDENTIFIED; basis Owner review of intended users, data, and geography found no applicable external obligation; owner NONE; review Reassess when users, data, geography, or governing terms change"
               ],
               "basis_ids": [
@@ -1840,7 +1857,7 @@
               "heading": "8. Data requirements",
               "start_line": 361,
               "end_line": 387,
-              "section_sha256": "sha256:2c8090b54d7a908f8074acfedf50d3841ba68ef95cd0a206c6ac9d6fe2fd95ed",
+              "section_sha256": "sha256:de5a665e8ff887e15227c99e8b577c3dd8c68921085b56d53e4ffc025bb2e56d",
               "required": true
             },
             {
@@ -1860,7 +1877,7 @@
               "heading": "10. Reliability requirements",
               "start_line": 411,
               "end_line": 431,
-              "section_sha256": "sha256:1122a2547a206c2749442b78e8fe0cb592fbe3e69c7d2cafa395bfc20fe8ee40",
+              "section_sha256": "sha256:b59312dd831ed202f3a0c82d787ed33231fff8d46487d99a88e0656b09623e5b",
               "required": true
             },
             {
@@ -1878,8 +1895,8 @@
               "label": "Gate A readiness",
               "path": "docs/project/PRD.md",
               "heading": "Gate A — readiness card",
-              "start_line": 648,
-              "end_line": 663,
+              "start_line": 717,
+              "end_line": 732,
               "section_sha256": "sha256:bca62caf3c18eb9a60ea295798fd4dd520bc222c701baae0956c118734393165",
               "required": true
             },
@@ -1888,8 +1905,8 @@
               "label": "Gate A acceptance record",
               "path": "docs/project/PRD.md",
               "heading": "Gate A — owner acceptance record",
-              "start_line": 664,
-              "end_line": 686,
+              "start_line": 733,
+              "end_line": 755,
               "section_sha256": "sha256:d2b78bf171294661d14edb369c53ce246460b516bba5cf6b5c7762c45669c229",
               "required": true
             }
@@ -1903,7 +1920,7 @@
             ]
           },
           "formal_receipt_required": false,
-          "canonical_sha256": "sha256:35af4ddd9c6a1b5aced65b6c3db5d057ec38045434ac46009ebe969fe41414a4"
+          "canonical_sha256": "sha256:7a2a019c1f2599d9607ccc114cbd6468575b7a158e20a80ad3663cf4c22e1642"
         },
         "owner_decision_inventory": {
           "schema_version": 1,
@@ -2237,7 +2254,7 @@
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
-          "schema_version": "1.5",
+          "schema_version": "1.6",
           "status": "READY",
           "completion_target": "LOCAL",
           "actor_ids": [
@@ -2405,7 +2422,7 @@
               "access_boundary": "Project developer and local test process only",
               "retention": "Delete within 30 days",
               "deletion": "Owner can delete the local fixture and derived output",
-              "recovery": "Recreate from source fixtures; no backup promise",
+              "recovery": "RECREATE: Regenerate synthetic records from the versioned local fixture",
               "residency": "Owner-approved operating geography",
               "migration": "NOT_APPLICABLE - greenfield fixture has no migration",
               "audit_obligation": "Record access and deletion test results",
@@ -2415,7 +2432,8 @@
                 "DATA-002",
                 "DATA-003",
                 "DATA-004",
-                "DATA-005"
+                "DATA-005",
+                "REL-004"
               ]
             }
           ],
@@ -2451,9 +2469,243 @@
             }
           ],
           "missing_records": [],
-          "canonical_sha256": "sha256:1c2c3089e6f7fdb941f75df719a24226a800145f52d1cfaab838b4c5129f7178",
+          "canonical_sha256": "sha256:cb1dfb0bf66602490d74239e5453a84a0e1593bf089c947eebc9f25216b89363",
           "grandfathered_approved_gate_a": false,
-          "approved_schema_14_compatibility": false
+          "approved_schema_14_compatibility": false,
+          "requirements_v16": {
+            "recoveries": [
+              {
+                "Dataset ID": "DATASET-001",
+                "Requirement IDs": "DATA-004, REL-004",
+                "Scenario IDs": "QAS-001",
+                "Recovery mode": "RECREATE",
+                "Recovery time minutes": "60",
+                "Data loss minutes": "0",
+                "Decision basis": "Synthetic records are regenerated from versioned fixtures; no backup is promised"
+              }
+            ],
+            "recovery_scenarios": [
+              {
+                "QAS ID": "QAS-001",
+                "Kind": "RECOVERY",
+                "Dataset IDs": "DATASET-001",
+                "Decision basis": "Synthetic record regeneration exercises the declared recovery objective"
+              }
+            ],
+            "input_applicability": [
+              {
+                "Requirement ID": "COST-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "FR-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "FR-002",
+                "Constraint IDs": "INPUT-001",
+                "Decision basis": "Validates the request outcome enum"
+              },
+              {
+                "Requirement ID": "OPS-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-006",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-007",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              }
+            ],
+            "inputs": [
+              {
+                "Constraint ID": "INPUT-001",
+                "Requirement IDs": "FR-002",
+                "Subject": "Request outcome selector",
+                "Kind": "ENUM",
+                "Minimum": "NOT_APPLICABLE",
+                "Maximum": "NOT_APPLICABLE",
+                "Allowed values JSON": "[\"current\", \"previous\"]",
+                "Valid example JSON": "\"current\"",
+                "Invalid example JSON": "\"unknown\"",
+                "Rejection behavior": "Reject the request without changing approved state"
+              }
+            ],
+            "quality_scenarios": [
+              {
+                "QAS ID": "QAS-001",
+                "Requirement IDs": "REL-004",
+                "Source": "Operator",
+                "Stimulus": "Primary data store becomes unavailable",
+                "Environment": "Development recovery rehearsal",
+                "Artifact": "Durable data store",
+                "Response": "RECREATE: Regenerate synthetic records from the versioned local fixture",
+                "Response measure": "RTO 60 minutes and RPO 0 minutes"
+              }
+            ]
+          }
         },
         "coverage_plan": {
           "schema_version": 1,
@@ -2518,7 +2770,7 @@
           "compatibility_full_coverage": false
         },
         "design_contract": {
-          "schema_version": 8,
+          "schema_version": 9,
           "status": "BLOCKED",
           "design_revision": "DES-0001",
           "technology_decisions": [
@@ -2955,7 +3207,7 @@
           },
           "canonical_sha256": null,
           "project_contract": {
-            "schema_version": 8,
+            "schema_version": 9,
             "status": "UNINITIALIZED",
             "application_source_disposition": null,
             "interface_ids": [],
@@ -2977,7 +3229,9 @@
               "dependency_additions": [],
               "acquisition_prohibited": true,
               "canonical_sha256": null
-            }
+            },
+            "validation_checks": [],
+            "acceptance_criteria": {}
           },
           "application_source_disposition": null
         },
@@ -3071,26 +3325,26 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 6263,
-          "budget_status": "WITHIN_LIMIT",
+          "actual_initial_source_bytes": 20954,
+          "budget_status": "OVERSIZED_REQUIRED_RECORD",
           "resolved_initial_slices": [
             {
               "path": ".agents/skills/fastlane/references/deliver.md",
               "selector_kind": "HEADING",
               "selector": "Tasks and local construction",
-              "start_line": 28,
-              "end_line": 41,
+              "start_line": 27,
+              "end_line": 40,
               "active_ids": [],
-              "canonical_sha256": "sha256:a2fa3ea4b776160e1dfa61c7c53e7dfbb5cf309521c7861a740663852184dceb",
-              "source_bytes": 3434,
+              "canonical_sha256": "sha256:d06345b16031fd131782c9a1992f27bf633e4236f53a6b2981cc2d5620fa6e20",
+              "source_bytes": 2668,
               "reason": "Current phase procedure"
             },
             {
               "path": "docs/project/TASKS.md",
               "selector_kind": "HEADING",
               "selector": "Active execution snapshot",
-              "start_line": 64,
-              "end_line": 88,
+              "start_line": 65,
+              "end_line": 89,
               "active_ids": [],
               "canonical_sha256": "sha256:a0face218cfa0511f0c8db96732a17f3435c55cebb84dc47b4c17aa21d493276",
               "source_bytes": 837,
@@ -3100,13 +3354,13 @@
               "path": "docs/project/TASKS.md",
               "selector_kind": "TASK_ID",
               "selector": "TASK-001",
-              "start_line": 198,
-              "end_line": 241,
+              "start_line": 199,
+              "end_line": 327,
               "active_ids": [
                 "TASK-001"
               ],
-              "canonical_sha256": "sha256:055e96d58e729d5826f0b0de66c1de00f5e45b5ad226b7e62a58952006c1a9d4",
-              "source_bytes": 1992,
+              "canonical_sha256": "sha256:295fc6d9fffcf8b8794fc65a31ec7df226fa4d489db702590d2ea7a7d3c51ee0",
+              "source_bytes": 17449,
               "reason": "Active task and dependencies"
             }
           ],
@@ -3115,32 +3369,32 @@
               "path": ".agents/skills/fastlane/references/deliver.md",
               "selector_kind": "HEADING",
               "selector": "AWS handoff and reconciliation",
-              "start_line": 56,
-              "end_line": 61,
+              "start_line": 55,
+              "end_line": 60,
               "active_ids": [],
-              "canonical_sha256": "sha256:2e63e90a25fb93f5be9d80bfb5a7fd52582c388f6be0225b666a00868afbf16b",
-              "source_bytes": 845,
+              "canonical_sha256": "sha256:9eaaffa2f8d3d1480654a5ffd81adb45719e65096a09d6b1b8c7ca57fcb15e00",
+              "source_bytes": 750,
               "reason": "On-demand canonical source"
             },
             {
               "path": ".agents/skills/fastlane/references/deliver.md",
               "selector_kind": "HEADING",
               "selector": "Teardown and residuals",
-              "start_line": 62,
-              "end_line": 67,
+              "start_line": 61,
+              "end_line": 68,
               "active_ids": [],
-              "canonical_sha256": "sha256:71fde07ab791d464aa3efa6ac22b72f6aac4e1ad6e29dd9e16d69f18e1021212",
-              "source_bytes": 1164,
+              "canonical_sha256": "sha256:9222d1ca78f37f571b8f051f30a9f64e10ac5badab11af55a5df6e062c5039b3",
+              "source_bytes": 1010,
               "reason": "On-demand canonical source"
             },
             {
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1509,
-              "end_line": 1575,
+              "start_line": 1634,
+              "end_line": 1700,
               "active_ids": [],
-              "canonical_sha256": "sha256:ebf8e83b9445ff1541a913db0806e50aea58674c0763db0bc225a86b993a07e5",
+              "canonical_sha256": "sha256:14436a02ac2ea750841f623a7859b4f5506548ad48880af2cc0ba650ea614824",
               "source_bytes": 4618,
               "reason": "On-demand canonical source"
             },
@@ -3159,8 +3413,8 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "Task completion evidence",
-              "start_line": 203,
-              "end_line": 211,
+              "start_line": 213,
+              "end_line": 221,
               "active_ids": [],
               "canonical_sha256": "sha256:9021b258e9ca2c35d9da019f1d222649a361a03a4180246ec32723a894bfa438",
               "source_bytes": 437,
@@ -3170,15 +3424,23 @@
               "path": "docs/project/VERIFY.md",
               "selector_kind": "HEADING",
               "selector": "Construction and release readiness checks",
-              "start_line": 268,
-              "end_line": 297,
+              "start_line": 286,
+              "end_line": 315,
               "active_ids": [],
               "canonical_sha256": "sha256:41a6a04132b57437b2b45865b3163850c224b3839551b9e8b006c87589196c2a",
               "source_bytes": 2750,
               "reason": "On-demand canonical source"
             }
           ],
-          "overflow_records": []
+          "overflow_records": [
+            {
+              "path": "docs/project/TASKS.md",
+              "selector_kind": "TASK_ID",
+              "selector": "TASK-001",
+              "source_bytes": 17449,
+              "reason": "Complete required record exceeds the remaining source-byte budget"
+            }
+          ]
         },
         "project": {
           "name": "Doctor Test Project",
@@ -3480,7 +3742,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:fd7c9de821f4ed9bb2eb164f18b2efbdfeb28e65b8206291f967868f78b30dcd"
+          "prd_snapshot_sha256": "sha256:46f09148bf456626c224b66ec21a955458bf41649d155761f4ddb4fbdc40b263"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -4347,7 +4609,7 @@
           "grandfathered_approved_gate_a": false
         },
         "requirements_contract": {
-          "schema_version": "1.5",
+          "schema_version": "1.6",
           "status": "READY",
           "completion_target": "LOCAL",
           "actor_ids": [
@@ -4515,7 +4777,7 @@
               "access_boundary": "Project developer and local test process only",
               "retention": "Delete within 30 days",
               "deletion": "Owner can delete the local fixture and derived output",
-              "recovery": "Recreate from source fixtures; no backup promise",
+              "recovery": "RECREATE: Regenerate synthetic records from the versioned local fixture",
               "residency": "Owner-approved operating geography",
               "migration": "NOT_APPLICABLE - greenfield fixture has no migration",
               "audit_obligation": "Record access and deletion test results",
@@ -4525,7 +4787,8 @@
                 "DATA-002",
                 "DATA-003",
                 "DATA-004",
-                "DATA-005"
+                "DATA-005",
+                "REL-004"
               ]
             }
           ],
@@ -4561,9 +4824,243 @@
             }
           ],
           "missing_records": [],
-          "canonical_sha256": "sha256:1c2c3089e6f7fdb941f75df719a24226a800145f52d1cfaab838b4c5129f7178",
+          "canonical_sha256": "sha256:cb1dfb0bf66602490d74239e5453a84a0e1593bf089c947eebc9f25216b89363",
           "grandfathered_approved_gate_a": false,
-          "approved_schema_14_compatibility": false
+          "approved_schema_14_compatibility": false,
+          "requirements_v16": {
+            "recoveries": [
+              {
+                "Dataset ID": "DATASET-001",
+                "Requirement IDs": "DATA-004, REL-004",
+                "Scenario IDs": "QAS-001",
+                "Recovery mode": "RECREATE",
+                "Recovery time minutes": "60",
+                "Data loss minutes": "0",
+                "Decision basis": "Synthetic records are regenerated from versioned fixtures; no backup is promised"
+              }
+            ],
+            "recovery_scenarios": [
+              {
+                "QAS ID": "QAS-001",
+                "Kind": "RECOVERY",
+                "Dataset IDs": "DATASET-001",
+                "Decision basis": "Synthetic record regeneration exercises the declared recovery objective"
+              }
+            ],
+            "input_applicability": [
+              {
+                "Requirement ID": "COST-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "COST-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "DATA-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "FR-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "FR-002",
+                "Constraint IDs": "INPUT-001",
+                "Decision basis": "Validates the request outcome enum"
+              },
+              {
+                "Requirement ID": "OPS-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "OPS-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "PERF-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "REL-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-005",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-006",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SEC-007",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-001",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-002",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-003",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              },
+              {
+                "Requirement ID": "SUS-004",
+                "Constraint IDs": "NONE",
+                "Decision basis": "This requirement adds no external input field"
+              }
+            ],
+            "inputs": [
+              {
+                "Constraint ID": "INPUT-001",
+                "Requirement IDs": "FR-002",
+                "Subject": "Request outcome selector",
+                "Kind": "ENUM",
+                "Minimum": "NOT_APPLICABLE",
+                "Maximum": "NOT_APPLICABLE",
+                "Allowed values JSON": "[\"current\", \"previous\"]",
+                "Valid example JSON": "\"current\"",
+                "Invalid example JSON": "\"unknown\"",
+                "Rejection behavior": "Reject the request without changing approved state"
+              }
+            ],
+            "quality_scenarios": [
+              {
+                "QAS ID": "QAS-001",
+                "Requirement IDs": "REL-004",
+                "Source": "Operator",
+                "Stimulus": "Primary data store becomes unavailable",
+                "Environment": "Development recovery rehearsal",
+                "Artifact": "Durable data store",
+                "Response": "RECREATE: Regenerate synthetic records from the versioned local fixture",
+                "Response measure": "RTO 60 minutes and RPO 0 minutes"
+              }
+            ]
+          }
         },
         "coverage_plan": {
           "schema_version": 1,
@@ -4628,7 +5125,7 @@
           "compatibility_full_coverage": false
         },
         "design_contract": {
-          "schema_version": 8,
+          "schema_version": 9,
           "status": "READY",
           "design_revision": "DES-0001",
           "technology_decisions": [
@@ -5813,9 +6310,9 @@
             "canonical_sha256": "sha256:ef26dbdd5b5a5a16e6a38b9ab6917a02b90dfb060bdedea221c95f24adfd2bba",
             "grandfathered_schema5": false
           },
-          "canonical_sha256": "sha256:c527a26e1653b016bf93fb5c9c59d593b9efe8b7bcda3d971f29c191cbcf5125",
+          "canonical_sha256": "sha256:6cc713701ab9d80f3fd1e9d7212d5492f37f970b6671fa5fecebcbf35ccfdf9b",
           "project_contract": {
-            "schema_version": 8,
+            "schema_version": 9,
             "status": "READY",
             "application_source_disposition": {
               "kind": "GREENFIELD_APP_ROOT",
@@ -5845,7 +6342,7 @@
             },
             "spike": null,
             "missing_records": [],
-            "canonical_sha256": "sha256:c1358047f98d7607152b1ae6410de641f34738f98d84842fc0278152017f3c97",
+            "canonical_sha256": "sha256:127410a67c2401085615cc5f1b861ee33591893e0e55386255561aeab1f3c143",
             "grandfathered_v4": false,
             "grandfathered_v5": false,
             "grandfathered_v6": false,
@@ -6017,6 +6514,425 @@
               "dependency_additions": [],
               "acquisition_prohibited": true,
               "canonical_sha256": "sha256:99791432c4e7cea4008e4c24b6ae1e201bdd511989b3e69c89ff7fbe3f204c70"
+            },
+            "validation_checks": [
+              [
+                "CHECK-001",
+                "AC-COST-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "The Gate A card, project state, and selected design use the same cost posture, and a traceability check finds no weakened approved requirement."
+              ],
+              [
+                "CHECK-002",
+                "AC-COST-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "The record contains the owner's exact cap and alert plan, or records `HARD_CAP_NOT_STATED` or why cost alerts do not apply."
+              ],
+              [
+                "CHECK-003",
+                "AC-COST-003",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "The design records material billing dimensions and an attributable estimate or current-source calculation."
+              ],
+              [
+                "CHECK-004",
+                "AC-COST-004",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Each proposed expansion records a bounded threshold, evidence source, and owner decision path."
+              ],
+              [
+                "CHECK-005",
+                "AC-COST-005",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "IaC and runbook checks cover approved tags, idle policy, and teardown or retained-resource behavior."
+              ],
+              [
+                "CHECK-006",
+                "AC-DATA-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A data-inventory check maps every persistent category to exactly one source of truth and one accountable owner."
+              ],
+              [
+                "CHECK-007",
+                "AC-DATA-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Access tests and configuration evidence show approved access succeeds and access outside each recorded boundary is denied."
+              ],
+              [
+                "CHECK-008",
+                "AC-DATA-003",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Time-bounded tests or observed evidence demonstrate the approved retention, deletion, and audit outcomes for every stored category."
+              ],
+              [
+                "CHECK-009",
+                "AC-DATA-004",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A timed fixture recreation rehearsal meets the approved RTO and RPO."
+              ],
+              [
+                "CHECK-010",
+                "AC-DATA-005",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A traceability check maps every applicable constraint to a validation, migration, or rollback check."
+              ],
+              [
+                "CHECK-011",
+                "AC-FR-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A rendered-output test confirms the approved outcome is displayed."
+              ],
+              [
+                "CHECK-012",
+                "AC-FR-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "GIVEN input outside approved constraints, WHEN the application receives it, THEN the input is rejected and approved state is unchanged."
+              ],
+              [
+                "CHECK-013",
+                "AC-OPS-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "IaC validation and environment-specific configuration checks pass for every approved environment."
+              ],
+              [
+                "CHECK-014",
+                "AC-OPS-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "The runbook check confirms the artifact, order, health checks, failure boundary, and authorized next action are explicit."
+              ],
+              [
+                "CHECK-015",
+                "AC-OPS-003",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Evidence checks confirm required signals, thresholds, destinations, and zero secret values in sampled content."
+              ],
+              [
+                "CHECK-016",
+                "AC-OPS-004",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "The runbook check identifies one responsible owner and one actionable escalation path for each material incident class."
+              ],
+              [
+                "CHECK-017",
+                "AC-OPS-005",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Rehearsal or observed evidence covers rollback, retained resources, and the approved teardown result."
+              ],
+              [
+                "CHECK-018",
+                "AC-PERF-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Each target names the path, percentile or bound, workload, and observable test result."
+              ],
+              [
+                "CHECK-019",
+                "AC-PERF-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A bounded test or calculation covers the approved normal and peak workload for every environment."
+              ],
+              [
+                "CHECK-020",
+                "AC-PERF-003",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Tests or configuration checks show work stays within approved limits and fails safely at each boundary."
+              ],
+              [
+                "CHECK-021",
+                "AC-PERF-004",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "The profile records data shape, duration, concurrency, environment, and pass condition, or records why performance evidence does not apply."
+              ],
+              [
+                "CHECK-022",
+                "AC-REL-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Generated failure-sequence tests never exceed the configured timeout and retry bounds."
+              ],
+              [
+                "CHECK-023",
+                "AC-REL-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "GIVEN work that may be delivered more than once, WHEN the same work is delivered repeatedly, THEN one effective outcome is recorded."
+              ],
+              [
+                "CHECK-024",
+                "AC-REL-003",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Stateful concurrency property tests preserve the newer valid state across the approved generated-case bound."
+              ],
+              [
+                "CHECK-025",
+                "AC-REL-004",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A timed fixture recreation rehearsal meets the approved RTO and RPO."
+              ],
+              [
+                "CHECK-026",
+                "AC-REL-005",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A rollback rehearsal restores the bound last known-good artifact and all approved smoke tests pass."
+              ],
+              [
+                "CHECK-027",
+                "AC-SEC-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "GIVEN an approved protected operation, WHEN a signed-in or signed-out identity requests it, THEN the signed-in request succeeds and the signed-out request is denied."
+              ],
+              [
+                "CHECK-028",
+                "AC-SEC-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Authorization tests prove approved access succeeds and unapproved access is denied at the recorded identity boundary."
+              ],
+              [
+                "CHECK-029",
+                "AC-SEC-003",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Secret scans pass and reviewed generated artifacts and logs contain zero secret values."
+              ],
+              [
+                "CHECK-030",
+                "AC-SEC-004",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "GIVEN invalid, malformed, or oversized external input, WHEN the application receives it, THEN the request is rejected and no unintended state change is recorded."
+              ],
+              [
+                "CHECK-031",
+                "AC-SEC-005",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Policy checks and deployed access tests confirm required actions succeed and actions outside the approved resource boundary are denied."
+              ],
+              [
+                "CHECK-032",
+                "AC-SEC-006",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Infrastructure definitions and deployed configuration checks match every approved encryption control."
+              ],
+              [
+                "CHECK-033",
+                "AC-SEC-007",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Audit-event tests and log review confirm all five required event conditions for every sampled event."
+              ],
+              [
+                "CHECK-034",
+                "AC-SUS-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Configuration or teardown evidence confirms the approved idle behavior for every applicable resource."
+              ],
+              [
+                "CHECK-035",
+                "AC-SUS-002",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A design review identifies material movement and retention and records a requirement basis for each retained path."
+              ],
+              [
+                "CHECK-036",
+                "AC-SUS-003",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "Expansion evidence cites the approved utilization trigger and an observed measurement at or above that trigger."
+              ],
+              [
+                "CHECK-037",
+                "AC-SUS-004",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "A traceability check links the affected requirement and design IDs, evidence, and owner decision."
+              ],
+              [
+                "CHECK-038",
+                "API-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "[\"API-001\",\"API\",\"FR-001, FR-002\",\"Local client\",\"Trusted application service\",\"Versioned request/response schema\",\"NOT_APPLICABLE - local development fixture\",\"Server verifies the caller may request the local outcome\",\"INPUT-001\",\"Return the approved outcome with success status\",\"Return a safe error and preserve approved state\",\"Compatible schema additions only\",\"One idempotent read per request\",\"2 seconds\",\"100 requests per minute\",\"p95 response within 2 seconds\"]"
+              ],
+              [
+                "CHECK-039",
+                "IAC-A-00101",
+                "AWS_READ",
+                "aws cloudformation describe-change-set --change-set-name synthetic-plan --region us-west-2",
+                "120",
+                "docs/project/VERIFY.md#iac-validation-evidence",
+                "[\"CloudFormation / SAM / CDK\",\"TECH-0004, TECH-0008, TECH-0009\",\"aws cloudformation describe-change-set --change-set-name synthetic-plan --region us-west-2\"]"
+              ],
+              [
+                "CHECK-040",
+                "IAC-L-00101",
+                "LOCAL_RELEASE",
+                "sam validate --lint --template-file infrastructure/template.yaml",
+                "120",
+                "docs/project/VERIFY.md#iac-validation-evidence",
+                "[\"CloudFormation / SAM / CDK\",\"TECH-0004, TECH-0008, TECH-0009\",\"sam validate --lint --template-file infrastructure/template.yaml\"]"
+              ],
+              [
+                "CHECK-041",
+                "INPUT-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "[\"INPUT-001\",\"FR-002\",\"Request outcome selector\",\"ENUM\",\"NOT_APPLICABLE\",\"NOT_APPLICABLE\",\"[\\\"current\\\", \\\"previous\\\"]\",\"\\\"current\\\"\",\"\\\"unknown\\\"\",\"Reject the request without changing approved state\"]"
+              ],
+              [
+                "CHECK-042",
+                "QAS-001",
+                "LOCAL_BUILD",
+                "python -m unittest",
+                "120",
+                "docs/project/VERIFY.md#task-completion-evidence",
+                "[\"QAS-001\",\"REL-004\",\"Operator\",\"Primary data store becomes unavailable\",\"Development recovery rehearsal\",\"Durable data store\",\"RECREATE: Regenerate synthetic records from the versioned local fixture\",\"RTO 60 minutes and RPO 0 minutes\"]"
+              ]
+            ],
+            "acceptance_criteria": {
+              "AC-FR-001": "A rendered-output test confirms the approved outcome is displayed.",
+              "AC-FR-002": "GIVEN input outside approved constraints, WHEN the application receives it, THEN the input is rejected and approved state is unchanged.",
+              "AC-DATA-001": "A data-inventory check maps every persistent category to exactly one source of truth and one accountable owner.",
+              "AC-DATA-002": "Access tests and configuration evidence show approved access succeeds and access outside each recorded boundary is denied.",
+              "AC-DATA-003": "Time-bounded tests or observed evidence demonstrate the approved retention, deletion, and audit outcomes for every stored category.",
+              "AC-DATA-004": "A timed fixture recreation rehearsal meets the approved RTO and RPO.",
+              "AC-DATA-005": "A traceability check maps every applicable constraint to a validation, migration, or rollback check.",
+              "AC-SEC-001": "GIVEN an approved protected operation, WHEN a signed-in or signed-out identity requests it, THEN the signed-in request succeeds and the signed-out request is denied.",
+              "AC-SEC-002": "Authorization tests prove approved access succeeds and unapproved access is denied at the recorded identity boundary.",
+              "AC-SEC-003": "Secret scans pass and reviewed generated artifacts and logs contain zero secret values.",
+              "AC-SEC-004": "GIVEN invalid, malformed, or oversized external input, WHEN the application receives it, THEN the request is rejected and no unintended state change is recorded.",
+              "AC-SEC-005": "Policy checks and deployed access tests confirm required actions succeed and actions outside the approved resource boundary are denied.",
+              "AC-SEC-006": "Infrastructure definitions and deployed configuration checks match every approved encryption control.",
+              "AC-SEC-007": "Audit-event tests and log review confirm all five required event conditions for every sampled event.",
+              "AC-REL-001": "Generated failure-sequence tests never exceed the configured timeout and retry bounds.",
+              "AC-REL-002": "GIVEN work that may be delivered more than once, WHEN the same work is delivered repeatedly, THEN one effective outcome is recorded.",
+              "AC-REL-003": "Stateful concurrency property tests preserve the newer valid state across the approved generated-case bound.",
+              "AC-REL-004": "A timed fixture recreation rehearsal meets the approved RTO and RPO.",
+              "AC-REL-005": "A rollback rehearsal restores the bound last known-good artifact and all approved smoke tests pass.",
+              "AC-PERF-001": "Each target names the path, percentile or bound, workload, and observable test result.",
+              "AC-PERF-002": "A bounded test or calculation covers the approved normal and peak workload for every environment.",
+              "AC-PERF-003": "Tests or configuration checks show work stays within approved limits and fails safely at each boundary.",
+              "AC-PERF-004": "The profile records data shape, duration, concurrency, environment, and pass condition, or records why performance evidence does not apply.",
+              "AC-COST-001": "The Gate A card, project state, and selected design use the same cost posture, and a traceability check finds no weakened approved requirement.",
+              "AC-COST-002": "The record contains the owner's exact cap and alert plan, or records `HARD_CAP_NOT_STATED` or why cost alerts do not apply.",
+              "AC-COST-003": "The design records material billing dimensions and an attributable estimate or current-source calculation.",
+              "AC-COST-004": "Each proposed expansion records a bounded threshold, evidence source, and owner decision path.",
+              "AC-COST-005": "IaC and runbook checks cover approved tags, idle policy, and teardown or retained-resource behavior.",
+              "AC-SUS-001": "Configuration or teardown evidence confirms the approved idle behavior for every applicable resource.",
+              "AC-SUS-002": "A design review identifies material movement and retention and records a requirement basis for each retained path.",
+              "AC-SUS-003": "Expansion evidence cites the approved utilization trigger and an observed measurement at or above that trigger.",
+              "AC-SUS-004": "A traceability check links the affected requirement and design IDs, evidence, and owner decision.",
+              "AC-OPS-001": "IaC validation and environment-specific configuration checks pass for every approved environment.",
+              "AC-OPS-002": "The runbook check confirms the artifact, order, health checks, failure boundary, and authorized next action are explicit.",
+              "AC-OPS-003": "Evidence checks confirm required signals, thresholds, destinations, and zero secret values in sampled content.",
+              "AC-OPS-004": "The runbook check identifies one responsible owner and one actionable escalation path for each material incident class.",
+              "AC-OPS-005": "Rehearsal or observed evidence covers rollback, retained resources, and the approved teardown result."
             }
           },
           "application_source_disposition": {

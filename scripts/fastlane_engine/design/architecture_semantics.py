@@ -124,7 +124,11 @@ def _supported_design_schema(
     design: Mapping[str, Any], project: Mapping[str, Any]
 ) -> bool:
     schema_version = design.get("schema_version")
-    if schema_version != project.get("schema_version") or schema_version not in {7, 8}:
+    if schema_version != project.get("schema_version") or schema_version not in {
+        7,
+        8,
+        9,
+    }:
         return False
     if schema_version == 7:
         return True

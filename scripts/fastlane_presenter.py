@@ -2132,6 +2132,116 @@ def render_architecture_board_completion(
     )
 
 
+def render_validation_explanation(
+    report: Mapping[str, Any], explanation: Mapping[str, Any]
+) -> str:
+    if (
+        explanation.get("kind") != "VALIDATION_EXPLANATION"
+        or explanation.get("schema_version") != 1
+    ):
+        raise PresentationError("invalid validation explanation")
+    if (
+        explanation.get("design_digest")
+        != report.get("design_contract", {}).get("canonical_sha256")
+        or explanation.get("requirements_digest")
+        != report.get("requirements_contract", {}).get("canonical_sha256")
+        or explanation.get("interaction") != report.get("interaction")
+        or any(
+            explanation.get("route", {}).get(key) != report.get(key)
+            for key in ("next_prompt", "lifecycle_state")
+        )
+    ):
+        raise PresentationError(
+            "validation explanation does not match the current Engine decision"
+        )
+    lines = [
+        "The current validation plan binds the approved behavior to these checks. These are obligations; this explanation has not run them.",
+        "",
+    ]
+    groups = {}
+    for check in explanation.get("checks", ()):
+        key = (
+            check["stage"],
+            check["command"],
+            check.get("time_limit_seconds")
+            or check.get("run_target_time_bound")
+            or "No separate time bound in this source",
+            check.get("evidence_destination"),
+        )
+        groups.setdefault(key, set()).add(check["kind"])
+    for (stage, command, bound, destination), kinds in groups.items():
+        timing = (
+            "Later AWS work, requiring separate authorization"
+            if stage.startswith("AWS_")
+            else "Local release review"
+            if stage == "LOCAL_RELEASE"
+            else "Local validation"
+        )
+        lines.append(
+            f"- {timing}: `{command}`. Bound: {bound}. Evidence: `{destination}`. Source: {', '.join(sorted(kinds)).lower()}."
+        )
+    drivers = explanation.get("source_drivers", {})
+    if drivers.get("iac"):
+        lines.extend(("", "Infrastructure validation:"))
+        for record in drivers["iac"]:
+            row = record["values"]
+            if row["Applicability"] == "APPLICABLE":
+                lines.append(
+                    f"- {row['Validation path']}: {row['Required local/static validation']}. Later AWS planning: {row['AWS planning validation']}. Evidence: `{row['Evidence destination']}`."
+                )
+    for record in drivers.get("interfaces", ()):
+        row = record["values"]
+        lines.extend(
+            (
+                "",
+                "Interface behavior: "
+                + "; ".join(f"{key}: {value}" for key, value in row.items())
+                + ".",
+            )
+        )
+    details = explanation.get("input_recovery_details", {})
+    for row in details.get("inputs", ()):
+        lines.extend(
+            (
+                "",
+                f"Input boundary for {row['Subject']}: {row['Kind']}; bounds {row['Minimum']} through {row['Maximum']}; allowed values {row['Allowed values JSON']}. Accept {row['Valid example JSON']}; reject {row['Invalid example JSON']}. {row['Rejection behavior']}",
+            )
+        )
+    for record in drivers.get("datasets", ()):
+        row = record["values"]
+        lines.extend(("", "Data recovery: " + str(row.get("Recovery", row)) + "."))
+    for record in drivers.get("quality_scenarios", ()):
+        row = record["values"]
+        lines.append(
+            f"Recovery or quality scenario: {row['Stimulus']}; response {row['Response']}; measure {row['Response measure']}."
+        )
+    conflicts = explanation.get("permission_conflicts", ())
+    if conflicts:
+        lines.extend(
+            (
+                "",
+                "Some declared checks fall outside the current local command boundary: "
+                + ", ".join(conflicts)
+                + ". Reconcile that boundary before running those commands.",
+            )
+        )
+    lines.extend(
+        (
+            "",
+            "A planned check, a command boundary, and an observed passing result are separate records. The current Engine decision and its existing authorization rules still govern execution.",
+        )
+    )
+    if explanation.get("errors"):
+        lines.extend(
+            (
+                "",
+                "Some source records remain unresolved: "
+                + "; ".join(explanation["errors"]),
+            )
+        )
+    return render_side_question_response(report, answer="\n".join(lines))
+
+
 def render_side_question_response(
     report: Mapping[str, Any],
     *,
@@ -2990,6 +3100,7 @@ def main(argv: list[str] | None = None) -> int:
             "owner",
             "project-ready",
             "side-question",
+            "validation",
             "gate-a-brief",
             "gate-b-brief",
             "answer-confirmation",
@@ -3020,7 +3131,12 @@ def main(argv: list[str] | None = None) -> int:
         report = payload.get("report")
         if not isinstance(report, Mapping):
             raise PresentationError("input is missing report")
-        if args.mode == "project-ready":
+        if args.mode == "validation":
+            explanation = payload.get("validation_explanation")
+            if not isinstance(explanation, Mapping):
+                raise PresentationError("input is missing validation_explanation")
+            output = render_validation_explanation(report, explanation)
+        elif args.mode == "project-ready":
             output = render_project_ready(report)
         elif args.mode == "owner":
             if "audit" in payload:

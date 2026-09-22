@@ -293,3 +293,22 @@ a second editable brief.
   from the current observation or source record, retaining its actual directory
   and heading. A familiar filename does not establish its parent directory;
   never substitute the template's usual path for a differently bound source.
+
+
+## Explain the current validation plan
+
+For questions about tests, checks, evidence, recovery, or what validates the
+design, use `python scripts/bootstrap_doctor.py --root . --explain-validation
+--json`, then pass that complete envelope to `python scripts/fastlane_presenter.py
+validation --input-stdin`. Both commands are read-only. The explanation includes
+current task, profile, property, and IaC obligations, exact commands, limits,
+destinations, interface and recovery drivers, source provenance, permission
+conflicts, and current evidence maturity. It executes nothing and grants no
+authority. Do not invent omitted legacy detail or imply that a record proves
+the check ran. Explain any structural or semantic gap plainly.
+
+Resume the action in that same Engine report. If a READY task is selected,
+continue bounded local construction; do not send the owner back to planning or
+expose internal prompt IDs. A correction that needs Codex work continues that
+work when authorized. Restoring a genuinely pending gate after a side question
+is allowed; asking again for an already completed owner action is not.

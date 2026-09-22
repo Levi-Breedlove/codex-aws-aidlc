@@ -1,6 +1,6 @@
 # AWS Codex Fastlane Prompt Pack
 
-**Pack version:** 1.3.5
+**Pack version:** 1.4.0
 
 Fastlane turns an idea or repository into approved requirements, an AWS-informed
 plan, bounded local construction, and honest verification. Owners use the first
@@ -296,7 +296,7 @@ preview it before writing and never treat it as approval or authority.
 
 ~~~text
 [REQ-10]
-Use the Define procedure and deterministic Requirements 1.5 contract. Before
+Use the Define procedure and deterministic Requirements 1.6 contract. Before
 requirements analysis, complete any projected Codex-owned project configuration
 action from its cited facts, use the derived project mode and safest current AWS
 lane, synchronize the PRD and `bootstrap.yaml`, and rerun the Engine. Do not

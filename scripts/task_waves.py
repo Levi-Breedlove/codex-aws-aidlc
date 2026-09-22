@@ -1830,6 +1830,20 @@ def safe_ready_candidates(
     return candidates, available_slots
 
 
+def close_check_attempt(text: str, task: Task, run_id: str, timestamp: str) -> str:
+    pattern = (
+        rf"^- Check attempt {task.attempts_used}: RUN={re.escape(run_id)}; "
+        r"STARTED=[^;\s]+$"
+    )
+    structural = without_fenced_code(task.block)
+    matches = list(re.finditer(pattern, structural, re.MULTILINE))
+    if len(matches) != 1:
+        raise ValueError(f"{task.task_id}: completion requires one open check attempt")
+    end = matches[0].end()
+    block = task.block[:end] + f"; ENDED={timestamp}" + task.block[end:]
+    return text[: task.start] + block + text[task.end :]
+
+
 def mutate_task_file(
     path: Path,
     task_id: str,
@@ -1900,7 +1914,7 @@ def mutate_task_file(
             text = replace_metadata(text, current, key, value)
         current_tasks = parse_tasks(text)
         current = next(item for item in current_tasks if item.task_id == task_id)
-        timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         text = replace_metadata(text, current, "Last updated", timestamp)
         if (
             task.status == "IN_PROGRESS"
@@ -1910,10 +1924,20 @@ def mutate_task_file(
             text = replace_snapshot_field(
                 text, "Last checkpoint", clean(updates["Last checkpoint"])
             )
-        if new_status is not None and new_status.upper() == "DONE":
-            updated_task = next(
-                item for item in parse_tasks(text) if item.task_id == task_id
-            )
+        updated_task = next(
+            item for item in parse_tasks(text) if item.task_id == task_id
+        )
+        if updated_task.status == "DONE":
+            if (
+                task.status == "IN_PROGRESS"
+                and approved_contract is not None
+                and approved_contract.delivery
+                and approved_contract.delivery.validation_checks
+            ):
+                text = close_check_attempt(text, updated_task, task.run_id, timestamp)
+                updated_task = next(
+                    item for item in parse_tasks(text) if item.task_id == task_id
+                )
             validate_done_evidence_file(
                 path,
                 updated_task,
@@ -2064,8 +2088,33 @@ def claim_task_file(
             )
             text = replace_metadata(text, current, key, value)
         current = next(item for item in parse_tasks(text) if item.task_id == task_id)
-        timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         text = replace_metadata(text, current, "Last updated", timestamp)
+        if (
+            approved_contract is not None
+            and approved_contract.delivery
+            and approved_contract.delivery.validation_checks
+        ):
+            current = next(
+                item for item in parse_tasks(text) if item.task_id == task_id
+            )
+            entry = f"- Check attempt {task.attempts_used + 1}: RUN={run_id}; STARTED={timestamp}"
+            lines = current.block.splitlines(keepends=True)
+            structural = without_fenced_code(current.block).splitlines()
+            headings = [
+                index
+                for index, line in enumerate(structural)
+                if re.fullmatch(r"#### Execution log[ \t]*", line)
+            ]
+            if len(headings) != 1:
+                raise ValueError(
+                    f"{task_id}: claim requires one structural Execution log"
+                )
+            offset = sum(len(line) for line in lines[: headings[0] + 1])
+            block = (
+                current.block[:offset] + "\n" + entry + "\n" + current.block[offset:]
+            )
+            text = text[: current.start] + block + text[current.end :]
         load_contract(text, **contract_kwargs)
         write_state_mirror(path, text)
         atomic_write_text(path, text)

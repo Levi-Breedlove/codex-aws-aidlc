@@ -883,8 +883,19 @@ class ProductJourneyTests(unittest.TestCase):
     def test_gate_evidence_and_construction_routes_use_real_project_artifacts(
         self,
     ) -> None:
+        from datetime import datetime, timezone
+        from unittest import mock
+        from scripts.fastlane_engine.deliver.evidence import (
+            TASK_CHECK_HEADERS,
+            task_check_projection,
+        )
+
         fixture = doctor_fixtures.BootstrapDoctorTests()
-        with tempfile.TemporaryDirectory() as directory:
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            mock.patch.object(task_waves, "datetime", wraps=datetime) as clock,
+        ):
+            clock.now.return_value = datetime(2026, 7, 17, tzinfo=timezone.utc)
             temporary = Path(directory)
 
             define_project = self.extract_template(temporary, "define")
@@ -1154,7 +1165,9 @@ class ProductJourneyTests(unittest.TestCase):
             task_start = claimed_tasks.index("### TASK-001")
             tasks_path.write_text(
                 claimed_tasks[:task_start]
-                + task_fixtures.observed_task_text(claimed_tasks[task_start:]),
+                + task_fixtures.observed_task_text(claimed_tasks[task_start:]).replace(
+                    "- [ ]", "- [x]"
+                ),
                 encoding="utf-8",
             )
 
@@ -1227,13 +1240,69 @@ class ProductJourneyTests(unittest.TestCase):
                     1,
                 )
             )
+            # Hand-authored synthetic check observations exercise receipt binding,
+            # not actual application execution. Every approved check is indexed.
+            task = task_waves.parse_tasks(tasks_path.read_text(encoding="utf-8"))[0]
+            checks = task_check_projection(task.block)
+            self.assertEqual(len(checks), 40)
+            self.assertEqual({row[3] for row in checks}, {"python -m unittest"})
+            basis = " / ".join(
+                task_waves.clean(task.metadata[key])
+                for key in ("Requirements", "Design", "Authorization")
+            )
+            indexed = []
+            for check in checks:
+                digest = (
+                    "sha256:"
+                    + hashlib.sha256(
+                        json.dumps(
+                            ["FASTLANE_CHECK_V1", *check],
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ).encode()
+                    ).hexdigest()
+                )
+                indexed.append(
+                    (
+                        check[0],
+                        "TASK-001",
+                        digest,
+                        basis,
+                        "RUN-0001",
+                        "1",
+                        "EV-0402",
+                        "1",
+                    )
+                )
+            verify_text = doctor_fixtures.replace_contract_table(
+                verify_text, "### Exact task check results", TASK_CHECK_HEADERS, indexed
+            )
+            anchor = "\n## Brownfield baseline and regression evidence"
+            self.assertIn(anchor, verify_text)
+            prefix, suffix = verify_text.split(anchor, 1)
+            verify_text = (
+                prefix.rstrip()
+                + "\n"
+                + task_fixtures.completion_evidence_row(
+                    evidence_id="EV-0402",
+                    command_or_observation="python -m unittest",
+                    result="Synthetic fixture: exact local checks passed",
+                    observed_at="2026-07-17T00:00:01+00:00",
+                    material=f"Commit: {known_green}",
+                    durable_source="docs/project/VERIFY.md#ev-0402",
+                )
+                + "\n"
+                + anchor
+                + suffix
+            )
             verify_path.write_text(verify_text, encoding="utf-8")
+            clock.now.return_value = datetime(2026, 7, 17, 0, 0, 2, tzinfo=timezone.utc)
             task_waves.update_task_file(
                 tasks_path,
                 "TASK-001",
                 coordinator="codex-coordinator",
                 status="DONE",
-                evidence="EV-0001, EV-0401",
+                evidence="EV-0001, EV-0401, EV-0402",
                 run_id="RUN-0001",
                 checkpoint="CP-0001",
             )
@@ -1244,7 +1313,7 @@ class ProductJourneyTests(unittest.TestCase):
                     "CP-0002",
                     commit=known_green,
                     outcomes="TASK-001 DONE attempts=1/3",
-                    evidence="EV-0001, EV-0401",
+                    evidence="EV-0001, EV-0401, EV-0402",
                     next_action="resume the checkpointed run",
                 ),
             )
@@ -1303,7 +1372,7 @@ class ProductJourneyTests(unittest.TestCase):
                     "CP-0003",
                     commit=known_green,
                     outcomes="TASK-001 DONE attempts=1/3",
-                    evidence="EV-0001, EV-0401",
+                    evidence="EV-0001, EV-0401, EV-0402",
                     next_action="review release readiness",
                 ),
             )

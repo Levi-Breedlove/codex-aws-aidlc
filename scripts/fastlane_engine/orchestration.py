@@ -34,6 +34,7 @@ from .aws import (
     derive_aws_execution_projection,
     derive_aws_residual_disposition,
     derive_deployment_sequence_state,
+    validated_deployment_release_cutoff,
     derive_read_preflight_state,
     derive_teardown_route,
     derive_teardown_sequence_state,
@@ -91,6 +92,28 @@ try:
     from fastlane_adr import derive_adr_rationale_from_snapshot
 except ModuleNotFoundError:
     from scripts.fastlane_adr import derive_adr_rationale_from_snapshot
+
+
+def _validate_release_evidence_cutoff(ctx, record, preflight, deployment, verify_text):
+    """Require positive AWS proof when active evidence advances beyond local checks."""
+    local = record.get("local_check_evidence_cutoff")
+    active = record["active_evidence_cutoff"]
+    if local is None or active == local:
+        return
+    read_verified = (
+        preflight.get("status") == "READY"
+        and not preflight.get("issues")
+        and active in preflight.get("evidence_ids", [])
+    )
+    deployment_verified = (
+        validated_deployment_release_cutoff(verify_text or "", deployment) == active
+    )
+    if not (read_verified or deployment_verified):
+        ctx.error(
+            "RELEASE_CHECK_EVIDENCE",
+            "Active evidence cutoff must be the local check anchor or validated current AWS evidence",
+            VERIFY_FILE,
+        )
 
 
 def _normalized_envelope_scalar(
@@ -318,21 +341,36 @@ def _preserve_specialized_teardown_block(ctx: Context, lifecycle_state: str) -> 
     return _preserve_teardown_block(ctx.diagnostics, lifecycle_state)
 
 
+def _evaluation_inputs(
+    root, observed_snapshot, template_source, prior_remediation_fingerprint
+):
+    snapshot = (
+        observed_snapshot
+        if observed_snapshot is not None
+        else capture_engine_snapshot(root)
+    )
+    if snapshot.root != root:
+        raise ValueError("The observed snapshot belongs to a different project root")
+    return snapshot, Context(
+        root=root,
+        template_source=template_source,
+        observed_snapshot=snapshot,
+        prior_remediation_fingerprint=prior_remediation_fingerprint,
+    )
+
+
 def evaluate_project(
     root: Path,
     *,
     template_source: bool = False,
     prior_remediation_fingerprint: str | None = None,
+    _observed_snapshot: Any = None,
 ) -> EngineEvaluation:
     """SAFETY: observe once and compose immutable domains in historical order."""
 
     root = root.resolve()
-    snapshot = capture_engine_snapshot(root)
-    ctx = Context(
-        root=root,
-        template_source=template_source,
-        observed_snapshot=snapshot,
-        prior_remediation_fingerprint=prior_remediation_fingerprint,
+    snapshot, ctx = _evaluation_inputs(
+        root, _observed_snapshot, template_source, prior_remediation_fingerprint
     )
     if not root.is_dir():
         ctx.error("PROJECT_ROOT", "Project root is not a directory", str(root))
@@ -433,7 +471,7 @@ def evaluate_project(
         requirements_contract,
         design_contract,
     )
-    release_record = validate_release_decision_record(ctx)
+    release_record = validate_release_decision_record(ctx, design_contract, prd_fields)
     release_decision = release_record["release_state"]
     release_evidence_cutoff = release_record["active_evidence_cutoff"]
     aws_lifecycle_intent_record = validate_aws_lifecycle_intent_record(ctx)
@@ -647,6 +685,9 @@ def evaluate_project(
             gate_b != "APPROVED_FOR_CONSTRUCTION"
             or any(item.code == "GATE_B_AUTHORITY_EXPIRED" for item in ctx.diagnostics)
         ),
+    )
+    _validate_release_evidence_cutoff(
+        ctx, release_record, preflight, deployment_sequence, verify_text
     )
     _preserve_expired_authority_for_deployment_closure(
         ctx, deployment_sequence, release_decision
