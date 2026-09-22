@@ -133,13 +133,16 @@ def _headings(
         )
     )
     result: list[HeadingSpan] = []
+    # Each heading closes open sections at its level or deeper, at most once.
+    ends = [len(text)] * len(matches)
+    pending: list[tuple[int, int]] = []
     for index, match in enumerate(matches):
         level = len(match.group("marks"))
-        end = len(text)
-        for following in matches[index + 1 :]:
-            if len(following.group("marks")) <= level:
-                end = following.start()
-                break
+        while pending and pending[-1][1] >= level:
+            ends[pending.pop()[0]] = match.start()
+        pending.append((index, level))
+    for match, end in zip(matches, ends):
+        level = len(match.group("marks"))
         section_text = text[match.start() : end]
         result.append(
             HeadingSpan(

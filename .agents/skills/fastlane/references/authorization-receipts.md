@@ -27,7 +27,9 @@ substitute a prose checklist or perform the read, mutation, or removal.
   wildcard-free subset of the Gate B maximum and the current phase. Execution
   uses only the intersection of Gate B, phase mode, current evidence, and the
   exact phase-specific receipt; a receipt never broadens an approved
-  construction envelope.
+  construction envelope. For S3 operations, match the actual partition, exact
+  bucket, and complete object key to the named resource; a similar name or
+  prefix never supplies authority.
 - The exact teardown receipt authorizes only AWS-50 mutations. Its ID and exact
   receipt digest bind the AWS-50 attempt and the subsequent AWS-40 terminal
   reconciliation row. AWS-50 always returns to AWS-40 for authenticated reads;

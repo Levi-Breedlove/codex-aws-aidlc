@@ -1,6 +1,6 @@
 interface:
   display_name: "Plan Fastlane (compatibility)"
-  short_description: "Delegate planning to the Fastlane coordinator"
+  short_description: "Continue planning with the Fastlane coordinator"
   default_prompt: "Use $fastlane to continue this requirements or design request through the single Fastlane coordinator."
 policy:
   allow_implicit_invocation: false

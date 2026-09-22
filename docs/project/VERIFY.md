@@ -38,7 +38,6 @@
 <!-- FASTLANE:DOCUMENT_SUMMARY:END -->
 
 ## Current result
-
 The current evidence dashboard and important claims appear above. Failed, stale, and unobserved claims stay visible; plans and source guidance never appear as deployed proof.
 
 ## Failed or stale
@@ -78,7 +77,7 @@ Fastlane validates release state, lifecycle intent, evidence, retry, reconciliat
 An accepted risk cannot contradict a requirement or exceed the approved boundary. A material scope, security, data, cost, or preservation decision returns to the applicable owner review.
 
 <details>
-<summary>Exact evidence scope, maturity, and recording rules</summary>
+<summary>Exact evidence scope, recording rules, and validation records</summary>
 
 ## Active evidence scope
 
@@ -157,10 +156,6 @@ When an approved requirement is already satisfied or does not apply, Fastlane
 records current proof and the reason instead of creating empty work. A plan,
 placeholder, or stale observation is not enough.
 
-</details>
-
-<details>
-<summary>Exact source, AWS preflight, IaC, task, and validation evidence records</summary>
 
 ## AWS Core evidence
 
@@ -199,6 +194,21 @@ distinct from authenticated AWS evidence.
 | Phase | TECH IDs | Validation method | Exact command or API | Artifact / plan / change-set binding | AWS account | AWS Region | AWS environment | Result | Observed at | Durable source |
 |---|---|---|---|---|---|---|---|---|---|---|
 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` | TODO | TODO |
+
+### Exact local check results
+
+<details>
+<summary>Checks bound to the current design and release artifact</summary>
+
+The local cutoff remains the original passing task evidence. Each result
+identifies the current requirements, design, authorization and release artifact.
+Later validated AWS evidence may advance the active cutoff without rewriting
+these local observations. Failed observations remain visible in this table.
+
+| Check ID | Design digest | Release evidence cutoff | Exact command | Elapsed seconds | Artifact | Observed at | Durable source | Status | REQ / DES / AUTH |
+|---|---|---|---|---|---|---|---|---|---|
+
+</details>
 
 ## Task completion evidence
 
@@ -245,6 +255,14 @@ the version or environment checked, and the observed result.
 | Evidence ID | Harness ID | Layer | Basis IDs | Exact command or API | Artifact / environment | Observed result | Observed at | Durable source | Status |
 |---|---|---|---|---|---|---|---|---|---|
 | EV-0401 | HARNESS-001 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | `NOT_STARTED` |
+
+### Exact task check results
+
+These observations connect each task check to its approved outcome and the
+recorded attempt that produced the evidence. Earlier attempts remain history.
+
+| Check ID | Task | Check SHA-256 | Requirements / design / authorization | Run ID | Attempt | Evidence ID | Elapsed seconds |
+|---|---|---|---|---|---|---|---|
 
 ## Property-based test evidence
 

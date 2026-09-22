@@ -688,6 +688,310 @@ class FastlaneHookTests(unittest.TestCase):
     def setUp(self) -> None:
         self.root = REPOSITORY_ROOT
 
+    def test_security_write_targets_include_moves_and_each_shell_mutation(self) -> None:
+        write = {
+            "valid": True,
+            "approved_write_roots": ["app/**"],
+            "exclusions": ["app/excluded/**"],
+            "protected_paths": ["app/protected.txt"],
+            "active_task": "TASK-0001",
+            "active_task_write_set": ["app/service/**"],
+        }
+        current = report(construction="AUTH-0001", write_authority=write)
+
+        def check(command, tool="Bash"):
+            return fastlane_hook.handle_event(
+                "pre-tool-use",
+                payload(
+                    "PreToolUse",
+                    self.root,
+                    tool_name=tool,
+                    tool_input={"command": command},
+                ),
+                root=self.root,
+                doctor_report=current,
+                envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+            )
+
+        for destination in (
+            "../outside.txt",
+            "docs/project/PRD.md",
+            "app/excluded/file.txt",
+            "app/protected.txt",
+            "app/other/file.txt",
+        ):
+            with self.subTest(destination=destination):
+                patch = f"*** Begin Patch\n*** Update File: app/service/old.txt\n*** Move to: {destination}\n@@\n-old\n+new\n*** End Patch"
+                self.assertIsNotNone(check(patch, "apply_patch"))
+                for command in (
+                    f"cp app/service/input.txt {destination}; printf done > app/service/stamp.txt",
+                    f"mv app/service/input.txt {destination} > app/service/stamp.txt",
+                    f"command cp -- app/service/input.txt {destination} > app/service/stamp.txt",
+                    f"cp -t {destination} app/service/input.txt > app/service/stamp.txt",
+                    f"Copy-Item -Path app/service/input.txt -Destination {destination}; Write-Output done > app/service/stamp.txt",
+                ):
+                    self.assertIsNotNone(check(command), command)
+        for command, tool in (
+            (
+                "*** Begin Patch\n*** Update File: app/service/old.txt\n*** Move to: app/service/new.txt\n@@\n-old\n+new\n*** End Patch",
+                "apply_patch",
+            ),
+            ("cp ../input.txt 'app/service/output file.txt'", "Bash"),
+            ("mv app/service/old.txt app/service/new.txt", "Bash"),
+            ("printf done > app/service/stamp.txt", "Bash"),
+            ("2> app/service/stamp.txt cp ../input.txt app/service/output.txt", "Bash"),
+            ("cp ../input.txt app/service/output.txt 2> app/service/stamp.txt", "Bash"),
+            ("Set-Content -LiteralPath app/service/stamp.txt -Value 'done'", "Bash"),
+        ):
+            self.assertIsNone(check(command, tool), command)
+        for command in (
+            "cp --unknown app/service/input.txt app/service/output.txt > app/service/stamp.txt",
+            "cd ..; printf done > app/service/stamp.txt",
+            "printf done > $destination",
+            "touch",
+            "mv ../input.txt app/service/output.txt > app/service/stamp.txt",
+            "> app/service/stamp.txt cp app/service/input.txt ../outside.txt",
+            "> app/service/stamp.txt command cp app/service/input.txt ../outside.txt",
+            "> app/service/stamp.txt cd ..; touch app/service/other.txt",
+            "env -C .. cp input.txt app/service/output.txt > app/service/stamp.txt",
+            "env --chdir=.. cp input.txt app/service/output.txt > app/service/stamp.txt",
+            "env -C.. bash -c 'cp input.txt app/service/output.txt' > app/service/stamp.txt",
+            "2> app/service/stamp.txt cp app/service/input.txt ../outside.txt",
+            "mv app/service/input.txt 2 > app/service/stamp.txt",
+            "mv app/service/input.txt '2'> app/service/stamp.txt",
+            "Set-Content -Path app/service/good.txt,../outside.txt -Value done > app/service/stamp.txt",
+            "Remove-Item -Path app/service/good.txt,../outside.txt > app/service/stamp.txt",
+            "cpi app/service/input.txt ../outside.txt > app/service/stamp.txt",
+            "ri -Path ../outside.txt > app/service/stamp.txt",
+            "sudo --chdir=.. cp input.txt app/service/output.txt > app/service/stamp.txt",
+            "sudo -D.. cp input.txt app/service/output.txt > app/service/stamp.txt",
+            "time -o ../outside.txt git status > app/service/stamp.txt",
+        ):
+            self.assertIsNotNone(check(command), command)
+
+    def test_security_shell_paths_use_the_tools_execution_directory(self) -> None:
+        current = report(
+            construction="AUTH-0001",
+            write_authority={
+                "valid": True,
+                "approved_write_roots": ["app/service/**"],
+                "exclusions": [],
+                "protected_paths": [],
+                "active_task": "NONE",
+                "active_task_write_set": [],
+            },
+        )
+        for key in ("workdir", "cwd"):
+            for directory, command, allowed in (
+                (str(self.root.parent), "printf done > app/service/stamp.txt", False),
+                ("app/service", "printf done > stamp.txt", True),
+                (str(self.root / "app/service"), "printf done > stamp.txt", True),
+                (str(self.root), "printf done > app/service/stamp.txt", True),
+            ):
+                with self.subTest(key=key, directory=directory):
+                    result = fastlane_hook.handle_event(
+                        "pre-tool-use",
+                        payload(
+                            "PreToolUse",
+                            self.root,
+                            tool_name="exec_command",
+                            tool_input={"cmd": command, key: directory},
+                        ),
+                        root=self.root,
+                        doctor_report=current,
+                        envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+                    )
+                    self.assertEqual(result is None, allowed)
+        self.assertIsNotNone(
+            fastlane_hook._authority_denial(
+                "exec_command",
+                {
+                    "cmd": "printf done > app/service/stamp.txt",
+                    "cwd": str(self.root),
+                    "workdir": str(self.root.parent),
+                },
+                current,
+                {"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+                self.root,
+                self.root,
+            )
+        )
+
+    def test_security_external_wrappers_and_git_global_options_are_checked(
+        self,
+    ) -> None:
+        commands = (
+            "command aws ec2 terminate-instances --instance-ids i-example",
+            "command -p aws.exe s3api get-object --bucket other --key private.txt output",
+            "env FLAG=1 aws.exe ec2 terminate-instances --instance-ids i-example",
+            'a""ws ec2 terminate-instances --instance-ids i-example',
+            "& 'aws.exe' ec2 terminate-instances --instance-ids i-example",
+            "git -C . push origin main",
+            "git -C. -c alias.example=status push origin main",
+            "git --git-dir=.git --work-tree=. push origin main",
+            "bash -c 'command git -C . push origin main'",
+            "> app/service/stamp.txt aws ec2 terminate-instances --instance-ids i-example",
+            "> app/service/stamp.txt git -C . push origin main",
+            "> app/service/stamp.txt bash -c 'aws ec2 terminate-instances --instance-ids i-example'",
+            "2> app/service/stamp.txt aws ec2 terminate-instances --instance-ids i-example",
+            "2> app/service/stamp.txt git -C . push origin main",
+            "nice -n 5 aws ec2 terminate-instances --instance-ids i-example",
+            "sudo -u root aws ec2 terminate-instances --instance-ids i-example",
+            "env -S 'aws ec2 terminate-instances --instance-ids i-example'",
+            "env --split-string='git push origin main' > app/service/stamp.txt",
+            "printf x#; aws ec2 terminate-instances --instance-ids i-example",
+            "git status # I'm checking state\naws ec2 terminate-instances --instance-ids i-example",
+        )
+        current = report(
+            construction="AUTH-0001",
+            write_authority={
+                "valid": True,
+                "approved_write_roots": ["app/service/**"],
+                "exclusions": [],
+                "protected_paths": [],
+                "active_task": "NONE",
+                "active_task_write_set": [],
+            },
+        )
+        for command in commands:
+            for key in ("command", "cmd"):
+                with self.subTest(command=command, key=key):
+                    denial = fastlane_hook.handle_event(
+                        "pre-tool-use",
+                        payload(
+                            "PreToolUse",
+                            self.root,
+                            tool_name="Bash",
+                            tool_input={key: command},
+                        ),
+                        root=self.root,
+                        doctor_report=current,
+                        envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+                    )
+                    self.assertIsNotNone(denial)
+        for command in (
+            "git -C . status",
+            "git --work-tree=. diff",
+            "printf 'aws ec2 terminate-instances'",
+            "gh api repos/example/project -X GET",
+            "git status # I'm checking state",
+            'git status # "quoted punctuation with no closing quote',
+            "printf 'a#b'",
+            "nice -n 5 git status",
+            "env -i git status",
+            "env --unset=EXAMPLE git status",
+            "sudo --user=root git status",
+        ):
+            allowed = fastlane_hook.handle_event(
+                "pre-tool-use",
+                payload(
+                    "PreToolUse",
+                    self.root,
+                    tool_name="Bash",
+                    tool_input={"command": command},
+                ),
+                root=self.root,
+                doctor_report=report(),
+                envelope={"AWS boundary": "NONE", "GitHub boundary": "NONE"},
+            )
+            self.assertIsNone(allowed, command)
+
+    def test_security_s3_reads_bind_bucket_and_literal_object_key(self) -> None:
+        resource = "arn:aws:s3:::fastlane-bucket/releases/app.zip"
+        external = authority("AWS_READ_ONLY", ["s3:GetObject"], resources=[resource])
+        current = report(external_authority=external)
+
+        def check(parameters, **extra):
+            return fastlane_hook.handle_event(
+                "pre-tool-use",
+                payload(
+                    "PreToolUse",
+                    self.root,
+                    tool_name="aws___call_aws",
+                    tool_input={
+                        "service_name": "s3",
+                        "operation_name": "GetObject",
+                        "parameters": parameters,
+                        **extra,
+                    },
+                ),
+                root=self.root,
+                doctor_report=current,
+                envelope={"AWS boundary": "READ_ONLY", "GitHub boundary": "NONE"},
+            )
+
+        self.assertIsNone(
+            check({"Bucket": "fastlane-bucket", "Key": "releases/app.zip"})
+        )
+        for parameters in (
+            {"Bucket": "other-bucket", "Key": "releases/app.zip"},
+            {"Bucket": "fastlane-bucket", "Key": "private.txt"},
+            {"Bucket": "fastlane-bucket", "Key": "/releases/app.zip"},
+            {"Bucket": "fastlane-bucket", "Key": "releases/app.zip "},
+            {"Bucket": "fastlane-bucket"},
+            {"bucket": "fastlane-bucket", "key": "releases/app.zip"},
+            {"Bucket": ["fastlane-bucket"], "Key": "releases/app.zip"},
+            None,
+        ):
+            with self.subTest(parameters=parameters):
+                self.assertIsNotNone(check(parameters, resource=resource))
+        current = report(
+            external_authority=authority(
+                "AWS_READ_ONLY",
+                ["s3:GetObject"],
+                resources=["arn:aws:s3:::fastlane-bucket//releases/app.zip"],
+            )
+        )
+        self.assertIsNone(
+            check({"Bucket": "fastlane-bucket", "Key": "/releases/app.zip"})
+        )
+
+    def test_security_s3_bucket_reads_and_account_reads_keep_their_scope(self) -> None:
+        for service, operation, parameters, resources in (
+            (
+                "s3",
+                "ListObjectsV2",
+                {"Bucket": "fastlane-bucket"},
+                ["arn:aws:s3:::fastlane-bucket"],
+            ),
+            (
+                "s3",
+                "GetBucketLocation",
+                {"Bucket": "fastlane-bucket"},
+                ["arn:aws:s3:::fastlane-bucket"],
+            ),
+            ("sts", "GetCallerIdentity", {}, ["111122223333"]),
+            (
+                "cloudformation",
+                "DescribeStacks",
+                {"StackName": "fastlane-stack"},
+                ["fastlane-stack"],
+            ),
+        ):
+            with self.subTest(operation=operation):
+                current = report(
+                    external_authority=authority(
+                        "AWS_READ_ONLY", [f"{service}:{operation}"], resources=resources
+                    )
+                )
+                result = fastlane_hook.handle_event(
+                    "pre-tool-use",
+                    payload(
+                        "PreToolUse",
+                        self.root,
+                        tool_name="aws___call_aws",
+                        tool_input={
+                            "service_name": service,
+                            "operation_name": operation,
+                            "parameters": parameters,
+                        },
+                    ),
+                    root=self.root,
+                    doctor_report=current,
+                    envelope={"AWS boundary": "READ_ONLY", "GitHub boundary": "NONE"},
+                )
+                self.assertIsNone(result)
+
     def test_example_is_opt_in_complete_and_cross_platform(self) -> None:
         self.assertFalse((self.root / ".codex" / "hooks.json").exists())
         data = json.loads(EXAMPLE_PATH.read_text(encoding="utf-8"))
@@ -3147,6 +3451,90 @@ class FastlaneHookTests(unittest.TestCase):
 
 
 class AwsActionTransitionHookTests(unittest.TestCase):
+    def test_security_transition_links_never_modify_an_outside_target(self) -> None:
+        from tests.test_package_release import PackageReleaseTests
+
+        helper = PackageReleaseTests()
+        for component in ("user", "repository"):
+            with (
+                self.subTest(component=component),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                base = Path(temporary)
+                project, outside = base / "project", base / "outside"
+                project.mkdir()
+                outside.mkdir()
+                for name in ("transition.json", "transition.tmp"):
+                    (outside / name).write_bytes(b"untouched")
+                with mock.patch.object(
+                    fastlane_hook.tempfile, "gettempdir", return_value=str(base)
+                ):
+                    path = fastlane_hook._transition_path(project)
+                    link = path.parents[1] if component == "user" else path.parent
+                    if component == "repository":
+                        link.parent.mkdir(mode=0o700)
+                    helper._create_directory_link(link, outside)
+                    try:
+                        for operation in (
+                            fastlane_hook._clear_transition,
+                            fastlane_hook._load_transition,
+                            lambda root: fastlane_hook._store_transition(root, {}),
+                        ):
+                            with self.assertRaises(fastlane_hook.HookInputError):
+                                operation(project)
+                        self.assertEqual(
+                            (outside / "transition.json").read_bytes(), b"untouched"
+                        )
+                        self.assertEqual(
+                            (outside / "transition.tmp").read_bytes(), b"untouched"
+                        )
+                    finally:
+                        helper._remove_directory_link(link)
+
+    def test_security_transition_read_is_bounded_and_rejects_nonregular_files(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._active_structured_transition(root)
+            state = fastlane_hook._load_transition(root)
+            self.assertIsNotNone(state)
+            path = fastlane_hook._transition_path(root)
+            path.write_bytes(b"x" * 20_000)
+            reads = []
+            real_fdopen = fastlane_hook.os.fdopen
+
+            class BoundedStream:
+                def __init__(self, *args, **kwargs):
+                    self.stream = real_fdopen(*args, **kwargs)
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    self.stream.close()
+
+                def fileno(self):
+                    return self.stream.fileno()
+
+                def read(self, size):
+                    reads.append(size)
+                    self_test.assertLessEqual(size, 8_193)
+                    return self.stream.read(size)
+
+            self_test = self
+            with mock.patch.object(fastlane_hook.os, "fdopen", BoundedStream):
+                self.assertIsNone(fastlane_hook._load_transition(root))
+            self.assertEqual(reads, [8_193])
+            self.assertFalse(path.exists())
+            path.mkdir()
+            with self.assertRaises(fastlane_hook.HookInputError):
+                fastlane_hook._load_transition(root)
+            path.rmdir()
+            fastlane_hook._store_transition(root, state)
+            self.assertEqual(fastlane_hook._load_transition(root), state)
+            fastlane_hook._clear_transition(root)
+
     def _report_for(self, external: dict[str, object]) -> dict[str, object]:
         current = report(
             aws=str(external["authorization_id"]), external_authority=external

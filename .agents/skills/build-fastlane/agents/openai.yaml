@@ -1,6 +1,6 @@
 interface:
   display_name: "Build Fastlane (compatibility)"
-  short_description: "Delegate approved construction to Fastlane"
+  short_description: "Resume approved construction with Fastlane"
   default_prompt: "Use $fastlane to resume the approved task plan through the single Fastlane coordinator."
 policy:
   allow_implicit_invocation: false

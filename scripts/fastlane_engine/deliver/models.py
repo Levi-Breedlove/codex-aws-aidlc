@@ -258,6 +258,8 @@ class ApprovedDeliveryContract:
     acceptance_test_ids: tuple[str, ...] = ()
     harness_id: str | None = None
     spike: ApprovedSpikeContract | None = None
+    validation_checks: tuple[tuple[str, ...], ...] = ()
+    acceptance_criteria: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)

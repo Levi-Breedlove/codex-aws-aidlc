@@ -202,6 +202,12 @@ class SourceAssistedDefineTests(unittest.TestCase):
     def test_unsafe_missing_non_utf8_and_oversized_sources_fail_closed(self) -> None:
         cases: list[tuple[str, str]] = [
             ("../outside.md", "SOURCE_BRIEF_PATH_UNSAFE"),
+            ("C:/outside.md", "SOURCE_BRIEF_PATH_UNSAFE"),
+            ("Z:/outside.md", "SOURCE_BRIEF_PATH_UNSAFE"),
+            ("C:outside.md", "SOURCE_BRIEF_PATH_UNSAFE"),
+            ("//server/share/outside.md", "SOURCE_BRIEF_PATH_UNSAFE"),
+            ("//?/C:/outside.md", "SOURCE_BRIEF_PATH_UNSAFE"),
+            ("docs/reference/brief.md:stream", "SOURCE_BRIEF_PATH_UNSAFE"),
             ("docs/reference/missing.md", "SOURCE_BRIEF_MISSING"),
         ]
         with tempfile.TemporaryDirectory() as temporary:
@@ -237,6 +243,26 @@ class SourceAssistedDefineTests(unittest.TestCase):
                 )
             self.assertEqual(preview["status"], "BLOCKED")
             self.assertEqual(preview["issues"][0]["code"], "SOURCE_BRIEF_SYMLINK")
+
+    def test_directory_link_cannot_disclose_a_source_brief(self) -> None:
+        from tests.test_package_release import PackageReleaseTests
+
+        helper = PackageReleaseTests()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root, outside = base / "project", base / "outside"
+            root.mkdir()
+            outside.mkdir()
+            (outside / "brief.md").write_text(SOURCE_BRIEF, encoding="utf-8")
+            link = root / "linked"
+            helper._create_directory_link(link, outside)
+            try:
+                preview = preview_source_brief(root, "linked/brief.md")
+                self.assertEqual(preview["status"], "BLOCKED")
+                self.assertEqual(preview["issues"][0]["code"], "SOURCE_BRIEF_SYMLINK")
+                self.assertNotIn("Builder Review Hub", json.dumps(preview))
+            finally:
+                helper._remove_directory_link(link)
 
     def test_deterministic_presenter_keeps_choices_readable_and_natural(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

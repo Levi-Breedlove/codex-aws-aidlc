@@ -1342,7 +1342,25 @@ def validate_approved_property_evidence(
         )
 
 
+def explain_project_validation(
+    root: Path, *, template_source: bool = False
+) -> dict[str, Any]:
+    """Observe once and return a non-authoritative explanation plus its Engine decision."""
+    from .project_inspection import capture_engine_snapshot
+    from .orchestration import evaluate_project
+    from .owner_explanations import derive_validation_explanation
+    from .report import serialize_validation_explanation
+
+    snapshot = capture_engine_snapshot(root.resolve())
+    evaluation = evaluate_project(
+        root, template_source=template_source, _observed_snapshot=snapshot
+    )
+    explanation = derive_validation_explanation(snapshot, evaluation)
+    return serialize_validation_explanation(explanation, evaluation)
+
+
 __all__ = (
+    "explain_project_validation",
     "IntakeFoundationContract",
     "ARCHITECTURE_BOARD_OWNER_REQUEST",
     "ARCHITECTURE_BOARD_QA_TILES",

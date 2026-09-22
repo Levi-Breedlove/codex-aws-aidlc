@@ -10,6 +10,11 @@ AWS Codex Fastlane is an owner-controlled AWS delivery workflow for Codex. Built
 
 **[Use this template →](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate)**
 
+**Current branch: local alpha 1.4.0.** This version is for a small local project
+and owner testing. Automated framework checks do not establish a completed
+first-user pilot or a field-qualified AWS execution lane. The release badge
+above links to the separately packaged release.
+
 ## Quick start
 
 1. Complete the [one-time setup](docs/SETUP.md) for Codex and the official AWS Core plugin, create a repository with the button above, clone your generated repository, and open it in a signed-in interactive Codex CLI session.
@@ -33,6 +38,13 @@ Fastlane initializes the repository locally, presents **Project Ready**, and ask
 | Honest evidence | Plans, source guidance, local checks, AWS observations, deployed behavior, and recovery exercises remain distinct. |
 | Separate AWS authority | Every account read, mutation, and teardown needs its own exact, current owner authorization. Credentials are never authorization. |
 
+The specification connects requirements to concrete accepted and rejected
+inputs, data-recovery promises, design checks, task acceptance, and recorded
+results. Ask Codex to explain the current validation plan to see the exact
+commands, limits, evidence destinations, and next action. These links help
+expose gaps; meaningful tests and owner review still determine whether the
+implementation satisfies the intended behavior.
+
 The read-only Fastlane Engine evaluates repository state and fails closed when scope, evidence, approval, or authority is missing, stale, conflicting, or broader than recorded.
 
 ## Product lifecycle
@@ -40,14 +52,15 @@ The read-only Fastlane Engine evaluates repository state and fails closed when s
 Two owner gates release local work. Optional AWS operations stay on a separate, explicitly authorized path.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 28}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: AWS Codex Fastlane product lifecycle
     accDescr: The owner approves requirements at Gate A and the technical plan and local construction boundary at Gate B. Fastlane then builds and verifies locally. An optional AWS operation requires separate exact owner authorization, and its observed result returns to release review.
 
     DEFINE["Define the outcome and first release"]
-    GATEA{"Gate A: approve requirements?"}
+    GATEA{"Gate A"}
     DESIGN["Design the AWS solution"]
-    GATEB{"Gate B: approve design and local boundary?"}
+    GATEB{"Gate B"}
     LOCAL["Build and verify locally"]
     REVIEW["Review evidence and release state"]
     AWS["Optional AWS operation"]

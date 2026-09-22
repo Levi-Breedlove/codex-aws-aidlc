@@ -53,8 +53,8 @@ status above explains the practical project state.
 |---|---|
 | Bootstrap release | TODO (release version and source commit/tag) |
 | Workflow mode | `codex-native` |
-| Project contract schema | `1.5` |
-| Project design contract schema | `8` |
+| Project contract schema | `1.6` |
+| Project design contract schema | `9` |
 | Project mode | `greenfield` / `brownfield` |
 | Delivery profile | `quick-mvp` / `standard` / `high-risk` |
 | Effective risk | `low` / `moderate` / `high` / `critical` |
@@ -541,13 +541,42 @@ source/basis and review trigger; every other obligation field is `NONE`.
 
 # Gate A Review
 
-Gate A confirms the complete product agreement: outcome, users, first-release scope,
-success measures, data and access boundaries, risk, recovery, Region, and cost posture.
+Gate A confirms the complete product agreement: outcome, users, first-release scope, success measures, data and access boundaries, risk, recovery, Region, and cost posture.
 It does not approve a technical design, construction, publication, deployment, or teardown.
 
-Review the readiness card, request a correction with
-`Change the requirements: <correction>.`, or provide the exact receipt shown
+Review the readiness card, request a correction with `Change the requirements: <correction>.`, or provide the exact receipt shown
 last in the owner acceptance record. After approval, Codex continues to Design.
+
+<details>
+<summary>Exact input boundaries, examples, and recovery commitments</summary>
+
+These records make accepted and rejected input, recovery expectations, and
+intentional exclusions visible before approval. The examples describe the
+product; a passing test still needs observed evidence.
+
+### Concrete inputs and recovery
+
+### Recovery applicability
+
+| Dataset ID | Requirement IDs | Scenario IDs | Recovery mode | Recovery time minutes | Data loss minutes | Decision basis |
+|---|---|---|---|---|---|---|
+
+### Recovery scenario classification
+
+| QAS ID | Kind | Dataset IDs | Decision basis |
+|---|---|---|---|
+
+### Input applicability
+
+| Requirement ID | Constraint IDs | Decision basis |
+|---|---|---|
+
+### Input boundaries
+
+| Constraint ID | Requirement IDs | Subject | Kind | Minimum | Maximum | Allowed values JSON | Valid example JSON | Invalid example JSON | Rejection behavior |
+|---|---|---|---|---|---|---|---|---|---|
+
+</details>
 
 ## 13. Cross-requirement analysis
 
@@ -1111,6 +1140,20 @@ planning evidence required for technical review.
 | Terraform | TODO | TODO | Formatting, validation, selected policy checks, and a deterministic plan boundary | Bind the reviewed plan to exact inputs, state/refresh mode, target, and digest | `docs/project/VERIFY.md#iac-validation-evidence` |
 | Container delivery | TODO | TODO | Dependency/lock validation, SBOM generation, and selected image/configuration checks | Bind the immutable image digest and deployment target | `docs/project/VERIFY.md#iac-validation-evidence` |
 | Other approved delivery path | TODO | TODO | Exact equivalent checks selected by current TECH decisions | Exact equivalent immutable plan and target binding | `docs/project/VERIFY.md#iac-validation-evidence` |
+
+</details>
+
+<details>
+<summary>Exact outcome-to-check bindings and evidence destinations</summary>
+
+Each planned check names the outcome it must demonstrate, where it runs, its
+time limit, and where the observed result will be recorded. AWS checks require
+their own later authorization.
+
+### Validation check bindings
+
+| Check ID | Obligation ID | Stage | Exact command | Time limit seconds | Evidence destination | Expected result |
+|---|---|---|---|---|---|---|
 
 </details>
 

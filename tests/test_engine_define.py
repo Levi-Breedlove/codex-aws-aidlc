@@ -11,6 +11,7 @@ from scripts.fastlane_engine import api
 from scripts.fastlane_engine.core import contracts
 from scripts.fastlane_engine.define import coverage, intake, project, requirements
 from scripts.fastlane_engine.define.models import RequirementsContract
+from scripts.fastlane_engine.owner_decisions import derive_owner_answer_confirmation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +19,105 @@ DEFINE_ROOT = ROOT / "scripts" / "fastlane_engine" / "define"
 
 
 class EngineDefineTests(unittest.TestCase):
+    def test_owner_response_sequence_is_bounded_and_keeps_contiguous_ids(self) -> None:
+        gap = (
+            "INTAKE_RESPONSE_REGISTER_INVALID",
+            "Owner response IDs must be monotonic without gaps",
+        )
+        for numbers, expected_gap in (
+            ([], False),
+            (["0001"], False),
+            (["0002", "0001"], False),
+            (["0001", "0001"], False),
+            (["0000"], True),
+            (["0001", "0003"], True),
+            (["99999999999999999999999999999999"], True),
+            (["0" * 63 + "1"], False),
+        ):
+            with self.subTest(lengths=[len(n) for n in numbers], gap=expected_gap):
+                rows = tuple(
+                    (
+                        f"OWNER-MSG-{number}",
+                        "INTAKE-CARD-0001",
+                        str(index + 1),
+                        "sha256:" + "a" * 64,
+                        "1",
+                        "INTAKE-Q-0001",
+                        "A",
+                        "NONE",
+                        "INTAKE-0001",
+                    )
+                    for index, number in enumerate(numbers)
+                )
+                table = contracts.ContractTable(
+                    intake.INTAKE_RESPONSE_REGISTER_HEADERS, rows, b""
+                )
+                issues = []
+                responses = intake._parse_intake_response_register(
+                    table, {"INTAKE-0001": "OWNER_WORK_CONTEXT"}, issues
+                )
+                self.assertEqual(gap in issues, expected_gap)
+                if len(numbers) == 1 and not expected_gap:
+                    self.assertFalse(issues)
+                    self.assertEqual(len(responses), 1)
+
+    def test_oversized_owner_response_ids_do_not_reach_integer_projections(
+        self,
+    ) -> None:
+        question = intake.IntakeQuestion(
+            "1",
+            "INTAKE-Q-0001",
+            "DECISION",
+            ("INTAKE-0001",),
+            "What work are we doing?",
+            "New application",
+            "Existing application",
+            "Repair",
+            "A",
+            (),
+            None,
+            "A",
+            None,
+        )
+        prd = (ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
+        for number, valid in (
+            ("0001", True),
+            ("0" * 63 + "1", True),
+            ("9" * 5_000, False),
+            ("0" * 5_000 + "1", False),
+        ):
+            with self.subTest(length=len(number), valid=valid):
+                table = contracts.ContractTable(
+                    intake.INTAKE_RESPONSE_REGISTER_HEADERS,
+                    (
+                        (
+                            f"OWNER-MSG-{number}",
+                            "INTAKE-CARD-0001",
+                            "1",
+                            "sha256:" + "a" * 64,
+                            "1",
+                            "INTAKE-Q-0001",
+                            "A",
+                            "NONE",
+                            "INTAKE-0001",
+                        ),
+                    ),
+                    b"",
+                )
+                issues = []
+                responses = intake._parse_intake_response_register(
+                    table, {"INTAKE-0001": "OWNER_WORK_CONTEXT"}, issues
+                )
+                self.assertEqual(bool(responses), valid)
+                self.assertEqual(bool(issues), not valid)
+                confirmation = derive_owner_answer_confirmation(
+                    prd,
+                    intake.IntakeFoundationContract(
+                        normalized_responses=responses, all_questions=(question,)
+                    ),
+                )
+                self.assertEqual(confirmation["status"] == "READY", valid)
+
     def test_public_facades_share_the_extracted_define_implementations(self) -> None:
         functions = {
             "derive_change_impact_contract": coverage.derive_change_impact_contract,

@@ -242,7 +242,7 @@ def _architecture_board_report_fixture(*, schema_version: int = 7) -> dict[str, 
     project_contract = design_contract["project_contract"]
     design_contract["schema_version"] = schema_version
     project_contract["schema_version"] = schema_version
-    if schema_version == 8:
+    if schema_version in {8, 9}:
         project_contract["design_v8"] = {"schema_version": 8, "status": "READY"}
     records = design_contract["diagram_contract"]["records"]
     groups = {
@@ -1082,13 +1082,18 @@ class EngineDesignTests(unittest.TestCase):
         report["write_authority"]["approved_write_roots"].pop()
         self.assertEqual(json.dumps(report, sort_keys=True), original)
 
-        current = _architecture_board_report_fixture(schema_version=8)
-        current["write_authority"]["approved_write_roots"].append(
-            "dist/architecture/**"
-        )
-        self.assertTrue(
-            engine_api.derive_architecture_board_handoff(current)["eligible"]
-        )
+        for schema_version in (8, 9):
+            with self.subTest(schema_version=schema_version):
+                current = _architecture_board_report_fixture(
+                    schema_version=schema_version
+                )
+                current["write_authority"]["approved_write_roots"].append(
+                    "dist/architecture/**"
+                )
+                handoff = engine_api.derive_architecture_board_handoff(current)
+                self.assertTrue(handoff["eligible"], handoff["issues"])
+                self.assertEqual(handoff["aws_authority"], "NONE")
+                self.assertEqual(handoff["external_authority"], "NONE")
 
     def test_architecture_board_handoff_fails_closed_without_changing_route(
         self,
@@ -1112,6 +1117,14 @@ class EngineDesignTests(unittest.TestCase):
             "mismatched-schema": lambda row: row["design_contract"][
                 "project_contract"
             ].update(schema_version=8),
+            "future-schema": lambda row: (
+                row["design_contract"].update(schema_version=10),
+                row["design_contract"]["project_contract"].update(schema_version=10),
+            ),
+            "incomplete-design-9": lambda row: (
+                row["design_contract"].update(schema_version=9),
+                row["design_contract"]["project_contract"].update(schema_version=9),
+            ),
             "incomplete-design-8": lambda row: (
                 row["design_contract"].update(schema_version=8),
                 row["design_contract"]["project_contract"].update(schema_version=8),

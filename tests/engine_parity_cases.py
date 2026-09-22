@@ -233,9 +233,27 @@ DEFINITION_OF_COMPLETE_CHANGE = {
         "frozen pre-refactor oracle mutation",
     ],
 }
+LOCAL_ALPHA_SPECIFICATION_CHANGE = {
+    "id": "REQUIREMENTS_1_6_DESIGN_9_LOCAL_ALPHA_1_4_0",
+    "base_commit": "831a3ae5bfcc0597f7ca763d8de0f211ee053fe2",
+    "scope": [
+        "Requirements 1.6 exact recovery, scenario-classification, input-applicability and input-boundary bindings",
+        "Design 9 exact acceptance criteria and one-obligation validation checks with command, stage, time bound and evidence destination",
+        "Current task acceptance and local-build check projections",
+        "Consequential current source ranges, source bytes, canonical digests and owner recovery wording",
+        "Explicit required-task-record overflow under the unchanged context budget",
+    ],
+    "prohibited": [
+        "Frozen pre-refactor oracle or historical canonical digest changes",
+        "Changes to independently specified lifecycle, route, gate, authority, task-state or diagnostic meanings",
+        "Truncating required records or increasing context limits to conceal growth",
+        "Application, AWS, recovery or arbitrary narrative correctness claims inferred from structured fixture validation",
+    ],
+}
 QUALIFICATION_APPROVED_BEHAVIOR_CHANGES = [
     *FROZEN_APPROVED_BEHAVIOR_CHANGES,
     DEFINITION_OF_COMPLETE_CHANGE,
+    LOCAL_ALPHA_SPECIFICATION_CHANGE,
 ]
 SUMMARY_TRUTH_COMPATIBILITY_DIGESTS = {
     "template_source": (
@@ -284,13 +302,13 @@ CURRENT_COMPATIBILITY_DIGESTS = {
     ),
 }
 CURRENT_APPROVED_BEHAVIOR_ADDITION_DIGESTS = {
-    "template_source": "ce1a7a795663022d71d2783dddfb591cc3d1eb28f2f0ded26655992c7db0e639",
-    "unconfigured_template": "ccb26536c270baa45b425eb5f0a5b7d2b9b42b80d81232b44879d12e9732fbbb",
-    "rendered_intake": "f7ef14bd0d89bb154d4ceb616fc2cda134815f98b917a3c531ac988c00b6c257",
-    "gate_a_pending": "f306b2d406bac71f34c6d6d9cff9b12f06db49e22840d6f5d4ba7be01a20a32e",
-    "gate_a_approved": "599ff556332efd5b09342f3b4acea28b759368bc3d5c5e56df2935748400f32d",
-    "gate_b_pending": "8685e03ba02db682f424a7c8845f2e9b0dc139dbe27de5ab146f6e3ea7c0e441",
-    "gate_b_approved": "6646bf730371f33b1f074e488d9233042b4fab5629dc2df2dcc6ac9902b51fe0",
+    "template_source": "adbdacc5d86cb139846a8ed3f8b7e316f2e1bf52b82cabc7325134ae4112fe36",
+    "unconfigured_template": "0da7f54daa597c43f4c62c430125fc1b8fe8dae5c51927bbdb633e1113b8333c",
+    "rendered_intake": "c2c41fdaaf0b563f21ce88d907be89a8a18447bc767bee17729b2b7d1bc43185",
+    "gate_a_pending": "9eb2d1be338a80a3d5cd7d222fbce2875d9fa8b90824d523ccc019933c43b47d",
+    "gate_a_approved": "58e837546e3806501be544ebcb876121e8e1a0adf8b67ac76daa4aff2a9c30a0",
+    "gate_b_pending": "9b5846d7f70efb679533ac5917fa305c20605adbef5e2bfd4a4efc83417329e8",
+    "gate_b_approved": "f8946406608bd31781fae91ab0f42d428c1ee6631b80f41c1d125cc76bccbe2b",
 }
 
 
@@ -1106,9 +1124,9 @@ def approved_behavior_compatibility_case(case: Mapping[str, Any]) -> dict[str, A
     requirements = report.get("requirements_contract")
     if isinstance(requirements, dict):
         requirements_schema = requirements.get("schema_version")
-        if requirements_schema in ("1.4", "1.5"):
+        if requirements_schema in ("1.4", "1.5", "1.6"):
             requirements.pop("canonical_sha256", None)
-        if requirements_schema == "1.5":
+        if requirements_schema in ("1.5", "1.6"):
             requirements["schema_version"] = "1.4"
             for field in (
                 "approved_schema_14_compatibility",
@@ -1117,37 +1135,41 @@ def approved_behavior_compatibility_case(case: Mapping[str, Any]) -> dict[str, A
                 "datasets",
                 "external_obligations",
                 "outcome_metrics",
+                "requirements_v16",
             ):
                 requirements.pop(field, None)
     design = report.get("design_contract")
     if not isinstance(design, dict):
         return normalized
     design_schema = design.get("schema_version")
-    if design_schema in (7, 8):
+    if design_schema in (7, 8, 9):
         design.pop("canonical_sha256", None)
-    if design_schema == 8:
+    if design_schema in (8, 9):
         design["schema_version"] = 7
     project_contract = design.get("project_contract")
     if isinstance(project_contract, dict):
         project_schema = project_contract.get("schema_version")
-        if project_schema in (7, 8):
+        if project_schema in (7, 8, 9):
             project_contract.pop("canonical_sha256", None)
-        if project_schema == 8:
+        if project_schema in (8, 9):
             project_contract["schema_version"] = 7
             project_contract.pop("design_v8", None)
+        if project_schema == 9:
+            project_contract.pop("validation_checks", None)
+            project_contract.pop("acceptance_criteria", None)
     diagram_contract = design.get("diagram_contract")
     if isinstance(diagram_contract, dict):
-        if design_schema in (7, 8):
+        if design_schema in (7, 8, 9):
             diagram_contract.pop("canonical_sha256", None)
         records = diagram_contract.get("records")
         if isinstance(records, list):
             for record in records:
                 if not isinstance(record, dict):
                     continue
-                if design_schema in (7, 8):
+                if design_schema in (7, 8, 9):
                     for field in ("rendered_sha256", "semantic_sha256"):
                         record.pop(field, None)
-                if design_schema == 8:
+                if design_schema in (8, 9):
                     for field in ("containment", "semantic_relationships"):
                         record.pop(field, None)
     return normalized

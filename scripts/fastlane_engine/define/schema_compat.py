@@ -138,8 +138,9 @@ def _migration_selection(
     legacy_ids: list[str],
     current_header_map: Mapping[tuple[str, ...], str],
     current_present: set[tuple[str, ...]],
+    current_schema: str,
 ) -> SchemaSelection:
-    migration_targets = ["Project contract schema 1.5"]
+    migration_targets = [f"Project contract schema {current_schema}"]
     if not clean_cell(document.get("Project completion target", "")):
         migration_targets.append("Project completion target")
     migration_targets.extend(
@@ -152,7 +153,7 @@ def _migration_selection(
     )
     issue = (
         "PROJECT_CONTRACT_MIGRATION_REQUIRED",
-        "Project contract schema 1.5 is required before Gate A readiness; "
+        f"Project contract schema {current_schema} is required before Gate A readiness; "
         "migrate only the listed generated records without inventing owner facts: "
         + ", ".join(migration_targets),
     )
@@ -166,6 +167,62 @@ def _migration_selection(
         contract,
         [issue],
     )
+
+
+def _requirements_surfaces(
+    text,
+    document,
+    observed_headers,
+    current_header_map,
+    schema_14_headers,
+    extension_headers,
+    detail_headers,
+):
+    structural_text = without_fenced_code(text)
+    schema_14_present = _contract_surface_present(
+        structural_text, observed_headers, current_header_map, schema_14_headers
+    )
+    detail_present = _contract_surface_present(
+        structural_text, observed_headers, current_header_map, detail_headers
+    )
+    extension_present = bool(
+        detail_present
+        or clean_cell(document.get("Project completion target", ""))
+        or _contract_surface_present(
+            structural_text, observed_headers, current_header_map, extension_headers
+        )
+    )
+    return schema_14_present, detail_present, extension_present
+
+
+def _approved_schema_flags(
+    project_schema,
+    current_schema,
+    grandfather_current_gate_a,
+    schema_14_present,
+    extension_present,
+    detail_present,
+):
+    grandfather_schema_13 = bool(
+        project_schema == "1.3"
+        and grandfather_current_gate_a
+        and not schema_14_present
+        and not extension_present
+    )
+    compatible_schema_14 = bool(
+        project_schema == "1.4" and grandfather_current_gate_a and not extension_present
+    )
+    compatible = (
+        project_schema in {current_schema}
+        or (
+            project_schema == "1.5"
+            and grandfather_current_gate_a
+            and not detail_present
+        )
+        or compatible_schema_14
+        or grandfather_schema_13
+    )
+    return compatible, grandfather_schema_13, compatible_schema_14
 
 
 def select_requirements_schema(
@@ -182,6 +239,7 @@ def select_requirements_schema(
     current_header_map: Mapping[tuple[str, ...], str],
     schema_14_headers: set[tuple[str, ...]],
     extension_headers: set[tuple[str, ...]],
+    detail_headers: set[tuple[str, ...]],
     legacy_headers: set[tuple[str, ...]],
     stable_contract_id: re.Pattern[str],
 ) -> SchemaSelection:
@@ -192,30 +250,24 @@ def select_requirements_schema(
     current_present = _present_current_headers(
         text, observed_headers, current_header_map
     )
-    structural_text = without_fenced_code(text)
-    schema_14_present = _contract_surface_present(
-        structural_text, observed_headers, current_header_map, schema_14_headers
+    schema_14_present, detail_present, extension_present = _requirements_surfaces(
+        text,
+        document,
+        observed_headers,
+        current_header_map,
+        schema_14_headers,
+        extension_headers,
+        detail_headers,
     )
-    extension_present = bool(
-        clean_cell(document.get("Project completion target", ""))
-        or _contract_surface_present(
-            structural_text, observed_headers, current_header_map, extension_headers
-        )
+    compatible, grandfather_schema_13, compatible_schema_14 = _approved_schema_flags(
+        project_schema,
+        current_schema,
+        grandfather_current_gate_a,
+        schema_14_present,
+        extension_present,
+        detail_present,
     )
-    grandfather_schema_13 = bool(
-        project_schema == "1.3"
-        and grandfather_current_gate_a
-        and not schema_14_present
-        and not extension_present
-    )
-    compatible_schema_14 = bool(
-        project_schema == "1.4" and grandfather_current_gate_a and not extension_present
-    )
-    if (
-        project_schema in {current_schema}
-        or compatible_schema_14
-        or grandfather_schema_13
-    ):
+    if compatible:
         return (
             document,
             requirement_rows,
@@ -235,7 +287,12 @@ def select_requirements_schema(
         current_present,
         stable_contract_id,
     )
-    if grandfather_current_gate_a and exact_legacy_ids:
+    if (
+        grandfather_current_gate_a
+        and exact_legacy_ids
+        and not schema_14_present
+        and not extension_present
+    ):
         return (
             document,
             requirement_rows,
@@ -246,7 +303,7 @@ def select_requirements_schema(
             _legacy_contract(text, document, exact_legacy_ids, legacy_headers),
             [],
         )
-    if not required and project_schema not in {"1.3", "1.4"}:
+    if not required and project_schema not in {"1.3", "1.4", "1.5", "1.6"}:
         return (
             document,
             requirement_rows,
@@ -265,6 +322,7 @@ def select_requirements_schema(
         legacy_ids,
         current_header_map,
         current_present,
+        current_schema,
     )
 
 

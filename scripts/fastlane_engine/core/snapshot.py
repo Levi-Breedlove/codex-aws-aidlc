@@ -15,6 +15,7 @@ import heapq
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import subprocess
 from types import MappingProxyType
 
@@ -224,6 +225,10 @@ class SnapshotObserver:
                 relative,
             )
         path = self.root / relative
+        if not path.resolve().is_relative_to(self.root):
+            raise ObservationError(
+                "MANIFEST_UNSAFE_PATH", "Path resolves outside the project", relative
+            )
         if not path.exists():
             raise ObservationError(
                 "REQUIRED_FILE_MISSING", "Required file is missing", relative
@@ -393,13 +398,13 @@ class SnapshotObserver:
                 for entry in heapq.nsmallest(
                     maximum_entries, path.iterdir(), key=lambda item: item.name
                 ):
-                    entry_is_symlink = entry.is_symlink()
-                    stat = entry.lstat()
+                    entry_is_symlink = has_symlink_component(path, entry.name)
+                    metadata = entry.lstat()
                     entries.append(
                         DirectoryEntrySnapshot(
                             path=PurePosixPath(relative, entry.name).as_posix(),
                             name=entry.name,
-                            byte_size=stat.st_size,
+                            byte_size=metadata.st_size,
                             is_file=bool(not entry_is_symlink and entry.is_file()),
                             is_directory=bool(not entry_is_symlink and entry.is_dir()),
                             is_symlink=entry_is_symlink,
@@ -781,7 +786,14 @@ def has_symlink_component(root: Path, relative: str) -> bool:
     current = root
     for part in PurePosixPath(relative).parts:
         current = current / part
-        if current.is_symlink():
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(metadata.st_mode) or (
+            getattr(metadata, "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        ):
             return True
     return False
 

@@ -12,10 +12,13 @@ import hashlib
 import json
 import os
 import re
+import shlex
+import stat
 import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Mapping, Sequence
 
@@ -242,7 +245,6 @@ GITHUB_CONSTRAINTS = re.compile(
     r"BRANCH: (?P<branch>[^;\r\n]+); MERGE: (?P<merge>ALLOWED|PROHIBITED)"
 )
 PATH_KEYS = {
-    "cwd",
     "directory",
     "file",
     "file_path",
@@ -250,9 +252,10 @@ PATH_KEYS = {
     "root",
     "target",
     "target_file",
-    "workdir",
 }
-PATCH_PATH = re.compile(r"^\*\*\* (?:Add|Delete|Update) File: (.+)$", re.MULTILINE)
+PATCH_PATH = re.compile(
+    r"^\*\*\* (?:(?:Add|Delete|Update) File|Move to): (.+)$", re.MULTILINE
+)
 BOOTSTRAP_MARKER = re.compile(
     r"^<!-- bootstrap:(?P<name>[a-z0-9][a-z0-9-]*):(?P<boundary>start|end) -->$"
 )
@@ -407,40 +410,216 @@ def _value_digest(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _windows_sid_text(pointer: object) -> str:
+    import ctypes
+    from ctypes import wintypes
+
+    advapi = ctypes.WinDLL("advapi32.dll", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32.dll", use_last_error=True)
+    advapi.ConvertSidToStringSidW.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.LPWSTR),
+    ]
+    advapi.ConvertSidToStringSidW.restype = wintypes.BOOL
+    kernel.LocalFree.argtypes = [ctypes.c_void_p]
+    result = wintypes.LPWSTR()
+    if not pointer or not advapi.ConvertSidToStringSidW(pointer, ctypes.byref(result)):
+        raise HookInputError("Unable to inspect Windows transition ownership")
+    try:
+        return result.value
+    finally:
+        kernel.LocalFree(ctypes.cast(result, ctypes.c_void_p))
+
+
+@lru_cache(maxsize=1)
+def _windows_user_sid() -> str:
+    import ctypes
+    from ctypes import wintypes
+
+    advapi = ctypes.WinDLL("advapi32.dll", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32.dll", use_last_error=True)
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    advapi.OpenProcessToken.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.HANDLE),
+    ]
+    advapi.GetTokenInformation.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    handle = wintypes.HANDLE()
+    if not advapi.OpenProcessToken(kernel.GetCurrentProcess(), 8, ctypes.byref(handle)):
+        raise HookInputError("Unable to identify the Windows transition owner")
+    try:
+        size = wintypes.DWORD()
+        advapi.GetTokenInformation(handle, 1, None, 0, ctypes.byref(size))
+        if not 0 < size.value <= 65_536:
+            raise HookInputError("Invalid Windows identity size")
+        buffer = ctypes.create_string_buffer(size.value)
+        if not advapi.GetTokenInformation(handle, 1, buffer, size, ctypes.byref(size)):
+            raise HookInputError("Unable to read the Windows transition owner")
+        return _windows_sid_text(
+            ctypes.cast(buffer, ctypes.POINTER(ctypes.c_void_p))[0]
+        )
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def _windows_private_transition_path(path: Path) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    advapi = ctypes.WinDLL("advapi32.dll", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32.dll", use_last_error=True)
+    pointer = ctypes.c_void_p
+    advapi.GetNamedSecurityInfoW.argtypes = [
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        *([ctypes.POINTER(pointer)] * 5),
+    ]
+    advapi.GetNamedSecurityInfoW.restype = wintypes.DWORD
+    advapi.GetAce.argtypes = [pointer, wintypes.DWORD, ctypes.POINTER(pointer)]
+    advapi.GetAce.restype = wintypes.BOOL
+    kernel.LocalFree.argtypes = [pointer]
+    owner, acl, descriptor = pointer(), pointer(), pointer()
+    if advapi.GetNamedSecurityInfoW(
+        str(path),
+        1,
+        5,
+        ctypes.byref(owner),
+        None,
+        ctypes.byref(acl),
+        None,
+        ctypes.byref(descriptor),
+    ):
+        raise HookInputError("Unable to inspect Windows transition permissions")
+    try:
+        trusted = {_windows_user_sid(), "S-1-5-18", "S-1-5-32-544"}
+        if not acl or _windows_sid_text(owner) not in trusted:
+            raise HookInputError("Windows transition state has an unsafe owner or ACL")
+        trusted.add("S-1-3-4")  # OWNER_RIGHTS is limited to the verified owner.
+        # ACL.AceCount is the WORD at offset 4. An ACCESS_ALLOWED_ACE has
+        # an eight-byte header/mask followed by its SID. Reject other grants.
+        for index in range(ctypes.c_ushort.from_address(acl.value + 4).value):
+            ace = pointer()
+            if not advapi.GetAce(acl, index, ctypes.byref(ace)):
+                raise HookInputError(
+                    "Unable to inspect a Windows transition access rule"
+                )
+            kind = ctypes.c_ubyte.from_address(ace.value).value
+            if kind == 1:  # ACCESS_DENIED_ACE cannot grant access.
+                continue
+            if kind != 0 or _windows_sid_text(ace.value + 8) not in trusted:
+                raise HookInputError(
+                    "Windows transition state is accessible to another user"
+                )
+    finally:
+        kernel.LocalFree(descriptor)
+
+
 def _transition_path(root: Path) -> Path:
     repository_hash = hashlib.sha256(
         str(root.resolve()).casefold().encode("utf-8")
     ).hexdigest()
+    user = (
+        str(os.getuid())
+        if hasattr(os, "getuid")
+        else _value_digest(_windows_user_sid())[7:]
+    )
     return (
-        Path(tempfile.gettempdir())
-        / TRANSITION_DIRECTORY
+        Path(tempfile.gettempdir()).resolve()
+        / f"{TRANSITION_DIRECTORY}-{user}"
         / repository_hash
         / "transition.json"
     )
 
 
-def _clear_transition(root: Path) -> None:
+def _transition_metadata(
+    path: Path, *, directory: bool = False
+) -> os.stat_result | None:
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return None
+    expected_type = stat.S_ISDIR if directory else stat.S_ISREG
+    if not expected_type(metadata.st_mode) or (
+        getattr(metadata, "st_file_attributes", 0)
+        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    ):
+        raise HookInputError(
+            "Fastlane private transition path is linked or not regular"
+        )
+    if hasattr(os, "getuid") and (
+        metadata.st_uid != os.getuid() or (directory and metadata.st_mode & 0o077)
+    ):
+        raise HookInputError(
+            "Fastlane transition state must be private to the current user"
+        )
+    if os.name == "nt":
+        _windows_private_transition_path(path)
+    return metadata
+
+
+def _safe_transition_path(root: Path, *, create: bool = False) -> Path:
     path = _transition_path(root)
+    base = path.parents[2]
+    # A shared POSIX temp parent must protect each user's private child from rename.
+    # On Windows require the user's temporary tree, which inherits the user's ACL.
+    if os.name == "nt":
+        if not base.resolve().is_relative_to(Path.home().resolve()):
+            raise HookInputError(
+                "Fastlane requires a per-user Windows temporary directory"
+            )
+    for ancestor in reversed((base, *base.parents)):
+        metadata = ancestor.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or (
+            getattr(metadata, "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        ):
+            raise HookInputError("Fastlane temporary parent must not be linked")
+        if (
+            os.name != "nt"
+            and metadata.st_mode & 0o022
+            and not (
+                metadata.st_mode & stat.S_ISVTX and metadata.st_uid in {0, os.getuid()}
+            )
+        ):
+            raise HookInputError("Fastlane temporary parent permits unsafe replacement")
+    for directory in (path.parents[1], path.parent):
+        if create:
+            try:
+                directory.mkdir(mode=0o700)
+            except FileExistsError:
+                pass
+        if _transition_metadata(directory, directory=True) is None:
+            break
+    return path
+
+
+def _clear_transition(root: Path) -> None:
+    path = _safe_transition_path(root)
     for candidate in (path, path.with_suffix(".tmp")):
-        try:
+        if _transition_metadata(candidate) is not None:
             candidate.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def _store_transition(root: Path, state: Mapping[str, str]) -> None:
-    path = _transition_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = _safe_transition_path(root, create=True)
+    _transition_metadata(path)
     encoded = json.dumps(dict(state), separators=(",", ":"), sort_keys=True).encode(
         "utf-8"
     )
     if len(encoded) > 8_192:
         raise HookInputError("Fastlane transition state exceeds its bounded schema")
     temporary = path.with_suffix(".tmp")
-    try:
+    if _transition_metadata(temporary) is not None:
         temporary.unlink()
-    except FileNotFoundError:
-        pass
     descriptor = os.open(
         temporary,
         os.O_CREAT | os.O_EXCL | os.O_WRONLY,
@@ -454,16 +633,25 @@ def _store_transition(root: Path, state: Mapping[str, str]) -> None:
 
 
 def _load_transition(root: Path) -> dict[str, str] | None:
-    path = _transition_path(root)
+    path = _safe_transition_path(root)
     try:
-        stat = path.stat()
+        metadata = _transition_metadata(path)
+        if metadata is None:
+            return None
         if (
-            datetime.now(timezone.utc).timestamp() - stat.st_mtime
+            datetime.now(timezone.utc).timestamp() - metadata.st_mtime
             > TRANSITION_MAX_AGE_SECONDS
         ):
             _clear_transition(root)
             return None
-        raw = path.read_bytes()
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+        )
+        with os.fdopen(descriptor, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise HookInputError("Fastlane transition state is not a regular file")
+            raw = stream.read(8_193)
     except FileNotFoundError:
         return None
     if len(raw) > 8_192:
@@ -1208,7 +1396,7 @@ def _transition_post_message(
 
 
 def _tool_command(tool_input: Mapping[str, Any]) -> str:
-    value = tool_input.get("command")
+    value = tool_input.get("command", tool_input.get("cmd"))
     return value if isinstance(value, str) and value.strip() else ""
 
 
@@ -1261,6 +1449,31 @@ def _parameter_resources(parameters: object) -> list[str]:
             if isinstance(item, str) and item.strip()
         )
     return values
+
+
+def _s3_parameter_resources(operation: str, parameters: object) -> list[str] | None:
+    service, separator, action = operation.partition(":")
+    if not separator or service.casefold() != "s3":
+        return None
+    if action.casefold() == "listbuckets":
+        return None
+    if not isinstance(parameters, Mapping):
+        return []
+    bucket = parameters.get("Bucket")
+    key = parameters.get("Key")
+    if not isinstance(bucket, str) or not re.fullmatch(
+        r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket
+    ):
+        return []
+    # Access point / directory bucket shapes require their own exact binding.
+    if (
+        "object" in action.casefold()
+        and not action.casefold().startswith(("listobjects", "listobjectversions"))
+    ) or "Key" in parameters:
+        if not isinstance(key, str) or not key or key != key.strip():
+            return []
+        return [f"arn:aws:s3:::{bucket}/{key}"]
+    return [f"arn:aws:s3:::{bucket}"]
 
 
 def _is_within(path: Path, root: Path) -> bool:
@@ -1337,24 +1550,328 @@ def _is_file_write_tool(tool_name: str) -> bool:
     ) or lowered in {"edit", "write"}
 
 
-def _shell_write_candidates(command: str) -> tuple[bool, list[str]]:
-    write_marker = re.search(
-        rf"{SHELL_COMMAND_BOUNDARY}(?:rm|mv|cp|touch|mkdir|rmdir|sed\s+-i|tee|"
-        r"set-content|add-content|out-file|remove-item|move-item|copy-item|"
-        r"new-item)(?:\s|$)|(?:^|[^>])>{1,2}(?!=)",
-        command,
-        re.IGNORECASE,
+def _shell_lex_source(command: str) -> str:
+    """Keep comments and adjacent descriptor numbers out of command operands."""
+    result: list[str] = []
+    quote = ""
+    word_start = True
+    index = 0
+    descriptor = re.compile(r"[0-9]+(?=[<>])")
+    while index < len(command):
+        character = command[index]
+        if character in {"\\", "`"} and quote != "'":
+            result.append(command[index : index + 2])
+            index += 2
+            word_start = False
+            continue
+        if quote:
+            if character == quote:
+                quote = ""
+        elif character in {"'", '"'}:
+            quote = character
+        elif character == "#" and word_start:
+            end = command.find("\n", index)
+            index = len(command) if end < 0 else end
+            continue
+        elif word_start and (match := descriptor.match(command, index)):
+            # Only adjacent, unquoted digits are a descriptor. The filename in
+            # ``mv app/a 2 > app/log`` must remain an observable mutation target.
+            index = match.end()
+            continue
+        result.append(character)
+        word_start = not quote and character in " \t\r\n;&|<>()"
+        index += 1
+    return "".join(result)
+
+
+def _shell_segments(command: str, depth: int = 0) -> list[list[str]]:
+    if depth > 4:
+        raise ValueError("Shell wrapper nesting exceeds the observable boundary")
+    lexer = shlex.shlex(
+        _shell_lex_source(command), posix=True, punctuation_chars=";&|<>\n"
     )
-    values = [match.strip() for match in PATCH_PATH.findall(command)]
-    values.extend(
-        match.strip("'\"")
-        for match in re.findall(
-            r"(?:>|>>|--file|-LiteralPath|-Path)\s*['\"]?([^'\"\s;&|]+)",
-            command,
-            re.IGNORECASE,
+    lexer.escape = ""
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    segments: list[list[str]] = [[]]
+    for token in lexer:
+        if token and all(character in ";&|\n" for character in token):
+            segments.append([])
+        else:
+            segments[-1].append(token)
+    result: list[list[str]] = []
+    for segment in segments:
+        program = _shell_program(segment, strip_redirections=True)
+        if segment:
+            result.append(segment)
+        if program and program[0] in {"bash", "sh", "zsh", "powershell", "pwsh", "cmd"}:
+            for index, argument in enumerate(program[1:], 1):
+                if argument.casefold() in {"-c", "-lc", "-ic", "-command", "/c", "/k"}:
+                    script = program[index + 1 :]
+                    if program[0] in {"bash", "sh", "zsh"}:
+                        script = script[:1]
+                    result.extend(_shell_segments(" ".join(script), depth + 1))
+                    break
+    return result
+
+
+def _shell_program(
+    arguments: list[str],
+    *,
+    strip_redirections: bool = False,
+    changed_directories: list[str] | None = None,
+) -> list[str]:
+    arguments = list(arguments)
+    if strip_redirections:
+        stripped: list[str] = []
+        index = 0
+        while index < len(arguments):
+            if arguments[index] in {">", ">>", "<"}:
+                index += 2
+            else:
+                stripped.append(arguments[index])
+                index += 1
+        arguments = stripped
+    while arguments:
+        name = (
+            arguments[0]
+            .strip("'\"")
+            .replace("\\", "/")
+            .rsplit("/", 1)[-1]
+            .casefold()
+            .removesuffix(".exe")
         )
-    )
-    return write_marker is not None or bool(values), values
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", arguments[0]):
+            arguments.pop(0)
+        elif name in {
+            "command",
+            "builtin",
+            "exec",
+            "env",
+            "sudo",
+            "doas",
+            "nohup",
+            "time",
+            "nice",
+        }:
+            arguments.pop(0)
+            while arguments and arguments[0].startswith("-"):
+                option = arguments.pop(0)
+                if option == "--":
+                    break
+                value_options = {
+                    "env": {"-u", "--unset", "-C", "--chdir"},
+                    "exec": {"-a"},
+                    "nice": {"-n", "--adjustment"},
+                    "sudo": {
+                        "-u",
+                        "--user",
+                        "-g",
+                        "--group",
+                        "-h",
+                        "--host",
+                        "-p",
+                        "--prompt",
+                        "-C",
+                        "--close-from",
+                        "-D",
+                        "--chdir",
+                        "-R",
+                        "--chroot",
+                    },
+                    "doas": {"-u", "-C"},
+                    "time": {"-f", "--format"},
+                }
+                parameter, value = option, None
+                if option.startswith("--") and "=" in option:
+                    parameter, value = option.split("=", 1)
+                elif len(option) > 2 and option[:2] in value_options.get(name, set()):
+                    parameter, value = option[:2], option[2:]
+                if parameter in value_options.get(name, set()):
+                    if value is None:
+                        if not arguments:
+                            raise ValueError("Shell wrapper option is missing a value")
+                        value = arguments.pop(0)
+                    if (
+                        name == "env"
+                        and parameter in {"-C", "--chdir"}
+                        or name == "sudo"
+                        and parameter in {"-D", "--chdir", "-R", "--chroot"}
+                    ) and changed_directories is not None:
+                        changed_directories.append(value)
+                elif option not in {
+                    "command": {"-p", "-v", "-V"},
+                    "exec": {"-c", "-l"},
+                    "env": {"-i", "--ignore-environment", "-0", "--null", "-"},
+                    "sudo": {
+                        "-n",
+                        "--non-interactive",
+                        "-E",
+                        "--preserve-env",
+                        "-H",
+                        "--set-home",
+                        "-S",
+                        "--stdin",
+                        "-b",
+                        "--background",
+                        "-k",
+                        "--reset-timestamp",
+                    },
+                    "doas": {"-n"},
+                    "time": {"-p", "--portability", "-v", "--verbose"},
+                }.get(name, set()):
+                    # Split-string execution, implicit shells, and wrapper-owned
+                    # output files need their own observable command contract.
+                    raise ValueError("Unsupported shell wrapper option")
+        else:
+            arguments[0] = {
+                "cpi": "copy-item",
+                "mi": "move-item",
+                "mvi": "move-item",
+                "ri": "remove-item",
+                "del": "remove-item",
+                "erase": "remove-item",
+                "sc": "set-content",
+                "ac": "add-content",
+                "ni": "new-item",
+            }.get(name, name)
+            return arguments
+    return []
+
+
+def _literal_shell_path(value: str) -> str | None:
+    value = value.strip("'\"")
+    if not value or re.search(r"[$`*?\[\]{}%,\r\n<>]", value):
+        return None
+    return value
+
+
+def _shell_mutation_paths(arguments: list[str]) -> list[str] | None:
+    name, *operands = arguments
+    if name in {"cp", "mv", "rm", "touch", "mkdir", "rmdir", "tee"}:
+        paths: list[str] = []
+        destination: str | None = None
+        options = True
+        while operands:
+            operand = operands.pop(0)
+            if options and operand == "--":
+                options = False
+            elif (
+                options
+                and name in {"cp", "mv"}
+                and operand in {"-t", "--target-directory"}
+            ):
+                if not operands:
+                    return None
+                destination = operands.pop(0)
+            elif (
+                options
+                and name in {"cp", "mv"}
+                and operand.startswith("--target-directory=")
+            ):
+                destination = operand.split("=", 1)[1]
+            elif options and operand.startswith("-"):
+                if not re.fullmatch(
+                    r"-[afinpRrvT]+|--(?:force|parents|recursive|verbose|no-clobber|append)",
+                    operand,
+                ):
+                    return None
+            else:
+                paths.append(operand)
+        if destination is not None:
+            paths.append(destination)
+        if not paths or (name in {"cp", "mv"} and len(paths) < 2):
+            return None
+        return paths[-1:] if name == "cp" else paths
+    # PowerShell bindings have many aliases and positional forms. Only a single
+    # literal named target plus explicitly supported options is attributable.
+    paths = []
+    positional_value = False
+    while operands:
+        option = operands.pop(0).casefold()
+        if option in {"-literalpath", "-path", "-filepath", "-destination"}:
+            if not operands:
+                return None
+            paths.append(operands.pop(0))
+        elif option in {"-value", "-encoding", "-itemtype"} and operands:
+            operands.pop(0)
+        elif option in {"-force", "-append", "-nonewline"}:
+            continue
+        elif name in {"set-content", "add-content"} and paths and not positional_value:
+            positional_value = True
+        elif option not in {"-force", "-append", "-nonewline"}:
+            return None
+    if name in {"copy-item", "move-item"} and len(paths) < 2:
+        return None
+    return paths or None
+
+
+def _shell_write_candidates(command: str) -> tuple[bool, list[str]]:
+    try:
+        segments = _shell_segments(command)
+    except ValueError:
+        return True, []
+    mutators = {
+        "cp",
+        "mv",
+        "rm",
+        "touch",
+        "mkdir",
+        "rmdir",
+        "tee",
+        "sed",
+        "set-content",
+        "add-content",
+        "out-file",
+        "remove-item",
+        "move-item",
+        "copy-item",
+        "new-item",
+    }
+    values: list[str] = []
+    is_write = False
+    changes_directory = False
+    for segment in segments:
+        if not segment:
+            continue
+        operands: list[str] = []
+        index = 0
+        while index < len(segment):
+            token = segment[index]
+            if token in {">", ">>"}:
+                is_write = True
+                if index + 1 >= len(segment):
+                    return True, []
+                values.append(segment[index + 1])
+                index += 2
+            elif re.fullmatch(r"[<>]+", token):
+                return True, []
+            else:
+                operands.append(token)
+                index += 1
+        directory_changes: list[str] = []
+        operands = _shell_program(operands, changed_directories=directory_changes)
+        name = operands[0] if operands else ""
+        changes_directory |= bool(directory_changes) or name in {
+            "cd",
+            "pushd",
+            "set-location",
+        }
+        if name in mutators and not (
+            name == "sed" and not any(item.startswith("-i") for item in operands[1:])
+        ):
+            is_write = True
+            paths = None if name == "sed" else _shell_mutation_paths(operands)
+            if paths is None:
+                return True, []
+            values.extend(paths)
+    if is_write and changes_directory:
+        return True, []
+    paths = [_literal_shell_path(value) for value in values]
+    if any(path is None for path in paths):
+        return True, []
+    return is_write, [path for path in paths if path is not None]
 
 
 def _write_denial(
@@ -1370,9 +1887,25 @@ def _write_denial(
     is_write = file_write or shell_write
     if not is_write:
         return None
+    if not file_write:
+        command_directories: set[Path] = set()
+        for key in ("cwd", "workdir"):
+            if key not in tool_input:
+                continue
+            value = tool_input[key]
+            if not isinstance(value, str) or not value:
+                return "Fastlane blocked a file mutation with an ambiguous execution directory."
+            try:
+                command_directories.add((cwd / value).resolve())
+            except (OSError, ValueError):
+                return "Fastlane blocked a file mutation with an invalid execution directory."
+        if len(command_directories) > 1:
+            return "Fastlane blocked a file mutation with conflicting execution directories."
+        if command_directories:
+            cwd = command_directories.pop()
     # File-write payloads may legitimately add strings such as ``-Path``.
     # Their exact targets come from the file tool contract, not shell parsing.
-    raw_paths = _candidate_paths(tool_input) + ([] if file_write else shell_paths)
+    raw_paths = _candidate_paths(tool_input) if file_write else shell_paths
     if not raw_paths:
         return "Fastlane blocked an ambiguous file mutation because its exact target path is not observable."
     relative_paths: list[str] = []
@@ -2406,12 +2939,25 @@ def _presigned_url_request(tool_input: Mapping[str, Any]) -> dict[str, Any]:
         operation = raw_direction
         kind = "AMBIGUOUS"
 
-    bucket = _first_string(tool_input, ("bucket", "bucket_name"))
-    key = _first_string(tool_input, ("key", "object", "object_key"))
+    buckets = {
+        tool_input[k]
+        for k in ("bucket", "bucket_name")
+        if isinstance(tool_input.get(k), str)
+    }
+    keys = {
+        tool_input[k]
+        for k in ("key", "object", "object_key")
+        if isinstance(tool_input.get(k), str)
+    }
     resources = (
-        [f"arn:aws:s3:::{bucket}/{key.lstrip('/')}"]
-        if bucket is not None and key is not None
-        else []
+        _s3_parameter_resources(
+            operation,
+            {
+                "Bucket": next(iter(buckets)) if len(buckets) == 1 else None,
+                "Key": next(iter(keys)) if len(keys) == 1 else None,
+            },
+        )
+        or []
     )
     expires_in = None
     for field in ("expires_in", "expires_in_seconds", "expiration", "ttl_seconds"):
@@ -2460,15 +3006,20 @@ def _aws_request_details(
     if capability in AWS_PRESIGNED_TOOL_MARKERS:
         return _presigned_url_request(tool_input)
 
-    command = _first_string(tool_input, ("command", "cli_command")) or ""
+    command = _first_string(tool_input, ("command", "cmd", "cli_command")) or ""
     lowered_command = command.casefold()
     is_external_tool = _is_aws_account_tool(tool_name)
-    is_shell_aws = bool(
-        re.search(
-            rf"{SHELL_COMMAND_BOUNDARY}(?:aws(?:\.exe)?|cdk|sam|terraform|serverless)\s+",
-            lowered_command,
-        )
-    ) or any(marker in lowered_command for marker in AWS_MUTATION_COMMANDS)
+    try:
+        programs = [
+            _shell_program(segment, strip_redirections=True)
+            for segment in _shell_segments(command)
+        ]
+    except ValueError:
+        programs = []
+    is_shell_aws = any(
+        program and program[0] in {"aws", "cdk", "sam", "terraform", "serverless"}
+        for program in programs
+    )
     if not is_external_tool and not is_shell_aws:
         return None
     service = _first_string(tool_input, ("service", "service_name")) or ""
@@ -2534,11 +3085,16 @@ def _aws_request_details(
         )
     )
     resources.extend(_parameter_resources(tool_input.get("parameters")))
+    s3_resources = _s3_parameter_resources(operation, tool_input.get("parameters"))
+    if s3_resources is not None:
+        resources.extend(s3_resources)
     details: dict[str, Any] = {
         "lane": "STRUCTURED_API",
         "kind": kind,
         "operation": operation,
         "resources": sorted(set(resources)),
+        "resource_required": s3_resources is not None,
+        "resource_unobservable": s3_resources == [],
     }
     key_map = {
         "account": ("account", "account_id"),
@@ -2764,12 +3320,31 @@ def _aws_authority_denial(
     ):
         return "Fastlane blocked the AWS request because its exact operation is outside the authorized operation list."
     requested_resources = request.get("resources")
-    if (kind in {"MUTATE", "TEARDOWN"} or request.get("presigned_url") is True) and (
-        not isinstance(requested_resources, list) or not requested_resources
+    if requested_resources and not isinstance(resources, list):
+        return "Fastlane blocked the AWS request because its resource authority is malformed."
+    if request.get("resource_unobservable") or (
+        (
+            kind in {"MUTATE", "TEARDOWN"}
+            or request.get("presigned_url") is True
+            or request.get("resource_required")
+        )
+        and (not isinstance(requested_resources, list) or not requested_resources)
     ):
         return "Fastlane blocked the AWS request because its exact resource target is not observable."
     if isinstance(requested_resources, list) and isinstance(resources, list):
         for requested in requested_resources:
+            if str(request.get("operation", "")).casefold().startswith("s3:"):
+                region = str(authority.get("region", ""))
+                partition = (
+                    "aws-cn"
+                    if region.startswith("cn-")
+                    else "aws-us-gov"
+                    if region.startswith("us-gov-")
+                    else "aws"
+                )
+                requested = str(requested).replace(
+                    "arn:aws:s3:::", f"arn:{partition}:s3:::", 1
+                )
             if not _exact_value_allowed(str(requested), resources):
                 return "Fastlane blocked the AWS request because a resource target is outside the authorized boundary."
     for key in ("account", "region", "environment", "role_or_profile"):
@@ -2822,6 +3397,30 @@ def _github_request_kind(tool_name: str, tool_input: Mapping[str, Any]) -> str |
         return "UNKNOWN"
 
     command = _tool_command(tool_input).casefold()
+    try:
+        programs = [
+            _shell_program(segment, strip_redirections=True)
+            for segment in _shell_segments(command)
+        ]
+    except ValueError:
+        programs = []
+    for program in programs:
+        if not program or program[0] != "git":
+            continue
+        arguments = program[1:]
+        while arguments and arguments[0].startswith("-"):
+            option = arguments.pop(0)
+            if option in {
+                "-c",
+                "--git-dir",
+                "--work-tree",
+                "--namespace",
+                "--config-env",
+            }:
+                if arguments:
+                    arguments.pop(0)
+        if arguments and arguments[0] == "push":
+            return "BRANCH_PR"
     prefix = rf"{SHELL_COMMAND_BOUNDARY}{SHELL_WRAPPER_PREFIX}"
     if re.search(rf"{prefix}git(?:\.exe)?\s+push(?:\s|$)", command):
         return "BRANCH_PR"

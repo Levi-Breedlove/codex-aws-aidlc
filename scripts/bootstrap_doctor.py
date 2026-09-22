@@ -583,6 +583,7 @@ if __package__:
         derive_write_authority,
         lifecycle_intent_record_boundary_is_settled,
         prepare_source_brief_request,
+        explain_project_validation,
     )
     from .fastlane_engine.authority.github import (
         _aws_action_transition_projection,
@@ -703,6 +704,7 @@ else:
         derive_write_authority,
         lifecycle_intent_record_boundary_is_settled,
         prepare_source_brief_request,
+        explain_project_validation,
     )
     from fastlane_engine.authority.github import (
         _aws_action_transition_projection,
@@ -1041,6 +1043,21 @@ def _validate_current_gate_receipt(
     return result, 0 if result["status"] == "PASS" else 2
 
 
+def _owner_input_usage(code: str, message: str) -> int:
+    print(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "FAIL",
+                "errors": [{"code": code, "message": message}],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_utf8_standard_streams()
     parser = argparse.ArgumentParser(description="Read-only AWS Codex Fastlane Engine")
@@ -1057,6 +1074,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Allow unresolved render tokens in the reusable template source",
     )
     parser.add_argument("--source-brief", help="Preview one owner product brief")
+    parser.add_argument(
+        "--explain-validation",
+        action="store_true",
+        help="Project source-bound validation obligations without executing them",
+    )
     parser.add_argument(
         "--prior-remediation-fingerprint",
         help="Prior sha256 remediation fingerprint for one bounded retry",
@@ -1085,23 +1107,24 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     if owner_input_modes > 1:
-        print(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "status": "FAIL",
-                    "errors": [
-                        {
-                            "code": "OWNER_INPUT_USAGE",
-                            "message": "Select exactly one owner-input parser mode",
-                        }
-                    ],
-                },
-                indent=2,
-                sort_keys=True,
-            )
+        return _owner_input_usage(
+            "OWNER_INPUT_USAGE", "Select exactly one owner-input parser mode"
         )
-        return 1
+    if args.explain_validation:
+        if (
+            not args.json
+            or owner_input_modes
+            or args.source_brief is not None
+            or args.input_stdin
+        ):
+            parser.error(
+                "--explain-validation requires --json and cannot combine with source or owner-input modes"
+            )
+        payload = explain_project_validation(
+            args.root, template_source=args.template_source
+        )
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0 if payload["report"]["ok"] else 1
     if args.source_brief is not None:
         payload, exit_code = prepare_source_brief_request(
             args.root, args.source_brief, args.json, owner_input_modes
@@ -1110,23 +1133,10 @@ def main(argv: list[str] | None = None) -> int:
         return exit_code
     if args.parse_gate_correction:
         if not args.input_stdin or not args.json:
-            print(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "status": "FAIL",
-                        "errors": [
-                            {
-                                "code": "GATE_CORRECTION_USAGE",
-                                "message": "Gate correction parsing requires stdin and JSON",
-                            }
-                        ],
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
+            return _owner_input_usage(
+                "GATE_CORRECTION_USAGE",
+                "Gate correction parsing requires stdin and JSON",
             )
-            return 1
         candidate = sys.stdin.read(MAX_RESPONSE_CHARACTERS + 1)
         result = parse_gate_correction(candidate).to_dict()
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -1139,47 +1149,18 @@ def main(argv: list[str] | None = None) -> int:
             or args.presented_card_revision is None
             or args.presented_card_sha256 is None
         ):
-            print(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "status": "FAIL",
-                        "errors": [
-                            {
-                                "code": "INTAKE_PARSE_USAGE",
-                                "message": "Parsing requires stdin, JSON, and the presented card ID, revision, and digest",
-                            }
-                        ],
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
+            return _owner_input_usage(
+                "INTAKE_PARSE_USAGE",
+                "Parsing requires stdin, JSON, and the presented card ID, revision, and digest",
             )
-            return 1
         result, exit_code = _parse_current_intake_response(args)
         print(json.dumps(result, indent=2, sort_keys=True))
         return exit_code
     if args.validate_gate_receipt:
         if not args.input_stdin or not args.json:
-            print(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "status": "FAIL",
-                        "errors": [
-                            {
-                                "code": "GATE_RECEIPT_USAGE",
-                                "message": (
-                                    "Gate receipt validation requires stdin and JSON"
-                                ),
-                            }
-                        ],
-                    },
-                    indent=2,
-                    sort_keys=True,
-                )
+            return _owner_input_usage(
+                "GATE_RECEIPT_USAGE", "Gate receipt validation requires stdin and JSON"
             )
-            return 1
         result, exit_code = _validate_current_gate_receipt(args)
         print(json.dumps(result, indent=2, sort_keys=True))
         return exit_code

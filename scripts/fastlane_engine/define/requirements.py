@@ -9,6 +9,7 @@ rendering. Approved Requirements 1.4 and older grandfathering remain compatible.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from typing import Any
 
 from ..core.contracts import (
@@ -45,6 +46,12 @@ from .requirements_v15 import (
     Requirements15Extension,
     derive_requirements_15_extension,
 )
+from .requirements_v16 import (
+    DETAIL_HEADERS,
+    Requirements16Extension,
+    derive_requirements_16_extension,
+    valid_recovery_measure,
+)
 from .schema_compat import (
     finalize_requirements_contract,
     select_requirements_schema,
@@ -67,7 +74,7 @@ LEGACY_NORMATIVE_REQUIREMENT_HEADERS = (
     "Acceptance form",
 )
 LEGACY_REQUIREMENT_HEADERS = ("ID", "Requirement", "Acceptance criteria")
-PROJECT_CONTRACT_SCHEMA = "1.5"
+PROJECT_CONTRACT_SCHEMA = "1.6"
 REQUIREMENTS_CHANGE_LINEAGE_HEADING = "### Requirements change lineage"
 REQUIREMENTS_CHANGE_LINEAGE_HEADERS = (
     "Current revision",
@@ -299,6 +306,8 @@ def observable_requirement_response(value: str) -> bool:
 
 
 def measurable_acceptance_is_bound(value: str) -> bool:
+    if valid_recovery_measure(value):
+        return True
     words = re.findall(r"[A-Za-z0-9]+", value)
     return bool(
         len(words) >= 6
@@ -701,6 +710,7 @@ def _current_contract_schema(
         DATASET_HEADERS: DATASET_HEADING,
         EXTERNAL_OBLIGATION_HEADERS: EXTERNAL_OBLIGATION_HEADING,
         CROSS_CUTTING_RISK_HEADERS: CROSS_CUTTING_RISK_HEADING,
+        **DETAIL_HEADERS,
     }
     return select_requirements_schema(
         text,
@@ -723,6 +733,7 @@ def _current_contract_schema(
             EXTERNAL_OBLIGATION_HEADERS,
             CROSS_CUTTING_RISK_HEADERS,
         },
+        detail_headers=set(DETAIL_HEADERS),
         legacy_headers={
             LEGACY_NORMATIVE_REQUIREMENT_HEADERS,
             LEGACY_REQUIREMENT_HEADERS,
@@ -744,6 +755,90 @@ def _requirements_presentation_labels(
         *((row[0], row[5]) for row in (use_cases.rows if use_cases else ())),
     ]
     return tuple((identifier, clean_cell(label)) for identifier, label in labels)
+
+
+def _requirements16_details(
+    text, document, extension, requirement_set, issues, missing_records, contract_tables
+):
+    details = Requirements16Extension()
+    if clean_cell(document.get("Project contract schema", "")) == "1.6":
+        details, detail_issues = derive_requirements_16_extension(
+            text,
+            {
+                item.dataset_id: (item.recovery, item.requirement_basis_ids)
+                for item in extension.datasets
+                if item.classification != "NONE"
+            },
+            requirement_set,
+        )
+        issues.extend(("REQUIREMENT_DETAIL_INVALID", issue) for issue in detail_issues)
+        if detail_issues:
+            missing_records.extend(DETAIL_HEADERS.values())
+        contract_tables = (*contract_tables, *details.canonical_tables)
+    return details, contract_tables
+
+
+def _requirements_approved_compatibility(
+    text, contract, details, requirement_rows, grandfather_current_gate_a, issues
+):
+    contract = replace(
+        contract,
+        requirements_v16=details,
+        acceptance_criteria=tuple((row[3], row[4]) for row in requirement_rows),
+    )
+    if contract.schema_version == "1.5":
+        try:
+            agent = table_after_heading(text, "### Gate A — agent analysis record")
+            exact = (
+                agent.get("Requirements contract SHA-256 analyzed")
+                == contract.canonical_sha256
+            )
+        except ValueError:
+            exact = False
+        if not grandfather_current_gate_a or not exact:
+            issues.append(
+                (
+                    "PROJECT_CONTRACT_MIGRATION_REQUIRED",
+                    "Requirements 1.5 remains compatible only with its exact approved digest; migrate to 1.6",
+                )
+            )
+            contract = replace(contract, status="MIGRATION_REQUIRED")
+    return contract
+
+
+def _validate_complete_coverage(
+    add,
+    covered_requirements,
+    requirement_set,
+    actor_ids,
+    covered_actor_ids,
+    journey_ids,
+    covered_journey_ids,
+):
+    if covered_requirements != sorted(requirement_set):
+        missing = sorted(requirement_set - set(covered_requirements))
+        extra = sorted(set(covered_requirements) - requirement_set)
+        add(
+            "REQUIREMENT_COVERAGE_INVALID",
+            "Coverage must enumerate every requirement exactly once in sorted order; missing="
+            + ",".join(missing)
+            + "; extra="
+            + ",".join(extra),
+        )
+    uncovered_actor_ids = sorted(set(actor_ids) - covered_actor_ids)
+    if uncovered_actor_ids:
+        add(
+            "ACTOR_CONTRACT_INVALID",
+            "Every declared actor must participate in first-release requirement coverage; uncovered="
+            + ",".join(uncovered_actor_ids),
+        )
+    uncovered_journey_ids = sorted(set(journey_ids) - covered_journey_ids)
+    if uncovered_journey_ids:
+        add(
+            "JOURNEY_CONTRACT_INVALID",
+            "Every declared journey must participate in first-release requirement coverage; uncovered="
+            + ",".join(uncovered_journey_ids),
+        )
 
 
 def derive_requirements_contract(
@@ -1524,31 +1619,25 @@ def derive_requirements_contract(
                     "REQUIREMENT_COVERAGE_INVALID",
                     f"{requirement_id}: Approved success measure ID must be INTAKE-0006",
                 )
-        if covered_requirements != sorted(requirement_set):
-            missing = sorted(requirement_set - set(covered_requirements))
-            extra = sorted(set(covered_requirements) - requirement_set)
-            add(
-                "REQUIREMENT_COVERAGE_INVALID",
-                "Coverage must enumerate every requirement exactly once in sorted order; missing="
-                + ",".join(missing)
-                + "; extra="
-                + ",".join(extra),
-            )
-        uncovered_actor_ids = sorted(set(actor_ids) - covered_actor_ids)
-        if uncovered_actor_ids:
-            add(
-                "ACTOR_CONTRACT_INVALID",
-                "Every declared actor must participate in first-release requirement coverage; uncovered="
-                + ",".join(uncovered_actor_ids),
-            )
-        uncovered_journey_ids = sorted(set(journey_ids) - covered_journey_ids)
-        if uncovered_journey_ids:
-            add(
-                "JOURNEY_CONTRACT_INVALID",
-                "Every declared journey must participate in first-release requirement coverage; uncovered="
-                + ",".join(uncovered_journey_ids),
-            )
+        _validate_complete_coverage(
+            add,
+            covered_requirements,
+            requirement_set,
+            actor_ids,
+            covered_actor_ids,
+            journey_ids,
+            covered_journey_ids,
+        )
 
+    details, contract_tables = _requirements16_details(
+        text,
+        document,
+        extension,
+        requirement_set,
+        issues,
+        missing_records,
+        contract_tables,
+    )
     contract = finalize_requirements_contract(
         requirement_rows=requirement_rows,
         contract_tables=contract_tables,
@@ -1570,7 +1659,10 @@ def derive_requirements_contract(
             *_requirements_presentation_labels(actors, journeys, use_cases),
             *extension.presentation_labels,
         ),
-        current_schema=PROJECT_CONTRACT_SCHEMA,
+        current_schema=clean_cell(document.get("Project contract schema", "")),
+    )
+    contract = _requirements_approved_compatibility(
+        text, contract, details, requirement_rows, grandfather_current_gate_a, issues
     )
     return contract, issues
 

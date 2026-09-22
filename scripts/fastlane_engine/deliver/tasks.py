@@ -37,6 +37,8 @@ from .evidence import (
     parse_task_completion_evidence,
     parse_verification_matrix,
     validate_done_evidence,
+    task_check_projection,
+    task_acceptance_check_issues,
     validate_done_property_evidence,
     validate_harness_projections,
     validate_task_property_projection,
@@ -779,6 +781,61 @@ def task_dependency_satisfied(
     )
 
 
+def validate_task_check_bindings(
+    task, delivery: ApprovedDeliveryContract | None
+) -> list[str]:
+    if delivery is None or not delivery.validation_checks:
+        return []
+    issues: list[str] = []
+    try:
+        rows = task_check_projection(task.block)
+    except ValueError as exc:
+        return [f"{task.task_id}: {exc}"]
+    approved = {row[0]: row for row in delivery.validation_checks}
+    selected = {row[0]: row for row in rows}
+    if len(selected) != len(rows) or not rows:
+        issues.append(
+            f"{task.task_id}: validation requires unique current check bindings"
+        )
+    sections, _ = inspect_task_sections(task.block)
+    commands = fenced_command_lines(sections.get("Validation", ""))
+    for identifier, row in selected.items():
+        if (
+            row != approved.get(identifier)
+            or row[2] != "LOCAL_BUILD"
+            or row[3] not in commands
+        ):
+            issues.append(
+                f"{task.task_id}: {identifier} must exactly project a current LOCAL_BUILD check and executable command"
+            )
+    issues.extend(task_acceptance_check_issues(task, delivery, rows, sections))
+    return issues
+
+
+def task_check_coverage_issues(
+    tasks, delivery: ApprovedDeliveryContract | None
+) -> list[str]:
+    if delivery is None or not delivery.validation_checks:
+        return []
+    expected = {row[0] for row in delivery.validation_checks if row[2] == "LOCAL_BUILD"}
+    covered: set[str] = set()
+    for task in tasks:
+        if task.status == "SKIPPED":
+            continue
+        try:
+            covered.update(row[0] for row in task_check_projection(task.block))
+        except ValueError:
+            continue  # The task-specific diagnostic owns malformed projections.
+    return (
+        [
+            "Current task plan does not cover validation checks: "
+            + ", ".join(sorted(expected - covered))
+        ]
+        if expected - covered
+        else []
+    )
+
+
 def derive_ready_task_ids(
     tasks: Sequence[Any],
     waivers: Mapping[str, TaskWaiver] | None = None,
@@ -797,6 +854,64 @@ def derive_ready_task_ids(
             for dependency_id in task.dependencies
         )
     )
+
+
+def _plan_completeness_issues(
+    tasks,
+    snapshot,
+    contract,
+    enforce_plan_completeness,
+    harness_contract_available,
+    property_contract_available,
+    policy,
+):
+    errors: list[str] = []
+    current = snapshot is not None and snapshot.get("Task-plan state") == "CURRENT"
+    if enforce_plan_completeness and current:
+        errors.extend(
+            validate_harness_projections(
+                tasks,
+                contract.harness if harness_contract_available else None,
+                current_plan=True,
+            )
+        )
+
+    if enforce_plan_completeness and current and property_contract_available:
+        referenced_property_ids = {
+            property_id
+            for task in tasks
+            if task.status in {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE"}
+            for property_id in policy.property_id.findall(
+                clean_cell(task.metadata.get("Requirements", ""))
+            )
+        }
+        missing_property_ids = sorted(
+            set(contract.property_execution) - referenced_property_ids
+        )
+        if missing_property_ids:
+            errors.append(
+                "Current task plan does not cover approved property execution IDs: "
+                + ", ".join(missing_property_ids)
+            )
+
+    if enforce_plan_completeness and current and contract.requirement_rules is not None:
+        requirement_coverage = derive_task_requirement_coverage(
+            tasks,
+            snapshot.get("Task-plan state"),
+            contract.requirement_rules,
+            contract.requirement_evidence or {},
+        )
+        errors.extend(requirement_coverage.trace_issues)
+        errors.extend(requirement_coverage.evidence_issues)
+        if requirement_coverage.missing_requirement_ids:
+            errors.append(
+                "Current task plan does not cover approved requirement IDs: "
+                + ", ".join(requirement_coverage.missing_requirement_ids)
+            )
+
+    if current:
+        errors.extend(task_check_coverage_issues(tasks, contract.delivery))
+    return errors
 
 
 def validate_task_graph(
@@ -1007,6 +1122,7 @@ def validate_task_graph(
             errors.append(f"{task.task_id}: SKIPPED requires a Skip record")
 
         if contract_bound:
+            errors.extend(validate_task_check_bindings(task, contract.delivery))
             sections, duplicate_sections = inspect_task_sections(task.block)
             for name in sorted(duplicate_sections):
                 errors.append(f"{task.task_id}: duplicate required section #### {name}")
@@ -1172,62 +1288,17 @@ def validate_task_graph(
                 )
             )
 
-    if (
-        enforce_plan_completeness
-        and snapshot is not None
-        and snapshot.get("Task-plan state") == "CURRENT"
-    ):
-        errors.extend(
-            validate_harness_projections(
-                tasks,
-                contract.harness if harness_contract_available else None,
-                current_plan=True,
-            )
-        )
-
-    if (
-        enforce_plan_completeness
-        and snapshot is not None
-        and snapshot.get("Task-plan state") == "CURRENT"
-        and property_contract_available
-    ):
-        referenced_property_ids = {
-            property_id
-            for task in tasks
-            if task.status in {"BACKLOG", "READY", "IN_PROGRESS", "BLOCKED", "DONE"}
-            for property_id in policy.property_id.findall(
-                clean_cell(task.metadata.get("Requirements", ""))
-            )
-        }
-        missing_property_ids = sorted(
-            set(contract.property_execution) - referenced_property_ids
-        )
-        if missing_property_ids:
-            errors.append(
-                "Current task plan does not cover approved property execution IDs: "
-                + ", ".join(missing_property_ids)
-            )
-
-    if (
-        enforce_plan_completeness
-        and snapshot is not None
-        and snapshot.get("Task-plan state") == "CURRENT"
-        and contract.requirement_rules is not None
-    ):
-        requirement_coverage = derive_task_requirement_coverage(
+    errors.extend(
+        _plan_completeness_issues(
             tasks,
-            snapshot.get("Task-plan state"),
-            contract.requirement_rules,
-            contract.requirement_evidence or {},
+            snapshot,
+            contract,
+            enforce_plan_completeness,
+            harness_contract_available,
+            property_contract_available,
+            policy,
         )
-        errors.extend(requirement_coverage.trace_issues)
-        errors.extend(requirement_coverage.evidence_issues)
-        if requirement_coverage.missing_requirement_ids:
-            errors.append(
-                "Current task plan does not cover approved requirement IDs: "
-                + ", ".join(requirement_coverage.missing_requirement_ids)
-            )
-
+    )
     if errors:
         raise ValueError("\n".join(errors))
     try:

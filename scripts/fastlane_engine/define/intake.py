@@ -117,9 +117,10 @@ INTAKE_CARD_HEADERS = (
 INTAKE_ID = re.compile(r"INTAKE-\d{4,}")
 INTAKE_CARD_ID = re.compile(r"INTAKE-CARD-\d{4,}")
 INTAKE_QUESTION_ID = re.compile(r"INTAKE-Q-\d{4,}")
-OWNER_RESPONSE_ID = re.compile(r"OWNER-MSG-\d{4,}")
+# Bound the representation before exposing IDs to integer-based projections.
+OWNER_RESPONSE_ID = re.compile(r"OWNER-MSG-\d{4,64}")
 INTAKE_OWNER_RESPONSE = re.compile(
-    r"OWNER_RESPONSE: (?P<message>OWNER-MSG-\d{4,}); "
+    r"OWNER_RESPONSE: (?P<message>OWNER-MSG-\d{4,64}); "
     r"CARD: (?P<card>INTAKE-CARD-\d{4,}); REVISION: (?P<revision>[1-9]\d*); "
     r"SHA256: (?P<digest>sha256:[0-9a-f]{64}); "
     r"QUESTION: (?P<question>INTAKE-Q-\d{4,}); ANSWER: (?P<answer>A|B|C|RESPONSE)"
@@ -223,7 +224,7 @@ def _parse_intake_response_register(
     seen_reply_rows: set[tuple[str, str]] = set()
     seen_presented_questions: set[tuple[str, int, str]] = set()
     message_identities: dict[str, tuple[str, int, str]] = {}
-    response_numbers: set[int] = set()
+    response_numbers: set[str] = set()
     for raw in table.rows:
         (
             owner_response_id,
@@ -246,7 +247,10 @@ def _parse_intake_response_register(
             )
             valid = False
         else:
-            response_numbers.add(int(owner_response_id.rsplit("-", 1)[1]))
+            digits = owner_response_id.rsplit("-", 1)[1]
+            response_numbers.add(
+                "".join(str(int(d)) for d in digits).lstrip("0") or "0"
+            )
         if INTAKE_CARD_ID.fullmatch(card_id) is None:
             issues.append(
                 (
@@ -398,9 +402,7 @@ def _parse_intake_response_register(
                     basis_ids=basis_ids,
                 )
             )
-    if response_numbers and sorted(response_numbers) != list(
-        range(1, max(response_numbers) + 1)
-    ):
+    if response_numbers != {str(n) for n in range(1, len(response_numbers) + 1)}:
         issues.append(
             (
                 "INTAKE_RESPONSE_REGISTER_INVALID",

@@ -615,6 +615,69 @@ class BootstrapSafetyTests(unittest.TestCase):
             self.assertEqual(destination.read_text(encoding="utf-8"), "user content")
             self.assertFalse((target / "new.txt").exists())
 
+    def test_linked_destination_parent_and_source_fail_before_any_write(self) -> None:
+        from tests.test_package_release import PackageReleaseTests
+
+        helper = PackageReleaseTests()
+        for link_source in (False, True):
+            with (
+                self.subTest(link_source=link_source),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                base = Path(temporary)
+                source, target, outside = (
+                    base / name for name in ("source", "target", "outside")
+                )
+                for directory in (source, target, outside):
+                    directory.mkdir()
+                sentinel = outside / "sentinel.txt"
+                sentinel.write_bytes(b"untouched")
+                link = (source if link_source else target) / "nested"
+                helper._create_directory_link(link, outside)
+                try:
+                    if link_source:
+                        with self.assertRaisesRegex(
+                            ValueError, "symbolic link|unsafe source"
+                        ):
+                            bootstrap.copy_template(source, target, {})
+                    else:
+                        (source / "nested").mkdir()
+                        (source / "nested" / "new.txt").write_bytes(b"new")
+                        result = bootstrap.copy_template(source, target, {})
+                        self.assertGreater(result.collisions, 0)
+                        self.assertEqual(result.written, 0)
+                    self.assertEqual(sentinel.read_bytes(), b"untouched")
+                    self.assertFalse((outside / "new.txt").exists())
+                    self.assertEqual(
+                        list(target.iterdir()), [] if link_source else [link]
+                    )
+                finally:
+                    helper._remove_directory_link(link)
+
+    def test_copy_recheck_rejects_parent_replaced_with_directory_link(self) -> None:
+        from tests.test_package_release import PackageReleaseTests
+
+        helper = PackageReleaseTests()
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root, outside = base / "project", base / "outside"
+            root.mkdir()
+            outside.mkdir()
+            source = base / "source.txt"
+            source.write_bytes(b"new")
+            destination = root / "nested" / "new.txt"
+            operation = bootstrap.CopyOperation(
+                "nested/new.txt", source, destination, b"new", "WRITE"
+            )
+            bootstrap.validate_copy_operation(operation, root)
+            helper._create_directory_link(destination.parent, outside)
+            try:
+                with self.assertRaisesRegex(ValueError, "parent changed"):
+                    bootstrap.validate_copy_operation(operation, root)
+                self.assertEqual(list(outside.iterdir()), [])
+            finally:
+                helper._remove_directory_link(destination.parent)
+
     def test_blanket_force_is_rejected_before_any_write(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

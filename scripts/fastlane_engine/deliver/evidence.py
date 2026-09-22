@@ -7,9 +7,11 @@ This module performs no I/O, mutation, routing, approval, or authorization.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import PurePosixPath
 from typing import Any
@@ -17,14 +19,17 @@ from typing import Any
 from ..core.contracts import (
     ContractParseError,
     ContractTable,
+    _heading_section_lines,
     _parse_contract_table_lines,
     contract_table_after_heading,
+    contract_table_in_section,
     parse_task_completion_evidence_cells,
     split_markdown_table_row,
     without_fenced_code,
 )
 from ..core.ids import (
     EVIDENCE_PLACEHOLDER_PATTERN,
+    STABLE_CONTRACT_ID,
     clean_cell,
     explicit_timestamp,
     require_explicit_evidence_value,
@@ -829,6 +834,7 @@ def validate_task_completion_evidence(text: str, task: Any) -> None:
         )
         if row.status not in TASK_COMPLETION_EVIDENCE_STATUSES:
             raise ValueError(f"{label} Status must be LOCAL_PASS or VERIFIED")
+    _validate_check_completion(text, task, rows, set(local))
 
 
 def require_durable_evidence_source(value: str, label: str) -> str:
@@ -891,6 +897,367 @@ def _validate_completion_evidence_row(
         raise ValueError(f"{label} status must be LOCAL_PASS or VERIFIED")
 
 
+RELEASE_CHECK_HEADING = "### Exact local check results"
+RELEASE_CHECK_HEADERS = (
+    "Check ID",
+    "Design digest",
+    "Release evidence cutoff",
+    "Exact command",
+    "Elapsed seconds",
+    "Artifact",
+    "Observed at",
+    "Durable source",
+    "Status",
+    "REQ / DES / AUTH",
+)
+
+
+def _exact_check_results_table(text: str, heading: str, headers):
+    table = contract_table_after_heading(text, heading, headers)
+    section = _heading_section_lines(text, heading)
+    if table is None or section is None:
+        raise ValueError(f"{heading}: exact observed check results are required")
+    lines = without_fenced_code("\n".join(section[1])).splitlines()
+    starts = sum(
+        line.strip().startswith("|")
+        and (index == 0 or not lines[index - 1].strip().startswith("|"))
+        for index, line in enumerate(lines)
+    )
+    if starts != 1:
+        raise ValueError(
+            f"{heading}: requires one authoritative contiguous results table"
+        )
+    return table
+
+
+def _release_check_anchor(text, cutoff):
+    anchors = [
+        row for row in parse_task_completion_evidence(text) if row.evidence_id == cutoff
+    ]
+    if len(anchors) != 1 or anchors[0].status not in TASK_COMPLETION_EVIDENCE_STATUSES:
+        raise ValueError(
+            "Local release checks require one passing current release evidence cutoff"
+        )
+    anchor = anchors[0]
+    _validate_completion_evidence_row(
+        InspectedTask(anchor.task_id, "Release cutoff", "", {}, set()), cutoff, anchors
+    )
+    return anchor, evidence_timestamp(anchor.observed_at, "release cutoff")
+
+
+def _release_check_observation(row, check, anchor, earliest, evaluation_time):
+    identifier, _, _, command, elapsed, artifact, observed_at, durable, status, _ = row
+    observed = evidence_timestamp(observed_at, identifier)
+    if (
+        observed < earliest
+        or observed > evaluation_time
+        or artifact != anchor.commit_worktree_artifact
+    ):
+        raise ValueError(
+            f"{identifier}: evidence must bind the current cutoff artifact and later observation"
+        )
+    if command != check[3]:
+        raise ValueError(
+            f"{identifier}: observed command differs from the Design obligation"
+        )
+    require_durable_evidence_source(durable, identifier)
+    if re.fullmatch(r"[0-9]{1,5}(?:\.[0-9]{1,6})?", elapsed) is None:
+        raise ValueError(
+            f"{identifier}: elapsed seconds must be a bounded finite nonnegative number"
+        )
+    if status in TASK_COMPLETION_EVIDENCE_STATUSES and Decimal(elapsed) > Decimal(
+        check[4]
+    ):
+        raise ValueError(
+            f"{identifier}: observed check exceeded its approved time limit"
+        )
+    return observed, status
+
+
+def _require_latest_release_passes(expected, observations):
+    for identifier in expected:
+        runs = sorted(observations.get(identifier, []))
+        if not runs or runs[-1][1] not in TASK_COMPLETION_EVIDENCE_STATUSES:
+            raise ValueError(
+                f"{identifier}: latest current local release result is not passing"
+            )
+        if len({observed for observed, _ in runs}) != len(runs):
+            raise ValueError(f"{identifier}: duplicate observation times are ambiguous")
+
+
+def _current_local_release_cutoff(table, design_digest, basis, artifact):
+    if re.fullmatch(r"REQ-\d{4,} / DES-\d{4,} / AUTH-\d{4,}", basis) is None:
+        raise ValueError(
+            "Local release checks require the canonical REQ / DES / AUTH basis"
+        )
+    require_explicit_evidence_value(artifact, "current release artifact")
+    cutoffs = {
+        row[2]
+        for row in table.rows
+        if row[1] == design_digest and row[9] == basis and row[5] == artifact
+    }
+    if len(cutoffs) != 1:
+        raise ValueError(
+            "Local release checks require one unambiguous local evidence cutoff"
+        )
+    return next(iter(cutoffs))
+
+
+def derive_local_release_check_evidence(
+    text: str,
+    checks,
+    design_digest: str | None,
+    basis: str,
+    artifact: str,
+    evaluation_time: datetime,
+) -> tuple[str | None, list[str]]:
+    """Bind immutable local proof independently of a later AWS evidence cutoff."""
+    expected = {row[0]: row for row in checks if row[2] == "LOCAL_RELEASE"}
+    if not expected:
+        return None, []
+    try:
+        table = _exact_check_results_table(
+            text, RELEASE_CHECK_HEADING, RELEASE_CHECK_HEADERS
+        )
+        cutoff = _current_local_release_cutoff(table, design_digest, basis, artifact)
+        anchor, earliest = _release_check_anchor(text, cutoff)
+        if anchor.commit_worktree_artifact != artifact:
+            raise ValueError("Local release cutoff must identify the current artifact")
+        observations = {}
+        for row in table.rows:
+            identifier, digest, bound_cutoff = row[:3]
+            if digest != design_digest or row[9] != basis or bound_cutoff != cutoff:
+                continue  # History never qualifies the selected current release.
+            if identifier not in expected:
+                raise ValueError(
+                    f"{identifier}: unknown local release check in current evidence"
+                )
+            # Include contradictory artifacts and failures at the selected anchor.
+            observation = _release_check_observation(
+                row, expected[identifier], anchor, earliest, evaluation_time
+            )
+            observations.setdefault(identifier, []).append(observation)
+        _require_latest_release_passes(expected, observations)
+    except ValueError as exc:
+        return None, [str(exc)]
+    return cutoff, []
+
+
+def release_check_evidence_issues(
+    text: str,
+    checks,
+    design_digest: str | None,
+    basis: str,
+    artifact: str,
+    evaluation_time: datetime,
+) -> list[str]:
+    return derive_local_release_check_evidence(
+        text, checks, design_digest, basis, artifact, evaluation_time
+    )[1]
+
+
+CHECK_PROJECTION_HEADERS = (
+    "Check ID",
+    "Obligation ID",
+    "Stage",
+    "Exact command",
+    "Time limit seconds",
+    "Evidence destination",
+    "Expected result",
+)
+
+
+def task_acceptance_check_issues(task, delivery, rows, sections):
+    issues: list[str] = []
+    referenced = set(
+        STABLE_CONTRACT_ID.findall(clean_cell(task.metadata.get("Requirements", "")))
+    )
+    acceptance = sections.get("Acceptance criteria", "")
+    for identifier, criterion in delivery.acceptance_criteria:
+        if identifier.removeprefix("AC-") not in referenced:
+            continue
+        candidates = [row[0] for row in rows if row[1] == identifier]
+        if not any(
+            re.search(
+                r"^- \[[ xX]\] "
+                + re.escape(f"{identifier}: {criterion} [CHECK: {check}]")
+                + r"[ \t]*$",
+                acceptance,
+                re.MULTILINE,
+            )
+            for check in candidates
+        ):
+            issues.append(
+                f"{task.task_id}: {identifier} requires its canonical criterion and exact check binding"
+            )
+    return issues
+
+
+def task_check_projection(block: str) -> tuple[tuple[str, ...], ...]:
+    table = contract_table_in_section(
+        block, "#### Validation", CHECK_PROJECTION_HEADERS
+    )
+    count = len(
+        re.findall(
+            r"^[ \t]*\|[ \t]*Check ID[ \t]*\|", without_fenced_code(block), re.MULTILINE
+        )
+    )
+    if count != (1 if table is not None else 0):
+        raise ValueError(
+            "Task validation has a malformed or conflicting Check ID table"
+        )
+    return table.rows if table is not None else ()
+
+
+TASK_CHECK_HEADING = "### Exact task check results"
+TASK_CHECK_HEADERS = (
+    "Check ID",
+    "Task",
+    "Check SHA-256",
+    "Requirements / design / authorization",
+    "Run ID",
+    "Attempt",
+    "Evidence ID",
+    "Elapsed seconds",
+)
+
+
+def check_fingerprint(check) -> str:
+    payload = json.dumps(
+        ["FASTLANE_CHECK_V1", *check], ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _check_attempt(task):
+    pattern = r"^- Check attempt (?P<attempt>[1-9]\d*): RUN=(?P<run>RUN-[A-Za-z0-9][A-Za-z0-9._-]*); STARTED=(?P<started>[^;\s]+)(?:; ENDED=(?P<ended>\S+))?$"
+    section = _heading_section_lines(task.block, "#### Execution log")
+    lines = section[1] if section else []
+    claims = [line for line in lines if line.startswith("- Check attempt ")]
+    if any(re.fullmatch(pattern, line) is None for line in claims):
+        raise ValueError(f"{task.task_id}: malformed check attempt record")
+    attempts = [
+        match
+        for match in re.finditer(pattern, "\n".join(claims), re.MULTILINE)
+        if match["attempt"] == clean_cell(task.metadata.get("Attempts used", ""))
+    ]
+    if len(attempts) != 1:
+        raise ValueError(
+            f"{task.task_id}: current check attempt requires one preserved claim record"
+        )
+    attempt = attempts[0]
+    started = evidence_timestamp(attempt["started"], "check attempt start")
+    if not attempt["ended"]:
+        raise ValueError(
+            f"{task.task_id}: check attempt needs its preserved completion time"
+        )
+    ended = evidence_timestamp(attempt["ended"], "check attempt completion")
+    if ended < started:
+        raise ValueError(f"{task.task_id}: check attempt completion precedes its claim")
+    active = clean_cell(task.metadata.get("Run ID", ""))
+    if active not in {"NONE", attempt["run"]}:
+        raise ValueError(f"{task.task_id}: claim record differs from active run")
+    return attempt["run"], attempt["attempt"], started, ended
+
+
+def _task_check_observation(task, check, evidence_id, elapsed, by_id, started, ended):
+    observed = by_id.get(evidence_id)
+    if (
+        observed is None
+        or observed.task_id != task.task_id
+        or observed.command_or_observation != check[3]
+    ):
+        raise ValueError(
+            f"{task.task_id}: {check[0]} requires task evidence for its exact command"
+        )
+    timestamp = evidence_timestamp(observed.observed_at, check[0])
+    if not started <= timestamp <= ended:
+        raise ValueError(
+            f"{task.task_id}: {check[0]} evidence is outside its preserved attempt interval"
+        )
+    if re.fullmatch(r"[0-9]{1,5}(?:\.[0-9]{1,6})?", elapsed) is None:
+        raise ValueError(
+            f"{task.task_id}: {check[0]} elapsed time is not bounded and finite"
+        )
+    duration = Decimal(elapsed)
+    if timestamp - timedelta(microseconds=int(duration * 1_000_000)) < started:
+        raise ValueError(f"{task.task_id}: {check[0]} execution began before its claim")
+    if observed.status in TASK_COMPLETION_EVIDENCE_STATUSES and duration > Decimal(
+        check[4]
+    ):
+        raise ValueError(f"{task.task_id}: {check[0]} exceeded its approved time limit")
+    return timestamp, observed
+
+
+def _latest_task_check_result(task, check, observations, rows, references):
+    if not observations or len({stamp for stamp, _ in observations}) != len(
+        observations
+    ):
+        raise ValueError(
+            f"{task.task_id}: {check[0]} needs unambiguous current check observations"
+        )
+    latest = max(observations, key=lambda item: item[0])[1]
+    if (
+        latest.status not in TASK_COMPLETION_EVIDENCE_STATUSES
+        or latest.evidence_id not in references
+    ):
+        raise ValueError(
+            f"{task.task_id}: {check[0]} latest current result must pass and be cited"
+        )
+    _validate_completion_evidence_row(task, latest.evidence_id, rows)
+    return latest.commit_worktree_artifact
+
+
+def _require_indexed_attempt_results(task, check, observations, rows, started, ended):
+    indexed = {row.evidence_id for _, row in observations}
+    for row in rows:
+        if row.task_id != task.task_id or row.command_or_observation != check[3]:
+            continue
+        stamp = evidence_timestamp(row.observed_at, check[0])
+        if started <= stamp <= ended and row.evidence_id not in indexed:
+            raise ValueError(
+                f"{task.task_id}: {check[0]} has unindexed current attempt evidence {row.evidence_id}"
+            )
+
+
+def _validate_check_completion(text, task, rows, references) -> None:
+    checks = task_check_projection(task.block)
+    if not checks:
+        return
+    table = _exact_check_results_table(text, TASK_CHECK_HEADING, TASK_CHECK_HEADERS)
+    run, attempt, started, ended = _check_attempt(task)
+    basis = " / ".join(
+        clean_cell(task.metadata.get(key, ""))
+        for key in ("Requirements", "Design", "Authorization")
+    )
+    by_id = {row.evidence_id: row for row in rows}
+    artifacts = set()
+    for check in checks:
+        identity = (
+            check[0],
+            task.task_id,
+            check_fingerprint(check),
+            basis,
+            run,
+            attempt,
+        )
+        observations = [
+            _task_check_observation(task, check, row[6], row[7], by_id, started, ended)
+            for row in table.rows
+            if row[:6] == identity
+        ]
+        _require_indexed_attempt_results(
+            task, check, observations, rows, started, ended
+        )
+        artifacts.add(
+            _latest_task_check_result(task, check, observations, rows, references)
+        )
+    if len(artifacts) != 1:
+        raise ValueError(
+            f"{task.task_id}: current check results must identify one completion artifact"
+        )
+
+
 def validate_done_evidence(verify_text: str | None, task: InspectedTask) -> None:
     """SAFETY: require every DONE citation to resolve to one durable passing row."""
 
@@ -920,6 +1287,7 @@ def validate_done_evidence(verify_text: str | None, task: InspectedTask) -> None
     rows = parse_task_completion_evidence(verify_text)
     for reference in local:
         _validate_completion_evidence_row(task, reference, rows)
+    _validate_check_completion(verify_text, task, rows, set(local))
 
 
 def task_property_execution_table(

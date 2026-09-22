@@ -65,39 +65,26 @@ Product Agreement and both gates remain required.
 ## Customer delivery lifecycle
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 28}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Fastlane customer delivery lifecycle
-    accDescr: The owner approves product and technical boundaries. Fastlane plans, builds, and verifies locally; corrections return to the affected stage, and separately authorized AWS results return to release review.
+    accDescr: Define the product and approve requirements at Gate A. Compare designs and review diagrams before approving design and bounded local construction at Gate B. Build and verify locally, then review the evidence. Optional AWS work needs a separate exact owner authorization and returns its observed results to release review.
 
-    IDEA["Describe the outcome or bounded change"]
-    DEFINE["Define users, journeys, scope, data, risks, and success"]
-    GATEA{"Gate A: approve the Product Agreement?"}
-    DESIGN["Compare complete AWS-informed system designs"]
-    DIAGRAMS["Create and validate the project architecture diagrams"]
-    GATEB{"Gate B: approve the plan and local boundary?"}
-    TASKS["Create dependency-aware bounded tasks"]
-    BUILD["Build inside approved local paths"]
-    VERIFY["Run validation and classify evidence"]
-    RELEASE{"Review release readiness"}
-    LOCAL["Conclude with the verified local state"]
-    AWSAUTH{"Authorize one exact AWS operation?"}
-    AWSOPS["Preflight, deploy, reconcile, review, or teardown"]
-    AWSRESULT["Record the observed AWS result"]
+    DEFINE["Define the outcome, scope, inputs, and recovery"]
+    GA{"Gate A"}
+    DESIGN["Compare designs and review the architecture diagrams"]
+    GB{"Gate B"}
+    BUILD["Plan bounded tasks, build, and check locally"]
+    REVIEW["Review current evidence and release readiness"]
+    LOCAL["Verified local result"]
+    AWS["Optional AWS operation Separate exact owner authorization"]
 
-    IDEA --> DEFINE --> GATEA
-    GATEA -->|"Approve"| DESIGN --> DIAGRAMS --> GATEB
-    GATEA -. "Request changes" .-> DEFINE
-    GATEB -->|"Approve"| TASKS
-    GATEB -. "Request changes" .-> DESIGN
-
-    TASKS --> BUILD --> VERIFY --> RELEASE
-    VERIFY -->|"Safe in-scope defect"| BUILD
-    VERIFY -. "Material product gap" .-> DEFINE
-    VERIFY -. "Material design gap" .-> DESIGN
-
-    RELEASE -->|"Local result"| LOCAL
-    RELEASE -. "Optional AWS path" .-> AWSAUTH
-    AWSAUTH -->|"Exact scope only"| AWSOPS --> AWSRESULT --> RELEASE
+    DEFINE -->|"Approve requirements"| GA
+    GA --> DESIGN
+    DESIGN -->|"Approve design and local boundary"| GB
+    GB --> BUILD --> REVIEW --> LOCAL
+    REVIEW -. "Choose an authorized AWS step" .-> AWS
+    AWS -->|"Observed result"| REVIEW
 ```
 
 | Stage | What Fastlane does | What you do |
@@ -109,6 +96,9 @@ flowchart TB
 | Tasks and Build | Creates dependency-aware work, builds locally, tests, and records evidence | No task-by-task approval |
 | Release review | Reconciles what is verified, failed, planned, or still unobserved | Resolve only a genuine release decision |
 | Optional AWS operations | Performs separately bounded preflight, deployment, reconciliation, or teardown | Supply the exact action-specific authorization |
+
+Corrections return to the affected requirements or design decision. A safe,
+in-scope implementation failure returns to local construction.
 
 Gate A continues into Design in the same run. Gate B continues into task
 generation and local construction. Build never deploys.
@@ -175,6 +165,26 @@ both views for direction, relation, edge kind, path, and containment parity. The
 board is a presentation derivative—not a third gate, implementation evidence,
 deployment evidence, or AWS authority—and Fastlane then restores the current route.
 
+## How the specification becomes a checked result
+
+Requirements describe observable outcomes, input boundaries and examples, and
+the recovery promise for each dataset. Intentional exclusions have a reason.
+The technical plan then ties each acceptance outcome, input rule, interface,
+and recovery scenario to an exact check, time limit, and result location.
+
+Tasks carry those checks into construction. A task is complete only with current
+passing evidence for its own attempt and approved check. Release review also
+requires applicable local infrastructure checks against the release artifact.
+Failures and prior results remain visible; a plan or old pass cannot stand in
+for a new observation. Local checks establish local confidence. AWS observations
+and any first-user pilot are separate, explicitly identified evidence.
+
+Ask "What validates this design?" to see the current plan and its source records.
+The answer distinguishes planned checks, permitted commands, and observed
+results, then returns to the same pending owner decision or continues authorized
+work. Fastlane checks these recorded relationships; it still needs meaningful
+tests and owner review to detect omissions or contradictions in product intent.
+
 ## How the control plane works
 
 Fastlane does not rely on chat memory or let Codex decide its own authority. It
@@ -182,73 +192,38 @@ evaluates the canonical repository, derives the permitted action, uses bounded
 execution paths, records evidence, and explains the result to the owner.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 28, "rankSpacing": 30}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Fastlane technical control plane and evidence loop
-    accDescr: One coordinator evaluates canonical repository state through a read-only Engine, invokes only bounded action paths, and returns every observed result for canonical recording and reevaluation.
+    accDescr: Canonical project records enter one coherent read-only Engine observation. The Engine validates facts, selects a route, and narrows authority. The presenter explains the current action. One coordinator uses dedicated bounded local or separately authorized AWS procedures, records observed results through validated writes, and reevaluates the records.
 
-    OWNER["Owner: intent, decisions, gates, and exact receipts"]
-    COORD["Fastlane: consultant, coordinator, and sole adopter writer"]
-    PRESENTER["Presenter: evaluated status and one current action"]
-    ALIASES["Launch, Plan, and Build compatibility aliases"]
-    CRITICS["Read-only requirements and architecture challengers"]
-    AWSCORE["AWS Core: current guidance and procedures"]
-    HOOKS["Optional hooks: additional denial only"]
+    RECORDS["Canonical project records Owner decisions, scope, and evidence"]
+    ENGINE["Read-only Fastlane Engine Observe, validate, and select the route"]
+    REPORT["Current action and limits Presenter explains what happens next"]
+    COORD["One coordinator and writer"]
+    LOCAL["Bounded local tasks Edits and checks"]
+    AWS["Optional AWS procedure Exact owner authorization required"]
+    RESULTS["Observed results Passing, failed, or unresolved"]
+    WRITE["Validated record and task updates"]
 
-    subgraph STATE["Canonical repository state"]
-        RECORDS["PRD · TASKS · VERIFY · RUNBOOK · BUGFIX"]
-    end
-
-    subgraph ENGINE["Read-only deterministic Fastlane Engine"]
-        SNAP["ProjectSnapshot: one coherent observation"]
-        EVAL["EngineEvaluation: Package · Define · Design · Deliver · AWS"]
-        AUTH["Authority intersection, route, remediation, and context"]
-        REPORT["Schema-2 report without new policy"]
-
-        SNAP --> EVAL --> AUTH --> REPORT
-    end
-
-    subgraph PATHS["Dedicated bounded action paths"]
-        WRITES["Validated canonical-record writes"]
-        TASKSTATE["task_waves.py task-state mutation"]
-        LOCAL["Approved application and infrastructure edits"]
-        CHECKS["Harness and local evidence"]
-        OPERATE["Operate Fastlane AWS"]
-        ACCOUNT["Bounded AWS account action"]
-        RESULTS["Observed local and AWS results"]
-    end
-
-    OWNER --> COORD
-    ALIASES -. "Delegate" .-> COORD
-    CRITICS -. "Critique" .-> COORD
-    AWSCORE -. "Advise" .-> COORD
-
-    RECORDS --> SNAP
-    COORD -->|"Invoke evaluation"| SNAP
-    REPORT -->|"Return route and bounded authority"| COORD
-    COORD -->|"Render evaluated truth"| PRESENTER --> OWNER
-
-    COORD -->|"Validated record update"| WRITES --> RECORDS
-    COORD -->|"Approved task transition"| TASKSTATE --> RECORDS
-    COORD -->|"Approved local edit"| LOCAL --> CHECKS --> RESULTS
-    COORD -->|"Engine-authorized AWS request"| OPERATE --> ACCOUNT --> RESULTS
-
-    AWSCORE -. "Supply current procedures" .-> OPERATE
-    HOOKS -. "May deny" .-> LOCAL
-    HOOKS -. "May deny" .-> OPERATE
-    RESULTS -->|"Return for canonical evidence recording"| COORD
+    RECORDS --> ENGINE --> REPORT --> COORD
+    COORD --> LOCAL --> RESULTS
+    COORD -. "Only within current authority" .-> AWS
+    AWS --> RESULTS --> WRITE
+    WRITE -->|"Reevaluate"| RECORDS
 ```
 
-The diagram enforces six boundaries:
+The Engine enforces the boundaries shown here:
 
 1. **Canonical state:** each project fact has one repository home.
 2. **One coherent observation:** `ProjectSnapshot` binds files, repository
    facts, project identity, lifecycle state, and evaluation time.
 3. **Deterministic evaluation:** all domains compose into one immutable
-   `EngineEvaluation`.
-4. **Authority by intersection:** validated facts narrow the current action;
+   `EngineEvaluation`; the Schema-2 report exposes its results.
+4. **Authority intersection:** validated facts narrow the current action;
    missing, stale, conflicting, expired, or broader input fails closed.
 5. **Dedicated mutation paths:** task and AWS actions use separate bounded
-   procedures while the Engine remains read-only.
+   procedures. `scripts/task_waves.py` owns task writes; the Engine remains read-only.
 6. **Evidence-backed presentation:** reporting explains evaluated state without
    inventing policy or authority.
 
@@ -326,7 +301,7 @@ proves neither success nor authority; credentials grant no permission.
 | Optional stage | Purpose | Owner boundary |
 |---|---|---|
 | AWS-10 | Read-only account preflight | Authorize the exact read-only account and scope |
-| AWS-20 | Bounded deployment | Authorize the exact mutation when the selected lane requires it |
+| AWS-20 | Bounded deployment | Provide the exact current deployment authorization |
 | AWS-30 | Reconcile observed results | No new mutation authority |
 | AWS-40 | Review residual resources | Choose a residual disposition when required |
 | AWS-50 | Bounded teardown | Provide the separate exact teardown authorization |

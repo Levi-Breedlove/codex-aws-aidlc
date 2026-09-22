@@ -52,7 +52,8 @@ outcome, success checks, blocker, and next safe action here.
 
 ## How to read a task card
 
-Read the status and outcome first, then the success checks. Open the technical
+Read the status and outcome first, then the success checks. Each check names
+the approved outcome and the evidence needed to demonstrate it. Open the technical
 records only when you need task IDs, dependencies, attempt history, checkpoints,
 or evidence links.
 

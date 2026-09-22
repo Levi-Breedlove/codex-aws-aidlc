@@ -78,6 +78,25 @@ status, Gate, evidence, remediation, and authority facts come from the current
 Engine projection and presenter; natural explanation may clarify but never
 alter them.
 
+For architecture or validation explanations, inspect the current canonical
+records before composing the answer. Name the actual data recovery mechanism
+and material interface failure, timeout, rate, and performance bounds. Explain
+each applicable property's concrete invariant and the project risk it protects,
+not merely that varied inputs are tested. Give every current required validation
+command or API, including applicable property and journey checks, with its
+recorded execution/replay bounds and exact evidence destination. State when a
+required detail is absent rather than inventing it. Keep planned obligations
+distinct from observed results; expose missing constraints rather than borrowing
+another project's records. A generic promise to run checks does not satisfy
+this explanation. These duties also apply when architecture appears inside a
+Gate-comprehension answer or validation appears in a harness answer, including
+current interface/recovery drivers and explicit disclosure of absent constraints.
+Before drafting it, collect obligations from the current task and selected
+validation profile, the property execution contract, and the IaC/delivery
+validation contract. Include required checks that are outside the current
+command boundary, explaining the unresolved permission separately; another
+profile's not-applicable row does not cancel those obligations.
+
 ## Plain-language decisions
 For guided intake, render only the current Engine-validated
 `INTAKE-CARD-*`. Keep its stable reply key for internal parser binding, but
@@ -136,6 +155,9 @@ new owner message may resolve it.
   shown flag. If the same response also renders the next route, use presenter
   mode `answer-progress`; its `Updated:` line is derived from the recorded
   change and must not say `Nothing.`
+  When replacing the current question, retain normalized response and foundation
+  provenance. The Engine confirms the previous answer from those bound values;
+  do not retain a second current question or reconstruct an old choice from memory.
 - At Gate A, accept a correction only as
   "Change the requirements: <correction>." At Gate B, accept one only as
   "Change the design: <correction>." Parse before writing, record owner
@@ -168,6 +190,9 @@ exactly these labels:
 - `Reply:` for a gate, the exact copyable response; for AWS, an instruction to
   fill every `<...>` placeholder and return the entire canonical block; and
 - `After that:` the work Fastlane will continue automatically.
+
+Keep source links and correction guidance inside those six labels; do not add
+a seventh decision-card label such as `Review:`.
 
 The card summarizes but never replaces or alters the exact gate receipt or the
 full canonical AWS template. A placeholder-bearing AWS block is a template, not
@@ -215,13 +240,24 @@ a second editable brief.
   explaining the authority limit. For Gate B, name the actual selected architecture
   and principal rejected alternative, then state the exact
   allowed local write set, command boundary, attempt/checkpoint limits, and
-  exclusions from the current construction envelope. Restore the same pending
-  gate action and never repeat the formal receipt.
+  exclusions from the current construction envelope. Include its expiry and
+  earlier completion condition, dependency/external restrictions, and actual
+  recovery and teardown allowances. Distinguish a permitted local rollback
+  from AWS rollback requiring separate current authority; do not describe all
+  rollback as either permitted or requiring a new approval. Restore the same
+  pending gate action and never repeat the formal receipt.
 - A source-navigation reply uses only the current Engine-projected
   `source_locators`. Render a scannable list containing each locator key,
   repository-relative path, bound heading, and inclusive current line range.
   Never reuse offsets from a different raw, template, or previously rendered
-  PRD, and never estimate line numbers.
+  PRD, and never estimate line numbers. Verify every linked fragment against
+  the current document's actual anchor or existing working link; do not infer
+  one by shortening a heading, dropping its number, or collapsing punctuation.
+  If no fragment is verified, link the file and retain the exact heading and
+  line range instead of inventing an anchor. Apply this rule to consultation
+  links as well as navigation tables. A file link does not validate adjacent
+  prose section names: copy current headings verbatim, including their numbers,
+  and retain the current locator range when one is supplied.
 - After DIAGRAM-10, claim completion only from observed current task evidence.
   Use presenter mode `architecture-board-completion` with the current request
   packet and an Engine-captured completion projection bound to the current
@@ -244,4 +280,35 @@ a second editable brief.
   write boundary, and exact validation commands/evidence destinations being
   rerun, followed by the exact one-time Engine rerun command and current
   remediation fingerprint. Do not reduce it to a generic statement that
-  validation failed.
+  validation failed. State explicitly when the current task is NONE. If the
+  correction projects no application-validation command or evidence destination,
+  say so and preserve the required Engine rerun; do not invent an application
+  check for metadata repair.
+- A failed task-completion reply also names the actual task, exact write set,
+  attempts used and remaining, focused failing command, any distinct broader
+  required command, and canonical evidence destination. Describe the bounded
+  recovery handoff concretely even when the response itself performs no repair.
+  Retain failed observations and distinguish an accepted evidence-record
+  transition from an observed test execution. Resolve evidence destinations
+  from the current observation or source record, retaining its actual directory
+  and heading. A familiar filename does not establish its parent directory;
+  never substitute the template's usual path for a differently bound source.
+
+
+## Explain the current validation plan
+
+For questions about tests, checks, evidence, recovery, or what validates the
+design, use `python scripts/bootstrap_doctor.py --root . --explain-validation
+--json`, then pass that complete envelope to `python scripts/fastlane_presenter.py
+validation --input-stdin`. Both commands are read-only. The explanation includes
+current task, profile, property, and IaC obligations, exact commands, limits,
+destinations, interface and recovery drivers, source provenance, permission
+conflicts, and current evidence maturity. It executes nothing and grants no
+authority. Do not invent omitted legacy detail or imply that a record proves
+the check ran. Explain any structural or semantic gap plainly.
+
+Resume the action in that same Engine report. If a READY task is selected,
+continue bounded local construction; do not send the owner back to planning or
+expose internal prompt IDs. A correction that needs Codex work continues that
+work when authorized. Restoring a genuinely pending gate after a side question
+is allowed; asking again for an already completed owner action is not.

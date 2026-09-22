@@ -10,6 +10,7 @@ from typing import Any
 from ..core.contracts import markdown_tables, table_after_heading, without_fenced_code
 from ..core.ids import clean_cell
 from .models import ProjectDesignContract
+from .contract_v9 import design9_surface_present
 
 
 @dataclass(frozen=True)
@@ -190,8 +191,15 @@ def project_schema_state(
     schema_5, schema_6, approved_schema_7 = _schema_flags(
         design_schema, structural_text, grandfather_approved, compatibility
     )
-    if design_schema == compatibility.current_schema or any(
-        (schema_5, schema_6, approved_schema_7)
+    compatible8 = (
+        design_schema == "8"
+        and grandfather_approved
+        and not design9_surface_present(text)
+    )
+    if (
+        design_schema == compatibility.current_schema
+        or compatible8
+        or any((schema_5, schema_6, approved_schema_7))
     ):
         return document, schema_5, schema_6, approved_schema_7, issues, None
 

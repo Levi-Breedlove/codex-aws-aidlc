@@ -36,6 +36,12 @@ from .contract_v8 import (
     derive_project_design8_state,
     project_design_is_uninitialized,
 )
+from .contract_v9 import (
+    VALIDATION_CHECK_HEADING,
+    VALIDATION_CHECK_HEADERS,
+    bind_design9_project,
+    bind_approved_schema8,
+)
 from .diagrams import (
     DIAGRAM_CONTRACT_HEADERS,
     DIAGRAM_CONTRACT_HEADING,
@@ -121,7 +127,7 @@ def _owner_visible_design_issues(text: str) -> list[str]:
     return issues
 
 
-PROJECT_DESIGN_CONTRACT_SCHEMA = "8"
+PROJECT_DESIGN_CONTRACT_SCHEMA = "9"
 
 
 JOURNEY_HEADING = "### Journey register"
@@ -276,8 +282,11 @@ PROJECT_SCHEMA_COMPATIBILITY = ProjectSchemaCompatibility(
     current_schema=PROJECT_DESIGN_CONTRACT_SCHEMA,
     diagram_heading=DIAGRAM_CONTRACT_HEADING,
     diagram_headers=DIAGRAM_CONTRACT_HEADERS,
-    partial_upgrade_headings=tuple(sorted(DESIGN8_HEADINGS)),
-    partial_upgrade_headers=tuple(sorted(DESIGN8_HEADERS)),
+    partial_upgrade_headings=(
+        *tuple(sorted(DESIGN8_HEADINGS)),
+        VALIDATION_CHECK_HEADING,
+    ),
+    partial_upgrade_headers=(*tuple(sorted(DESIGN8_HEADERS)), VALIDATION_CHECK_HEADERS),
     current_headers=(
         INTERFACE_HEADERS,
         LAYER_BOUNDARY_HEADERS,
@@ -476,6 +485,23 @@ def _project_presentation_labels(
         *((row[0], row[2]) for row in (states.rows if states else ())),
     ]
     return tuple((identifier, clean_cell(label)) for identifier, label in labels)
+
+
+def _project_design_status(issues, grandfather_schema_5, grandfather_schema_6):
+    if issues:
+        return "BLOCKED"
+    return "GRANDFATHERED" if grandfather_schema_5 or grandfather_schema_6 else "READY"
+
+
+def _uninitialized_project_contract(document: dict[str, str]) -> ProjectDesignContract:
+    return ProjectDesignContract(
+        schema_version=(
+            9
+            if clean_cell(document.get("Project design contract schema", "")) == "9"
+            else 8
+        ),
+        status="UNINITIALIZED",
+    )
 
 
 def derive_project_design_contract(
@@ -1052,35 +1078,32 @@ def derive_project_design_contract(
         effective_schema,
         design_v8,
     ):
-        return ProjectDesignContract(status="UNINITIALIZED"), []
-    return (
-        ProjectDesignContract(
-            schema_version=(effective_schema),
-            status=(
-                "GRANDFATHERED"
-                if (grandfather_schema_5 or grandfather_schema_6) and not issues
-                else "READY"
-                if not issues
-                else "BLOCKED"
-            ),
-            application_source_disposition=source_disposition,
-            interface_ids=tuple(interface_ids),
-            boundary_ids=tuple(boundary_ids),
-            state_ids=tuple(state_ids),
-            presentation_labels=_project_presentation_labels(
-                interfaces, boundaries, states
-            ),
-            first_wave=first_wave,
-            spike=spike,
-            missing_records=tuple(dict.fromkeys(missing_records)),
-            canonical_sha256=canonical_sha256,
-            grandfathered_v5=grandfather_schema_5,
-            grandfathered_v6=grandfather_schema_6,
-            design_v8=design_v8,
-            canonical_bytes=canonical_bytes,
+        return _uninitialized_project_contract(document), []
+    project_result = ProjectDesignContract(
+        schema_version=(effective_schema),
+        status=_project_design_status(
+            issues, grandfather_schema_5, grandfather_schema_6
         ),
-        issues,
+        application_source_disposition=source_disposition,
+        interface_ids=tuple(interface_ids),
+        boundary_ids=tuple(boundary_ids),
+        state_ids=tuple(state_ids),
+        presentation_labels=_project_presentation_labels(
+            interfaces, boundaries, states
+        ),
+        first_wave=first_wave,
+        spike=spike,
+        missing_records=tuple(dict.fromkeys(missing_records)),
+        canonical_sha256=canonical_sha256,
+        grandfathered_v5=grandfather_schema_5,
+        grandfathered_v6=grandfather_schema_6,
+        design_v8=design_v8,
+        canonical_bytes=canonical_bytes,
     )
+    project_result, detail_issues = bind_design9_project(
+        text, project_result, requirements_contract, interfaces
+    )
+    return project_result, [*issues, *detail_issues]
 
 
 def _current_design_support_records(
@@ -1181,6 +1204,24 @@ def _current_project_contract(
         required=required,
         grandfather_approved_v4=grandfathered,
     )
+
+
+def _approved_project_compatibility(
+    text, project_contract, canonical_sha256, grandfather_approved_v1, issues
+):
+    project_contract, schema_compatibility_issues = bind_approved_schema7_compatibility(
+        text,
+        project_contract,
+        canonical_sha256,
+        grandfather_approved=grandfather_approved_v1,
+        design8_headings=tuple(DESIGN8_HEADINGS),
+    )
+    issues.extend(schema_compatibility_issues)
+    project_contract, schema8_issues = bind_approved_schema8(
+        text, project_contract, canonical_sha256, grandfather_approved_v1
+    )
+    issues.extend(schema8_issues)
+    return project_contract
 
 
 def derive_design_contract(
@@ -1644,14 +1685,9 @@ def derive_design_contract(
         bind_design_support=bind_design_support,
         grandfather_approved=grandfather_approved_v1,
     )
-    project_contract, schema_compatibility_issues = bind_approved_schema7_compatibility(
-        text,
-        project_contract,
-        canonical_sha256,
-        grandfather_approved=grandfather_approved_v1,
-        design8_headings=tuple(DESIGN8_HEADINGS),
+    project_contract = _approved_project_compatibility(
+        text, project_contract, canonical_sha256, grandfather_approved_v1, issues
     )
-    issues.extend(schema_compatibility_issues)
     blocking_issues = [
         issue for issue in issues if not is_diagram_presentation_issue(issue)
     ]

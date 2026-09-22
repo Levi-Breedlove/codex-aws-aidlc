@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .requirements_v16 import Requirements16Extension
+
 
 @dataclass(frozen=True)
 class RequirementsChangeLineage:
@@ -180,7 +182,7 @@ class CrossCuttingRisk:
 
 @dataclass(frozen=True)
 class RequirementsContract:
-    schema_version: str = "1.5"
+    schema_version: str = "1.6"
     status: str = "UNINITIALIZED"
     actor_ids: tuple[str, ...] = ()
     requirement_ids: tuple[str, ...] = ()
@@ -204,6 +206,10 @@ class RequirementsContract:
     external_obligations: tuple[ExternalObligation, ...] = ()
     cross_cutting_risks: tuple[CrossCuttingRisk, ...] = ()
     approved_schema_14_compatibility: bool = False
+    requirements_v16: Requirements16Extension = field(
+        default_factory=Requirements16Extension
+    )
+    acceptance_criteria: tuple[tuple[str, str], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -233,6 +239,11 @@ class RequirementsContract:
             "canonical_sha256": self.canonical_sha256,
             "grandfathered_approved_gate_a": self.grandfathered_approved_gate_a,
             "approved_schema_14_compatibility": (self.approved_schema_14_compatibility),
+            **(
+                {"requirements_v16": self.requirements_v16.to_dict()}
+                if self.schema_version == "1.6"
+                else {}
+            ),
         }
 
 

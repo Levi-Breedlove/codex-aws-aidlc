@@ -68,6 +68,34 @@ Hooks are optional. Review `/hooks`, remove the local `.codex/hooks.json`, and
 restart Codex to disable them. The Engine and normal Codex approval/sandbox
 controls continue to govern Fastlane. See [Optional Fastlane hooks](../.codex/hooks/README.md).
 
+## A check or evidence record is rejected
+
+Ask Codex to explain the current validation plan. It will show the exact check,
+time limit, result location, and any mismatch with the approved command boundary.
+It can also produce a read-only diagnostic:
+
+```text
+python scripts/bootstrap_doctor.py --root . --explain-validation --json
+```
+
+An old pass cannot establish a changed acceptance outcome or a new task attempt.
+Keep the old result, correct the current binding or implementation, and rerun the
+affected check inside its approved boundary. A later failure remains blocking
+until a later current result passes. A missing tool is a prerequisite gap, not a
+passing result or permission to install software.
+
+If recovery wording conflicts, resolve the promise first: recreating a synthetic
+fixture does not prove that a backup can restore durable data. If an input limit
+is unresolved, state the accepted and rejected cases before approving it.
+
+## An older project needs new records
+
+Resume the existing project. Exact unchanged approvals remain readable; do not
+delete records or copy new headings into an old approval to force a pass. Codex
+will identify the missing decisions and refresh only the affected requirements,
+design, gates, tasks, and evidence. A material requirement change needs both
+approvals again; a design change needs the technical approval again.
+
 ## Another blocker appears
 
 Follow the single diagnostic named by the Engine. Preserve dirty files,

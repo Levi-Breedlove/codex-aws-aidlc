@@ -4,6 +4,10 @@ This guide is for project owners starting from the template. Fastlane checks
 planning dependencies before it writes project configuration. Installation,
 plugin enablement, and trust decisions always remain owner-run.
 
+Fastlane 1.4 is a local alpha for owner testing. Start with a small, reversible
+development project and synthetic data. A local completion has its own evidence;
+real AWS operation and recovery qualification remain separate work.
+
 ## First-time setup, in order
 
 ### 1. Install Codex
@@ -132,5 +136,10 @@ Deployment and teardown retain separate exact Fastlane authority.
 Repository hooks are optional and disabled by default. If you choose to enable
 them after Gate B, follow [Optional Fastlane hooks](../.codex/hooks/README.md). Hook trust stays
 in your local Codex profile.
+
+After Project Ready, describe your first useful outcome. Fastlane records
+concrete input limits, accepted and rejected examples, and the recovery promise
+that fits your data before asking you to approve requirements. You can ask
+"What will you check, and where will the results be recorded?" at any point.
 
 For help, see [Troubleshooting Fastlane](TROUBLESHOOTING.md).

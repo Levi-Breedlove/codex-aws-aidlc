@@ -566,6 +566,8 @@ class ProjectDesignContract:
     )
     approved_schema7_compatibility: bool = False
     design_v8: Design8Extension = field(default_factory=Design8Extension)
+    validation_checks: tuple[tuple[str, ...], ...] = ()
+    acceptance_criteria: tuple[tuple[str, str], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         result = {
@@ -589,6 +591,9 @@ class ProjectDesignContract:
         }
         if self.schema_version >= 8:
             result["design_v8"] = self.design_v8.to_dict()
+        if self.schema_version >= 9:
+            result["validation_checks"] = [list(row) for row in self.validation_checks]
+            result["acceptance_criteria"] = dict(self.acceptance_criteria)
         return result
 
 
