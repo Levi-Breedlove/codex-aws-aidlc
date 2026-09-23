@@ -1,12 +1,16 @@
 # Troubleshooting Fastlane
 
-Fastlane reports one current action whenever possible. Start with that action;
-do not regenerate an initialized project to clear an error.
+This guide helps you continue Fastlane's requirements, design, implementation,
+verification, and AWS delivery workflow when a step needs attention. Fastlane
+reports one current action whenever possible. Start with that action; do not
+regenerate an initialized project to clear an error. For the full product and
+lifecycle, see the [overview](../README.md) and [workflow guide](WORKFLOW.md).
 
 | Symptom | Start here |
 |---|---|
 | You need safe diagnostic output | [Read-only checks](#read-only-checks) |
 | A Codespaces command is unavailable or the wrong version opens | [Codespaces setup and resume](#codespaces-setup-and-resume) |
+| Workspace checks passed but AWS has not changed | [Construction and AWS delivery](#construction-and-aws-delivery) |
 | Setup repeats | [`init template` repeats setup](#init-template-repeats-setup) |
 | AWS Core is unavailable | [AWS Core is missing](#aws-core-is-missing) |
 | Current AWS guidance cannot be retrieved | [AWS Core research fails later](#aws-core-research-fails-later) |
@@ -46,6 +50,18 @@ owner-run installation or plugin change, reopen the terminal or restart Codex
 as requested and retry the same pending step. Never clear the canonical project
 records to repair a missing tool. For a sign-in callback failure, use the
 [official remote sign-in guidance](https://learn.chatgpt.com/docs/auth).
+
+## Construction and AWS delivery
+
+Fastlane's build stage edits and checks the approved project inside its development
+workspace, whether on your computer or in a Codespace. A local result describes
+that evidence; it does not restrict where the finished application can run.
+
+Ask Codex what target is complete and which delivery step comes next. AWS account
+preflight, deployment, recovery, and teardown require their applicable exact
+authorization and observed results. Gate B and a passing build do not authorize
+those operations. Continue from the existing project records and the
+[AWS delivery stages](WORKFLOW.md#aws-core-and-aws-authority).
 
 ## `init template` repeats setup
 

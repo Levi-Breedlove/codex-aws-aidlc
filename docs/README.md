@@ -1,7 +1,9 @@
 # Fastlane documentation
 
-Use this page to find the right customer or project guide. Internal maintenance
-guidance stays outside this customer index so it cannot compete with project truth.
+Fastlane is a spec-driven software and AWS delivery framework for Codex. These
+guides explain how to turn an idea or existing-system change into requirements,
+design, implementation, verification, release preparation, and authorized AWS
+operations. Start with the [product overview](../README.md), then choose a guide.
 
 ## Start here
 
@@ -9,8 +11,8 @@ guidance stays outside this customer index so it cannot compete with project tru
   fresh template.
 - [Use GitHub Codespaces](SETUP.md#github-codespaces) — choose the intended branch,
   complete setup in the hosted environment, and follow the owner pilot checklist.
-- [Understand the workflow](WORKFLOW.md) — see the complete owner journey from
-  idea through local construction and optional AWS operations.
+- [Understand the workflow](WORKFLOW.md) — follow product definition, architecture,
+  both owner decisions, implementation, resume, release review, and AWS delivery.
 - [Troubleshoot](TROUBLESHOOTING.md) — resolve setup, resume, AWS Core, and
   Engine blockers without regenerating an active project.
 - [Security policy](../SECURITY.md) — understand trust, data, credentials, and

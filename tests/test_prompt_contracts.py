@@ -853,7 +853,7 @@ class PromptPackContractTests(unittest.TestCase):
             combined,
         )
         self.assertIn("Other AWS lanes remain unqualified", combined)
-        self.assertIn("Teardown-only E5 evidence does not qualify Recovery", combined)
+        self.assertIn("Teardown-only evidence does not qualify Recovery", combined)
         self.assertIn("Rollback or restore behavior was exercised", combined)
         self.assertNotIn(
             "Rollback, restore, or teardown behavior was exercised", combined
@@ -871,9 +871,9 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.4.2")
-        self.assertIn("**Pack version:** 1.4.2", self.prompts)
-        self.assertIn("[![Release v1.4.2]", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.4.3")
+        self.assertIn("**Pack version:** 1.4.3", self.prompts)
+        self.assertIn("[![Release v1.4.3]", self.readme)
         self.assertNotIn("Current customer build:", self.readme)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",

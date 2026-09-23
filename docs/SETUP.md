@@ -1,6 +1,11 @@
 # AWS Codex Fastlane setup
 
-This guide is for project owners starting from the template. Fastlane checks
+This guide prepares your development workspace for Fastlane's spec-driven
+software and AWS delivery workflow. Start with the [product overview](../README.md)
+for what Fastlane does and the [workflow guide](WORKFLOW.md) for how Codex moves
+from requirements and design to implementation, verification, and delivery.
+
+Use a repository on your computer or in GitHub Codespaces. Fastlane checks
 planning dependencies before it writes project configuration. Installation,
 plugin enablement, and trust decisions always remain owner-run.
 
@@ -9,7 +14,9 @@ features, repairs, refactors, migrations, and security work. For your first alph
 pilot, choose a small, reversible development outcome with synthetic data so you
 can learn the workflow and evaluate it. That recommendation sets the pilot size;
 your approved requirements and construction boundary set the project's scope.
-Local completion, real AWS operation, and recovery each require their own evidence.
+Workspace construction is one stage of the workflow. AWS deployment and recovery
+follow their applicable authorization and verification steps. In these guides,
+local checks run in the development workspace, including a Codespace.
 
 For a hosted development environment, start with [GitHub Codespaces](#github-codespaces).
 
