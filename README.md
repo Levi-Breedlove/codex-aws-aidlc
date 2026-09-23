@@ -29,7 +29,7 @@ Using GitHub Codespaces? Follow the [Codespaces walkthrough](docs/SETUP.md#githu
 
 3. If Fastlane shows one consolidated checklist, complete it and send the same message again. Then provide the project name, one exact preferred AWS Region, and the development cost posture or hard cap. Reply `recommend one` for one explained Region option; it never chooses a default.
 
-Fastlane initializes your project repository, presents **Project Ready**, and asks the first product question. Your development workspace can be on your computer or in GitHub Codespaces. Requirements, design, and repository construction need no AWS credentials; setup does not access an AWS account or deploy. An initialized project resumes without repeating setup.
+Fastlane initializes your project repository, presents **Project Ready**, and asks the first product question. Your development workspace can be on your computer or in GitHub Codespaces. No AWS credentials are needed for requirements, design, or local construction. Setup does not access an AWS account or deploy. Initialized projects resume without repeating setup.
 
 ## Why Fastlane is different
 

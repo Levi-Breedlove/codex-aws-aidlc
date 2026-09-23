@@ -3,8 +3,8 @@
 ## Supported state
 
 The current Fastlane software and AWS delivery framework is maintained on the
-protected customer branch `fast-lane`. The protected `fast-lane-foundation`
-branch preserves the 1.0.5 predecessor and remains outside the customer release
+protected customer branch `fast-lane`. The protected `fast-lane-foundation` branch
+preserves the 1.0.5 predecessor and remains outside the customer release
 flow. The [published releases](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases)
 identify the exact template revisions they contain. See the [product overview](README.md)
 and [workflow guide](docs/WORKFLOW.md) for capabilities and delivery stages.
