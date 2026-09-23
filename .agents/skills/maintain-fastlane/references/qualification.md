@@ -46,6 +46,13 @@ Run focused tests before the complete suite. Then require manifest parity,
 format checks, two byte-identical package builds, and package comparison against
 the exact base commit.
 
+Verify Python 3.11 or newer and an external trusted Git executable in the test
+process environment before discovery. Save full failure logs and classify
+environment, implementation, specification, and fixture failures separately.
+Documentation and stale-version checks use the repository source inventory;
+ignored backups and generated output are not product sources and are never
+deleted to obtain a pass. Extracted templates use their manifest inventory.
+
 Exercise the extracted template through prerequisites, initialization, resume,
 Engine routing, one-question intake, both gates, task readiness, greenfield,
 brownfield, infrastructure-only, correction, side-question, overlap, privacy,

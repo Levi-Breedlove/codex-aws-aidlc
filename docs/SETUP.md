@@ -4,9 +4,14 @@ This guide is for project owners starting from the template. Fastlane checks
 planning dependencies before it writes project configuration. Installation,
 plugin enablement, and trust decisions always remain owner-run.
 
-Fastlane 1.4 is a local alpha for owner testing. Start with a small, reversible
-development project and synthetic data. A local completion has its own evidence;
-real AWS operation and recovery qualification remain separate work.
+Fastlane supports new applications, existing-system changes, infrastructure,
+features, repairs, refactors, migrations, and security work. For your first alpha
+pilot, choose a small, reversible development outcome with synthetic data so you
+can learn the workflow and evaluate it. That recommendation sets the pilot size;
+your approved requirements and construction boundary set the project's scope.
+Local completion, real AWS operation, and recovery each require their own evidence.
+
+For a hosted development environment, start with [GitHub Codespaces](#github-codespaces).
 
 ## First-time setup, in order
 
@@ -125,6 +130,57 @@ does not repeat prerequisites, setup questions, or the Project Ready handoff.
 
 Ruff is only a Fastlane maintainer qualification check. Project owners do not
 install Ruff system-wide to use the template.
+
+## GitHub Codespaces
+
+Use your own template-derived repository or a disposable fork for the pilot.
+When testing this framework's published candidate, select `fast-lane` in that
+repository's branch menu before choosing **Code → Codespaces → Create codespace**.
+For an ordinary new project, select the branch containing your generated template.
+See [GitHub's branch-specific creation guide](https://docs.github.com/en/codespaces/developing-in-a-codespace/creating-a-codespace-for-a-repository).
+
+In the Codespaces terminal, confirm the checkout before changing anything:
+
+```bash
+git branch --show-current
+git rev-parse HEAD
+git status --short
+python3 --version
+git --version
+codex --version
+uvx --version
+bwrap --version
+```
+
+Compare the branch and commit with the candidate you intend to test. A missing
+command belongs on the setup checklist. Follow the Linux prerequisites above
+inside the Codespace; tools installed on your laptop do not establish that they
+are available there. This walkthrough uses the normal Codespaces environment
+and adds no custom devcontainer or automatic installation.
+
+Complete the owner-run Codex sign-in and AWS Core steps above in this environment.
+If the browser callback cannot reach the remote terminal, follow the
+[official remote sign-in options](https://learn.chatgpt.com/docs/auth).
+Do not paste tokens, authentication files, or AWS credentials into chat or records.
+Launch `codex` from the repository root, then send `init template` **inside the
+Codex conversation**. A shell does not interpret that message as a Fastlane action.
+The credential-free AWS Core handshake checks documentation capabilities only.
+
+### Owner pilot checklist
+
+- [ ] Record the candidate commit and confirm that the setup checklist is resolved.
+- [ ] Reach **Project Ready**, then describe one useful, reversible outcome.
+- [ ] Answer one product question per turn; review the requirements and approve Gate A.
+- [ ] Review the proposed design, checks, and local write boundary; approve Gate B.
+- [ ] Let Codex perform the permitted local work and show the observed verification results.
+- [ ] Ask Codex what completed, what failed or remains unobserved, and what happens next.
+- [ ] Close and reopen the same Codespace and repository. Start Codex and ask it to resume;
+  it should recover the next action from the records without repeating setup or approvals.
+
+Keep pilot observations with the tested project. A completed checklist records
+your observed experience; publishing this guide does not establish a completed
+Codespaces pilot or qualify an AWS deployment. GitHub publication, AWS operations,
+and billable external changes still need their applicable authorization.
 
 ## Privacy, hooks, and authority
 

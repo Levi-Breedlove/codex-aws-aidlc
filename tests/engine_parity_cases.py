@@ -302,13 +302,13 @@ CURRENT_COMPATIBILITY_DIGESTS = {
     ),
 }
 CURRENT_APPROVED_BEHAVIOR_ADDITION_DIGESTS = {
-    "template_source": "adbdacc5d86cb139846a8ed3f8b7e316f2e1bf52b82cabc7325134ae4112fe36",
-    "unconfigured_template": "0da7f54daa597c43f4c62c430125fc1b8fe8dae5c51927bbdb633e1113b8333c",
-    "rendered_intake": "c2c41fdaaf0b563f21ce88d907be89a8a18447bc767bee17729b2b7d1bc43185",
-    "gate_a_pending": "9eb2d1be338a80a3d5cd7d222fbce2875d9fa8b90824d523ccc019933c43b47d",
-    "gate_a_approved": "58e837546e3806501be544ebcb876121e8e1a0adf8b67ac76daa4aff2a9c30a0",
-    "gate_b_pending": "9b5846d7f70efb679533ac5917fa305c20605adbef5e2bfd4a4efc83417329e8",
-    "gate_b_approved": "f8946406608bd31781fae91ab0f42d428c1ee6631b80f41c1d125cc76bccbe2b",
+    "template_source": "9870c8c3d83d1d5d79be733fa2baa39c5d3a7718b66504aeb46e556b30fe1edb",
+    "unconfigured_template": "680b873da939d4ba6af8cc219e3750b0746549dbb41b5bdd62ae52144a6eed5b",
+    "rendered_intake": "3b4ca31afaf86349ea5708de1aadd5ddad53be8f8d4cfd7b9c396ef6302aeb1f",
+    "gate_a_pending": "88dcebba43bda89219adfeb6e293e934504df5d2c1702189592a1e81ad974531",
+    "gate_a_approved": "91b67ba37ea5fc2b7f41510f6ceb1b543421c8a9aab87b963599605ffcb9666d",
+    "gate_b_pending": "a4da066331f4870fba719b381eacb68e6ab36d89dc2414542f4df41440cd2a44",
+    "gate_b_approved": "2ff1183d18cf510e7d3b713acef07650fa4931c7b4f71fb7e444985244aa5b8a",
 }
 
 

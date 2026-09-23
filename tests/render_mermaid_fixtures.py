@@ -20,6 +20,8 @@ import zlib
 from pathlib import Path
 from unittest import mock
 
+from scripts.fastlane_engine.design.diagrams import LINEAR_DIAGRAM_CONFIG
+
 from tests.test_bootstrap_doctor import (
     BootstrapDoctorTests,
     approve_gate_a,
@@ -110,7 +112,10 @@ def _blocks(source: str, *, expected: int, label: str) -> tuple[str, ...]:
     if len(blocks) != expected:
         raise ValueError(f"{label} must contain exactly {expected} Mermaid blocks")
     for index, block in enumerate(blocks, 1):
-        first = next((line.strip() for line in block.splitlines() if line.strip()), "")
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if lines and lines[0] == LINEAR_DIAGRAM_CONFIG:
+            lines = lines[1:]
+        first = lines[0] if lines else ""
         if not first.startswith("flowchart "):
             raise ValueError(f"{label} Mermaid block {index} is not a flowchart")
         if "TODO" in block or "PLACEHOLDER" in block:

@@ -7,6 +7,9 @@ description: Coordinate Fastlane initialization, requirements, design, tasks, an
 
 You are the single coordinator and sole writer.
 
+Examples require verified Python >=3.11: use `py -3` (Windows), `python3`
+(macOS/Linux/Codespaces), or verified `python`; never install or alias it.
+
 1. Read root and applicable nested `AGENTS.md` files.
 2. Inspect `bootstrap.yaml` before running setup or printing a welcome.
    - An initialized project skips prerequisites and setup questions, then
@@ -56,10 +59,8 @@ You are the single coordinator and sole writer.
    external-authorization boundary.
    Setup renderer output is final owner copy; never translate it.
    Owner-facing responses are technical consultation, not raw state relay.
-   Translate validated projections into practical consequences,
-   evidence-backed recommendations when justified, principal tradeoffs, and
-   one next action without changing the projected state, evidence maturity, or
-   authority.
+   Explain practical effects, supported recommendations, tradeoffs, and one
+   next action; preserve projected state, evidence maturity, and authority.
 7. Read only Engine-selected prompts; IDs are routing, not owner instructions.
    BUG-10, DIAGRAM-10, and SYNC-10 are exact-request adjuncts within authority.
    DIAGRAM-10 requires `aws-architecture-diagrams` 1.3.1, v1.3/schema 2, exact
@@ -104,12 +105,10 @@ You are the single coordinator and sole writer.
    material interfaces, boundaries, states, diagram contract, and approved first wave.
 
 
-For a side question, answer directly without state change unless requested.
-Rerun the Engine, then use
-`scripts/fastlane_presenter.py side-question --input-stdin` to restore the
-pending action. Explaining current questions is clarification, not learning:
-explain practical consequences, say state is unchanged, and restore the same
-choices. Route teaching Fastlane itself to `explain-fastlane`.
+Answer side questions without state changes unless requested. Rerun Engine;
+use `scripts/fastlane_presenter.py side-question --input-stdin` to restore the
+pending action. Clarify practical effects, state that nothing changed, and
+restore the same choices. Route teaching Fastlane itself to `explain-fastlane`.
 
 Stop only for an owner decision or gate, human safety review, stale/conflicting
 scope, missing material evidence, an exhausted correction or write boundary,

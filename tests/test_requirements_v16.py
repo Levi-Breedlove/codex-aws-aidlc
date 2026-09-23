@@ -132,9 +132,10 @@ class Requirements16Tests(unittest.TestCase):
                 "Development recovery rehearsal",
                 "Development isolated recovery rehearsal",
             ),
-            ("Durable data store", "Synthetic durable data store"),
+            ("Versioned synthetic fixture", "Reviewed versioned synthetic fixture"),
             ("versioned local fixture", "reviewed versioned local fixture"),
         ):
+            self.assertIn(old, self.source)
             changed, errors = derive(self.source.replace(old, new))
             self.assertEqual(errors, [])
             self.assertNotEqual(changed.canonical_sha256, baseline.canonical_sha256)

@@ -2,7 +2,7 @@
 
 > Owner-controlled AWS delivery for Codex.
 
-[![Release v1.4.1](https://img.shields.io/badge/release-v1.4.1-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.1)
+[![Release v1.4.2](https://img.shields.io/badge/release-v1.4.2-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.2)
 ![Python requirement: 3.11 or newer](https://img.shields.io/badge/python-%E2%89%A53.11-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2da44e)](LICENSE)
 
@@ -11,6 +11,8 @@ AWS Codex Fastlane is an owner-controlled AWS delivery workflow for Codex. Built
 **[Use this template →](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate)**
 
 ## Quick start
+
+Using GitHub Codespaces? Follow the [Codespaces walkthrough](docs/SETUP.md#github-codespaces) and its owner pilot checklist.
 
 1. Complete the [one-time setup](docs/SETUP.md) for Codex and the official AWS Core plugin, create a repository with the button above, clone your generated repository, and open it in a signed-in interactive Codex CLI session.
 2. Send this in the Codex conversation—not a shell:

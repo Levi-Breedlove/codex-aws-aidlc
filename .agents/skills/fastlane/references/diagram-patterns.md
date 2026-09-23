@@ -23,6 +23,10 @@ label with current canonical PRD records. Remove unused nodes and paths.
 - Do not rely on a nested subgraph direction when its nodes connect outside that subgraph. Organize the parent direction, declaration order, and boundaries.
 - Aim for 12–20 nodes in broad views. Keep nodes to at most three visual lines, boundaries to at most two, and relationships to at most two; every line contains 1–48 visible characters.
 - Use solid arrows for primary runtime and data flow. Use dashed arrows for trust, telemetry, control, planning, and optional relationships.
+- Start new flowcharts with the exact linear-arrow initialization shown below.
+  It is the supported static presentation configuration; do not add other init
+  settings, callbacks, HTML-label options, or active directives. Existing
+  diagrams without it remain readable. Styling does not change semantic relationships.
 - Use comments to divide request, data, failure, and operations flows in Mermaid source.
 - Declare the primary owner-to-outcome runtime spine in reading order. Keep
   operations and recovery on one side of that spine and data and safeguards on
@@ -61,6 +65,7 @@ Use the section-14 view for the selected architecture, real actors, trust and
 data boundaries, selected AWS capabilities, observability, and recovery.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Complete proposed application architecture
     accDescr: The customer enters through the public interface, the application applies identity and business rules, and managed data, operations, and recovery services support the outcome.
@@ -100,6 +105,7 @@ Use the section-20 table to retain all eight validated AWS concerns. Show only
 applicable selected services and mechanisms in the diagram; do not reproduce an AWS catalog or draw a non-applicable path.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Proposed AWS implementation
     accDescr: Requests enter through the selected AWS edge and identity services, run through the application compute and data path, and are supported by messaging, observability, deployment, and encryption controls.
@@ -155,6 +161,7 @@ flowchart TB
 - `MIGRATION` shows the preserved source, bounded transition, validation point, and rollback target.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart LR
     accTitle: Customer journey with a safe alternate path
     accDescr: The invited customer submits one request and receives the validated result, while a recoverable failure follows the selected recovery path before returning to the interface.
@@ -168,6 +175,7 @@ flowchart LR
 ```
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Compact project state flow
     accDescr: The application points to one canonical state-model card whose relationship names the exact validation and publication transitions recorded in the State register.

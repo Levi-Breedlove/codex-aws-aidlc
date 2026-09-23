@@ -52,6 +52,13 @@ def complete_alpha_requirements(text: str, requirement_ids: list[str]) -> str:
         "A timed restore rehearsal meets RTO 60 minutes and RPO 15 minutes.",
         "RTO 60 minutes and RPO 0 minutes",
     )
+    text = text.replace(
+        "RTO: 60 minutes; RPO: 15 minutes",
+        "RTO: 60 minutes; RPO: 0 minutes",
+    ).replace(
+        "| Durable data store | RECREATE:",
+        "| Versioned synthetic fixture | RECREATE:",
+    )
     rows = {
         RECOVERY_HEADERS: [
             (

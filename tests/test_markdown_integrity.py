@@ -10,6 +10,8 @@ from unittest import mock
 from urllib.parse import unquote
 
 from tests import render_mermaid_fixtures, test_bootstrap_doctor
+from tests.repository_sources import source_files
+from scripts.fastlane_engine.design.diagrams import LINEAR_DIAGRAM_CONFIG
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -143,9 +145,7 @@ def rendered_visible_lines(markdown: str) -> list[str]:
 class MarkdownIntegrityTests(unittest.TestCase):
     def markdown_files(self) -> list[Path]:
         return sorted(
-            path
-            for path in REPOSITORY_ROOT.rglob("*.md")
-            if ".git" not in path.parts and "dist" not in path.parts
+            path for path in source_files(REPOSITORY_ROOT) if path.suffix == ".md"
         )
 
     def test_relative_markdown_links_and_fragments_resolve(self) -> None:
@@ -336,8 +336,14 @@ sequenceDiagram
                 first = next(
                     line.strip() for line in block.splitlines() if line.strip()
                 )
+                self.assertEqual(first, LINEAR_DIAGRAM_CONFIG)
+                declaration = next(
+                    line.strip()
+                    for line in block.splitlines()
+                    if line.strip() and line.strip() != LINEAR_DIAGRAM_CONFIG
+                )
                 self.assertEqual(
-                    first,
+                    declaration,
                     ("flowchart TB", "flowchart TB", "flowchart LR", "flowchart TB")[
                         index
                     ],
@@ -907,8 +913,8 @@ sequenceDiagram
         root_agents = (REPOSITORY_ROOT / "AGENTS.md").resolve()
         nested_guides = sorted(
             path
-            for path in REPOSITORY_ROOT.rglob("AGENTS.md")
-            if path.resolve() != root_agents and ".git" not in path.parts
+            for path in source_files(REPOSITORY_ROOT)
+            if path.name == "AGENTS.md" and path.resolve() != root_agents
         )
         self.assertTrue(nested_guides)
         for guide in nested_guides:
@@ -1222,7 +1228,7 @@ sequenceDiagram
             for marker in markers:
                 self.assertIn(marker, fixtures[name], name)
         complete = fixtures["golden-complete-architecture"]
-        self.assertTrue(complete.startswith("flowchart TB\n"))
+        self.assertTrue(complete.startswith(LINEAR_DIAGRAM_CONFIG + "\nflowchart TB\n"))
         self.assertEqual(complete.count("classDef "), 6)
         organized_groups = (
             'subgraph PEOPLE["People"]',
@@ -1238,7 +1244,9 @@ sequenceDiagram
             sorted(complete.index(marker) for marker in organized_groups),
         )
         published_journey = fixtures["published-journey-flow"]
-        self.assertTrue(published_journey.startswith("flowchart LR\n"))
+        self.assertTrue(
+            published_journey.startswith(LINEAR_DIAGRAM_CONFIG + "\nflowchart LR\n")
+        )
         self.assertIn(
             "accTitle: Customer journey with a safe alternate path",
             published_journey,
@@ -1252,7 +1260,9 @@ sequenceDiagram
             published_journey,
         )
         published_state = fixtures["published-state-flow"]
-        self.assertTrue(published_state.startswith("flowchart TB\n"))
+        self.assertTrue(
+            published_state.startswith(LINEAR_DIAGRAM_CONFIG + "\nflowchart TB\n")
+        )
         self.assertIn("accTitle: Compact project state flow", published_state)
         self.assertIn('ARCH-0000["Project application"]:::compute', published_state)
         self.assertIn(
@@ -1310,7 +1320,9 @@ sequenceDiagram
             )
             for path in outputs:
                 source = path.read_text(encoding="utf-8")
-                self.assertTrue(source.startswith("flowchart "), path.name)
+                self.assertTrue(
+                    source.startswith(LINEAR_DIAGRAM_CONFIG + "\nflowchart "), path.name
+                )
                 self.assertTrue(source.endswith("\n"), path.name)
                 self.assertNotIn("TODO", source)
                 self.assertNotIn("PLACEHOLDER", source)

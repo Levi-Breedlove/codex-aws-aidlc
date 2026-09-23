@@ -64,6 +64,7 @@ from .design import (
     validate_aws_artifact,
 )
 from .design.diagrams import DIAGRAM_PRESENTATION_DIAGNOSTIC
+from .design.contract_v9 import validation_destination_issues
 from .package.manifest import (
     validate_manifest as validate_package_manifest,
     validate_placeholders as validate_package_placeholders,
@@ -88,6 +89,7 @@ from .project_inspection import (
     REQ_ID,
     RISK_LEVELS,
     STATE_FILE,
+    VERIFY_FILE,
     STATE_POLICY,
     Context,
     explicit_human_approver,
@@ -177,10 +179,10 @@ def derive_design_contract(
     coverage_contract: CoverageContract | None = None,
     requirements_contract: RequirementsContract | None = None,
     _evaluator: Any = None,
+    _verification_text: str | None = None,
 ) -> tuple[DesignContract, list[str]]:
     """COMPATIBILITY: preserve Design derivation while orchestration is extracted."""
-
-    initial_issues: list[str] = []
+    initial_issues = validation_destination_issues(text, _verification_text)
     if coverage_contract is None:
         try:
             document = table_after_heading(text, "## Document status")
@@ -1042,6 +1044,9 @@ def validate_prd(
         grandfather_approved_v1=grandfather_approved_v1_design,
         coverage_contract=coverage_contract,
         requirements_contract=requirements_contract,
+        _verification_text=ctx.texts.get(VERIFY_FILE)
+        or safe_read_text(ctx, VERIFY_FILE)
+        or "",
     )
     if design_contract_required:
         for issue in design_contract_issues:
