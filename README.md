@@ -1,12 +1,18 @@
 # AWS Codex Fastlane
 
-> Owner-controlled AWS delivery for Codex.
+> Spec-driven software and AWS delivery with Codex.
 
-[![Release v1.4.2](https://img.shields.io/badge/release-v1.4.2-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.2)
+[![Release v1.4.3](https://img.shields.io/badge/release-v1.4.3-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.3)
 ![Python requirement: 3.11 or newer](https://img.shields.io/badge/python-%E2%89%A53.11-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2da44e)](LICENSE)
 
-AWS Codex Fastlane is an owner-controlled AWS delivery workflow for Codex. Built for developers delivering AWS software and infrastructure, it turns a product idea, existing application change, or infrastructure task into an evidence-backed local result while keeping project truth in the repository. You approve two decisions—what should be built and the technical boundary for local construction—then Codex plans, edits, tests, and records what it actually observed. AWS account reads, deployments, recovery actions, and teardown stay separate, exact, owner-authorized operations; credentials and the two gates never count as AWS permission.
+AWS Codex Fastlane is a spec-driven software and AWS delivery framework for Codex. It turns a product idea, an existing application, or an infrastructure change into a structured workflow: understand the problem, define requirements, design the solution, implement the work, verify the results, and prepare for release and authorized AWS operations.
+
+Your requirements, architecture, decisions, tasks, and verification results stay together in the repository. Codex uses those records to understand what has been agreed, what is complete, what needs attention, and what should happen next—even when you reopen the project in a later session.
+
+You approve two major decisions: the product requirements and the technical plan with its construction boundaries. Codex then carries out the approved work, tracks progress, runs the required checks, handles bounded corrections, and records the results. Publication and AWS operations follow their own explicit authorization steps.
+
+Fastlane supports new applications, existing systems, infrastructure, features, repairs, refactors, and migrations. It keeps the intended product, implementation, and delivery evidence connected throughout the project.
 
 **[Use this template →](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate)**
 
@@ -23,44 +29,44 @@ Using GitHub Codespaces? Follow the [Codespaces walkthrough](docs/SETUP.md#githu
 
 3. If Fastlane shows one consolidated checklist, complete it and send the same message again. Then provide the project name, one exact preferred AWS Region, and the development cost posture or hard cap. Reply `recommend one` for one explained Region option; it never chooses a default.
 
-Fastlane initializes the repository locally, presents **Project Ready**, and asks the first product question. No AWS credentials are needed for requirements, design, or local construction. Setup does not inspect credentials, access an AWS account, deploy, or authorize an AWS operation. An initialized project resumes without repeating setup.
+Fastlane initializes your project repository, presents **Project Ready**, and asks the first product question. Your development workspace can be on your computer or in GitHub Codespaces. Requirements, design, and repository construction need no AWS credentials; setup does not access an AWS account or deploy. An initialized project resumes without repeating setup.
 
 ## Why Fastlane is different
 
-| Product boundary | What it changes |
+| Capability | What it does for your project |
 |---|---|
+| Guided product definition | Turns users, outcomes, constraints, and success criteria into a reviewable specification. |
+| Architecture and diagrams | Compares designs and explains interfaces, security, data, recovery, and cost decisions. |
 | Repository truth | Canonical project records—not chat memory—determine facts, progress, and the next permitted action. |
 | Two owner gates | Gate A approves what should be built. Gate B approves the technical plan and bounded local construction. |
-| Bounded construction | After Gate B, Codex works only inside the recorded paths, commands, tasks, and attempt limits. |
+| Implementation and resume | Codex runs dependency-ready tasks within approved boundaries and preserves session checkpoints. |
 | Honest evidence | Plans, source guidance, local checks, AWS observations, deployed behavior, and recovery exercises remain distinct. |
-| Separate AWS authority | Every account read, mutation, and teardown needs its own exact, current owner authorization. Credentials are never authorization. |
+| AWS delivery | Covers account preflight, deployment, reconciliation, recovery, and teardown with exact owner authorization. |
 
-The specification connects requirements to concrete accepted and rejected
-inputs, data-recovery promises, design checks, task acceptance, and recorded
-results. Ask Codex to explain the current validation plan to see the exact
-commands, limits, evidence destinations, and next action. These links help
-expose gaps; meaningful tests and owner review still determine whether the
-implementation satisfies the intended behavior.
+The specification connects requirements, input boundaries, recovery promises,
+design checks, task acceptance, and results. Ask Codex to explain the validation
+plan and next action. Tests and owner review establish whether the implementation
+satisfies the intended behavior.
 
 The read-only Fastlane Engine evaluates repository state and fails closed when scope, evidence, approval, or authority is missing, stale, conflicting, or broader than recorded.
 
 ## Product lifecycle
 
-Two owner gates release local work. Optional AWS operations stay on a separate, explicitly authorized path.
+Move from an agreed outcome to implementation, verification, and release review. AWS delivery follows separately authorized account operations and recorded results.
 
 ```mermaid
 %%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 28}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: AWS Codex Fastlane product lifecycle
-    accDescr: The owner approves requirements at Gate A and the technical plan and local construction boundary at Gate B. Fastlane then builds and verifies locally. An optional AWS operation requires separate exact owner authorization, and its observed result returns to release review.
+    accDescr: Define the product, approve requirements at Gate A, design the solution, and approve bounded repository construction at Gate B. Build and verify the project, then review release evidence. Authorized AWS delivery follows separately and returns observed results to release review.
 
     DEFINE["Define the outcome and first release"]
     GATEA{"Gate A"}
-    DESIGN["Design the AWS solution"]
+    DESIGN["Design the solution"]
     GATEB{"Gate B"}
-    LOCAL["Build and verify locally"]
+    LOCAL["Build and verify the project"]
     REVIEW["Review evidence and release state"]
-    AWS["Optional AWS operation"]
+    AWS["Authorized AWS delivery"]
 
     DEFINE --> GATEA
     GATEA -->|"Approve"| DESIGN
@@ -73,13 +79,13 @@ flowchart TB
     AWS -->|"Record observed result"| REVIEW
 ```
 
-**Build never deploys.** Gate A and Gate B do not authorize GitHub publication or AWS account work. Read the [complete workflow](docs/WORKFLOW.md) for corrections, resume behavior, architecture diagrams, and optional AWS stages.
+**Build never deploys.** Publication and AWS account work need separate authorization. **Local** means the development workspace, including a Codespace; the finished system can run elsewhere. Read the [complete workflow](docs/WORKFLOW.md) for each stage.
 
 ## Supported project work
 
 | Project shape | Fastlane boundary |
 |---|---|
-| New AWS application | Uses the approved greenfield design and reserves `app/**` as the single application source root. |
+| New application | Uses the approved greenfield design and reserves `app/**` as the single application source root. |
 | Existing application | Records the brownfield baseline and preserves approved source roots, behavior, data, interfaces, and rollback boundaries. |
 | Infrastructure-only work | Records that application source is not applicable and limits construction to the approved infrastructure boundary. |
 

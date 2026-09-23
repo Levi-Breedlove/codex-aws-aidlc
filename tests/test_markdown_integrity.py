@@ -1070,15 +1070,15 @@ sequenceDiagram
         )
 
         pitch_match = re.search(
-            r"^AWS Codex Fastlane is an owner-controlled AWS delivery workflow "
-            r"for Codex\..*?AWS permission\.$",
+            r"^AWS Codex Fastlane is a spec-driven software and AWS delivery "
+            r"framework for Codex\..*?(?=\n\*\*\[Use this template)",
             readme,
-            re.MULTILINE,
+            re.MULTILINE | re.DOTALL,
         )
         self.assertIsNotNone(pitch_match)
         pitch_words = re.findall(r"\b[\w’'-]+\b", pitch_match.group(0))
-        self.assertGreaterEqual(len(pitch_words), 70)
-        self.assertLessEqual(len(pitch_words), 95)
+        self.assertGreaterEqual(len(pitch_words), 150)
+        self.assertLessEqual(len(pitch_words), 220)
 
         start_action = (
             "**[Use this template →](https://github.com/"
@@ -1089,15 +1089,20 @@ sequenceDiagram
         self.assertNotIn("actions/workflows/", readme)
 
         for product_claim in (
-            "owner-controlled AWS delivery workflow for Codex",
-            "AWS software and infrastructure",
-            "evidence-backed local result",
+            "spec-driven software and AWS delivery framework for Codex",
+            "define requirements, design the solution, implement the work",
+            "Publication and AWS operations follow their own explicit authorization",
+            "even when you reopen the project in a later session",
+            "Guided product definition",
+            "Architecture and diagrams",
+            "Implementation and resume",
+            "Authorized AWS delivery",
             "Canonical project records—not chat memory",
             "Gate A approves what should be built",
             "Gate B approves the technical plan and bounded local construction",
             "Build never deploys",
             "Source-assisted Define",
-            "New AWS application",
+            "New application",
             "Existing application",
             "Infrastructure-only work",
             "Product Agreement",

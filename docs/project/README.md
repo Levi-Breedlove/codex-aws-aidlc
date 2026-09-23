@@ -1,6 +1,6 @@
 # Project record guide
 
-This folder is the one durable project record Fastlane uses to define, design, build, verify, and operate the application.
+This folder holds the durable project records Fastlane uses to define, design, build, verify, and operate your software or infrastructure project.
 <!-- FASTLANE:DOCUMENT_SUMMARY:BEGIN -->
 ## Current state
 
@@ -41,7 +41,13 @@ This folder is the one durable project record Fastlane uses to define, design, b
 | [Bounded defect](BUGFIX.md) | The current focused repair, when BUG-10 is active |
 
 Start with the current Fastlane conversation action. Owner Decision Briefs link
-back to readable sections in these same canonical records.
+back to readable sections in these same canonical records. Together, the records
+connect requirements to architecture, implementation tasks, verification results,
+and operating procedures, so Codex can resume the agreed work in a later session.
+
+For the complete product lifecycle, see the [workflow guide](../WORKFLOW.md).
+Workspace checks, AWS observations, deployment, and recovery retain their own
+evidence; a planned operating procedure does not establish that it was executed.
 
 ## Record integrity
 

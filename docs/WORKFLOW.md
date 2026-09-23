@@ -1,10 +1,14 @@
 # Fastlane workflow and operating model
 
-This guide explains the lifecycle, gates, records, control plane, and AWS authority.
-Canonical project records hold the facts; the Engine validates them and derives
-readiness and permitted actions. The owner supplies approvals and authorizations.
-Start with the [README](../README.md) for the overview
-and quick start.
+Fastlane is a spec-driven software and AWS delivery framework for Codex. This
+guide follows requirements, architecture, implementation, verification, release,
+and authorized AWS operations. Start with the [README](../README.md) for setup.
+
+Project records hold the facts; the Engine derives readiness and permitted
+actions. You approve decisions and authorize external actions. Codex coordinates
+delivery and preserves progress. **Local construction** means work inside your
+development workspace, including GitHub Codespaces; the finished system can run
+elsewhere.
 
 **Contents:** [First run](#first-run) · [Lifecycle](#customer-delivery-lifecycle) ·
 [Gate A](#gate-a--product-owner-brief) ·
@@ -18,7 +22,7 @@ and quick start.
 ## First run
 
 Send `init template` from a repository created from this template. Fastlane
-checks the [required local setup](SETUP.md) and current official AWS Core plugin
+checks the [required workspace setup](SETUP.md) and current official AWS Core plugin
 without inspecting credentials or accessing an AWS account. Missing items
 appear in one checklist.
 
@@ -70,16 +74,16 @@ Product Agreement and both gates remain required.
 %%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 28}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Fastlane customer delivery lifecycle
-    accDescr: Define the product and approve requirements at Gate A. Compare designs and review diagrams before approving design and bounded local construction at Gate B. Build and verify locally, then review the evidence. Optional AWS work needs a separate exact owner authorization and returns its observed results to release review.
+    accDescr: Approve requirements at Gate A, then design and bounded construction at Gate B. Build, verify, and review release evidence. Separately authorized AWS delivery returns observed results to review.
 
     DEFINE["Define the outcome, scope, inputs, and recovery"]
     GA{"Gate A"}
     DESIGN["Compare designs and review the architecture diagrams"]
     GB{"Gate B"}
-    BUILD["Plan bounded tasks, build, and check locally"]
+    BUILD["Plan bounded tasks, build, and verify"]
     REVIEW["Review current evidence and release readiness"]
-    LOCAL["Verified local result"]
-    AWS["Optional AWS operation Separate exact owner authorization"]
+    LOCAL["Verified workspace result"]
+    AWS["Authorized AWS delivery"]
 
     DEFINE -->|"Approve requirements"| GA
     GA --> DESIGN
@@ -95,9 +99,9 @@ flowchart TB
 | Gate A | Presents the complete Product Owner Brief | Approve requirements or request a correction |
 | Design | Uses current AWS Core guidance, compares complete solutions, and creates the traceable project diagram set | Nothing unless a business decision is missing |
 | Gate B | Presents the complete Technical Owner Brief | Approve the design and local construction boundary or request a correction |
-| Tasks and Build | Creates dependency-aware work, builds locally, tests, and records evidence | No task-by-task approval |
+| Tasks and Build | Implements dependency-aware tasks, tests, and records evidence | No task-by-task approval |
 | Release review | Reconciles what is verified, failed, planned, or still unobserved | Resolve only a genuine release decision |
-| Optional AWS operations | Performs separately bounded preflight, deployment, reconciliation, or teardown | Supply the exact action-specific authorization |
+| AWS delivery, when included | Runs bounded account preflight, deployment, reconciliation, recovery, and teardown | Authorize the exact action |
 
 Corrections return to the affected requirements or design decision. A safe,
 in-scope implementation failure returns to local construction.
@@ -197,7 +201,7 @@ execution paths, records evidence, and explains the result to the owner.
 %%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 28, "rankSpacing": 30}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Fastlane technical control plane and evidence loop
-    accDescr: Canonical project records enter one coherent read-only Engine observation. The Engine validates facts, selects a route, and narrows authority. The presenter explains the current action. One coordinator uses dedicated bounded local or separately authorized AWS procedures, records observed results through validated writes, and reevaluates the records.
+    accDescr: The read-only Engine validates project records and derives the route and authority. The presenter explains the action. One coordinator performs bounded work, records results through validated writes, and reevaluates. AWS operations need separate authorization.
 
     RECORDS["Canonical project records Owner decisions, scope, and evidence"]
     ENGINE["Read-only Fastlane Engine Observe, validate, and select the route"]
@@ -282,16 +286,16 @@ Codex evaluates all six Well-Architected areas with attributable AWS Core
 guidance. The owner approves Gate B; this is neither account observation nor an
 official AWS Well-Architected Review.
 
-Completion is target-specific:
+Completion describes the verified outcome, from workspace results through AWS delivery:
 
 | Target | Evidence |
 |---|---|
-| Local | E2: current local checks demonstrate the approved outcome. |
-| AWS read | E2 + E3: authorized reads establish facts about the named AWS environment. |
-| Deployed | E2 + E3 + E4: the named artifact's deployment and applicable runtime checks were observed. |
-| Recovery | E2 + E3 + E4 + E5: an authorized rollback or restore was exercised and verified. |
+| Local | Workspace checks demonstrate the approved outcome. |
+| AWS read | Workspace evidence plus authorized reads establish AWS environment facts. |
+| Deployed | The named artifact's deployment and runtime checks were observed, with prior workspace and AWS evidence. |
+| Recovery | Current workspace, AWS, and deployment evidence, plus authorized rollback or restore exercised and verified against the deployed target. |
 
-Teardown-only E5 evidence does not qualify Recovery; rollback or restore is
+Teardown-only evidence does not qualify Recovery; rollback or restore is
 required. A failed or unobserved higher target does not erase a lower target
 that remains current and proven. Other AWS lanes remain unqualified.
 Reconciliation means Fastlane compared expected and observed AWS state. It
