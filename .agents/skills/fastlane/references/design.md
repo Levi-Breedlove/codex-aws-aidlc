@@ -72,7 +72,12 @@ interface to one or more concrete LOCAL_BUILD checks. One CHECK row covers one
 complete obligation. Expected result is the exact AC criterion or compact JSON
 array of every canonical source row cell for INPUT, QAS, and interfaces. Keep
 sorted unique CHECK IDs, executable exact commands, positive time limits up to
-86400 seconds, and a specific `docs/project/VERIFY.md#...` destination. Tests
+86400 seconds, and `docs/project/VERIFY.md#task-completion-evidence` for LOCAL_BUILD.
+IaC checks use `docs/project/VERIFY.md#iac-validation-evidence`; the destination
+must match the source row and resolve to exactly one canonical heading in the
+already-observed VERIFY record. Correct missing or duplicate sections before
+presenting Gate B without inventing results or altering an approved binding.
+Tests
 must actually assert these outcomes; structural bindings alone do not prove
 test quality. Interfaces reference precisely the applicable INPUT IDs.
 

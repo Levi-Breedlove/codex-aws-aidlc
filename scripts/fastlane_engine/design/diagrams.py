@@ -39,8 +39,9 @@ from .models import (
 )
 from .support import AwsImplementationDecision
 
-DIAGRAM_CONTRACT_HEADING = "### Project diagram contract"
+LINEAR_DIAGRAM_CONFIG = '%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%'
 
+DIAGRAM_CONTRACT_HEADING = "### Project diagram contract"
 DIAGRAM_CONTRACT_HEADERS = (
     "Diagram ID",
     "Kind",
@@ -806,7 +807,7 @@ def _unsupported_mermaid_statement_issues(
         if not stripped:
             continue
         if stripped.startswith("%%"):
-            if not stripped.startswith("%%{"):
+            if stripped == LINEAR_DIAGRAM_CONFIG or not stripped.startswith("%%{"):
                 continue
         elif (
             DIAGRAM_FLOWCHART.fullmatch(line)
@@ -963,18 +964,21 @@ def _mermaid_structure_issues(
 ) -> list[str]:
     """Require one portable flowchart and structurally valid optional grouping."""
 
-    flowcharts = [
-        match
-        for line in lines
-        if (match := DIAGRAM_FLOWCHART.fullmatch(line)) is not None
+    declarations = [
+        i for i, line in enumerate(lines) if DIAGRAM_FLOWCHART.fullmatch(line)
     ]
-    issues = (
-        []
-        if len(flowcharts) == 1
-        else [
+    issues = []
+    if len(declarations) != 1:
+        issues.append(
             f"{diagram_id}: Mermaid requires exactly one supported flowchart declaration"
-        ]
-    )
+        )
+    configs = [
+        i for i, line in enumerate(lines) if line.strip() == LINEAR_DIAGRAM_CONFIG
+    ]
+    if len(configs) > 1 or (configs and declarations and configs[0] > declarations[0]):
+        issues.append(
+            f"{diagram_id}: linear diagram configuration must appear once before the flowchart"
+        )
     first_statement = next(
         (line for line in lines if line.strip() and not line.lstrip().startswith("%%")),
         "",
@@ -983,15 +987,11 @@ def _mermaid_structure_issues(
         issues.append(
             f"{diagram_id}: flowchart declaration must be the first statement"
         )
-    _count, subgraph_issues = _mermaid_subgraph_issues(
-        diagram_id,
-        lines,
-        maximum_depth_allowed=(
-            3 if kind in {"SYSTEM_CONTEXT", "AWS_IMPLEMENTATION"} else None
-        ),
-        current_ids=current_ids,
+    maximum_depth = 3 if kind in {"SYSTEM_CONTEXT", "AWS_IMPLEMENTATION"} else None
+    _, subgraph_issues = _mermaid_subgraph_issues(
+        diagram_id, lines, maximum_depth_allowed=maximum_depth, current_ids=current_ids
     )
-    return [*issues, *subgraph_issues]
+    return issues + subgraph_issues
 
 
 def _mermaid_class_definitions(

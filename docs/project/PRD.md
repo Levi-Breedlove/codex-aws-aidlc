@@ -1149,6 +1149,9 @@ planning evidence required for technical review.
 Each planned check names the outcome it must demonstrate, where it runs, its
 time limit, and where the observed result will be recorded. AWS checks require
 their own later authorization.
+Local construction results belong in [task completion evidence](VERIFY.md#task-completion-evidence);
+infrastructure validation results belong in [IaC validation evidence](VERIFY.md#iac-validation-evidence).
+Those sections must be present before this technical plan is ready for approval.
 
 ### Validation check bindings
 

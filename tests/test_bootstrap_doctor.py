@@ -784,8 +784,8 @@ def approve_gate_a(
         if text.count(before) != 1:
             raise AssertionError(f"Expected one method-contract fixture row: {before}")
         text = text.replace(before, after, 1)
-    text = complete_requirements_contract(text)
     text = complete_owner_visible_gate_a(text, project_mode=project_mode)
+    text = complete_requirements_contract(text)
 
     for field, value in {
         "Project mode": f"`{project_mode}`",
@@ -1805,6 +1805,7 @@ def complete_diagram_contract(text: str) -> str:
         "### Proposed system at a glance",
         "## 15. Component design",
         """```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Complete proposed review application architecture
     accDescr: The project owner enters through a managed API and identity boundary, the review application runs on managed compute, and data, operations, encryption, deployment, and rollback services support the result.
@@ -1864,6 +1865,7 @@ flowchart TB
         "### AWS implementation at a glance",
         "<details>\n<summary>Exact AWS service decision records</summary>",
         """```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart TB
     accTitle: Proposed AWS implementation
     accDescr: Requests move through the selected edge, identity, compute, and data services while managed observability, encryption, deployment, and rollback controls support the application.
@@ -1914,6 +1916,7 @@ flowchart TB
         "### Data lifecycle view",
         "## 18. Detailed sequence diagrams",
         """```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart LR
     accTitle: Owner record data lifecycle
     accDescr: The review API validates each request before storing an owner-scoped record.
@@ -1927,6 +1930,7 @@ flowchart LR
         "### Sequence — primary outcome",
         "### Sequence — failure and recovery",
         """```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart LR
     accTitle: First useful owner outcome
     accDescr: The project owner submits one review request and receives the validated result through the review API.
@@ -1941,6 +1945,7 @@ flowchart LR
         "### Sequence — failure and recovery",
         "## 19. Error handling strategy",
         """```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart LR
     accTitle: Review failure and recovery path
     accDescr: A failed review request preserves the approved state and uses the planned rollback and recovery path.
@@ -2854,6 +2859,7 @@ def complete_existing_design_contract(
         "### Migration view",
         "## 14. Architecture overview",
         """```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 24, "rankSpacing": 120, "subGraphTitleMargin": {"top": 8, "bottom": 16}}, "themeVariables": {"fontSize": "16px"}}}%%
 flowchart LR
     accTitle: Existing application compatibility and rollback
     accDescr: Existing requests cross the project boundary into the selected architecture, which keeps compatible owner records and a failure recovery path.
@@ -2969,6 +2975,10 @@ def complete_legacy_design_bridge(text: str) -> str:
 def schema_six_design_projection(text: str) -> str:
     """Project a modern test design into the exact pre-AWS schema-six shape."""
 
+    # The old presentation grammar predates the bounded styling directive.
+    from scripts.fastlane_engine.design.diagrams import LINEAR_DIAGRAM_CONFIG
+
+    text = text.replace(LINEAR_DIAGRAM_CONFIG + "\n", "")
     text = text.replace(
         "| Project design contract schema | `9` |",
         "| Project design contract schema | `6` |",
@@ -4220,7 +4230,7 @@ class BootstrapDoctorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"], report["diagnostics"])
         self.assertEqual(report["schema_version"], 2)
-        self.assertEqual(report["bootstrap_version"], "1.4.1")
+        self.assertEqual(report["bootstrap_version"], "1.4.2")
         self.assertEqual(report["classification"], "TEMPLATE_SOURCE")
         summaries = report["document_summaries"]
         self.assertEqual(summaries["schema_version"], 1)
@@ -6349,28 +6359,33 @@ class BootstrapDoctorTests(unittest.TestCase):
         )
 
     def test_doctor_does_not_mutate_project(self) -> None:
-        before = {
-            path.relative_to(PROJECT_ROOT): (
-                path.read_bytes(),
-                path.stat().st_mode,
-                path.stat().st_mtime_ns,
-            )
-            for path in PROJECT_ROOT.rglob("*")
-            if path.is_file() and "__pycache__" not in path.parts
-        }
+        from tests.repository_sources import source_files
 
-        doctor.inspect_project(PROJECT_ROOT, template_source=True)
+        def snapshot(project: Path) -> dict:
+            return {
+                path.relative_to(project): (
+                    path.read_bytes(),
+                    path.stat().st_mode,
+                    path.stat().st_mtime_ns,
+                )
+                for path in project.rglob("*")
+                if path.is_file()
+            }
 
-        after = {
-            path.relative_to(PROJECT_ROOT): (
-                path.read_bytes(),
-                path.stat().st_mode,
-                path.stat().st_mtime_ns,
-            )
-            for path in PROJECT_ROOT.rglob("*")
-            if path.is_file() and "__pycache__" not in path.parts
-        }
-        self.assertEqual(after, before)
+        # Observe every file in an isolated template, including ignored data;
+        # unrelated backup contents and concurrent maintainer logs are not inputs.
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            for source in source_files(PROJECT_ROOT):
+                target = project / source.relative_to(PROJECT_ROOT)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            preserved = project / "tmp/preserved-owner-file.txt"
+            preserved.parent.mkdir(exist_ok=True)
+            preserved.write_text("Preserve this ignored file.\n", encoding="utf-8")
+            before = snapshot(project)
+            doctor.inspect_project(project, template_source=True)
+            self.assertEqual(snapshot(project), before)
 
     @source_template_only
     def test_active_project_rejects_unresolved_placeholders(self) -> None:
@@ -13272,6 +13287,10 @@ flowchart LR
                 "<details>\n<summary>Exact AWS service decision records</summary>",
                 "No AWS implementation diagram was required by this approved legacy design.",
             )
+            # Recreate the pre-style presentation as well as the old contract.
+            from scripts.fastlane_engine.design.diagrams import LINEAR_DIAGRAM_CONFIG
+
+            text = text.replace(LINEAR_DIAGRAM_CONFIG + "\n", "")
             legacy_contract, legacy_issues = doctor.derive_design_contract(
                 text,
                 "DES-0001",

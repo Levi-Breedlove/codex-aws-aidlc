@@ -36,6 +36,15 @@ class Requirements16Tests(unittest.TestCase):
             (ROOT / "docs/project/PRD.md").read_text(encoding="utf-8")
         )
 
+    def test_gate_a_fixture_keeps_its_recreation_targets_consistent(self):
+        self.assertIn(
+            "| Recovery target | `RTO: 60 minutes; RPO: 0 minutes` |", self.source
+        )
+        self.assertNotIn("RPO: 15 minutes", self.source)
+        self.assertIn("RTO 60 minutes and RPO 0 minutes", self.source)
+        self.assertIn("| RECREATE | 60 | 0 |", self.source)
+        self.assertNotIn("| Durable data store | RECREATE:", self.source)
+
     def test_typed_recovery_measure_is_an_observable_bound(self):
         for value in (
             "RTO 60 minutes and RPO 0 minutes",
@@ -132,9 +141,10 @@ class Requirements16Tests(unittest.TestCase):
                 "Development recovery rehearsal",
                 "Development isolated recovery rehearsal",
             ),
-            ("Durable data store", "Synthetic durable data store"),
+            ("Versioned synthetic fixture", "Reviewed versioned synthetic fixture"),
             ("versioned local fixture", "reviewed versioned local fixture"),
         ):
+            self.assertIn(old, self.source)
             changed, errors = derive(self.source.replace(old, new))
             self.assertEqual(errors, [])
             self.assertNotEqual(changed.canonical_sha256, baseline.canonical_sha256)

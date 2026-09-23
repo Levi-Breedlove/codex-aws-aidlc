@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -22,7 +23,9 @@ from tests.test_bootstrap_doctor import (
     replace_contract_table,
     set_table_value,
     task_completion_evidence_section,
+    refresh_control_hashes,
 )
+from tests import test_bootstrap_doctor as doctor_fixtures
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -84,6 +87,127 @@ class Design9Tests(unittest.TestCase):
             )
             self.assertEqual(contract.status, "BLOCKED")
             self.assertTrue(issues)
+
+    def test_nonexistent_or_wrong_stage_evidence_destination_blocks_design(self):
+        table = doctor.contract_table_after_heading(
+            self.source, VALIDATION_CHECK_HEADING, VALIDATION_CHECK_HEADERS
+        )
+        for destination in (
+            "docs/project/VERIFY.md#section-does-not-exist",
+            "docs/project/VERIFY.md#iac-validation-evidence",
+        ):
+            with self.subTest(destination=destination):
+                rows = [list(row) for row in table.rows]
+                next(row for row in rows if row[1] == "AC-FR-001")[5] = destination
+                candidate = replace_contract_table(
+                    self.source,
+                    VALIDATION_CHECK_HEADING,
+                    VALIDATION_CHECK_HEADERS,
+                    rows,
+                )
+                contract, issues = doctor.derive_design_contract(
+                    candidate, "DES-0001", required=True
+                )
+                self.assertEqual(contract.status, "BLOCKED")
+                self.assertTrue(
+                    any("evidence destination" in issue for issue in issues)
+                )
+
+    def test_linear_diagrams_preserve_semantics_and_reject_active_configuration(self):
+        from scripts.fastlane_engine.design.diagrams import LINEAR_DIAGRAM_CONFIG
+
+        plain = self.source.replace(LINEAR_DIAGRAM_CONFIG + "\n", "")
+        styled = plain.replace(
+            "```mermaid\nflowchart",
+            "```mermaid\n" + LINEAR_DIAGRAM_CONFIG + "\nflowchart",
+        )
+        baseline, baseline_issues = doctor.derive_design_contract(
+            plain, "DES-0001", required=True
+        )
+        current, issues = doctor.derive_design_contract(
+            styled, "DES-0001", required=True
+        )
+        self.assertEqual(baseline_issues, [])
+        self.assertEqual(issues, [])
+        self.assertEqual(current.canonical_sha256, baseline.canonical_sha256)
+        self.assertEqual(
+            current.diagram_contract.canonical_sha256,
+            baseline.diagram_contract.canonical_sha256,
+        )
+        self.assertNotEqual(
+            current.diagram_contract.records[0].rendered_sha256,
+            baseline.diagram_contract.records[0].rendered_sha256,
+        )
+        for directive in (
+            '%%{init: {"securityLevel": "loose"}}%%',
+            LINEAR_DIAGRAM_CONFIG + "\n" + LINEAR_DIAGRAM_CONFIG,
+            '%%{init: {"flowchart": {"htmlLabels": true}}}%%',
+        ):
+            with self.subTest(directive=directive):
+                _, errors = doctor.derive_design_contract(
+                    styled.replace(LINEAR_DIAGRAM_CONFIG, directive, 1),
+                    "DES-0001",
+                    required=True,
+                )
+                self.assertTrue(errors)
+
+    def test_engine_blocks_missing_duplicate_and_fenced_only_evidence_headings(self):
+        fixture = doctor_fixtures.BootstrapDoctorTests()
+        with tempfile.TemporaryDirectory() as directory:
+            project = fixture.copy_project(Path(directory))
+            fixture.approve_project(project)
+            fixture.set_non_material_req_evidence(project)
+            refresh_control_hashes(project)
+            baseline = doctor.inspect_project(project)
+            self.assertTrue(baseline["ok"], baseline["diagnostics"])
+            path = project / "docs/project/VERIFY.md"
+            original = path.read_text(encoding="utf-8")
+            heading = "## Task completion evidence"
+            for replacement in (
+                "## Lost task evidence",
+                heading + "\n\n" + heading,
+                "```text\n" + heading + "\n```",
+            ):
+                with self.subTest(replacement=replacement):
+                    path.write_text(
+                        original.replace(heading, replacement), encoding="utf-8"
+                    )
+                    report = doctor.inspect_project(project)
+                    self.assertFalse(report["ok"])
+                    self.assertEqual(report["design_contract"]["status"], "BLOCKED")
+                    self.assertTrue(
+                        any(
+                            "requires exactly one 'Task completion evidence'"
+                            in item["message"]
+                            for item in report["diagnostics"]
+                        )
+                    )
+                    self.assertFalse(report["write_authority"]["valid"])
+
+    def test_current_recovery_fixture_agrees_and_durable_restore_remains_valid(self):
+        self.assertIn("RTO: 60 minutes; RPO: 0 minutes", self.source)
+        self.assertIn("| Versioned synthetic fixture | RECREATE:", self.source)
+        self.assertNotIn("| Durable data store | RECREATE:", self.source)
+        self.assertEqual(self.issues, [])
+        from tests.alpha_project_fixture import complete_alpha_design
+
+        source = self.source.replace(
+            "| Versioned synthetic fixture | RECREATE: Regenerate synthetic records from the versioned local fixture |",
+            "| Durable data store | RESTORE: Restore the latest approved backup |",
+        )
+        source = source.replace("| RECREATE | 60 | 0 |", "| RESTORE | 60 | 0 |")
+        source = source.replace(
+            "Synthetic records are regenerated from versioned fixtures; no backup is promised",
+            "Restore the durable data store from the approved backup",
+        )
+        source = source.replace(
+            "RECREATE: Regenerate synthetic records from the versioned local fixture",
+            "RESTORE: Restore the latest approved backup",
+        )
+        contract, issues = doctor.derive_design_contract(
+            complete_alpha_design(source), "DES-0001", required=True
+        )
+        self.assertEqual(contract.status, "READY", issues)
 
     def test_exact_approved_design8_preserves_digest_and_partial_upgrade_fails(self):
         frozen = json.loads(

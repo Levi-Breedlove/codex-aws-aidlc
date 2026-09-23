@@ -220,7 +220,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.4.1")
+        self.assertEqual(manifest["bootstrap_version"], "1.4.2")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -235,7 +235,7 @@ class PackageReleaseTests(unittest.TestCase):
         linked_versions = re.findall(
             r"releases/(?:download|tag)/v(\d+\.\d+\.\d+)", readme
         )
-        self.assertEqual(set(linked_versions), {"1.4.1"})
+        self.assertEqual(set(linked_versions), {"1.4.2"})
 
     def test_release_contains_official_aws_core_setup_assets(self) -> None:
         _version, files = package_release.load_release_files(REPOSITORY_ROOT)
@@ -271,16 +271,11 @@ class PackageReleaseTests(unittest.TestCase):
         )
 
     def test_manifest_is_the_exact_template_file_inventory(self) -> None:
+        from tests.repository_sources import source_files
+
         template = REPOSITORY_ROOT
         actual = {
-            path.relative_to(template).as_posix()
-            for path in template.rglob("*")
-            if path.is_file()
-            and ".git" not in path.parts
-            and "__pycache__" not in path.parts
-            and ".ruff_cache" not in path.parts
-            and path.suffix != ".pyc"
-            and "dist" not in path.parts
+            path.relative_to(template).as_posix() for path in source_files(template)
         }
         manifest = json.loads(
             (template / "bootstrap.manifest.json").read_text(encoding="utf-8")
@@ -893,9 +888,9 @@ class PackageReleaseTests(unittest.TestCase):
         allowed_characterization_fixtures = 0
         allowed_aws_version_observations = 0
         violations: list[str] = []
-        for path in REPOSITORY_ROOT.rglob("*"):
-            if not path.is_file() or ".git" in path.parts:
-                continue
+        from tests.repository_sources import source_files
+
+        for path in source_files(REPOSITORY_ROOT):
             if path.suffix not in text_suffixes:
                 continue
             content = path.read_text(encoding="utf-8")

@@ -211,8 +211,8 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "9fff326f15e5bf20a6056a7a519d796c775d7a63ab1309c972374d33be15cd48",
-    "task_ready": "8860c93a66df2384157816f71cfa9e12b52c113d91bc0bd7e15ae54e0779334f"
+    "stale_gate_a_summary": "b1d90df5def9382a787e81a68abe2de7744569c4e5abd6c4ded77bf7a4fc0839",
+    "task_ready": "20843b854f5221d2c34fad98194c33b12bf40ed35ce70340e0698099d1d903ee"
   },
   "report_cases": {
     "stale_gate_a_summary": {
@@ -444,8 +444,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:195df81301fd062ff7f26afc97dfa65a36f9b7d60ed3c1ecb83790927bf8204c",
-              "source_bytes": 37648,
+              "canonical_sha256": "sha256:293aeeee1ce72ef384dc5d02cdfe4168cf89573281e1a386f3ae95582154aa82",
+              "source_bytes": 37656,
               "reason": "Controlling PRD record"
             },
             {
@@ -527,7 +527,7 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:8b7505f7a3f5f255066325e7e1a79a96b15b13d5ac5a13c3037c7c42139dab54",
+              "canonical_sha256": "sha256:36be86e2088e871a2af10e8ddf0cd3ab6479342c9eb80a84c228100b0cfb8c84",
               "source_bytes": 9237,
               "reason": "On-demand canonical source"
             }
@@ -817,7 +817,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:5ed6293cf917fc85dfa6293d951448256e35d08f2e7cb889674941a952082435"
+          "prd_snapshot_sha256": "sha256:400e9bf3d30193254e2f404d24c43ed532078810977960a71cc71ed3d3188f65"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -2469,7 +2469,7 @@
             }
           ],
           "missing_records": [],
-          "canonical_sha256": "sha256:cb1dfb0bf66602490d74239e5453a84a0e1593bf089c947eebc9f25216b89363",
+          "canonical_sha256": "sha256:6092fabc900f1a61fc2adb5177c8e4746cbea8cdd430e87570c37418427abfda",
           "grandfathered_approved_gate_a": false,
           "approved_schema_14_compatibility": false,
           "requirements_v16": {
@@ -2700,7 +2700,7 @@
                 "Source": "Operator",
                 "Stimulus": "Primary data store becomes unavailable",
                 "Environment": "Development recovery rehearsal",
-                "Artifact": "Durable data store",
+                "Artifact": "Versioned synthetic fixture",
                 "Response": "RECREATE: Regenerate synthetic records from the versioned local fixture",
                 "Response measure": "RTO 60 minutes and RPO 0 minutes"
               }
@@ -3325,7 +3325,7 @@
           ],
           "maximum_initial_bytes": 12000,
           "maximum_initial_source_bytes": 12000,
-          "actual_initial_source_bytes": 20954,
+          "actual_initial_source_bytes": 20963,
           "budget_status": "OVERSIZED_REQUIRED_RECORD",
           "resolved_initial_slices": [
             {
@@ -3359,8 +3359,8 @@
               "active_ids": [
                 "TASK-001"
               ],
-              "canonical_sha256": "sha256:295fc6d9fffcf8b8794fc65a31ec7df226fa4d489db702590d2ea7a7d3c51ee0",
-              "source_bytes": 17449,
+              "canonical_sha256": "sha256:e7b5f5ccfc21a77b52aa5349c6ff2c355cb8621c1b6a174991ddcd8dd1fc7f31",
+              "source_bytes": 17458,
               "reason": "Active task and dependencies"
             }
           ],
@@ -3391,10 +3391,10 @@
               "path": "docs/project/PRD.md",
               "selector_kind": "HEADING",
               "selector": "Construction envelope",
-              "start_line": 1634,
-              "end_line": 1700,
+              "start_line": 1642,
+              "end_line": 1708,
               "active_ids": [],
-              "canonical_sha256": "sha256:14436a02ac2ea750841f623a7859b4f5506548ad48880af2cc0ba650ea614824",
+              "canonical_sha256": "sha256:6987753ae623839f715596dfe91afc056c7641736e835e9c83a8f8f9091b1509",
               "source_bytes": 4618,
               "reason": "On-demand canonical source"
             },
@@ -3437,7 +3437,7 @@
               "path": "docs/project/TASKS.md",
               "selector_kind": "TASK_ID",
               "selector": "TASK-001",
-              "source_bytes": 17449,
+              "source_bytes": 17458,
               "reason": "Complete required record exceeds the remaining source-byte budget"
             }
           ]
@@ -3742,7 +3742,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:46f09148bf456626c224b66ec21a955458bf41649d155761f4ddb4fbdc40b263"
+          "prd_snapshot_sha256": "sha256:c975da4aa50b574008d275e74ca2e808672ebb429ea44eb861fd6acad373b2f4"
         },
         "document_summaries": {
           "schema_version": 1,
@@ -4824,7 +4824,7 @@
             }
           ],
           "missing_records": [],
-          "canonical_sha256": "sha256:cb1dfb0bf66602490d74239e5453a84a0e1593bf089c947eebc9f25216b89363",
+          "canonical_sha256": "sha256:6092fabc900f1a61fc2adb5177c8e4746cbea8cdd430e87570c37418427abfda",
           "grandfathered_approved_gate_a": false,
           "approved_schema_14_compatibility": false,
           "requirements_v16": {
@@ -5055,7 +5055,7 @@
                 "Source": "Operator",
                 "Stimulus": "Primary data store becomes unavailable",
                 "Environment": "Development recovery rehearsal",
-                "Artifact": "Durable data store",
+                "Artifact": "Versioned synthetic fixture",
                 "Response": "RECREATE: Regenerate synthetic records from the versioned local fixture",
                 "Response measure": "RTO 60 minutes and RPO 0 minutes"
               }
@@ -5863,7 +5863,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:f859874a4478c130b946d43925751e77a9d7a4f98faa147c6aa98b8f1b527923",
-                "rendered_sha256": "sha256:cb6651049687751c5d2e064d4c834249267c7868aae558f24cb0d80d3dba7586",
+                "rendered_sha256": "sha256:fe4ac15951d6b2679e5ee75286dd5e06245d35f147077f19109c1ef7701514c9",
                 "semantic_relationships": [
                   {
                     "from_id": "ACT-001",
@@ -6013,7 +6013,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:36bbf81154e669440d57af1d381481d2d6acf8581c53ccd4afe4603cdd68c7f7",
-                "rendered_sha256": "sha256:5c16f47e0022bae1318ed9a2d2b115dc296bfe505a4bde4525f94508a4544f5f",
+                "rendered_sha256": "sha256:9d58d6d788bd7f7ce411c548ca3d4f4bab7c2717a9e478d0015494337dc8a16c",
                 "semantic_relationships": [
                   {
                     "from_id": "ACT-001",
@@ -6052,7 +6052,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:0465ae349d42797e923a1bceab81d9d40abab6ac6a686e43e88824999232ee4a",
-                "rendered_sha256": "sha256:3e6abc7ce300e3fe7cff64a867a6c8616df05cfbb28091b99ea11726cb037925",
+                "rendered_sha256": "sha256:da99737e9a32c53d6f2a171926db4a037649eeaebd4476807e91a1a03d4a2427",
                 "semantic_relationships": [
                   {
                     "from_id": "API-001",
@@ -6085,7 +6085,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:3363c93b8b4fdf7c5ec429fe37f9d1dd2d38da667beb6aa6c9eda6648eb143fb",
-                "rendered_sha256": "sha256:e625a0e19fd32fbb4562861e2de3e2593cd5cdab50ed4fd9174a99e10f22cbd7",
+                "rendered_sha256": "sha256:84ef8ac994431a7192abc0ea31e0ea40b5fd3a6cd86f45e68748d593e457e8bc",
                 "semantic_relationships": [
                   {
                     "from_id": "API-001",
@@ -6208,7 +6208,7 @@
                   }
                 ],
                 "semantic_sha256": "sha256:44af223f3f8526b8798541903c701eb07c4be94e0964b8dfe842497813cc4225",
-                "rendered_sha256": "sha256:2fa9ad5f009f39335f87650e1fc68a9410fdee95c49b9c201021cb0707d74cc4",
+                "rendered_sha256": "sha256:c361904ecd7ebe65d8486474a7872331b0e59d292d928392060a76833cce68aa",
                 "semantic_relationships": [
                   {
                     "from_id": "ARCH-0001",
@@ -6310,7 +6310,7 @@
             "canonical_sha256": "sha256:ef26dbdd5b5a5a16e6a38b9ab6917a02b90dfb060bdedea221c95f24adfd2bba",
             "grandfathered_schema5": false
           },
-          "canonical_sha256": "sha256:6cc713701ab9d80f3fd1e9d7212d5492f37f970b6671fa5fecebcbf35ccfdf9b",
+          "canonical_sha256": "sha256:af73cb42699e1699cca7f185aa90eef8a2461bcc6a7214c25217b2ab377423e8",
           "project_contract": {
             "schema_version": 9,
             "status": "READY",
@@ -6342,7 +6342,7 @@
             },
             "spike": null,
             "missing_records": [],
-            "canonical_sha256": "sha256:127410a67c2401085615cc5f1b861ee33591893e0e55386255561aeab1f3c143",
+            "canonical_sha256": "sha256:7e2c55b625acce5384026415ae7c23770028f627673da43bd73fa29f02f2e710",
             "grandfathered_v4": false,
             "grandfathered_v5": false,
             "grandfathered_v6": false,
@@ -6892,7 +6892,7 @@
                 "python -m unittest",
                 "120",
                 "docs/project/VERIFY.md#task-completion-evidence",
-                "[\"QAS-001\",\"REL-004\",\"Operator\",\"Primary data store becomes unavailable\",\"Development recovery rehearsal\",\"Durable data store\",\"RECREATE: Regenerate synthetic records from the versioned local fixture\",\"RTO 60 minutes and RPO 0 minutes\"]"
+                "[\"QAS-001\",\"REL-004\",\"Operator\",\"Primary data store becomes unavailable\",\"Development recovery rehearsal\",\"Versioned synthetic fixture\",\"RECREATE: Regenerate synthetic records from the versioned local fixture\",\"RTO 60 minutes and RPO 0 minutes\"]"
               ]
             ],
             "acceptance_criteria": {

@@ -6,26 +6,46 @@ do not regenerate an initialized project to clear an error.
 | Symptom | Start here |
 |---|---|
 | You need safe diagnostic output | [Read-only checks](#read-only-checks) |
+| A Codespaces command is unavailable or the wrong version opens | [Codespaces setup and resume](#codespaces-setup-and-resume) |
 | Setup repeats | [`init template` repeats setup](#init-template-repeats-setup) |
 | AWS Core is unavailable | [AWS Core is missing](#aws-core-is-missing) |
 | Current AWS guidance cannot be retrieved | [AWS Core research fails later](#aws-core-research-fails-later) |
 | A prior approval is no longer current | [A gate becomes stale](#a-gate-becomes-stale) |
 | An optional hook blocks valid work | [Optional hooks deny a valid action](#optional-hooks-deny-a-valid-action) |
+| A check or evidence binding is rejected | [Check and evidence correction](#a-check-or-evidence-record-is-rejected) |
+| An older project needs additional records | [Existing-project compatibility](#an-older-project-needs-new-records) |
 | The Engine reports another blocker | [Another blocker appears](#another-blocker-appears) |
 
 ## Read-only checks
 
 Run these from the repository root when Codex asks for diagnostic output:
 
+The examples use `python3` for macOS, Linux, and Codespaces. On Windows, replace
+`python3` with `py -3`. Use the same Python 3.11-or-newer interpreter throughout.
+
 ```text
-python scripts/setup_assistant.py prerequisites --root . --json
-python scripts/bootstrap_dependencies.py --root . --json
-python scripts/bootstrap_doctor.py --root . --json
+python3 scripts/setup_assistant.py prerequisites --root . --json
+python3 scripts/bootstrap_dependencies.py --root . --json
+python3 scripts/bootstrap_doctor.py --root . --json
 ```
 
 The Fastlane Engine is the bundled read-only validator and lifecycle router.
 Its compatibility filename is `scripts/bootstrap_doctor.py`; it is not another
 service or installation.
+
+## Codespaces setup and resume
+
+Check the branch and commit in the Codespaces terminal against the candidate
+you intended to open. A new Codespace may use a different branch; reopening an
+existing Codespace retains that workspace's state. Preserve local changes
+before synchronizing it. Use the [Codespaces walkthrough](SETUP.md#github-codespaces).
+
+If `python`, Codex, Git, `uvx`, or Bubblewrap is missing, check the Linux setup
+steps in that environment. `python3` can exist when `python` does not. After an
+owner-run installation or plugin change, reopen the terminal or restart Codex
+as requested and retry the same pending step. Never clear the canonical project
+records to repair a missing tool. For a sign-in callback failure, use the
+[official remote sign-in guidance](https://learn.chatgpt.com/docs/auth).
 
 ## `init template` repeats setup
 
@@ -75,7 +95,7 @@ time limit, result location, and any mismatch with the approved command boundary
 It can also produce a read-only diagnostic:
 
 ```text
-python scripts/bootstrap_doctor.py --root . --explain-validation --json
+python3 scripts/bootstrap_doctor.py --root . --explain-validation --json
 ```
 
 An old pass cannot establish a changed acceptance outcome or a new task attempt.
@@ -83,6 +103,11 @@ Keep the old result, correct the current binding or implementation, and rerun th
 affected check inside its approved boundary. A later failure remains blocking
 until a later current result passes. A missing tool is a prerequisite gap, not a
 passing result or permission to install software.
+
+If the result location is missing or belongs to a different kind of check,
+Codex must reconcile it with the appropriate verification section before
+presenting the technical plan for approval. Restoring a section restores a
+place to record evidence; it does not create a passing result.
 
 If recovery wording conflicts, resolve the promise first: recreating a synthetic
 fixture does not prove that a backup can restore durable data. If an input limit

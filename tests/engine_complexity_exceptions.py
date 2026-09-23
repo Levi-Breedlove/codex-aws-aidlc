@@ -14,7 +14,7 @@ REVIEWED_MODULE_SIZE_EXCEPTIONS: dict[str, dict[str, int | str]] = {
         "reviewed_lines": 2_223,
         "reason": "One cohesive diagram contract owns legacy compatibility, semantic binding, portable Mermaid validation, claim safety, and presentation-only repair without a second architecture graph.",
         "risk": "Further growth can obscure fail-closed diagnostic order or ownership; exact measurements and expiry force a new bounded review.",
-        "reviewed_in": "1.4.0",
+        "reviewed_in": "1.4.2",
         "expires": "1.5.0",
     },
 }
@@ -844,11 +844,11 @@ REVIEWED_COMPLEXITY_EXCEPTIONS: dict[str, dict[str, int | str]] = {
     "project_validation.py:validate_prd": {
         "maximum_lines": 651,
         "maximum_complexity": 108,
-        "reviewed_lines": 642,
-        "reviewed_complexity": 107,
-        "reason": "Cross-record PRD composition preserves canonical validation and diagnostic order.",
+        "reviewed_lines": 645,
+        "reviewed_complexity": 108,
+        "reason": "Cross-record PRD composition preserves canonical validation and diagnostic order; verification text comes from the existing snapshot for pure evidence-heading validation.",
         "risk": "Further growth can obscure fail-closed diagnostic order or ownership; exact measurements and expiry force a new bounded review.",
-        "reviewed_in": "1.4.0",
+        "reviewed_in": "1.4.2",
         "expires": "1.5.0",
     },
     "remediation.py:_agent_correction_is_safe": {

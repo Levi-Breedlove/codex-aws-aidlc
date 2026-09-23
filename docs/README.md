@@ -7,6 +7,8 @@ guidance stays outside this customer index so it cannot compete with project tru
 
 - [Set up Fastlane](SETUP.md) — install the owner-run prerequisites and start a
   fresh template.
+- [Use GitHub Codespaces](SETUP.md#github-codespaces) — choose the intended branch,
+  complete setup in the hosted environment, and follow the owner pilot checklist.
 - [Understand the workflow](WORKFLOW.md) — see the complete owner journey from
   idea through local construction and optional AWS operations.
 - [Troubleshoot](TROUBLESHOOTING.md) — resolve setup, resume, AWS Core, and

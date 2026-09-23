@@ -1,6 +1,8 @@
 # Fastlane workflow and operating model
 
-This guide owns the lifecycle, gates, records, control plane, and AWS authority.
+This guide explains the lifecycle, gates, records, control plane, and AWS authority.
+Canonical project records hold the facts; the Engine validates them and derives
+readiness and permitted actions. The owner supplies approvals and authorizations.
 Start with the [README](../README.md) for the overview
 and quick start.
 
@@ -284,10 +286,10 @@ Completion is target-specific:
 
 | Target | Evidence |
 |---|---|
-| Local | E2 |
-| AWS read | E2 + E3 |
-| Deployed | E2 + E3 + E4 |
-| Recovery | E2 + E3 + E4 + E5 |
+| Local | E2: current local checks demonstrate the approved outcome. |
+| AWS read | E2 + E3: authorized reads establish facts about the named AWS environment. |
+| Deployed | E2 + E3 + E4: the named artifact's deployment and applicable runtime checks were observed. |
+| Recovery | E2 + E3 + E4 + E5: an authorized rollback or restore was exercised and verified. |
 
 Teardown-only E5 evidence does not qualify Recovery; rollback or restore is
 required. A failed or unobserved higher target does not erase a lower target

@@ -34,6 +34,11 @@ VALIDATION_CHECK_HEADERS = (
 )
 CHECK_ID = re.compile(r"CHECK-\d{3,}")
 EVIDENCE_DESTINATION = re.compile(r"docs/project/VERIFY\.md#[a-z][a-z0-9-]*")
+BUILD_EVIDENCE_DESTINATION = "docs/project/VERIFY.md#task-completion-evidence"
+EVIDENCE_HEADINGS = {
+    BUILD_EVIDENCE_DESTINATION: "Task completion evidence",
+    "docs/project/VERIFY.md#iac-validation-evidence": "IaC validation evidence",
+}
 
 
 def source_expectation(cells) -> str:
@@ -105,7 +110,7 @@ def _iac_obligations(text: str, completion_target: str | None):
 def validation_obligations(text: str, requirements, interfaces):
     """Bind one check to one complete canonical obligation; IDs alone are insufficient."""
     obligations = {
-        identifier: (criterion, {"LOCAL_BUILD"}, None, None)
+        identifier: (criterion, {"LOCAL_BUILD"}, None, BUILD_EVIDENCE_DESTINATION)
         for identifier, criterion in requirements.acceptance_criteria
     }
     details = requirements.requirements_v16.to_dict()
@@ -115,12 +120,50 @@ def validation_obligations(text: str, requirements, interfaces):
                 source_expectation(row.values()),
                 {"LOCAL_BUILD"},
                 None,
-                None,
+                BUILD_EVIDENCE_DESTINATION,
             )
     for row in interfaces.rows if interfaces else ():
-        obligations[row[0]] = (source_expectation(row), {"LOCAL_BUILD"}, None, None)
+        obligations[row[0]] = (
+            source_expectation(row),
+            {"LOCAL_BUILD"},
+            None,
+            BUILD_EVIDENCE_DESTINATION,
+        )
     obligations.update(_iac_obligations(text, requirements.completion_target))
     return obligations
+
+
+def validation_destination_issues(
+    text: str, verification_text: str | None
+) -> list[str]:
+    """Resolve current check destinations from observed text without filesystem I/O."""
+    if verification_text is None or not design9_surface_present(text):
+        return []
+    try:
+        table = contract_table_after_heading(
+            text, VALIDATION_CHECK_HEADING, VALIDATION_CHECK_HEADERS
+        )
+    except ValueError:
+        return []  # The Design parser reports malformed check tables.
+    structural = without_fenced_code(verification_text)
+    issues = []
+    for destination in sorted({row[5] for row in table.rows} if table else set()):
+        heading = EVIDENCE_HEADINGS.get(destination)
+        if heading is None:
+            issues.append(f"Unsupported validation evidence destination: {destination}")
+        elif (
+            len(
+                re.findall(
+                    rf"^## {re.escape(heading)}[ \t]*$", structural, re.MULTILINE
+                )
+            )
+            != 1
+        ):
+            issues.append(
+                f"Validation evidence destination {destination} requires exactly one "
+                f"'{heading}' heading in VERIFY; restore its canonical evidence section"
+            )
+    return issues
 
 
 def _check_row_issues(row, expected) -> list[str]:

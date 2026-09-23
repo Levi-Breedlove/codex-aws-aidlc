@@ -7,6 +7,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from tests.repository_sources import source_files
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -234,7 +235,8 @@ class ModelRoleplayEvaluationTests(unittest.TestCase):
         self.assertEqual(
             {
                 path.relative_to(REPOSITORY_ROOT).as_posix()
-                for path in REPOSITORY_ROOT.rglob("AGENTS.md")
+                for path in source_files(REPOSITORY_ROOT)
+                if path.name == "AGENTS.md"
             },
             {
                 path
