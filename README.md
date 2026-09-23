@@ -2,18 +2,13 @@
 
 > Owner-controlled AWS delivery for Codex.
 
-[![Release v1.3.3](https://img.shields.io/badge/release-v1.3.3-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.3.3)
+[![Release v1.4.1](https://img.shields.io/badge/release-v1.4.1-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.1)
 ![Python requirement: 3.11 or newer](https://img.shields.io/badge/python-%E2%89%A53.11-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2da44e)](LICENSE)
 
 AWS Codex Fastlane is an owner-controlled AWS delivery workflow for Codex. Built for developers delivering AWS software and infrastructure, it turns a product idea, existing application change, or infrastructure task into an evidence-backed local result while keeping project truth in the repository. You approve two decisions—what should be built and the technical boundary for local construction—then Codex plans, edits, tests, and records what it actually observed. AWS account reads, deployments, recovery actions, and teardown stay separate, exact, owner-authorized operations; credentials and the two gates never count as AWS permission.
 
 **[Use this template →](https://github.com/Levi-Breedlove/codex-aws-aidlc/generate)**
-
-**Current branch: local alpha 1.4.0.** This version is for a small local project
-and owner testing. Automated framework checks do not establish a completed
-first-user pilot or a field-qualified AWS execution lane. The release badge
-above links to the separately packaged release.
 
 ## Quick start
 
