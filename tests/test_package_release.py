@@ -220,7 +220,7 @@ class PackageReleaseTests(unittest.TestCase):
         manifest = json.loads(
             (REPOSITORY_ROOT / "bootstrap.manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(manifest["bootstrap_version"], "1.4.0")
+        self.assertEqual(manifest["bootstrap_version"], "1.4.1")
         self.assertIn("README.md", manifest["required_files"])
         for removed in ("VERSION", "CONTRIBUTING.md", "CHANGELOG.md"):
             self.assertFalse((REPOSITORY_ROOT / removed).exists())
@@ -235,7 +235,7 @@ class PackageReleaseTests(unittest.TestCase):
         linked_versions = re.findall(
             r"releases/(?:download|tag)/v(\d+\.\d+\.\d+)", readme
         )
-        self.assertEqual(set(linked_versions), {"1.3.3"})
+        self.assertEqual(set(linked_versions), {"1.4.1"})
 
     def test_release_contains_official_aws_core_setup_assets(self) -> None:
         _version, files = package_release.load_release_files(REPOSITORY_ROOT)
