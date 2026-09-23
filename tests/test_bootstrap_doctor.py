@@ -784,8 +784,8 @@ def approve_gate_a(
         if text.count(before) != 1:
             raise AssertionError(f"Expected one method-contract fixture row: {before}")
         text = text.replace(before, after, 1)
-    text = complete_requirements_contract(text)
     text = complete_owner_visible_gate_a(text, project_mode=project_mode)
+    text = complete_requirements_contract(text)
 
     for field, value in {
         "Project mode": f"`{project_mode}`",

@@ -211,7 +211,7 @@
     ]
   },
   "report_case_digests": {
-    "stale_gate_a_summary": "4d7f4c0ad159614ceb91120f9f1e0cff10b83f01be8941a82f47f037afa248e1",
+    "stale_gate_a_summary": "b1d90df5def9382a787e81a68abe2de7744569c4e5abd6c4ded77bf7a4fc0839",
     "task_ready": "20843b854f5221d2c34fad98194c33b12bf40ed35ce70340e0698099d1d903ee"
   },
   "report_cases": {
@@ -444,8 +444,8 @@
                 "SUS-003",
                 "SUS-004"
               ],
-              "canonical_sha256": "sha256:7908db3ae91b6224be63645a1137c12cef315dd1ec3de309be2babe58e38e1d1",
-              "source_bytes": 37657,
+              "canonical_sha256": "sha256:293aeeee1ce72ef384dc5d02cdfe4168cf89573281e1a386f3ae95582154aa82",
+              "source_bytes": 37656,
               "reason": "Controlling PRD record"
             },
             {
@@ -817,7 +817,7 @@
           "requirements_revision": "REQ-0001",
           "design_revision": "DES-0001",
           "construction_authorization": "AUTH-0001",
-          "prd_snapshot_sha256": "sha256:653266c5636a11da3c2ccee8094ba3e4659ddcd416fd0e47d87058e24b38b785"
+          "prd_snapshot_sha256": "sha256:400e9bf3d30193254e2f404d24c43ed532078810977960a71cc71ed3d3188f65"
         },
         "document_summaries": {
           "schema_version": 1,

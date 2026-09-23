@@ -305,8 +305,8 @@ CURRENT_APPROVED_BEHAVIOR_ADDITION_DIGESTS = {
     "template_source": "9870c8c3d83d1d5d79be733fa2baa39c5d3a7718b66504aeb46e556b30fe1edb",
     "unconfigured_template": "680b873da939d4ba6af8cc219e3750b0746549dbb41b5bdd62ae52144a6eed5b",
     "rendered_intake": "3b4ca31afaf86349ea5708de1aadd5ddad53be8f8d4cfd7b9c396ef6302aeb1f",
-    "gate_a_pending": "88dcebba43bda89219adfeb6e293e934504df5d2c1702189592a1e81ad974531",
-    "gate_a_approved": "91b67ba37ea5fc2b7f41510f6ceb1b543421c8a9aab87b963599605ffcb9666d",
+    "gate_a_pending": "73ec17d4d6b4e8688cf9f43f71893e846819347686e0076a4bbb319891595bd4",
+    "gate_a_approved": "dd0b3dd451f59233b26062b9f67c3fea736e0c9951a680c436ddfc5094000870",
     "gate_b_pending": "a4da066331f4870fba719b381eacb68e6ab36d89dc2414542f4df41440cd2a44",
     "gate_b_approved": "2ff1183d18cf510e7d3b713acef07650fa4931c7b4f71fb7e444985244aa5b8a",
 }
