@@ -55,6 +55,17 @@ def harness_status_parts(value: str) -> tuple[str, str | None]:
     return "INVALID", None
 
 
+def _harness_table(text: str):
+    """Keep command-container decoding at the Harness parser boundary."""
+
+    return contract_table_after_heading(
+        text,
+        HARNESS_HEADING,
+        HARNESS_HEADERS,
+        command_columns=("Exact command or API",),
+    )
+
+
 def derive_harness_contract(
     text: str,
     allowed_basis_ids: set[str],
@@ -66,7 +77,7 @@ def derive_harness_contract(
 
     issues: list[str] = []
     try:
-        table = contract_table_after_heading(text, HARNESS_HEADING, HARNESS_HEADERS)
+        table = _harness_table(text)
     except ValueError as exc:
         table = None
         issues.append(f"Harness Profile: {exc}")

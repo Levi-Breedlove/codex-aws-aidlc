@@ -178,9 +178,9 @@ the recovery promise for each dataset. Intentional exclusions have a reason.
 The technical plan then ties each acceptance outcome, input rule, interface,
 and recovery scenario to an exact check, time limit, and result location.
 
-Tasks carry those checks into construction. A task is complete only with current
-passing evidence for its own attempt and approved check. Release review also
-requires applicable local infrastructure checks against the release artifact.
+Tasks retain approved commands exactly, including quoted spaces. Completion
+requires current passing evidence for the task's own attempt and approved check.
+Release review checks applicable local infrastructure against the release artifact.
 Failures and prior results remain visible; a plan or old pass cannot stand in
 for a new observation. Local checks establish local confidence. AWS observations
 and any first-user pilot are separate, explicitly identified evidence.

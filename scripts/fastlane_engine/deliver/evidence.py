@@ -23,6 +23,8 @@ from ..core.contracts import (
     _parse_contract_table_lines,
     contract_table_after_heading,
     contract_table_in_section,
+    decode_command_cell,
+    fenced_command_payloads,
     parse_task_completion_evidence_cells,
     split_markdown_table_row,
     without_fenced_code,
@@ -146,29 +148,28 @@ VERIFICATION_MATRIX_HEADERS = (
 def fenced_command_lines(text: str) -> list[str]:
     """Return exact non-empty lines inside Markdown code fences."""
 
-    commands: list[str] = []
-    fence_character: str | None = None
-    fence_length = 0
-    for line in text.splitlines():
-        match = re.match(r"^[ \t]*(`{3,}|~{3,})", line)
-        if match:
-            marker = match.group(1)
-            if fence_character is None:
-                fence_character = marker[0]
-                fence_length = len(marker)
-            elif marker[0] == fence_character and len(marker) >= fence_length:
-                fence_character = None
-                fence_length = 0
-            continue
-        if fence_character is not None and line.strip():
-            commands.append(line.strip())
-    return commands
+    return fenced_command_payloads(text)
 
 
 def normalize_harness_command(value: str) -> str:
-    """Normalize insignificant whitespace without changing command tokens."""
+    """Preserve the exact payload already decoded at the Markdown boundary."""
 
-    return " ".join(clean_cell(value).split())
+    return value
+
+
+def _harness_cells(cells: Sequence[str], command_index: int) -> list[str]:
+    """Decode a Harness command once without changing other record columns."""
+
+    return [
+        decode_command_cell(cell) if index == command_index else clean_cell(cell)
+        for index, cell in enumerate(cells)
+    ]
+
+
+HARNESS_COMMAND_APPROVAL_MISMATCH_CORRECTION = (
+    "command/API does not match the approved Harness row; "
+    "rerun its exact command or return to the design-change process"
+)
 
 
 def harness_rows_equivalent(
@@ -224,12 +225,12 @@ def parse_harness_projection_rows(
     ):
         if not structural_line.strip().startswith("|"):
             break
-        cells = split_markdown_table_row(raw_line)
+        cells = split_markdown_table_row(raw_line, preserve_padding=True)
         if cells is None or len(cells) != len(HARNESS_HEADERS):
             raise ValueError(
                 f"{label}: Harness projection row must have exactly eight cells"
             )
-        row = HarnessExecutionRow(*(clean_cell(cell) for cell in cells))
+        row = HarnessExecutionRow(*_harness_cells(cells, 5))
         if HARNESS_ID.fullmatch(row.harness_id) is None:
             raise ValueError(f"{label}: invalid Harness ID {row.harness_id!r}")
         if row.harness_id in rows:
@@ -494,7 +495,8 @@ def validate_harness_projections(
             if not harness_rows_equivalent(observed, expected):
                 errors.append(
                     f"{task.task_id}: {harness_id} projection does not match "
-                    "the approved PRD Harness row after command normalization"
+                    "the approved PRD Harness row; copy its exact command or return "
+                    "to the design-change process"
                 )
             count = sum(
                 normalize_harness_command(command)
@@ -521,7 +523,7 @@ def parse_harness_evidence(text: str) -> list[HarnessEvidenceRow]:
 
     masked = without_fenced_code(text)
     headings = list(
-        re.finditer(r"^## Harness execution evidence[ \t]*$", masked, re.MULTILINE)
+        re.finditer(r"^## Harness execution evidence[ \t]*\r?$", masked, re.MULTILINE)
     )
     if len(headings) != 1:
         raise ValueError(
@@ -555,12 +557,12 @@ def parse_harness_evidence(text: str) -> list[HarnessEvidenceRow]:
     for line in lines[header_index + 2 :]:
         if not line.strip().startswith("|"):
             break
-        cells = split_markdown_table_row(line)
+        cells = split_markdown_table_row(line, preserve_padding=True)
         if cells is None or len(cells) != len(HARNESS_EVIDENCE_HEADERS):
             raise ValueError(
                 "VERIFY.md Harness execution evidence row must have exactly ten cells"
             )
-        row = HarnessEvidenceRow(*(clean_cell(cell) for cell in cells))
+        row = HarnessEvidenceRow(*_harness_cells(cells, 4))
         if re.fullmatch(r"EV-\d{4,}", row.evidence_id) is None:
             raise ValueError(
                 f"VERIFY.md Harness evidence has invalid Evidence ID {row.evidence_id!r}"
@@ -660,7 +662,7 @@ def validate_done_harness_evidence(
                 row.exact_command
             ) != normalize_harness_command(expected.exact_command):
                 raise ValueError(
-                    f"{label} command/API does not match the approved Harness row"
+                    f"{label} {HARNESS_COMMAND_APPROVAL_MISMATCH_CORRECTION}"
                 )
             observed_basis = set(
                 re.findall(

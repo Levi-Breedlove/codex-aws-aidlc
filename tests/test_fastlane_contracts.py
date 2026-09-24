@@ -5,6 +5,11 @@ import unittest
 from scripts import bootstrap_doctor as doctor
 from scripts import fastlane_contracts as contracts
 from scripts import task_waves
+from scripts.fastlane_engine import api
+from scripts.fastlane_engine.core.contracts import fenced_command_payloads
+from scripts.fastlane_engine.design.harness import HARNESS_HEADERS, HARNESS_HEADING
+from scripts.fastlane_engine.deliver import parse_harness_evidence
+from tests.test_task_waves import harness_evidence_document, harness_evidence_row
 
 
 TASK_HEADERS = " | ".join(contracts.TASK_COMPLETION_EVIDENCE_HEADERS)
@@ -70,6 +75,88 @@ def checkpoint_row(
 
 
 class SharedMarkdownGrammarTests(unittest.TestCase):
+    def test_command_payload_round_trip_through_prd_task_fence_and_evidence(
+        self,
+    ) -> None:
+        commands = (
+            'python -c "a  b"',
+            'python -c "a\tb"',
+            'python -c "a\u00a0b"',
+            'python -c "a|b"',
+            r'python -c "C:\\work\file"',
+            'pwsh -Command "Write-Output `"a`""',
+            "python -m unittest\u00a0",
+            "python -m unittest ",
+        )
+        for command in commands:
+            for newline in ("\n", "\r\n"):
+                with self.subTest(command=command, newline=repr(newline)):
+                    encoded = (
+                        "`" + command.replace("\\", "\\\\").replace("|", "\\|") + "`"
+                    )
+                    values = (
+                        "HARNESS-001",
+                        "Unit",
+                        "Python unittest",
+                        "Before completion",
+                        "REQ-0001, DES-0001, TECH-0001",
+                        encoded,
+                        "docs/project/VERIFY.md#harness-execution-evidence",
+                        "REQUIRED",
+                    )
+                    table = newline.join(
+                        (
+                            "| " + " | ".join(HARNESS_HEADERS) + " |",
+                            "|" + "---|" * len(HARNESS_HEADERS),
+                            "|\t" + "\t|\t".join(values) + "\t|",
+                        )
+                    )
+                    prd, issues = doctor.derive_harness_contract(
+                        HARNESS_HEADING + newline * 2 + table,
+                        {"REQ-0001", "DES-0001", "TECH-0001"},
+                        required=True,
+                        grandfather_approved_v1=False,
+                    )
+                    expected_issues = (
+                        [
+                            "HARNESS-001: Exact command or API must be one concrete command"
+                        ]
+                        if command in commands[3:6]
+                        else []
+                    )
+                    self.assertEqual(issues, expected_issues)
+                    self.assertEqual(prd.rows[0].exact_command, command)
+                    projected, present = api.parse_task_harness_projection(
+                        table, "TASK-001"
+                    )
+                    self.assertTrue(present)
+                    self.assertEqual(projected["HARNESS-001"].exact_command, command)
+                    fenced = newline.join(("  ~~~powershell", "  " + command, "  ~~~~"))
+                    self.assertEqual(fenced_command_payloads(fenced), [command])
+                    evidence = harness_evidence_document(
+                        harness_evidence_row(
+                            evidence_id="EV-2002",
+                            status="LOCAL_PASS",
+                            layer="Unit",
+                            observed_at="2026-07-17T00:01:00+00:00",
+                            observed_result="exit=0",
+                            command=encoded,
+                        )
+                    ).replace("\n", newline)
+                    self.assertEqual(
+                        parse_harness_evidence(evidence)[0].exact_command, command
+                    )
+
+    def test_fence_extraction_preserves_literal_markers_and_requires_closure(
+        self,
+    ) -> None:
+        payload = '`python -c "a  b"`\u00a0'
+        self.assertEqual(fenced_command_payloads(f"```text\n{payload}\n```"), [payload])
+        self.assertEqual(fenced_command_payloads(f"```text\n{payload}"), [])
+        self.assertEqual(
+            fenced_command_payloads("~~~~text\n```\n~~~\n~~~~"), ["```", "~~~"]
+        )
+
     def test_fence_masking_accepts_longer_matching_closer(self) -> None:
         source = (
             "before\r\n"

@@ -871,10 +871,15 @@ class PromptPackContractTests(unittest.TestCase):
         self.assertLessEqual(len(self.prompts.encode("utf-8")), 32 * 1024)
 
     def test_manifest_and_customer_navigation_match_the_current_product(self) -> None:
-        self.assertEqual(self.manifest["bootstrap_version"], "1.4.3")
-        self.assertIn("**Pack version:** 1.4.3", self.prompts)
-        self.assertIn("[![Release v1.4.3]", self.readme)
+        self.assertEqual(self.manifest["bootstrap_version"], "1.4.4")
+        self.assertIn("**Pack version:** 1.4.4", self.prompts)
+        self.assertIn("[![Release v1.4.4]", self.readme)
         self.assertNotIn("Current customer build:", self.readme)
+        self.assertIn("[Current alpha release]", self.readme)
+        self.assertNotIn("/releases/latest", self.readme)
+        self.assertIn("protected customer branch `fast-lane`", self.security)
+        self.assertNotIn("1.3.5", self.security)
+        self.assertIn("preserves the 1.0.5 predecessor", self.security)
         self.assertIn(
             "https://github.com/Levi-Breedlove/codex-aws-aidlc/generate",
             self.readme,

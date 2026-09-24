@@ -14,6 +14,7 @@ from datetime import datetime
 
 from ..core.contracts import (
     SHELL_CONTROL,
+    fenced_command_payloads,
     parse_task_external_state,
     parse_task_write_set,
     path_boundaries_overlap,
@@ -235,22 +236,15 @@ def parse_command_prefixes(value: str) -> list[str]:
 
 
 def validation_commands(section: str, task_id: str) -> list[str]:
-    fences = re.findall(
-        r"^```[^\r\n]*\r?\n(.*?)^```\s*$", section, re.MULTILINE | re.DOTALL
-    )
     commands: list[str] = []
-    for body in fences:
-        for raw_line in body.splitlines():
-            command = raw_line.strip()
-            if not command or command.startswith("#"):
-                continue
-            if command.startswith("$ "):
-                command = command[2:].strip()
-            if SHELL_CONTROL.search(command):
-                raise ValueError(
-                    f"{task_id}: Validation command contains shell-control syntax"
-                )
-            commands.append(command)
+    for command in fenced_command_payloads(section):
+        if command.lstrip(" \t").startswith("#"):
+            continue
+        if SHELL_CONTROL.search(command):
+            raise ValueError(
+                f"{task_id}: Validation command contains shell-control syntax"
+            )
+        commands.append(command)
     if not commands:
         raise ValueError(f"{task_id}: Validation requires at least one fenced command")
     return commands

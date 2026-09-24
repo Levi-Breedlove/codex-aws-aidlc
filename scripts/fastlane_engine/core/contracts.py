@@ -95,7 +95,9 @@ def without_fenced_code(text: str) -> str:
     return "".join(result)
 
 
-def split_markdown_table_row(line: str) -> list[str] | None:
+def split_markdown_table_row(
+    line: str, *, preserve_padding: bool = False
+) -> list[str] | None:
     """Split a pipe table row while honoring escaped pipes and backslashes."""
 
     stripped = line.strip()
@@ -116,13 +118,51 @@ def split_markdown_table_row(line: str) -> list[str] | None:
             index += 2
             continue
         if character == "|":
-            cells.append("".join(current).strip())
+            cells.append("".join(current))
             current = []
         else:
             current.append(character)
         index += 1
-    cells.append("".join(current).strip())
-    return cells
+    cells.append("".join(current))
+    return cells if preserve_padding else [cell.strip() for cell in cells]
+
+
+def decode_command_cell(value: str) -> str:
+    """Decode only table padding and one wrapper; payload whitespace is exact."""
+
+    value = value.strip(" \t")
+    if len(value) >= 2 and value.startswith("`") and value.endswith("`"):
+        return value[1:-1]
+    return value
+
+
+def fenced_command_payloads(text: str) -> list[str]:
+    """Preserve command bytes after fence framing and its own indentation."""
+
+    commands: list[str] = []
+    pending: list[str] = []
+    marker = ""
+    indent = ""
+    for line in text.replace("\r\n", "\n").split("\n"):
+        match = re.match(r"^([ \t]*)(`{3,}|~{3,})(.*)$", line)
+        if not marker:
+            if match:
+                indent, marker = match.group(1, 2)
+                pending = []
+            continue
+        if (
+            match
+            and match.group(2)[0] == marker[0]
+            and len(match.group(2)) >= len(marker)
+            and not match.group(3).strip(" \t")
+        ):
+            commands.extend(pending)
+            marker = ""
+            continue
+        payload = line[len(indent) :] if line.startswith(indent) else line
+        if payload.strip(" \t"):
+            pending.append(payload)
+    return commands
 
 
 def split_table_row(line: str) -> list[str]:
@@ -154,16 +194,28 @@ def _canonical_contract_table(raw_lines: list[str]) -> bytes:
 
 
 def _parse_contract_table_lines(
-    raw_lines: list[str], expected_headers: tuple[str, ...]
+    raw_lines: list[str],
+    expected_headers: tuple[str, ...],
+    *,
+    command_columns: tuple[str, ...] = (),
 ) -> ContractTable:
     if len(raw_lines) < 2:
         raise ValueError("Markdown contract table requires a header and separator")
     parsed: list[tuple[str, ...]] = []
-    for raw_line in raw_lines:
-        cells = split_markdown_table_row(raw_line)
+    for row_index, raw_line in enumerate(raw_lines):
+        cells = split_markdown_table_row(raw_line, preserve_padding=True)
         if cells is None:
             raise ValueError("Malformed Markdown contract table row")
-        parsed.append(tuple(clean_cell(cell) for cell in cells))
+        parsed.append(
+            tuple(
+                decode_command_cell(cell)
+                if row_index >= 2
+                and index < len(expected_headers)
+                and expected_headers[index] in command_columns
+                else clean_cell(cell)
+                for index, cell in enumerate(cells)
+            )
+        )
     if parsed[0] != expected_headers:
         raise ValueError(
             "Contract table headers must be exactly: " + " | ".join(expected_headers)
@@ -215,7 +267,11 @@ def _heading_section_lines(
 
 
 def contract_table_after_heading(
-    text: str, heading: str, expected_headers: tuple[str, ...]
+    text: str,
+    heading: str,
+    expected_headers: tuple[str, ...],
+    *,
+    command_columns: tuple[str, ...] = (),
 ) -> ContractTable | None:
     """Return the first exact table in one uniquely identified heading section."""
 
@@ -238,7 +294,9 @@ def contract_table_after_heading(
         if not structural_line.strip().startswith("|"):
             break
         raw_lines.append(line)
-    return _parse_contract_table_lines(raw_lines, expected_headers)
+    return _parse_contract_table_lines(
+        raw_lines, expected_headers, command_columns=command_columns
+    )
 
 
 def contract_table_in_section(
