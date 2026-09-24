@@ -108,6 +108,9 @@ controls continue to govern Fastlane. See [Optional Fastlane hooks](../.codex/ho
 
 Ask Codex to explain the current validation plan. It will show the exact check,
 time limit, result location, and any mismatch with the approved command boundary.
+Commands must match the approved text, including spaces inside quotes. Ask Codex
+to restore the approved command and rerun it; if the command needs to change,
+review that change through the existing design step. Keep prior evidence intact.
 It can also produce a read-only diagnostic:
 
 ```text

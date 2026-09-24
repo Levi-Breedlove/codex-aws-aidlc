@@ -551,6 +551,78 @@ class Design8ContractTests(unittest.TestCase):
             issues,
         )
 
+    def test_dependency_command_identity_preserves_quoted_whitespace(self) -> None:
+        source = complete_design8().replace(
+            doctor.DEPENDENCY_ACQUISITION_NONE, dependency_table(), 1
+        )
+        design, issues = self.derive(source)
+        self.assertEqual(issues, [])
+        extension = design.project_contract.design_v8
+        approved = extension.dependency_additions[0].exact_acquisition_command
+        self.assertTrue(dependency_command_allowed(extension, approved))
+        for changed in (
+            approved.replace("ruff @ ", "ruff  @ ", 1),
+            approved.replace("ruff @ ", "ruff\t@ ", 1),
+            approved.replace("ruff @ ", "ruff\u00a0@ ", 1),
+            approved.replace("python -m", "python  -m", 1),
+            approved.replace("python -m", "python\t-m", 1),
+            approved.replace("python -m", "python\u00a0-m", 1),
+            approved + "\u00a0",
+        ):
+            with self.subTest(command=changed):
+                self.assertFalse(dependency_command_allowed(extension, changed))
+                codes = [
+                    code
+                    for code, _ in task_command_boundary_issues(
+                        "TASK-001",
+                        f"```powershell\n{changed}\n```",
+                        ("python",),
+                        9,
+                        extension,
+                    )
+                ]
+                self.assertIn("TASK_DEPENDENCY_ACQUISITION_BOUNDARY", codes)
+
+    def test_dependency_policy_parser_does_not_repair_an_invalid_quoted_argument(
+        self,
+    ) -> None:
+        approved = dependency_table().splitlines()[-1].split(" | ")[-2]
+        for spacing in ("  ", "\t", "\u00a0"):
+            changed = approved.replace("ruff @ ", "ruff" + spacing + "@ ", 1)
+            with self.subTest(spacing=repr(spacing)):
+                source = complete_design8().replace(
+                    doctor.DEPENDENCY_ACQUISITION_NONE,
+                    dependency_table(**{"Exact acquisition command": changed}),
+                    1,
+                )
+                design, issues = self.derive(source)
+                self.assertEqual(design.status, "BLOCKED")
+                self.assertIn(
+                    "DEPENDENCY_POLICY_INVALID: DEP-001 requires the exact wheel command",
+                    issues,
+                )
+                self.assertEqual(
+                    design.project_contract.design_v8.dependency_additions[
+                        0
+                    ].exact_acquisition_command,
+                    changed,
+                )
+
+    def test_dependency_default_deny_recognizes_spacing_variants(self) -> None:
+        denied, issues = self.derive(complete_design8())
+        self.assertEqual(issues, [])
+        for command in (
+            "python  -m pip install package",
+            "npm\tinstall package",
+            "uv\u00a0sync",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(
+                    dependency_command_allowed(
+                        denied.project_contract.design_v8, command
+                    )
+                )
+
     def test_exact_approved_design7_digest_is_compatible_but_partial_is_not(
         self,
     ) -> None:

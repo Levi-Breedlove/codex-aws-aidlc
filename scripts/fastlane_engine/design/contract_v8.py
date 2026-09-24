@@ -168,9 +168,13 @@ def _table(
     headers: tuple[str, ...],
     code: str,
     issues: list[str],
+    *,
+    command_columns: tuple[str, ...] = (),
 ) -> ContractTable | None:
     try:
-        table = contract_table_after_heading(text, heading, headers)
+        table = contract_table_after_heading(
+            text, heading, headers, command_columns=command_columns
+        )
     except ValueError as exc:
         issues.append(f"{code}: {exc}")
         return None
@@ -654,6 +658,7 @@ def _dependency_policy(
         DEPENDENCY_POLICY_HEADERS,
         "DEPENDENCY_POLICY_MISSING",
         issues,
+        command_columns=("Exact acquisition command",),
     )
     if table is None:
         return (), None, True
@@ -815,15 +820,17 @@ def project_design_is_uninitialized(
 
 
 def canonical_command(command: str) -> str:
-    """Return the policy's whitespace-stable command identity."""
+    """Return the exact payload already decoded at the Markdown boundary."""
 
-    return re.sub(r"\s+", " ", clean_cell(command)).strip()
+    return command
 
 
 def is_dependency_acquisition_command(command: str) -> bool:
     """Recognize commands that can add, resolve, update, or fetch dependencies."""
 
-    return DEPENDENCY_COMMAND.search(canonical_command(command)) is not None
+    # Recognition stays conservative; this lossy view never establishes approval.
+    recognition = re.sub(r"\s+", " ", clean_cell(command)).strip()
+    return DEPENDENCY_COMMAND.search(recognition) is not None
 
 
 def dependency_command_allowed(extension: Design8Extension, command: str) -> bool:

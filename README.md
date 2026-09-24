@@ -2,7 +2,7 @@
 
 > Spec-driven software and AWS delivery with Codex.
 
-[![Release v1.4.3](https://img.shields.io/badge/release-v1.4.3-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.3)
+[![Release v1.4.4](https://img.shields.io/badge/release-v1.4.4-0969da)](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.4)
 ![Python requirement: 3.11 or newer](https://img.shields.io/badge/python-%E2%89%A53.11-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2da44e)](LICENSE)
 
@@ -121,6 +121,6 @@ See the [security policy](SECURITY.md) for reporting, credentials, privacy, hook
 - [Project record guide](docs/project/README.md) — the durable project handoff
 - [Troubleshooting](docs/TROUBLESHOOTING.md) — read-only diagnostics and safe recovery from blockers
 - [Security](SECURITY.md) — trust, privacy, credentials, hooks, and vulnerability reporting
-- [Latest release](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/latest) — exact package evidence and assets
+- [Current alpha release](https://github.com/Levi-Breedlove/codex-aws-aidlc/releases/tag/v1.4.4) — exact package evidence and assets
 
 Licensed under the [MIT License](LICENSE).

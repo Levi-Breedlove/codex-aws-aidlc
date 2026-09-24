@@ -84,6 +84,11 @@ and validate it with `scripts/model_roleplay_eval.py`.
 
 ## Exact-head closure
 
+Alpha packages use GitHub prereleases with an explicit versioned release link.
+Keep the title, prerelease flag, tag, package version, assets, and customer download
+link aligned; GitHub's latest-release discovery excludes prereleases. A metadata
+correction preserves existing tags and asset bytes and requires provider readback.
+
 Run the deterministic checks above on the exact candidate in one clean,
 supported local or Codespaces environment and record the observed operating
 system and Python version. Hosted CI, operating-system matrices, and

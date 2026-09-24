@@ -1539,6 +1539,108 @@ Not started.
             errors,
         )
 
+    def test_harness_command_identity_is_exact_at_every_boundary(self) -> None:
+        def cell(command: str) -> str:
+            return "`" + command.replace("\\", "\\\\").replace("|", "\\|") + "`"
+
+        pairs = (
+            ('python -c "a  b"', 'python -c "a b"'),
+            ('python -c "a\tb"', 'python -c "a b"'),
+            ('python -c "a\u00a0b"', 'python -c "a b"'),
+            ("python -c 'a  b'", "python -c 'a b'"),
+            ('python -c "a\\\\b"', 'python -c "a\\b"'),
+            ('python -c "a|b"', 'python -c "a&b"'),
+            ('python -c "a\\"b"', 'python -c "a"b"'),
+            ('pwsh -Command "Write-Output `"a`""', 'pwsh -Command "Write-Output a"'),
+            ("python  -m unittest", "python -m unittest"),
+            ("python -m unittest\u00a0", "python -m unittest"),
+        )
+        for approved_command, changed in pairs:
+            approved = harness_execution_values(command=approved_command)[1]
+            for boundary in ("projection", "fence", "evidence"):
+                for mutate in (False, True):
+                    with self.subTest(
+                        command=approved_command, boundary=boundary, mutate=mutate
+                    ):
+                        projected = (
+                            changed
+                            if mutate and boundary == "projection"
+                            else approved_command
+                        )
+                        fenced = (
+                            changed
+                            if mutate and boundary in {"projection", "fence"}
+                            else approved_command
+                        )
+                        observed = (
+                            changed
+                            if mutate and boundary == "evidence"
+                            else approved_command
+                        )
+                        row = harness_execution_values(command=cell(projected))[0]
+                        task = task_waves.parse_tasks(
+                            task_block(
+                                "TASK-001",
+                                "DONE",
+                                evidence="EV-2002",
+                                validation_command=fenced,
+                                harness_projection_rows=(row,),
+                            )
+                        )[0]
+                        if boundary != "evidence":
+                            errors = task_waves.validate_harness_projections(
+                                [task],
+                                {approved.harness_id: approved},
+                                current_plan=True,
+                            )
+                            self.assertEqual(bool(errors), mutate, errors)
+                        else:
+                            ledger = harness_evidence_document(
+                                harness_evidence_row(
+                                    evidence_id="EV-2002",
+                                    status="LOCAL_PASS",
+                                    observed_at="2026-07-17T00:01:00+00:00",
+                                    observed_result="exit=0; synthetic check passed",
+                                    command=cell(observed),
+                                )
+                            )
+                            args = (
+                                ledger,
+                                task,
+                                task_waves.parse_snapshot(document([task.block])),
+                                {approved.harness_id: approved},
+                            )
+                            if mutate:
+                                with self.assertRaisesRegex(
+                                    ValueError, "command/API does not match"
+                                ):
+                                    task_waves.validate_done_harness_evidence(*args)
+                            else:
+                                task_waves.validate_done_harness_evidence(*args)
+
+    def test_fenced_harness_payload_is_not_inline_markdown(self) -> None:
+        row, approved = harness_execution_values()
+        for command in (
+            f"`{approved.exact_command}`",
+            approved.exact_command + "\u00a0",
+            approved.exact_command + " ",
+        ):
+            with self.subTest(command=command):
+                tasks = task_waves.parse_tasks(
+                    task_block(
+                        "TASK-001",
+                        "READY",
+                        validation_command=command,
+                        harness_projection_rows=(row,),
+                    )
+                )
+                errors = task_waves.validate_harness_projections(
+                    tasks, {approved.harness_id: approved}, current_plan=True
+                )
+                self.assertTrue(
+                    any("unchanged exactly once" in error for error in errors), errors
+                )
+
     def test_harness_done_requires_latest_pass_and_preserves_failure(self) -> None:
         row, approved_row = harness_execution_values()
         failed = harness_evidence_row(
@@ -1584,6 +1686,85 @@ Not started.
             harness_evidence_document(failed, passed)
         )
         self.assertEqual([item.status for item in parsed], ["FAILED", "LOCAL_PASS"])
+
+    def test_harness_changed_completion_command_is_rejected_atomically(self) -> None:
+        command = 'python -c "a  b"'
+        row, approved = harness_execution_values(command=command)
+        contract = task_waves.ApprovedTaskContract(
+            frozenset({"TECH-0001"}),
+            {},
+            {approved.harness_id: approved},
+        )
+        text = observed_task_text(
+            document(
+                [
+                    task_block(
+                        "TASK-001",
+                        "IN_PROGRESS",
+                        owner="lead",
+                        validation_command=command,
+                        harness_projection_rows=(row,),
+                    )
+                ],
+                snapshot_text=snapshot(
+                    run_state="RUNNING", run_id="RUN-0001", coordinator="lead"
+                ),
+            )
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path, state_path = write_task_project(root, text)
+            original = path.read_bytes(), state_path.read_bytes()
+            generic = completion_evidence_document(
+                completion_evidence_row(
+                    evidence_id="EV-2002",
+                    command_or_observation=command,
+                    observed_at="2026-07-17T00:01:00+00:00",
+                )
+            )
+            for observed in ('python -c "a b"', command):
+                path.with_name("VERIFY.md").write_text(
+                    generic
+                    + harness_evidence_document(
+                        harness_evidence_row(
+                            evidence_id="EV-2002",
+                            status="LOCAL_PASS",
+                            observed_at="2026-07-17T00:01:00+00:00",
+                            observed_result="exit=0",
+                            command=observed,
+                        )
+                    ),
+                    encoding="utf-8",
+                )
+                # Inject only the observed approval; all validation and writes stay real.
+                with mock.patch.object(
+                    task_waves, "approved_contract_for_tasks", return_value=contract
+                ):
+                    arguments = dict(
+                        coordinator="lead",
+                        status="DONE",
+                        evidence="EV-2002",
+                        run_id="RUN-0001",
+                        checkpoint="CP-0002",
+                    )
+                    if observed != command:
+                        with self.assertRaisesRegex(
+                            ValueError, "command/API does not match"
+                        ):
+                            task_waves.update_task_file(path, "TASK-001", **arguments)
+                        self.assertEqual(
+                            (path.read_bytes(), state_path.read_bytes()), original
+                        )
+                    else:
+                        self.assertTrue(
+                            task_waves.update_task_file(path, "TASK-001", **arguments)
+                        )
+                        self.assertEqual(
+                            task_waves.parse_tasks(path.read_text(encoding="utf-8"))[
+                                0
+                            ].status,
+                            "DONE",
+                        )
 
     def test_property_execution_rejects_sentinels_and_prose_commands(self) -> None:
         headers = (
